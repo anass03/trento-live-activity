@@ -1,0 +1,27 @@
+#Dependencies
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+
+#Environment
+.env
+.env.local
+.env.*.local
+
+#Claude Code - personal files (each colaborator has its own local preferences)
+CLAUDE.local.md
+.claude/settings.local.json
+
+#Build
+dist/
+build/
+*.egg-info/
+
+#OS
+.DS_Store
+Thumbs.db
+
+#IDE
+.vscode/
+.idea/
