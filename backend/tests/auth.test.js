@@ -8,6 +8,10 @@ jest.mock('../src/data/models', () => ({
   },
 }));
 
+jest.mock('../src/notifications/email.service', () => ({
+  sendPasswordReset: jest.fn().mockResolvedValue(undefined),
+}));
+
 const { User } = require('../src/data/models');
 
 process.env.JWT_SECRET = 'test-secret';
@@ -108,5 +112,68 @@ describe('Auth Service — login', () => {
 
     await expect(authService.login({ email: validUserData.email, password: 'Password123' }))
       .rejects.toMatchObject({ code: '2FA_REQUIRED' });
+  });
+});
+
+describe('Auth Service — password reset (RF8)', () => {
+  const { sendPasswordReset } = require('../src/notifications/email.service');
+
+  beforeEach(() => jest.clearAllMocks());
+
+  test('TC-AUTH-10: sends reset email for existing user', async () => {
+    const fakeUser = makeFakeUser({ update: jest.fn() });
+    User.findOne.mockResolvedValue(fakeUser);
+
+    await authService.forgotPassword(validUserData.email);
+
+    expect(fakeUser.update).toHaveBeenCalledWith(expect.objectContaining({
+      passwordResetToken: expect.any(String),
+      passwordResetExpires: expect.any(Date),
+    }));
+    expect(sendPasswordReset).toHaveBeenCalledWith(validUserData.email, expect.any(String));
+  });
+
+  test('TC-AUTH-11: silently succeeds for unknown email (no enumeration)', async () => {
+    User.findOne.mockResolvedValue(null);
+    await expect(authService.forgotPassword('nobody@example.com')).resolves.toBeUndefined();
+    expect(sendPasswordReset).not.toHaveBeenCalled();
+  });
+
+  test('TC-AUTH-12: resets password with valid token', async () => {
+    const crypto = require('crypto');
+    const rawToken = 'validrawtoken123';
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const fakeUser = makeFakeUser({
+      passwordResetToken: tokenHash,
+      passwordResetExpires: new Date(Date.now() + 30 * 60 * 1000),
+      update: jest.fn(),
+    });
+    User.findOne.mockResolvedValue(fakeUser);
+
+    await authService.resetPassword(rawToken, 'NewPassword123');
+    expect(fakeUser.update).toHaveBeenCalledWith(expect.objectContaining({
+      passwordResetToken: null,
+      passwordResetExpires: null,
+    }));
+  });
+
+  test('TC-AUTH-13: rejects expired reset token', async () => {
+    const crypto = require('crypto');
+    const rawToken = 'expiredtoken';
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const fakeUser = makeFakeUser({
+      passwordResetToken: tokenHash,
+      passwordResetExpires: new Date(Date.now() - 1000), // already expired
+      update: jest.fn(),
+    });
+    User.findOne.mockResolvedValue(fakeUser);
+
+    await expect(authService.resetPassword(rawToken, 'NewPassword123'))
+      .rejects.toMatchObject({ code: 'TOKEN_INVALID' });
+  });
+
+  test('TC-AUTH-14: rejects weak password on reset', async () => {
+    await expect(authService.resetPassword('anytoken', 'short'))
+      .rejects.toMatchObject({ code: 'WEAK_PASSWORD' });
   });
 });
