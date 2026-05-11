@@ -1,0 +1,27 @@
+const service = require('./map.service');
+
+async function getMap(req, res, next) {
+  try { res.json(await service.getMapData()); } catch (e) { next(e); }
+}
+
+async function listPOIs(req, res, next) {
+  try { res.json(await service.listPOIs(req.query)); } catch (e) { next(e); }
+}
+
+async function getPOI(req, res, next) {
+  try { res.json(await service.getPOI(req.params.id)); } catch (e) { next(e); }
+}
+
+async function createPOI(req, res, next) {
+  try { res.status(201).json(await service.createPOI(req.body)); } catch (e) { next(e); }
+}
+
+async function updatePOI(req, res, next) {
+  try { res.json(await service.updatePOI(req.params.id, req.body)); } catch (e) { next(e); }
+}
+
+async function deletePOI(req, res, next) {
+  try { await service.deletePOI(req.params.id); res.status(204).send(); } catch (e) { next(e); }
+}
+
+module.exports = { getMap, listPOIs, getPOI, createPOI, updatePOI, deletePOI };
