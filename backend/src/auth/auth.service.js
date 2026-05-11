@@ -1,7 +1,9 @@
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const speakeasy = require('speakeasy');
 const { User } = require('../data/models');
+const { sendPasswordReset } = require('../notifications/email.service');
 
 function calcAge(dataNascita) {
   const today = new Date();
@@ -26,6 +28,8 @@ function sanitize(user) {
   const obj = user.toJSON ? user.toJSON() : { ...user };
   delete obj.passwordHash;
   delete obj.twoFactorSecret;
+  delete obj.passwordResetToken;
+  delete obj.passwordResetExpires;
   return obj;
 }
 
@@ -133,4 +137,33 @@ async function verify2fa(userId, token) {
   return { message: '2FA enabled successfully' };
 }
 
-module.exports = { register, login, getMe, updateProfile, deleteAccount, setup2fa, verify2fa };
+async function forgotPassword(email) {
+  const user = await User.findOne({ where: { email } });
+  // Always return success to avoid user enumeration attacks
+  if (!user || !user.passwordHash) return;
+
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+  const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+  await user.update({ passwordResetToken: tokenHash, passwordResetExpires: expires });
+  await sendPasswordReset(email, rawToken);
+}
+
+async function resetPassword(rawToken, newPassword) {
+  if (!newPassword || newPassword.length < 8) {
+    throw { status: 400, code: 'WEAK_PASSWORD', error: 'Password must be at least 8 characters' };
+  }
+
+  const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+  const user = await User.findOne({ where: { passwordResetToken: tokenHash } });
+
+  if (!user || !user.passwordResetExpires || user.passwordResetExpires < new Date()) {
+    throw { status: 400, code: 'TOKEN_INVALID', error: 'Reset token is invalid or has expired' };
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+  await user.update({ passwordHash, passwordResetToken: null, passwordResetExpires: null });
+}
+
+module.exports = { register, login, getMe, updateProfile, deleteAccount, setup2fa, verify2fa, forgotPassword, resetPassword };

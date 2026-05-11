@@ -49,4 +49,18 @@ async function verify2fa(req, res, next) {
   } catch (e) { next(e); }
 }
 
-module.exports = { register, login, getMe, updateProfile, deleteAccount, setup2fa, verify2fa };
+async function forgotPassword(req, res, next) {
+  try {
+    await service.forgotPassword(req.body.email);
+    res.json({ message: 'If that email is registered, a reset link has been sent' });
+  } catch (e) { next(e); }
+}
+
+async function resetPassword(req, res, next) {
+  try {
+    await service.resetPassword(req.params.token, req.body.password);
+    res.json({ message: 'Password updated successfully' });
+  } catch (e) { next(e); }
+}
+
+module.exports = { register, login, getMe, updateProfile, deleteAccount, setup2fa, verify2fa, forgotPassword, resetPassword };
