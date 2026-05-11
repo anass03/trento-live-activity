@@ -29,6 +29,9 @@ module.exports = (sequelize) => {
     // AmministratoreDiSistema only
     twoFactorSecret: { type: DataTypes.STRING, allowNull: true },
     twoFactorEnabled: { type: DataTypes.BOOLEAN, defaultValue: false },
+    // Password reset (RF8)
+    passwordResetToken: { type: DataTypes.STRING, allowNull: true },
+    passwordResetExpires: { type: DataTypes.DATE, allowNull: true },
   }, {
     tableName: 'users',
     timestamps: true,
