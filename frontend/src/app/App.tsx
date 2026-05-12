@@ -55,12 +55,12 @@ export function App() {
   return (
     <AppShell user={user}>
       <Routes>
-        <Route path="/" element={<MapPage />} />
-        <Route path="/attivita" element={<ActivitiesPage />} />
+        <Route path="/" element={<MapPage user={user} />} />
+        <Route path="/attivita" element={<ActivitiesPage userInterests={user.interessi} />} />
         <Route path="/attivita/:id" element={<ActivityDetailPage />} />
-        <Route path="/eventi" element={<EventsPage />} />
-        <Route path="/eventi/:id" element={<EventDetailPage />} />
-        <Route path="/eventi-certificati" element={<EventsPage certifiedOnly />} />
+        <Route path="/eventi" element={<EventsPage user={user} />} />
+        <Route path="/eventi/:id" element={<EventDetailPage user={user} />} />
+        <Route path="/eventi-certificati" element={<EventsPage user={user} certifiedOnly />} />
 
         <Route path="/login" element={<LoginPage />} />
         <Route path="/registrazione" element={<RegistrationPage />} />

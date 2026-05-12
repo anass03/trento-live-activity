@@ -1,16 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getEvents, type ApiEvent } from '../lib/api';
+import { getEventCalendarUrl, getEvents, getToken, reportEvent, type ApiEvent } from '../lib/api';
+import type { AppUser } from '../data/mockUser';
 
 function formatDateTime(value: string | null) {
   if (!value) return 'Data da definire';
   return new Intl.DateTimeFormat('it-IT', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
 }
 
-export function EventsPage({ certifiedOnly = false }: { certifiedOnly?: boolean }) {
+const REPORT_TYPES = ['contenuto_inappropriato', 'spam', 'disinformazione', 'altro'];
+
+export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: boolean; user?: AppUser }) {
   const [events, setEvents] = useState<ApiEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reportingId, setReportingId] = useState<string | null>(null);
+  const [reportTipo, setReportTipo] = useState(REPORT_TYPES[0]);
+  const [reportMsg, setReportMsg] = useState<{ id: string; ok: boolean; text: string } | null>(null);
+
+  const isLoggedIn = !!getToken() && user?.role !== 'anonymous';
+  const hasInterests = Array.isArray(user?.interessi) && (user!.interessi!.length ?? 0) > 0;
 
   async function loadEvents() {
     setIsLoading(true);
@@ -24,21 +33,36 @@ export function EventsPage({ certifiedOnly = false }: { certifiedOnly?: boolean 
     }
   }
 
-  useEffect(() => {
-    void loadEvents();
-  }, []);
+  useEffect(() => { void loadEvents(); }, []);
 
   const visibleEvents = useMemo(
-    () => events.filter((event) => !certifiedOnly || event.isCertified),
-    [certifiedOnly, events],
+    () => events.filter((event) => {
+      if (certifiedOnly && !event.isCertified) return false;
+      if (hasInterests && user?.interessi && event.category) {
+        return user.interessi.includes(event.category);
+      }
+      return true;
+    }),
+    [certifiedOnly, events, hasInterests, user],
   );
+
+  async function submitReport(eventId: string) {
+    try {
+      await reportEvent(eventId, reportTipo);
+      setReportMsg({ id: eventId, ok: true, text: 'Segnalazione inviata.' });
+    } catch (e) {
+      setReportMsg({ id: eventId, ok: false, text: e instanceof Error ? e.message : 'Errore' });
+    } finally {
+      setReportingId(null);
+    }
+  }
 
   return (
     <section className="data-page">
       <header className="utility-strip glass-card">
         <div>
           <h1>{certifiedOnly ? 'Eventi certificati' : 'Eventi'}</h1>
-          <p>Dati caricati dal database PostgreSQL tramite API backend</p>
+          <p>{hasInterests ? `Filtrati per i tuoi interessi: ${user?.interessi?.join(', ')}` : 'Dati caricati dal database PostgreSQL tramite API backend'}</p>
         </div>
         <button className="refresh-button" onClick={loadEvents} type="button">Aggiorna</button>
       </header>
@@ -64,16 +88,31 @@ export function EventsPage({ certifiedOnly = false }: { certifiedOnly?: boolean 
               <h2>{event.title}</h2>
               <p>{event.description || 'Nessuna descrizione disponibile.'}</p>
               <dl>
-                <div>
-                  <dt>Luogo</dt>
-                  <dd>{event.location || 'Non specificato'}</dd>
-                </div>
-                <div>
-                  <dt>Quando</dt>
-                  <dd>{formatDateTime(event.dateTime)}</dd>
-                </div>
+                <div><dt>Luogo</dt><dd>{event.location || 'Non specificato'}</dd></div>
+                <div><dt>Quando</dt><dd>{formatDateTime(event.dateTime)}</dd></div>
               </dl>
-              <Link className="detail-link" to={`/eventi/${event.id}`}>Apri dettagli</Link>
+              {event.dateTime && (
+                <a href={getEventCalendarUrl(event.id)} download={`${event.title}.ics`} style={{ fontSize: 12, color: 'var(--color-text-secondary)', textDecoration: 'none' }}>📅 Aggiungi al calendario</a>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
+                <Link className="detail-link" to={`/eventi/${event.id}`}>Apri dettagli</Link>
+                {isLoggedIn && reportMsg?.id !== event.id && (
+                  reportingId === event.id ? (
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <select value={reportTipo} onChange={(e) => setReportTipo(e.target.value)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--color-glass-border)', color: 'inherit', borderRadius: 6, padding: '4px 8px', font: 'inherit', fontSize: 12 }}>
+                        {REPORT_TYPES.map((t) => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
+                      </select>
+                      <button className="danger-button" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => submitReport(event.id)}>Invia</button>
+                      <button onClick={() => setReportingId(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--color-text-secondary)' }}>✕</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => { setReportingId(event.id); setReportMsg(null); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--color-text-secondary)' }}>🚩 Segnala</button>
+                  )
+                )}
+                {reportMsg?.id === event.id && (
+                  <small style={{ color: reportMsg.ok ? '#d2ffe6' : '#ffd0d0' }}>{reportMsg.text}</small>
+                )}
+              </div>
             </article>
           ))}
         </div>

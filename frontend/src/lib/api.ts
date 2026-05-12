@@ -39,6 +39,7 @@ export interface MapMarker {
   crowdingStatus: CrowdingStatus;
   isCertified: boolean;
   sourceId: string;
+  category?: string | null;
 }
 
 export interface CurrentUser {
@@ -340,4 +341,13 @@ export function getReports(stato?: string): Promise<{ reports: Report[] }> {
 }
 export function resolveReport(id: string, azione: 'rimuovi' | 'archivia' | 'in_lavorazione'): Promise<{ message: string }> {
   return request(`/api/moderation/reports/${encodeURIComponent(id)}`, { method: 'PATCH', body: { azione } });
+}
+
+// ============================== Calendar ICS ==============================
+
+export function getActivityCalendarUrl(id: string): string {
+  return `${API_BASE_URL}/api/activities/${encodeURIComponent(id)}/calendar`;
+}
+export function getEventCalendarUrl(id: string): string {
+  return `${API_BASE_URL}/api/events/${encodeURIComponent(id)}/calendar`;
 }

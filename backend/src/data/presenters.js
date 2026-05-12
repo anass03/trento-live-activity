@@ -162,6 +162,7 @@ function markerFromActivity(record) {
     crowdingStatus: crowdingStatus(activity.poi?.statoAffollamento),
     isCertified: false,
     sourceId: activity.id,
+    category: activity.tipo,
   };
 }
 
@@ -176,6 +177,7 @@ function markerFromEvent(record) {
     crowdingStatus: crowdingStatus(event.poi?.statoAffollamento),
     isCertified: Boolean(event.badgeVerifica),
     sourceId: event.id,
+    category: event.categoria,
   };
 }
 

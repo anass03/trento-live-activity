@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getActivities, type ApiActivity } from '../lib/api';
+import { getActivities, getActivityCalendarUrl, type ApiActivity } from '../lib/api';
 
 function formatDateTime(value?: string | null) {
   if (!value) return 'Data da definire';
   return new Intl.DateTimeFormat('it-IT', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
 }
 
-export function ActivitiesPage() {
+export function ActivitiesPage({ userInterests }: { userInterests?: string[] }) {
   const [activities, setActivities] = useState<ApiActivity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hasInterests = Array.isArray(userInterests) && userInterests.length > 0;
 
   async function loadActivities() {
     setIsLoading(true);
@@ -33,7 +34,7 @@ export function ActivitiesPage() {
       <header className="utility-strip glass-card">
         <div>
           <h1>Attività</h1>
-          <p>Attività spontanee lette dal database tramite il backend Express</p>
+          <p>{hasInterests ? `Filtrate per i tuoi interessi: ${userInterests!.join(', ')}` : 'Attività spontanee lette dal database tramite il backend Express'}</p>
         </div>
         <button className="refresh-button" onClick={loadActivities} type="button">Aggiorna</button>
       </header>
@@ -50,7 +51,7 @@ export function ActivitiesPage() {
       )}
       {!isLoading && !error && activities.length > 0 && (
         <div className="data-grid">
-          {activities.map((activity) => (
+          {activities.filter((a) => !hasInterests || userInterests!.includes(a.category)).map((activity) => (
             <article className="data-card glass-card" key={activity.id}>
               <div className="data-card-header">
                 <span>{activity.category}</span>
@@ -72,6 +73,9 @@ export function ActivitiesPage() {
                   <dd>{activity.participantCount} / {activity.maxParticipants}</dd>
                 </div>
               </dl>
+              {activity.dateTime && (
+                <a href={getActivityCalendarUrl(activity.id)} download={`attivita-${activity.id}.ics`} style={{ fontSize: 12, color: 'var(--color-text-secondary)', textDecoration: 'none' }}>📅 Aggiungi al calendario</a>
+              )}
               <Link className="detail-link" to={`/attivita/${activity.id}`}>Apri dettagli</Link>
             </article>
           ))}
