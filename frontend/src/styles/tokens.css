@@ -1,0 +1,26 @@
+:root {
+  --color-bg-base: #0a1311;
+  --color-bg-elevated: #0f1d19;
+  --color-glass: rgba(24, 43, 37, 0.48);
+  --color-glass-border: rgba(190, 255, 227, 0.2);
+  --color-primary: #51d5a8;
+  --color-primary-soft: rgba(81, 213, 168, 0.14);
+  --color-text-primary: #edf8f4;
+  --color-text-secondary: #9cb8af;
+  --color-success: #53e198;
+  --color-warning: #d1be58;
+  --color-danger: #df5e5e;
+
+  --glass-blur: 16px;
+  --glass-shadow: 0 12px 40px rgba(1, 8, 7, 0.6);
+  --glass-border: 1px solid var(--color-glass-border);
+  --glow-soft: 0 0 40px rgba(81, 213, 168, 0.14);
+  --transition-fast: 180ms ease;
+  --radius-lg: 18px;
+  --radius-md: 12px;
+
+  --sidebar-width: 300px;
+  --page-padding: 22px;
+  --card-padding: 16px;
+  --nav-gap: 8px;
+}

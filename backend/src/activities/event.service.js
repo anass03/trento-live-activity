@@ -1,6 +1,7 @@
 const { Op } = require('sequelize');
 const { Event, User, Report, POI } = require('../data/models');
 const { sendNewEventToInterested } = require('../notifications/push.service');
+const { serializeEvent } = require('../data/presenters');
 const { buildIcs } = require('./ics');
 
 async function createEvent(entityId, { titolo, descrizione, categoria, latitudine, longitudine, poiId, data, orarioInizio, orarioFine }) {
@@ -41,22 +42,28 @@ async function listEvents({ categoria, q, page = 1, limit = 20 }) {
   }
   const { rows, count } = await Event.findAndCountAll({
     where,
-    include: [{ model: User, as: 'entity', attributes: ['id', 'nome', 'nomeEnte'] }],
+    include: [
+      { model: User, as: 'entity', attributes: ['id', 'nome', 'cognome', 'nomeEnte'] },
+      { model: POI, as: 'poi', attributes: ['id', 'nome'] },
+    ],
     limit,
     offset: (page - 1) * limit,
     order: [['createdAt', 'DESC']],
   });
-  return { events: rows, total: count, page, limit };
+  return { events: rows.map(serializeEvent), total: count, page, limit };
 }
 
 async function getEvent(id) {
   const event = await Event.findByPk(id, {
-    include: [{ model: User, as: 'entity', attributes: ['id', 'nome', 'nomeEnte'] }],
+    include: [
+      { model: User, as: 'entity', attributes: ['id', 'nome', 'cognome', 'nomeEnte'] },
+      { model: POI, as: 'poi', attributes: ['id', 'nome'] },
+    ],
   });
   if (!event) throw { status: 404, code: 'NOT_FOUND', error: 'Event not found' };
   // RF25: increment view counter (non-blocking)
   Event.increment('views', { by: 1, where: { id } }).catch(() => {});
-  return event;
+  return serializeEvent(event);
 }
 
 async function updateEvent(entityId, eventId, updates) {
@@ -93,11 +100,12 @@ async function getEventStats(entityId, eventId) {
 async function listEntityEvents(entityId, { page = 1, limit = 20 } = {}) {
   const { rows, count } = await Event.findAndCountAll({
     where: { entityId },
+    include: [{ model: POI, as: 'poi', attributes: ['id', 'nome'] }],
     limit,
     offset: (page - 1) * limit,
     order: [['createdAt', 'DESC']],
   });
-  return { events: rows, total: count, page, limit };
+  return { events: rows.map(serializeEvent), total: count, page, limit };
 }
 
 // RF12 / RF49: calendar export

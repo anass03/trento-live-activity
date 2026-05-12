@@ -1,5 +1,6 @@
 const service = require('./activity.service');
 const { User } = require('../data/models');
+const { assertUuid } = require('../data/presenters');
 
 async function create(req, res, next) {
   try {
@@ -30,6 +31,7 @@ async function list(req, res, next) {
 
 async function get(req, res, next) {
   try {
+    assertUuid(req.params.id, 'activity id');
     const activity = await service.getActivity(req.params.id);
     res.json(activity);
   } catch (e) { next(e); }
@@ -37,6 +39,7 @@ async function get(req, res, next) {
 
 async function update(req, res, next) {
   try {
+    assertUuid(req.params.id, 'activity id');
     const activity = await service.updateActivity(req.user.id, req.params.id, req.body);
     res.json(activity);
   } catch (e) { next(e); }
@@ -44,6 +47,7 @@ async function update(req, res, next) {
 
 async function cancel(req, res, next) {
   try {
+    assertUuid(req.params.id, 'activity id');
     await service.cancelActivity(req.user.id, req.params.id);
     res.status(204).send();
   } catch (e) { next(e); }
@@ -51,6 +55,7 @@ async function cancel(req, res, next) {
 
 async function join(req, res, next) {
   try {
+    assertUuid(req.params.id, 'activity id');
     const activity = await service.joinActivity(req.user.id, req.params.id);
     res.json(activity);
   } catch (e) { next(e); }
@@ -58,6 +63,7 @@ async function join(req, res, next) {
 
 async function leave(req, res, next) {
   try {
+    assertUuid(req.params.id, 'activity id');
     await service.leaveActivity(req.user.id, req.params.id);
     res.status(204).send();
   } catch (e) { next(e); }
@@ -65,6 +71,7 @@ async function leave(req, res, next) {
 
 async function calendar(req, res, next) {
   try {
+    assertUuid(req.params.id, 'activity id');
     const ics = await service.getActivityIcs(req.params.id);
     res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="activity-${req.params.id}.ics"`);
