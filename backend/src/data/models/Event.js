@@ -22,6 +22,7 @@ module.exports = (sequelize) => {
     data: { type: DataTypes.DATEONLY, allowNull: true },
     orarioInizio: { type: DataTypes.STRING(5), allowNull: true },
     orarioFine: { type: DataTypes.STRING(5), allowNull: true },
+    views: { type: DataTypes.INTEGER, defaultValue: 0 },
   }, {
     tableName: 'events',
     timestamps: true,

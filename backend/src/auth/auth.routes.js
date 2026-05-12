@@ -9,6 +9,7 @@ router.post('/forgot-password', ctrl.forgotPassword);
 router.post('/reset-password/:token', ctrl.resetPassword);
 
 // Protected
+router.post('/logout', authenticate, ctrl.logout);
 router.get('/me', authenticate, ctrl.getMe);
 router.put('/me', authenticate, ctrl.updateProfile);
 router.delete('/me', authenticate, ctrl.deleteAccount);
