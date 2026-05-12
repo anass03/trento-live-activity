@@ -8,7 +8,7 @@ const {
   sendActivityUpdated,
   sendActivityCancelled,
 } = require('../notifications/email.service');
-const { sendActivityJoined } = require('../notifications/push.service');
+const { sendActivityJoined, sendActivityNearby } = require('../notifications/push.service');
 const { buildIcs } = require('./ics');
 
 function isDatePast(data) {
@@ -54,6 +54,17 @@ async function createActivity(creatorId, { tipo, data, orarioInizio, orarioFine,
     stato: 'attiva', creatorId, latitudine, longitudine, poiId,
   });
   await Participation.create({ userId: creatorId, activityId: activity.id });
+
+  // RF40: notify nearby users whose interests match this activity type
+  sendActivityNearby({
+    activityId: activity.id,
+    tipo: activity.tipo,
+    lat: latitudine,
+    lng: longitudine,
+    creatorId,
+    radiusKm: 3,
+  }).catch(() => {});
+
   return activity;
 }
 

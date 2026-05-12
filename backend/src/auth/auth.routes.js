@@ -13,10 +13,15 @@ router.post('/register/entity', ctrl.registerEntity);
 router.post('/logout', authenticate, ctrl.logout);
 router.get('/me', authenticate, ctrl.getMe);
 router.put('/me', authenticate, ctrl.updateProfile);
+router.put('/me/location', authenticate, ctrl.updateLocation);
 router.delete('/me', authenticate, ctrl.deleteAccount);
 
 // 2FA (AmministratoreDiSistema)
 router.post('/2fa/setup', authenticate, ctrl.setup2fa);
 router.post('/2fa/verify', authenticate, ctrl.verify2fa);
+
+// GDPR consent (RNF19)
+router.get('/consents', authenticate, ctrl.listConsents);
+router.post('/consents', authenticate, ctrl.updateConsent);
 
 module.exports = router;

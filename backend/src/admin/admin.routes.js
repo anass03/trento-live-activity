@@ -3,7 +3,7 @@ const { User } = require('../data/models');
 const { authenticate, authorize } = require('../middleware/auth');
 
 //GET all pending entities
-router.get('entities/pending', authenticate, authorize('AmministratoreDiSistema'), async (req, res, next) => {
+router.get('/entities/pending', authenticate, authorize('AmministratoreDiSistema'), async (req, res, next) => {
     try {
         const entities = await User.findAll({
             where: { ruolo: 'EnteCertificato', approvato:false },
@@ -37,6 +37,30 @@ router.patch('/entities/:id/reject', authenticate, authorize('AmministratoreDiSi
     } catch (error) {
         next(error);
     }
+});
+
+// GET all users (system admin only)
+router.get('/users', authenticate, authorize('AmministratoreDiSistema'), async (req, res, next) => {
+    try {
+        const users = await User.findAll({
+            attributes: ['id', 'email', 'nome', 'cognome', 'ruolo', 'approvato', 'nomeEnte', 'createdAt'],
+            order: [['createdAt', 'DESC']],
+        });
+        res.json(users);
+    } catch (error) { next(error); }
+});
+
+// DELETE a user account (system admin only). Cascades to participations, device tokens, consents.
+router.delete('/users/:id', authenticate, authorize('AmministratoreDiSistema'), async (req, res, next) => {
+    try {
+        const user = await User.findByPk(req.params.id);
+        if (!user) return res.status(404).json({ error: 'User not found', code: 'NOT_FOUND' });
+        if (user.id === req.user.id) {
+            return res.status(400).json({ error: 'Cannot delete your own admin account from here', code: 'SELF_DELETE_FORBIDDEN' });
+        }
+        await user.destroy();
+        res.status(204).send();
+    } catch (error) { next(error); }
 });
 
 module.exports = router;

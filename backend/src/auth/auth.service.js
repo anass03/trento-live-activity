@@ -2,7 +2,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const speakeasy = require('speakeasy');
-const { User } = require('../data/models');
+const { User, Consent } = require('../data/models');
 const { sendPasswordReset } = require('../notifications/email.service');
 const { revoke } = require('./tokenBlacklist');
 
@@ -36,9 +36,14 @@ function sanitize(user) {
   return obj;
 }
 
-async function register({ email, password, nome, cognome, dataNascita } = {}) {
+async function register({ email, password, nome, cognome, dataNascita, consents } = {}) {
   if (!email || !password || !nome || !cognome || !dataNascita) {
     throw { status: 400, code: 'MISSING_FIELDS', error: 'email, password, nome, cognome and dataNascita are required' };
+  }
+
+  // RNF19 — GDPR art. 7: explicit consent required for privacy_policy + terms_of_service
+  if (!consents || !consents.privacy_policy || !consents.terms_of_service) {
+    throw { status: 400, code: 'CONSENT_REQUIRED', error: 'Consent to privacy_policy and terms_of_service is required to register' };
   }
 
   // OCL C5: age >= 13
@@ -64,8 +69,35 @@ async function register({ email, password, nome, cognome, dataNascita } = {}) {
   const passwordHash = await bcrypt.hash(password, 12);
   // OCL C3: registration automatically authenticates the user
   const user = await User.create({ email, passwordHash, nome, cognome, dataNascita });
+
+  // RNF19: persist the consents given at registration time
+  const consentRows = ['privacy_policy', 'terms_of_service', 'marketing', 'analytics']
+    .filter((type) => consents[type])
+    .map((type) => ({ userId: user.id, type, version: '1.0', granted: true }));
+  if (consentRows.length) await Consent.bulkCreate(consentRows);
+
   const token = signToken(user);
   return { user: sanitize(user), token };
+}
+
+async function listConsents(userId) {
+  return Consent.findAll({ where: { userId }, order: [['createdAt', 'DESC']] });
+}
+
+async function updateConsent(userId, type, granted) {
+  const validTypes = ['privacy_policy', 'terms_of_service', 'marketing', 'analytics'];
+  if (!validTypes.includes(type)) {
+    throw { status: 400, code: 'INVALID_CONSENT_TYPE', error: `type must be one of ${validTypes.join(', ')}` };
+  }
+  // RNF19: keep audit trail. Don't update old rows; insert a new one to record the change.
+  return Consent.create({
+    userId,
+    type,
+    version: '1.0',
+    granted: !!granted,
+    grantedAt: granted ? new Date() : null,
+    revokedAt: granted ? null : new Date(),
+  });
 }
 
 async function login({ email, password, otpToken } = {}) {
@@ -117,6 +149,16 @@ async function updateProfile(userId, { nome, cognome, interessi }) {
   if (!user) throw { status: 404, code: 'NOT_FOUND', error: 'User not found' };
   await user.update({ nome, cognome, interessi });
   return sanitize(user);
+}
+
+async function updateLocation(userId, { lat, lng }) {
+  if (typeof lat !== 'number' || typeof lng !== 'number') {
+    throw { status: 400, code: 'INVALID_LOCATION', error: 'lat and lng must be numbers' };
+  }
+  const user = await User.findByPk(userId);
+  if (!user) throw { status: 404, code: 'NOT_FOUND', error: 'User not found' };
+  await user.update({ lastLat: lat, lastLng: lng, lastLocationAt: new Date() });
+  return { lat, lng, updatedAt: new Date() };
 }
 
 async function deleteAccount(userId) {
@@ -212,4 +254,8 @@ async function registerEntity({ email, password, nomeEnte, nome, cognome }) {
   });
   return { message: 'Registration request submitted. Await admin approval.', userId: user.id };
 }
-module.exports = { register, login, logout, getMe, updateProfile, deleteAccount, setup2fa, verify2fa, forgotPassword, resetPassword, registerEntity };
+module.exports = {
+  register, login, logout, getMe, updateProfile, updateLocation, deleteAccount,
+  setup2fa, verify2fa, forgotPassword, resetPassword, registerEntity,
+  listConsents, updateConsent,
+};

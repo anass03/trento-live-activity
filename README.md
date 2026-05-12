@@ -96,8 +96,12 @@ trento-live-activity/
 
 ## API Documentation
 
-All API endpoints are documented on Apiary:  
-🔗 **[Link Apiary — TBD]**
+The complete OpenAPI 3 specification lives in [`docs/openapi.yaml`](docs/openapi.yaml) — every endpoint, request/response schema, security scheme and references to RF/RNF/OCL requirements are documented there.
+
+To explore it interactively:
+
+- Open `docs/openapi.yaml` in [Swagger Editor](https://editor.swagger.io/) (drag and drop the file)
+- Or upload to Apiary (link TBD when the Apiary project is created)
 
 ---
 

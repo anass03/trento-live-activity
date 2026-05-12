@@ -2,19 +2,23 @@ import type { UserRole } from '../data/mockUser';
 
 export interface NavItem { label: string; path: string; roles: UserRole[]; }
 
+const ALL_ROLES: UserRole[] = ['anonymous', 'registered_user', 'certified_entity', 'municipal_admin', 'system_admin'];
+
 export const primaryNav: NavItem[] = [
-  { label: 'Mappa', path: '/', roles: ['anonymous', 'registered_user', 'municipal_admin', 'system_admin'] },
-  { label: 'Attività', path: '/attivita', roles: ['anonymous', 'registered_user', 'municipal_admin', 'system_admin'] },
-  { label: 'Eventi', path: '/eventi', roles: ['anonymous', 'registered_user', 'municipal_admin', 'system_admin'] },
-  { label: 'Eventi certificati', path: '/eventi-certificati', roles: ['anonymous', 'registered_user', 'municipal_admin', 'system_admin'] },
-  { label: 'Profilo', path: '/profilo', roles: ['registered_user'] },
+  { label: 'Mappa', path: '/', roles: ALL_ROLES },
+  { label: 'Attività', path: '/attivita', roles: ALL_ROLES },
+  { label: 'Eventi', path: '/eventi', roles: ALL_ROLES },
+  { label: 'Eventi certificati', path: '/eventi-certificati', roles: ALL_ROLES },
+  { label: 'Profilo', path: '/profilo', roles: ['registered_user', 'certified_entity', 'municipal_admin', 'system_admin'] },
   { label: 'Accedi / Registrati', path: '/login', roles: ['anonymous'] },
+];
+
+export const entityNav: NavItem[] = [
+  { label: 'Pubblica evento', path: '/ente/pubblica', roles: ['certified_entity'] },
 ];
 
 export const municipalityNav: NavItem[] = [
   { label: 'Dashboard Comune', path: '/comune/dashboard', roles: ['municipal_admin'] },
-  { label: 'Statistiche', path: '/comune/statistiche', roles: ['municipal_admin'] },
-  { label: 'Export', path: '/comune/export', roles: ['municipal_admin'] },
 ];
 
 export const adminNav: NavItem[] = [
