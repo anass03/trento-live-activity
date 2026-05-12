@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const speakeasy = require('speakeasy');
 const { User } = require('../data/models');
 const { sendPasswordReset } = require('../notifications/email.service');
+const { revoke } = require('./tokenBlacklist');
 
 function calcAge(dataNascita) {
   const today = new Date();
@@ -17,11 +18,13 @@ function calcAge(dataNascita) {
 }
 
 function signToken(user) {
-  return jwt.sign(
-    { id: user.id, ruolo: user.ruolo },
+  const jti = crypto.randomUUID();
+  const token = jwt.sign(
+    { id: user.id, ruolo: user.ruolo, jti },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   );
+  return token;
 }
 
 function sanitize(user) {
@@ -33,7 +36,11 @@ function sanitize(user) {
   return obj;
 }
 
-async function register({ email, password, nome, cognome, dataNascita }) {
+async function register({ email, password, nome, cognome, dataNascita } = {}) {
+  if (!email || !password || !nome || !cognome || !dataNascita) {
+    throw { status: 400, code: 'MISSING_FIELDS', error: 'email, password, nome, cognome and dataNascita are required' };
+  }
+
   // OCL C5: age >= 13
   if (calcAge(dataNascita) < 13) {
     throw { status: 400, code: 'AGE_TOO_YOUNG', error: 'Must be at least 13 years old to register' };
@@ -61,7 +68,11 @@ async function register({ email, password, nome, cognome, dataNascita }) {
   return { user: sanitize(user), token };
 }
 
-async function login({ email, password, otpToken }) {
+async function login({ email, password, otpToken } = {}) {
+  if (!email || !password) {
+    throw { status: 400, code: 'MISSING_CREDENTIALS', error: 'Email and password are required' };
+  }
+
   const user = await User.findOne({ where: { email } });
   if (!user || !user.passwordHash) {
     throw { status: 401, code: 'INVALID_CREDENTIALS', error: 'Invalid email or password' };
@@ -166,4 +177,9 @@ async function resetPassword(rawToken, newPassword) {
   await user.update({ passwordHash, passwordResetToken: null, passwordResetExpires: null });
 }
 
-module.exports = { register, login, getMe, updateProfile, deleteAccount, setup2fa, verify2fa, forgotPassword, resetPassword };
+function logout(jti) {
+  if (!jti) throw { status: 400, code: 'INVALID_TOKEN', error: 'Token has no jti claim' };
+  revoke(jti);
+}
+
+module.exports = { register, login, logout, getMe, updateProfile, deleteAccount, setup2fa, verify2fa, forgotPassword, resetPassword };

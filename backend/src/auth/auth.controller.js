@@ -63,4 +63,11 @@ async function resetPassword(req, res, next) {
   } catch (e) { next(e); }
 }
 
-module.exports = { register, login, getMe, updateProfile, deleteAccount, setup2fa, verify2fa, forgotPassword, resetPassword };
+async function logout(req, res, next) {
+  try {
+    service.logout(req.user.jti);
+    res.status(204).send();
+  } catch (e) { next(e); }
+}
+
+module.exports = { register, login, logout, getMe, updateProfile, deleteAccount, setup2fa, verify2fa, forgotPassword, resetPassword };

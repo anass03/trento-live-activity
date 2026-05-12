@@ -1,12 +1,15 @@
 const router = require('express').Router();
 const ctrl = require('./activity.controller');
-const { authenticate, authorize } = require('../middleware/auth');
+const { authenticate, authorize, optionalAuth } = require('../middleware/auth');
 
 const REGISTERED = 'UtenteRegistrato';
 
-// Public
-router.get('/', ctrl.list);
+// Public — RF15 search via ?q, RF14 filter via ?tipo, RF9 personalised via ?mine=interests (auth)
+router.get('/', optionalAuth, ctrl.list);
 router.get('/:id', ctrl.get);
+
+// RF12 / RF49: calendar export (public — the link can be shared)
+router.get('/:id/calendar', ctrl.calendar);
 
 // Registered users only
 router.post('/', authenticate, authorize(REGISTERED, 'EnteCertificato'), ctrl.create);
