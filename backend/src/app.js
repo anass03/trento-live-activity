@@ -10,6 +10,7 @@ const userRoutes = require('./users/user.routes');
 const moderationRoutes = require('./moderation/moderation.routes');
 const dashboardRoutes = require('./dashboard/dashboard.routes');
 const adminRoutes = require('./admin/admin.routes');
+const notificationsRoutes = require('./notifications/notifications.routes');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -64,6 +65,7 @@ app.use('/api/moderation', moderationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 
 app.use('/admin', adminRoutes);
+app.use('/notifications', notificationsRoutes);
 app.use(errorHandler);
 
 module.exports = app;
