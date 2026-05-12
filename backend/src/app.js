@@ -66,6 +66,8 @@ app.use('/api/dashboard', dashboardRoutes);
 
 app.use('/admin', adminRoutes);
 app.use('/notifications', notificationsRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/notifications', notificationsRoutes);
 app.use(errorHandler);
 
 module.exports = app;

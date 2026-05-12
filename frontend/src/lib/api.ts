@@ -188,7 +188,7 @@ export function getCurrentUser(): Promise<CurrentUser> {
 // ============================== Auth ==============================
 
 export async function login(email: string, password: string, otpToken?: string): Promise<AuthResponse> {
-  const result = await request<AuthResponse>('/auth/login', {
+  const result = await request<AuthResponse>('/api/auth/login', {
     method: 'POST',
     body: { email, password, otpToken },
     auth: false,
@@ -201,7 +201,7 @@ export interface RegisterPayload {
   consents: { privacy_policy: boolean; terms_of_service: boolean; marketing?: boolean; analytics?: boolean; };
 }
 export async function register(payload: RegisterPayload): Promise<AuthResponse> {
-  const result = await request<AuthResponse>('/auth/register', { method: 'POST', body: payload, auth: false });
+  const result = await request<AuthResponse>('/api/auth/register', { method: 'POST', body: payload, auth: false });
   setToken(result.token);
   return result;
 }
@@ -209,28 +209,28 @@ export interface RegisterEntityPayload {
   email: string; password: string; nomeEnte: string; nome?: string; cognome?: string;
 }
 export function registerEntity(payload: RegisterEntityPayload): Promise<{ message: string; userId: string }> {
-  return request('/auth/register/entity', { method: 'POST', body: payload, auth: false });
+  return request('/api/auth/register/entity', { method: 'POST', body: payload, auth: false });
 }
 export function forgotPassword(email: string): Promise<{ message: string }> {
-  return request('/auth/forgot-password', { method: 'POST', body: { email }, auth: false });
+  return request('/api/auth/forgot-password', { method: 'POST', body: { email }, auth: false });
 }
 export function resetPassword(token: string, password: string): Promise<{ message: string }> {
-  return request(`/auth/reset-password/${encodeURIComponent(token)}`, { method: 'POST', body: { password }, auth: false });
+  return request(`/api/auth/reset-password/${encodeURIComponent(token)}`, { method: 'POST', body: { password }, auth: false });
 }
 export async function logout(): Promise<void> {
-  try { await request('/auth/logout', { method: 'POST' }); } finally { setToken(null); }
+  try { await request('/api/auth/logout', { method: 'POST' }); } finally { setToken(null); }
 }
 export function getMe(): Promise<CurrentUser & { id: string }> {
-  return request('/auth/me');
+  return request('/api/auth/me');
 }
 export function updateProfile(data: { nome?: string; cognome?: string; interessi?: string[] }): Promise<CurrentUser> {
-  return request('/auth/me', { method: 'PUT', body: data });
+  return request('/api/auth/me', { method: 'PUT', body: data });
 }
 export function deleteAccount(): Promise<void> {
-  return request('/auth/me', { method: 'DELETE' });
+  return request('/api/auth/me', { method: 'DELETE' });
 }
 export function updateLocation(lat: number, lng: number): Promise<{ lat: number; lng: number }> {
-  return request('/auth/me/location', { method: 'PUT', body: { lat, lng } });
+  return request('/api/auth/me/location', { method: 'PUT', body: { lat, lng } });
 }
 
 // ============================== Activities (write) ==============================
@@ -240,16 +240,16 @@ export interface CreateActivityPayload {
   maxPartecipanti: number; latitudine?: number; longitudine?: number; poiId?: string;
 }
 export function createActivity(payload: CreateActivityPayload): Promise<ApiActivity> {
-  return request('/activities', { method: 'POST', body: payload });
+  return request('/api/activities', { method: 'POST', body: payload });
 }
 export function joinActivity(activityId: string): Promise<ApiActivity> {
-  return request(`/activities/${encodeURIComponent(activityId)}/join`, { method: 'POST' });
+  return request(`/api/activities/${encodeURIComponent(activityId)}/join`, { method: 'POST' });
 }
 export function leaveActivity(activityId: string): Promise<void> {
-  return request(`/activities/${encodeURIComponent(activityId)}/join`, { method: 'DELETE' });
+  return request(`/api/activities/${encodeURIComponent(activityId)}/join`, { method: 'DELETE' });
 }
 export function cancelActivity(activityId: string): Promise<void> {
-  return request(`/activities/${encodeURIComponent(activityId)}`, { method: 'DELETE' });
+  return request(`/api/activities/${encodeURIComponent(activityId)}`, { method: 'DELETE' });
 }
 
 // ============================== Events (write) ==============================
@@ -260,25 +260,25 @@ export interface CreateEventPayload {
   latitudine?: number; longitudine?: number; poiId?: string;
 }
 export function createEvent(payload: CreateEventPayload): Promise<ApiEvent> {
-  return request('/events', { method: 'POST', body: payload });
+  return request('/api/events', { method: 'POST', body: payload });
 }
 export function getMyEvents(): Promise<{ events: ApiEvent[] }> {
-  return request('/events/mine');
+  return request('/api/events/mine');
 }
 export function getEventStats(eventId: string): Promise<{ eventId: string; titolo: string; views: number; reports: number }> {
-  return request(`/events/${encodeURIComponent(eventId)}/stats`);
+  return request(`/api/events/${encodeURIComponent(eventId)}/stats`);
 }
 
 // ============================== Dashboard (municipal admin) ==============================
 
 export function getDashboardStats(params?: Record<string, string | number>): Promise<DashboardStats & { filters?: unknown }> {
   const qs = params ? `?${new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])).toString()}` : '';
-  return request(`/dashboard/stats${qs}`);
+  return request(`/api/dashboard/stats${qs}`);
 }
 export function getDashboardExportUrl(format: 'csv' | 'pdf', params?: Record<string, string | number>): string {
   const allParams = { ...(params || {}), format };
   const qs = new URLSearchParams(Object.entries(allParams).map(([k, v]) => [k, String(v)])).toString();
-  return `${API_BASE_URL}/dashboard/stats/export?${qs}`;
+  return `${API_BASE_URL}/api/dashboard/stats/export?${qs}`;
 }
 
 // ============================== Admin ==============================
@@ -287,13 +287,13 @@ export interface PendingEntity {
   id: string; email: string; nome: string; nomeEnte: string; createdAt: string;
 }
 export function getPendingEntities(): Promise<PendingEntity[]> {
-  return request('/admin/entities/pending');
+  return request('/api/admin/entities/pending');
 }
 export function approveEntity(id: string): Promise<{ message: string }> {
-  return request(`/admin/entities/${encodeURIComponent(id)}/approve`, { method: 'PATCH' });
+  return request(`/api/admin/entities/${encodeURIComponent(id)}/approve`, { method: 'PATCH' });
 }
 export function rejectEntity(id: string): Promise<{ message: string }> {
-  return request(`/admin/entities/${encodeURIComponent(id)}/reject`, { method: 'PATCH' });
+  return request(`/api/admin/entities/${encodeURIComponent(id)}/reject`, { method: 'PATCH' });
 }
 
 export interface AdminUser {
@@ -301,10 +301,10 @@ export interface AdminUser {
   ruolo: string; approvato?: boolean; nomeEnte?: string | null; createdAt: string;
 }
 export function getAdminUsers(): Promise<AdminUser[]> {
-  return request('/admin/users');
+  return request('/api/admin/users');
 }
 export function deleteAdminUser(id: string): Promise<void> {
-  return request(`/admin/users/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  return request(`/api/admin/users/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
 
 export interface POI {
@@ -312,16 +312,16 @@ export interface POI {
   capacitaMax: number; statoAffollamento: string; tipo?: string; descrizione?: string;
 }
 export function getPOIs(): Promise<POI[]> {
-  return request('/map/poi', { auth: false });
+  return request('/api/map/poi', { auth: false });
 }
 export function createPOI(payload: Partial<POI>): Promise<POI> {
-  return request('/map/poi', { method: 'POST', body: payload });
+  return request('/api/map/poi', { method: 'POST', body: payload });
 }
 export function updatePOI(id: string, payload: Partial<POI>): Promise<POI> {
-  return request(`/map/poi/${encodeURIComponent(id)}`, { method: 'PUT', body: payload });
+  return request(`/api/map/poi/${encodeURIComponent(id)}`, { method: 'PUT', body: payload });
 }
 export function deletePOI(id: string): Promise<void> {
-  return request(`/map/poi/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  return request(`/api/map/poi/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
 
 // ============================== Moderation ==============================
@@ -332,12 +332,12 @@ export interface Report {
   event?: { id: string; titolo: string };
 }
 export function reportEvent(eventId: string, tipo: string, descrizione?: string): Promise<Report> {
-  return request(`/moderation/events/${encodeURIComponent(eventId)}/report`, { method: 'POST', body: { tipo, descrizione } });
+  return request(`/api/moderation/events/${encodeURIComponent(eventId)}/report`, { method: 'POST', body: { tipo, descrizione } });
 }
 export function getReports(stato?: string): Promise<{ reports: Report[] }> {
   const qs = stato ? `?stato=${encodeURIComponent(stato)}` : '';
-  return request(`/moderation/reports${qs}`);
+  return request(`/api/moderation/reports${qs}`);
 }
 export function resolveReport(id: string, azione: 'rimuovi' | 'archivia' | 'in_lavorazione'): Promise<{ message: string }> {
-  return request(`/moderation/reports/${encodeURIComponent(id)}`, { method: 'PATCH', body: { azione } });
+  return request(`/api/moderation/reports/${encodeURIComponent(id)}`, { method: 'PATCH', body: { azione } });
 }
