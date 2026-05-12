@@ -32,6 +32,10 @@ module.exports = (sequelize) => {
     // Password reset (RF8)
     passwordResetToken: { type: DataTypes.STRING, allowNull: true },
     passwordResetExpires: { type: DataTypes.DATE, allowNull: true },
+    // Last known position (RF40 — geo-aware push notifications)
+    lastLat: { type: DataTypes.FLOAT, allowNull: true },
+    lastLng: { type: DataTypes.FLOAT, allowNull: true },
+    lastLocationAt: { type: DataTypes.DATE, allowNull: true },
   }, {
     tableName: 'users',
     timestamps: true,

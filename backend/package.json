@@ -21,6 +21,7 @@
     "firebase-admin": "^13.9.0",
     "jsonwebtoken": "^9.0.2",
     "nodemailer": "^8.0.7",
+    "pdfkit": "^0.18.0",
     "pg": "^8.12.0",
     "pg-hstore": "^2.3.4",
     "sequelize": "^6.37.3",

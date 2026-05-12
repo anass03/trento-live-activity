@@ -1,0 +1,556 @@
+openapi: 3.0.3
+info:
+  title: Trento Live Activity API
+  description: |
+    REST API per Trento Live Activity — piattaforma civic-tech per la città di Trento.
+    Università di Trento — Software Engineering a.a. 2025-2026, Gruppo 7.
+  version: "1.0.0"
+  contact:
+    name: Group 7 (Soussane, Marcatili, Safi)
+servers:
+  - url: http://localhost:3000
+    description: Local development
+tags:
+  - name: Auth
+  - name: Activities
+  - name: Events
+  - name: Map
+  - name: Moderation
+  - name: Dashboard
+  - name: Admin
+  - name: Notifications
+  - name: Users
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+        code:  { type: string }
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        nome: { type: string }
+        cognome: { type: string }
+        ruolo:
+          type: string
+          enum: [UtenteRegistrato, EnteCertificato, AmministratoreComunale, AmministratoreDiSistema]
+        interessi:
+          type: array
+          items: { type: string }
+        approvato: { type: boolean }
+        nomeEnte: { type: string, nullable: true }
+    AuthResponse:
+      type: object
+      properties:
+        user: { $ref: '#/components/schemas/User' }
+        token: { type: string }
+    RegisterRequest:
+      type: object
+      required: [email, password, nome, cognome, dataNascita, consents]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        nome: { type: string }
+        cognome: { type: string }
+        dataNascita: { type: string, format: date }
+        consents:
+          type: object
+          required: [privacy_policy, terms_of_service]
+          properties:
+            privacy_policy: { type: boolean }
+            terms_of_service: { type: boolean }
+            marketing: { type: boolean }
+            analytics: { type: boolean }
+    Activity:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tipo: { type: string, enum: [sport, cultura, musica, studio] }
+        data: { type: string, format: date }
+        orarioInizio: { type: string, example: "18:00" }
+        orarioFine: { type: string, example: "19:30" }
+        maxPartecipanti: { type: integer, minimum: 2, maximum: 50 }
+        stato: { type: string, enum: [attiva, cancellata, conclusa] }
+        creatorId: { type: string, format: uuid }
+        latitudine: { type: number, nullable: true }
+        longitudine: { type: number, nullable: true }
+        poiId: { type: string, format: uuid, nullable: true }
+    Event:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        titolo: { type: string, maxLength: 100 }
+        descrizione: { type: string, nullable: true }
+        categoria: { type: string, enum: [sport, cultura, musica, arte, gastronomia, altro] }
+        badgeVerifica: { type: boolean }
+        entityId: { type: string, format: uuid }
+        data: { type: string, format: date, nullable: true }
+        views: { type: integer }
+    POI:
+      type: object
+      required: [nome, latitudine, longitudine, capacitaMax]
+      properties:
+        id: { type: string, format: uuid }
+        nome: { type: string }
+        latitudine: { type: number }
+        longitudine: { type: number }
+        capacitaMax: { type: integer, minimum: 1 }
+        statoAffollamento: { type: string, enum: [verde, giallo, rosso] }
+        tipo: { type: string, nullable: true }
+        descrizione: { type: string, nullable: true }
+    Report:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        tipo: { type: string, enum: [contenuto_illegale, spam, informazioni_false, contenuto_offensivo] }
+        stato: { type: string, enum: [aperta, in lavorazione, risolta] }
+        descrizione: { type: string, nullable: true }
+    DashboardStats:
+      type: object
+      properties:
+        totalUsers: { type: integer }
+        totalActivities: { type: integer }
+        totalEvents: { type: integer }
+        totalPOIs: { type: integer }
+        totalParticipations: { type: integer }
+        activitiesByType:
+          type: array
+          items: { type: object, properties: { tipo: {type: string}, count: {type: integer} } }
+        poiCrowding:
+          type: array
+          items: { type: object, properties: { statoAffollamento: {type: string}, count: {type: integer} } }
+
+paths:
+  /health:
+    get:
+      tags: [Auth]
+      summary: Health check
+      responses: { '200': { description: OK } }
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new citizen (RF5, RNF19, OCL C2/C5/C7)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201':
+          description: User created and authenticated
+          content: { application/json: { schema: { $ref: '#/components/schemas/AuthResponse' } } }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: Email already taken }
+  /auth/register/entity:
+    post:
+      tags: [Auth]
+      summary: Request registration as a certified entity (RF31)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, nomeEnte]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                nomeEnte: { type: string }
+                nome: { type: string }
+                cognome: { type: string }
+      responses: { '201': { description: Pending approval } }
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login (RF6). 2FA required for AmministratoreDiSistema (RNF15)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string }
+                password: { type: string }
+                otpToken: { type: string, description: "6-digit TOTP, required for system admins" }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/AuthResponse' } } } }
+        '401': { description: Invalid credentials or 2FA }
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Revoke the current JWT (OCL C6)
+      security: [{ BearerAuth: [] }]
+      responses: { '204': { description: Logged out } }
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Current authenticated user
+      security: [{ BearerAuth: [] }]
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } } }
+    put:
+      tags: [Auth]
+      summary: Update profile (RF20, RF13)
+      security: [{ BearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { nome: {type: string}, cognome: {type: string}, interessi: { type: array, items: { type: string } } } } } } }
+      responses: { '200': { description: OK } }
+    delete:
+      tags: [Auth]
+      summary: Delete account (GDPR art. 17, RF26, RNF20)
+      security: [{ BearerAuth: [] }]
+      responses: { '204': { description: Account deleted } }
+  /auth/me/location:
+    put:
+      tags: [Auth]
+      summary: Update user's last known location (for RF40 geo push)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [lat, lng], properties: { lat: {type: number}, lng: {type: number} } } } }
+      responses: { '200': { description: OK } }
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Send password reset link (RF8)
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [email], properties: { email: { type: string, format: email } } } } } }
+      responses: { '200': { description: Email sent (always 200 to prevent enumeration) } }
+  /auth/reset-password/{token}:
+    post:
+      tags: [Auth]
+      summary: Complete password reset (RF8)
+      parameters: [{ in: path, name: token, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [password], properties: { password: { type: string, minLength: 8 } } } } } }
+      responses: { '200': { description: Password updated } }
+  /auth/2fa/setup:
+    post:
+      tags: [Auth]
+      summary: Setup 2FA for AmministratoreDiSistema (RNF15)
+      security: [{ BearerAuth: [] }]
+      responses: { '200': { description: otpauth URL, content: { application/json: { schema: { type: object, properties: { otpauthUrl: { type: string } } } } } } }
+  /auth/2fa/verify:
+    post:
+      tags: [Auth]
+      summary: Verify and activate 2FA
+      security: [{ BearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [token], properties: { token: { type: string } } } } } }
+      responses: { '200': { description: 2FA enabled } }
+  /auth/consents:
+    get:
+      tags: [Auth]
+      summary: List user consent history (GDPR RNF19)
+      security: [{ BearerAuth: [] }]
+      responses: { '200': { description: Consents } }
+    post:
+      tags: [Auth]
+      summary: Grant or revoke a consent
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [type, granted], properties: { type: { type: string }, granted: { type: boolean } } }
+      responses: { '200': { description: Consent recorded } }
+
+  /activities:
+    get:
+      tags: [Activities]
+      summary: List active activities (RF14, RF15, RF9)
+      parameters:
+        - { in: query, name: tipo, schema: { type: string } }
+        - { in: query, name: q, schema: { type: string }, description: "Textual search via POI name (RF15)" }
+        - { in: query, name: mine, schema: { type: string, enum: [interests] }, description: "RF9 — filter by current user interests" }
+        - { in: query, name: page, schema: { type: integer } }
+        - { in: query, name: limit, schema: { type: integer } }
+      responses: { '200': { description: OK } }
+    post:
+      tags: [Activities]
+      summary: Create a spontaneous activity (RF10, OCL C8/C9/C10/C11)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tipo, data, orarioInizio, orarioFine, maxPartecipanti]
+              properties:
+                tipo: { type: string, enum: [sport, cultura, musica, studio] }
+                data: { type: string, format: date }
+                orarioInizio: { type: string }
+                orarioFine: { type: string }
+                maxPartecipanti: { type: integer, minimum: 2, maximum: 50 }
+                latitudine: { type: number }
+                longitudine: { type: number }
+                poiId: { type: string, format: uuid }
+      responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Activity' } } } } }
+  /activities/{id}:
+    get:
+      tags: [Activities]
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses: { '200': { description: OK } }
+    put:
+      tags: [Activities]
+      summary: Modify activity (creator-only, before start; RF19, OCL C12)
+      security: [{ BearerAuth: [] }]
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Activity' } } } }
+      responses: { '200': { description: Updated } }
+    delete:
+      tags: [Activities]
+      summary: Cancel activity (creator-only)
+      security: [{ BearerAuth: [] }]
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses: { '204': { description: Cancelled } }
+  /activities/{id}/join:
+    post:
+      tags: [Activities]
+      summary: Join an activity (RF11, OCL C13/C14/C18)
+      security: [{ BearerAuth: [] }]
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses: { '200': { description: Joined } }
+    delete:
+      tags: [Activities]
+      summary: Cancel own participation (RF17, OCL C19)
+      security: [{ BearerAuth: [] }]
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses: { '204': { description: Left activity } }
+  /activities/{id}/calendar:
+    get:
+      tags: [Activities]
+      summary: Export activity to iCalendar (RF12, RF49)
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses: { '200': { description: text/calendar, content: { text/calendar: {} } } }
+
+  /events:
+    get:
+      tags: [Events]
+      summary: List certified events (RF15)
+      parameters:
+        - { in: query, name: categoria, schema: { type: string } }
+        - { in: query, name: q, schema: { type: string }, description: "Textual search on titolo + descrizione" }
+      responses: { '200': { description: OK } }
+    post:
+      tags: [Events]
+      summary: Publish certified event (RF21, OCL C15/C16/C17/C24)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [titolo, categoria]
+              properties:
+                titolo: { type: string, maxLength: 100 }
+                descrizione: { type: string }
+                categoria: { type: string }
+                data: { type: string, format: date }
+                orarioInizio: { type: string }
+                orarioFine: { type: string }
+                latitudine: { type: number }
+                longitudine: { type: number }
+                poiId: { type: string }
+      responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Event' } } } } }
+  /events/mine:
+    get:
+      tags: [Events]
+      summary: Certified entity's own events
+      security: [{ BearerAuth: [] }]
+      responses: { '200': { description: OK } }
+  /events/{id}:
+    get:
+      tags: [Events]
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses: { '200': { description: OK — view counter incremented (RF25) } }
+    put:
+      tags: [Events]
+      summary: Modify event (RF24)
+      security: [{ BearerAuth: [] }]
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses: { '200': { description: Updated } }
+  /events/{id}/stats:
+    get:
+      tags: [Events]
+      summary: Event statistics — owning entity only (RF25)
+      security: [{ BearerAuth: [] }]
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses: { '200': { description: OK } }
+  /events/{id}/calendar:
+    get:
+      tags: [Events]
+      summary: Export event to iCalendar (RF49)
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses: { '200': { description: text/calendar } }
+
+  /map:
+    get:
+      tags: [Map]
+      summary: Map data — POIs + activities + events (RF2, RF3)
+      responses: { '200': { description: OK } }
+  /map/poi:
+    get:
+      tags: [Map]
+      responses: { '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/POI' } } } } } }
+    post:
+      tags: [Map]
+      summary: Add POI (RF36) — AmministratoreDiSistema only
+      security: [{ BearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/POI' } } } }
+      responses: { '201': { description: Created } }
+  /map/poi/{id}:
+    get:
+      tags: [Map]
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses: { '200': { description: OK } }
+    put:
+      tags: [Map]
+      summary: Modify POI (RF36)
+      security: [{ BearerAuth: [] }]
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses: { '200': { description: Updated } }
+    delete:
+      tags: [Map]
+      summary: Delete POI (RF36)
+      security: [{ BearerAuth: [] }]
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses: { '204': { description: Deleted } }
+
+  /moderation/events/{eventId}/report:
+    post:
+      tags: [Moderation]
+      summary: Report an event (RF16, OCL C22/C23)
+      security: [{ BearerAuth: [] }]
+      parameters: [{ in: path, name: eventId, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tipo]
+              properties:
+                tipo: { type: string, enum: [contenuto_illegale, spam, informazioni_false, contenuto_offensivo] }
+                descrizione: { type: string }
+      responses: { '201': { description: Report created } }
+  /moderation/reports:
+    get:
+      tags: [Moderation]
+      summary: List reports — AmministratoreDiSistema (RF33)
+      security: [{ BearerAuth: [] }]
+      parameters: [{ in: query, name: stato, schema: { type: string } }]
+      responses: { '200': { description: OK } }
+  /moderation/reports/{id}:
+    get:
+      tags: [Moderation]
+      security: [{ BearerAuth: [] }]
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses: { '200': { description: OK } }
+    patch:
+      tags: [Moderation]
+      summary: Resolve report (DSA flow, RNF23/RNF24)
+      security: [{ BearerAuth: [] }]
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [azione]
+              properties: { azione: { type: string, enum: [rimuovi, archivia, in_lavorazione] } }
+      responses: { '200': { description: Resolved } }
+
+  /dashboard/stats:
+    get:
+      tags: [Dashboard]
+      summary: Aggregated stats — AmministratoreComunale (RF27/RF28/RF29, OCL C25)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { in: query, name: tipo, schema: { type: string } }
+        - { in: query, name: da, schema: { type: string, format: date } }
+        - { in: query, name: a, schema: { type: string, format: date } }
+        - { in: query, name: centerLat, schema: { type: number } }
+        - { in: query, name: centerLng, schema: { type: number } }
+        - { in: query, name: radiusKm, schema: { type: number } }
+        - { in: query, name: poiId, schema: { type: string } }
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/DashboardStats' } } } } }
+  /dashboard/stats/export:
+    get:
+      tags: [Dashboard]
+      summary: Export stats as CSV or PDF (RF30)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { in: query, name: format, schema: { type: string, enum: [csv, pdf] } }
+      responses: { '200': { description: File download } }
+
+  /admin/entities/pending:
+    get:
+      tags: [Admin]
+      summary: Pending entity registration requests (RF31)
+      security: [{ BearerAuth: [] }]
+      responses: { '200': { description: OK } }
+  /admin/entities/{id}/approve:
+    patch:
+      tags: [Admin]
+      security: [{ BearerAuth: [] }]
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses: { '200': { description: Approved } }
+  /admin/entities/{id}/reject:
+    patch:
+      tags: [Admin]
+      security: [{ BearerAuth: [] }]
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses: { '200': { description: Rejected — account deleted } }
+  /admin/users:
+    get:
+      tags: [Admin]
+      security: [{ BearerAuth: [] }]
+      responses: { '200': { description: OK } }
+  /admin/users/{id}:
+    delete:
+      tags: [Admin]
+      security: [{ BearerAuth: [] }]
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses: { '204': { description: Deleted } }
+
+  /notifications/device-token:
+    post:
+      tags: [Notifications]
+      summary: Register FCM device token (RF40)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+                platform: { type: string, enum: [web, ios, android] }
+      responses: { '201': { description: Registered } }
+    delete:
+      tags: [Notifications]
+      summary: Unregister FCM device token
+      security: [{ BearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [token], properties: { token: { type: string } } } } } }
+      responses: { '204': { description: Removed } }
+
+  /api/users/me:
+    get:
+      tags: [Users]
+      summary: Mocked "current user" for frontend dev (no auth required)
+      responses: { '200': { description: OK } }
