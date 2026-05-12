@@ -7,6 +7,7 @@ const Participation = require('./Participation')(sequelize);
 const POI = require('./POI')(sequelize);
 const Report = require('./Report')(sequelize);
 const DeviceToken = require('./DeviceToken')(sequelize);
+const Consent = require('./Consent')(sequelize);
 
 // User <-> Activity (creator)
 Activity.belongsTo(User, { foreignKey: 'creatorId', as: 'creator' });
@@ -35,4 +36,8 @@ Event.belongsTo(POI, { foreignKey: 'poiId', as: 'poi' });
 DeviceToken.belongsTo(User, { foreignKey: 'userId', onDelete: 'CASCADE' });
 User.hasMany(DeviceToken, { foreignKey: 'userId', as: 'deviceTokens' });
 
-module.exports = { sequelize, User, Activity, Event, Participation, POI, Report, DeviceToken };
+// User <-> Consent (GDPR RNF19)
+Consent.belongsTo(User, { foreignKey: 'userId', onDelete: 'CASCADE' });
+User.hasMany(Consent, { foreignKey: 'userId', as: 'consents' });
+
+module.exports = { sequelize, User, Activity, Event, Participation, POI, Report, DeviceToken, Consent };

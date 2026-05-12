@@ -6,6 +6,11 @@ jest.mock('../src/data/models', () => ({
     findByPk: jest.fn(),
     create: jest.fn(),
   },
+  Consent: {
+    bulkCreate: jest.fn().mockResolvedValue([]),
+    findAll: jest.fn(),
+    create: jest.fn(),
+  },
 }));
 
 jest.mock('../src/notifications/email.service', () => ({
@@ -22,6 +27,7 @@ const validUserData = {
   nome: 'Mario',
   cognome: 'Rossi',
   dataNascita: '1995-06-15',
+  consents: { privacy_policy: true, terms_of_service: true },
 };
 
 function makeFakeUser(overrides = {}) {
