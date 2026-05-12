@@ -8,6 +8,7 @@ const eventRoutes = require('./activities/event.routes');
 const mapRoutes = require('./map/map.routes');
 const moderationRoutes = require('./moderation/moderation.routes');
 const dashboardRoutes = require('./dashboard/dashboard.routes');
+const adminRoutes = require('./admin/admin.routes');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -30,7 +31,7 @@ app.use('/events', eventRoutes);
 app.use('/map', mapRoutes);
 app.use('/moderation', moderationRoutes);
 app.use('/dashboard', dashboardRoutes);
-
+app.use('/admin', adminRoutes);
 app.use(errorHandler);
 
 module.exports = app;
