@@ -49,6 +49,7 @@ Frontend WebApp
 ```
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full component breakdown.
+See [`docs/frontend-backend-db-connection.md`](docs/frontend-backend-db-connection.md) for the current frontend → backend API → PostgreSQL development flow.
 
 ---
 
