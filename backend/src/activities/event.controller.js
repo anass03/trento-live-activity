@@ -1,4 +1,5 @@
 const service = require('./event.service');
+const { assertUuid } = require('../data/presenters');
 
 async function create(req, res, next) {
   try {
@@ -22,6 +23,7 @@ async function list(req, res, next) {
 
 async function get(req, res, next) {
   try {
+    assertUuid(req.params.id, 'event id');
     const event = await service.getEvent(req.params.id);
     res.json(event);
   } catch (e) { next(e); }
@@ -29,6 +31,7 @@ async function get(req, res, next) {
 
 async function update(req, res, next) {
   try {
+    assertUuid(req.params.id, 'event id');
     const event = await service.updateEvent(req.user.id, req.params.id, req.body);
     res.json(event);
   } catch (e) { next(e); }
@@ -36,6 +39,7 @@ async function update(req, res, next) {
 
 async function stats(req, res, next) {
   try {
+    assertUuid(req.params.id, 'event id');
     const result = await service.getEventStats(req.user.id, req.params.id);
     res.json(result);
   } catch (e) { next(e); }
@@ -54,6 +58,7 @@ async function listMine(req, res, next) {
 
 async function calendar(req, res, next) {
   try {
+    assertUuid(req.params.id, 'event id');
     const ics = await service.getEventIcs(req.params.id);
     res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="event-${req.params.id}.ics"`);

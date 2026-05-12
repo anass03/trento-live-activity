@@ -1,4 +1,11 @@
 const { POI, Activity, Event } = require('../data/models');
+const {
+  markerFromActivity,
+  markerFromEvent,
+  markerFromPOI,
+  serializeActivity,
+  serializeEvent,
+} = require('../data/presenters');
 
 async function listPOIs({ tipo } = {}) {
   const where = {};
@@ -38,11 +45,33 @@ async function deletePOI(id) {
 
 async function getMapData() {
   const [pois, activities, events] = await Promise.all([
-    POI.findAll(),
-    Activity.findAll({ where: { stato: 'attiva' }, attributes: ['id', 'tipo', 'data', 'orarioInizio', 'latitudine', 'longitudine', 'poiId'] }),
-    Event.findAll({ attributes: ['id', 'titolo', 'categoria', 'badgeVerifica', 'latitudine', 'longitudine', 'poiId'] }),
+    POI.findAll({ order: [['nome', 'ASC']] }),
+    Activity.findAll({
+      where: { stato: 'attiva' },
+      attributes: ['id', 'tipo', 'data', 'orarioInizio', 'maxPartecipanti', 'stato', 'latitudine', 'longitudine', 'poiId', 'createdAt'],
+      include: [{ model: POI, as: 'poi', attributes: ['id', 'nome', 'statoAffollamento'] }],
+      order: [['data', 'ASC']],
+    }),
+    Event.findAll({
+      attributes: ['id', 'titolo', 'descrizione', 'categoria', 'badgeVerifica', 'latitudine', 'longitudine', 'poiId', 'data', 'orarioInizio', 'orarioFine', 'createdAt'],
+      include: [{ model: POI, as: 'poi', attributes: ['id', 'nome', 'statoAffollamento'] }],
+      order: [['data', 'ASC']],
+    }),
   ]);
-  return { pois, activities, events };
+
+  const hasCoordinates = (marker) => marker.latitude != null && marker.longitude != null;
+  const markers = [
+    ...pois.map(markerFromPOI),
+    ...activities.map(markerFromActivity),
+    ...events.map(markerFromEvent),
+  ].filter(hasCoordinates);
+
+  return {
+    markers,
+    pois,
+    activities: activities.map(serializeActivity),
+    events: events.map(serializeEvent),
+  };
 }
 
 module.exports = { listPOIs, getPOI, createPOI, updatePOI, deletePOI, getMapData };
