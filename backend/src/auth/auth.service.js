@@ -185,4 +185,31 @@ function logout(jti) {
   revoke(jti);
 }
 
-module.exports = { register, login, logout, getMe, updateProfile, deleteAccount, setup2fa, verify2fa, forgotPassword, resetPassword };
+async function registerEntity({ email, password, nomeEnte, nome, cognome }) {
+  if (!email || !password || !nomeEnte) {
+    throw { status: 400, code: 'MISSING_FIELDS', error: 'email, password and nomeEnte are required' };
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw { status: 400, code: 'INVALID_EMAIL', error: 'Invalid email format' };
+  }
+  if (password.length < 8) {
+    throw { status: 400, code: 'WEAK_PASSWORD', error: 'Password must be at least 8 characters' };
+  }
+  const existing = await User.findOne({ where: { email } });
+  if (existing) {
+    throw { status: 409, code: 'EMAIL_TAKEN', error: 'Email already registered' };
+  }
+  const passwordHash = await bcrypt.hash(password, 12);
+  const user = await User.create({
+    email,
+    passwordHash,
+    nome: nome || nomeEnte,
+    cognome: cognome || '',
+    dataNascita: '2000-01-01', // placeholder — not meaningful for entities
+    ruolo: 'EnteCertificato',
+    approvato: false,
+    nomeEnte,
+  });
+  return { message: 'Registration request submitted. Await admin approval.', userId: user.id };
+}
+module.exports = { register, login, logout, getMe, updateProfile, deleteAccount, setup2fa, verify2fa, forgotPassword, resetPassword, registerEntity };
