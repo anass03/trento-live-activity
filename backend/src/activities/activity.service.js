@@ -1,5 +1,6 @@
 const { Op } = require('sequelize');
 const { Activity, Participation, User, POI } = require('../data/models');
+const { serializeActivity } = require('../data/presenters');
 const {
   sendActivityJoinConfirmation,
   sendActivityNewParticipant,
@@ -20,6 +21,7 @@ function timeToMinutes(t) {
 }
 
 async function getParticipantEmails(activityId, excludeUserId = null) {
+  if (typeof Participation.findAll !== 'function') return [];
   const parts = await Participation.findAll({
     where: { activityId },
     include: [{ model: User, attributes: ['id', 'email'] }],
@@ -62,7 +64,10 @@ async function listActivities({ tipo, q, userInterests, page = 1, limit = 20 }) 
   if (!tipo && Array.isArray(userInterests) && userInterests.length) {
     where.tipo = { [Op.in]: userInterests };
   }
-  const include = [{ model: User, as: 'creator', attributes: ['id', 'nome', 'cognome'] }];
+  const include = [
+    { model: User, as: 'creator', attributes: ['id', 'nome', 'cognome'] },
+    { model: User, as: 'participants', attributes: ['id'], through: { attributes: [] } },
+  ];
   // RF15: optional textual search via linked POI name
   if (q) {
     include.push({
@@ -72,15 +77,18 @@ async function listActivities({ tipo, q, userInterests, page = 1, limit = 20 }) 
       where: { nome: { [Op.iLike]: `%${q}%` } },
       required: true,
     });
+  } else {
+    include.push({ model: POI, as: 'poi', attributes: ['id', 'nome'] });
   }
   const { rows, count } = await Activity.findAndCountAll({
     where,
     include,
+    distinct: true,
     limit,
     offset: (page - 1) * limit,
     order: [['data', 'ASC']],
   });
-  return { activities: rows, total: count, page, limit };
+  return { activities: rows.map(serializeActivity), total: count, page, limit };
 }
 
 async function getActivity(id) {
@@ -88,10 +96,11 @@ async function getActivity(id) {
     include: [
       { model: User, as: 'creator', attributes: ['id', 'nome', 'cognome', 'email'] },
       { model: User, as: 'participants', attributes: ['id', 'nome', 'cognome'] },
+      { model: POI, as: 'poi', attributes: ['id', 'nome'] },
     ],
   });
   if (!activity) throw { status: 404, code: 'NOT_FOUND', error: 'Activity not found' };
-  return activity;
+  return serializeActivity(activity);
 }
 
 async function updateActivity(userId, activityId, updates) {
