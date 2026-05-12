@@ -79,7 +79,7 @@ export function ProfilePage() {
           <h1>Il mio profilo</h1>
           <p>{user.email} — {user.ruolo}</p>
         </div>
-        <button type="button" onClick={handleLogout}>Logout</button>
+        <button type="button" className="primary-button" onClick={handleLogout}>Logout</button>
       </header>
 
       <form className="auth-form glass-card" onSubmit={handleSave}>
@@ -113,7 +113,7 @@ export function ProfilePage() {
       <div className="auth-form glass-card">
         <h2>Posizione (per notifiche di attività vicine)</h2>
         <p>Condividi la tua posizione corrente per ricevere notifiche di attività entro 3 km dai tuoi interessi.</p>
-        <button type="button" onClick={handleShareLocation}>Condividi posizione</button>
+        <button type="button" className="primary-button" onClick={handleShareLocation}>📍 Condividi posizione</button>
       </div>
 
       <div className="auth-form glass-card danger-zone">

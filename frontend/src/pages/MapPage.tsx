@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MapCanvas } from '../components/map/MapCanvas';
 import { getMapMarkers, type MapMarker, type MarkerType } from '../lib/api';
+import type { AppUser } from '../data/mockUser';
 
 type Filter = 'all' | MarkerType;
 
@@ -11,11 +12,12 @@ const filterLabels: Array<{ label: string; value: Filter }> = [
   { label: 'POI', value: 'poi' },
 ];
 
-export function MapPage() {
+export function MapPage({ user }: { user?: AppUser }) {
   const [markers, setMarkers] = useState<MapMarker[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hasInterests = Array.isArray(user?.interessi) && (user!.interessi!.length ?? 0) > 0;
 
   async function loadMarkers() {
     setIsLoading(true);
@@ -34,8 +36,14 @@ export function MapPage() {
   }, []);
 
   const visibleMarkers = useMemo(
-    () => markers.filter((marker) => filter === 'all' || marker.type === filter),
-    [filter, markers],
+    () => markers.filter((marker) => {
+      if (filter !== 'all' && marker.type !== filter) return false;
+      if (hasInterests && marker.type !== 'poi' && marker.category) {
+        return user!.interessi!.includes(marker.category);
+      }
+      return true;
+    }),
+    [filter, markers, hasInterests, user],
   );
 
   return (

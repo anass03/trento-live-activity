@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { MapMarker } from '../../lib/api';
 
 const statusLabel = { green: 'Basso affollamento', yellow: 'Medio affollamento', red: 'Alto affollamento' };
@@ -21,15 +22,33 @@ function markerPosition(marker: MapMarker) {
   return { left: `${clamp(x)}%`, top: `${clamp(y)}%` };
 }
 
-export function MapCanvas({ markers }: { markers: MapMarker[] }) {
-  const [selected, setSelected] = useState<MapMarker | null>(markers[0] ?? null);
+function detailPath(marker: MapMarker): string | null {
+  if (marker.type === 'activity') return `/attivita/${marker.sourceId}`;
+  if (marker.type === 'event') return `/eventi/${marker.sourceId}`;
+  return null;
+}
 
+export function MapCanvas({ markers }: { markers: MapMarker[] }) {
+  const navigate = useNavigate();
+  const [hovered, setHovered] = useState<MapMarker | null>(null);
+  const [pinned, setPinned] = useState<MapMarker | null>(null);
+
+  // Clear pinned if it disappears from visible markers
   useEffect(() => {
-    setSelected((current) => {
-      if (current && markers.some((marker) => marker.id === current.id)) return current;
-      return markers[0] ?? null;
-    });
-  }, [markers]);
+    if (pinned && !markers.some((m) => m.id === pinned.id)) setPinned(null);
+  }, [markers, pinned]);
+
+  const displayed = pinned ?? hovered;
+
+  function handleMarkerClick(marker: MapMarker) {
+    setPinned((prev) => (prev?.id === marker.id ? null : marker));
+  }
+
+  function handleCardClick() {
+    if (!displayed) return;
+    const path = detailPath(displayed);
+    if (path) navigate(path);
+  }
 
   return (
     <section className="map-area glass-panel">
@@ -37,9 +56,11 @@ export function MapCanvas({ markers }: { markers: MapMarker[] }) {
         {markers.map((marker) => (
           <button
             key={marker.id}
-            className={`marker marker-${marker.crowdingStatus}`}
+            className={`marker marker-${marker.crowdingStatus}${pinned?.id === marker.id ? ' marker-pinned' : ''}`}
             style={markerPosition(marker)}
-            onClick={() => setSelected(marker)}
+            onMouseEnter={() => setHovered(marker)}
+            onMouseLeave={() => setHovered(null)}
+            onClick={() => handleMarkerClick(marker)}
           >
             <span>{marker.title}</span>
             {marker.isCertified && <small className="badge">Verificato</small>}
@@ -47,12 +68,22 @@ export function MapCanvas({ markers }: { markers: MapMarker[] }) {
         ))}
       </div>
 
-      {selected && (
-        <aside className="marker-card glass-card">
-          <h3>{selected.title}</h3>
-          <p>Tipo: {typeLabel[selected.type]}</p>
-          <p>Stato: {statusLabel[selected.crowdingStatus]}</p>
-          {selected.isCertified && <p className="badge">Evento certificato</p>}
+      {displayed && (
+        <aside
+          className="marker-card glass-card"
+          style={{ cursor: detailPath(displayed) ? 'pointer' : 'default' }}
+          onClick={handleCardClick}
+          title={detailPath(displayed) ? 'Clicca per aprire i dettagli' : undefined}
+        >
+          <p style={{ margin: '0 0 4px', fontSize: 11, color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>
+            {typeLabel[displayed.type]}{pinned ? ' · fissato' : ''}
+          </p>
+          <h3 style={{ margin: '0 0 6px' }}>{displayed.title}</h3>
+          <p style={{ margin: '0 0 4px', fontSize: 13 }}>Affollamento: {statusLabel[displayed.crowdingStatus]}</p>
+          {displayed.isCertified && <p className="badge" style={{ margin: 0 }}>Evento certificato</p>}
+          {detailPath(displayed) && (
+            <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--color-primary)' }}>Apri dettagli →</p>
+          )}
         </aside>
       )}
     </section>
