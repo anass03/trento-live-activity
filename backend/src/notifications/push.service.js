@@ -77,6 +77,49 @@ async function sendActivityJoined(creatorUserId, activityTipo, participantName) 
   });
 }
 
+// Haversine distance between two coordinates, in kilometres
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+// Trigger 3 (RF40): newly created activity → notify users within radiusKm whose
+// declared interests include the activity type. Skips the creator.
+async function sendActivityNearby({ activityId, tipo, lat, lng, creatorId, radiusKm = 3 }) {
+  if (lat === undefined || lat === null || lng === undefined || lng === null) return;
+  const candidates = await User.findAll({
+    where: {
+      ruolo: 'UtenteRegistrato',
+      interessi: { [Op.contains]: [tipo] },
+      lastLat: { [Op.not]: null },
+      lastLng: { [Op.not]: null },
+    },
+    attributes: ['id', 'lastLat', 'lastLng'],
+  });
+  const nearbyIds = candidates
+    .filter((u) => u.id !== creatorId && haversineKm(lat, lng, u.lastLat, u.lastLng) <= radiusKm)
+    .map((u) => u.id);
+  if (nearbyIds.length === 0) return;
+
+  const rows = await DeviceToken.findAll({
+    where: { userId: { [Op.in]: nearbyIds } },
+    attributes: ['token'],
+  });
+  const tokens = rows.map((r) => r.token);
+  if (tokens.length === 0) return;
+
+  return sendToTokens(tokens, {
+    title: `Nuova attività di ${tipo} vicino a te`,
+    body: `Un'attività di ${tipo} è stata pubblicata a meno di ${radiusKm} km da te`,
+    data: { type: 'activity_nearby', activityId },
+  });
+}
+
 // Trigger 2: a certified entity published a new event → notify users with matching interest
 async function sendNewEventToInterested(eventId, categoria, titolo) {
   const interestedUsers = await User.findAll({
@@ -109,6 +152,7 @@ init();
 module.exports = {
   sendActivityJoined,
   sendNewEventToInterested,
+  sendActivityNearby,
   // exposed for tests / admin debug
   sendToTokens,
   getUserTokens,

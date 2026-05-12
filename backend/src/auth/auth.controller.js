@@ -28,6 +28,13 @@ async function updateProfile(req, res, next) {
   } catch (e) { next(e); }
 }
 
+async function updateLocation(req, res, next) {
+  try {
+    const result = await service.updateLocation(req.user.id, req.body);
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
 async function deleteAccount(req, res, next) {
   try {
     await service.deleteAccount(req.user.id);
@@ -77,4 +84,22 @@ async function registerEntity(req, res, next) {
   } catch (e) { next(e); }
 }
 
-module.exports = { register, login, logout, getMe, updateProfile, deleteAccount, setup2fa, verify2fa, forgotPassword, resetPassword, registerEntity };
+async function listConsents(req, res, next) {
+  try {
+    const consents = await service.listConsents(req.user.id);
+    res.json(consents);
+  } catch (e) { next(e); }
+}
+
+async function updateConsent(req, res, next) {
+  try {
+    const consent = await service.updateConsent(req.user.id, req.body.type, req.body.granted);
+    res.json(consent);
+  } catch (e) { next(e); }
+}
+
+module.exports = {
+  register, login, logout, getMe, updateProfile, updateLocation, deleteAccount,
+  setup2fa, verify2fa, forgotPassword, resetPassword, registerEntity,
+  listConsents, updateConsent,
+};
