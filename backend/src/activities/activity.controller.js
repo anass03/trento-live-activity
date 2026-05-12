@@ -1,4 +1,5 @@
 const service = require('./activity.service');
+const { User } = require('../data/models');
 
 async function create(req, res, next) {
   try {
@@ -9,7 +10,20 @@ async function create(req, res, next) {
 
 async function list(req, res, next) {
   try {
-    const result = await service.listActivities(req.query);
+    const { tipo, q, page, limit, mine } = req.query;
+    let userInterests;
+    // RF9: if "mine=interests" and user is authenticated, filter by their interests
+    if (mine === 'interests' && req.user) {
+      const user = await User.findByPk(req.user.id, { attributes: ['interessi'] });
+      userInterests = user?.interessi || [];
+    }
+    const result = await service.listActivities({
+      tipo,
+      q,
+      userInterests,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
     res.json(result);
   } catch (e) { next(e); }
 }
@@ -49,4 +63,13 @@ async function leave(req, res, next) {
   } catch (e) { next(e); }
 }
 
-module.exports = { create, list, get, update, cancel, join, leave };
+async function calendar(req, res, next) {
+  try {
+    const ics = await service.getActivityIcs(req.params.id);
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="activity-${req.params.id}.ics"`);
+    res.send(ics);
+  } catch (e) { next(e); }
+}
+
+module.exports = { create, list, get, update, cancel, join, leave, calendar };

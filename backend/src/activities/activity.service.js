@@ -1,4 +1,13 @@
-const { Activity, Participation, User } = require('../data/models');
+const { Op } = require('sequelize');
+const { Activity, Participation, User, POI } = require('../data/models');
+const {
+  sendActivityJoinConfirmation,
+  sendActivityNewParticipant,
+  sendActivityParticipantLeft,
+  sendActivityUpdated,
+  sendActivityCancelled,
+} = require('../notifications/email.service');
+const { buildIcs } = require('./ics');
 
 function isDatePast(data) {
   return new Date(data) < new Date(new Date().toDateString());
@@ -7,6 +16,17 @@ function isDatePast(data) {
 function timeToMinutes(t) {
   const [h, m] = t.split(':').map(Number);
   return h * 60 + m;
+}
+
+async function getParticipantEmails(activityId, excludeUserId = null) {
+  const parts = await Participation.findAll({
+    where: { activityId },
+    include: [{ model: User, attributes: ['id', 'email'] }],
+  });
+  return parts
+    .map((p) => p.User)
+    .filter((u) => u && u.email && u.id !== excludeUserId)
+    .map((u) => u.email);
 }
 
 async function createActivity(creatorId, { tipo, data, orarioInizio, orarioFine, maxPartecipanti, latitudine, longitudine, poiId }) {
@@ -34,12 +54,27 @@ async function createActivity(creatorId, { tipo, data, orarioInizio, orarioFine,
   return activity;
 }
 
-async function listActivities({ tipo, page = 1, limit = 20 }) {
+async function listActivities({ tipo, q, userInterests, page = 1, limit = 20 }) {
   const where = { stato: 'attiva' };
   if (tipo) where.tipo = tipo;
+  // RF9 / RF14: personalise by user interests if provided and no explicit filter
+  if (!tipo && Array.isArray(userInterests) && userInterests.length) {
+    where.tipo = { [Op.in]: userInterests };
+  }
+  const include = [{ model: User, as: 'creator', attributes: ['id', 'nome', 'cognome'] }];
+  // RF15: optional textual search via linked POI name
+  if (q) {
+    include.push({
+      model: POI,
+      as: 'poi',
+      attributes: ['id', 'nome'],
+      where: { nome: { [Op.iLike]: `%${q}%` } },
+      required: true,
+    });
+  }
   const { rows, count } = await Activity.findAndCountAll({
     where,
-    include: [{ model: User, as: 'creator', attributes: ['id', 'nome', 'cognome'] }],
+    include,
     limit,
     offset: (page - 1) * limit,
     order: [['data', 'ASC']],
@@ -50,7 +85,7 @@ async function listActivities({ tipo, page = 1, limit = 20 }) {
 async function getActivity(id) {
   const activity = await Activity.findByPk(id, {
     include: [
-      { model: User, as: 'creator', attributes: ['id', 'nome', 'cognome'] },
+      { model: User, as: 'creator', attributes: ['id', 'nome', 'cognome', 'email'] },
       { model: User, as: 'participants', attributes: ['id', 'nome', 'cognome'] },
     ],
   });
@@ -80,6 +115,11 @@ async function updateActivity(userId, activityId, updates) {
   }
 
   await activity.update(updates);
+
+  // RF19: notify registered participants (excluding the creator who triggered the change)
+  const emails = await getParticipantEmails(activityId, userId);
+  sendActivityUpdated(emails, activity.tipo).catch(() => {});
+
   return activity;
 }
 
@@ -90,11 +130,18 @@ async function cancelActivity(userId, activityId) {
     throw { status: 403, code: 'FORBIDDEN', error: 'Only the creator can cancel this activity' };
   }
   await activity.update({ stato: 'cancellata' });
+
+  // Notify all participants except the creator
+  const emails = await getParticipantEmails(activityId, userId);
+  sendActivityCancelled(emails, activity.tipo).catch(() => {});
 }
 
 async function joinActivity(userId, activityId) {
   const activity = await Activity.findByPk(activityId, {
-    include: [{ model: User, as: 'participants', attributes: ['id'] }],
+    include: [
+      { model: User, as: 'participants', attributes: ['id'] },
+      { model: User, as: 'creator', attributes: ['id', 'email'] },
+    ],
   });
   if (!activity) throw { status: 404, code: 'NOT_FOUND', error: 'Activity not found' };
   if (activity.stato !== 'attiva') {
@@ -120,6 +167,19 @@ async function joinActivity(userId, activityId) {
     throw e;
   }
 
+  // RF11: notify creator + send confirmation to participant
+  const participant = await User.findByPk(userId, { attributes: ['email', 'nome', 'cognome'] });
+  if (participant && activity.creator && activity.creator.id !== userId) {
+    sendActivityNewParticipant(
+      activity.creator.email,
+      activity.tipo,
+      `${participant.nome} ${participant.cognome}`,
+    ).catch(() => {});
+  }
+  if (participant) {
+    sendActivityJoinConfirmation(participant.email, activity.tipo, activity.data).catch(() => {});
+  }
+
   // OCL C14: user is now in participants list
   return getActivity(activityId);
 }
@@ -137,6 +197,37 @@ async function leaveActivity(userId, activityId) {
 
   // OCL C19: decrement is implicit via destroy
   await participation.destroy();
+
+  // RF17: notify other participants of the cancellation
+  const leaver = await User.findByPk(userId, { attributes: ['nome', 'cognome'] });
+  const emails = await getParticipantEmails(activityId);
+  if (leaver) {
+    sendActivityParticipantLeft(emails, activity.tipo, `${leaver.nome} ${leaver.cognome}`).catch(() => {});
+  }
 }
 
-module.exports = { createActivity, listActivities, getActivity, updateActivity, cancelActivity, joinActivity, leaveActivity };
+// RF12 / RF49: calendar export
+async function getActivityIcs(id) {
+  const activity = await Activity.findByPk(id, { include: [{ model: POI, as: 'poi', attributes: ['nome'] }] });
+  if (!activity) throw { status: 404, code: 'NOT_FOUND', error: 'Activity not found' };
+  return buildIcs({
+    uid: `activity-${activity.id}`,
+    summary: `Attività: ${activity.tipo}`,
+    description: `Attività spontanea di ${activity.tipo} su Trento Live Activity`,
+    location: activity.poi?.nome || (activity.latitudine && activity.longitudine ? `${activity.latitudine},${activity.longitudine}` : ''),
+    dateStr: activity.data,
+    startTime: activity.orarioInizio,
+    endTime: activity.orarioFine,
+  });
+}
+
+module.exports = {
+  createActivity,
+  listActivities,
+  getActivity,
+  updateActivity,
+  cancelActivity,
+  joinActivity,
+  leaveActivity,
+  getActivityIcs,
+};

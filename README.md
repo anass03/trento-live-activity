@@ -112,19 +112,19 @@ All API endpoints are documented on Apiary:
 ```bash
 # Clone the repository
 git clone https://github.com/<org>/trento-live-activity.git
-cd trento-live-activity
+cd trento-live-activity/backend
 
-# Install backend dependencies
-cd backend
-npm install
+# One-shot setup: creates PostgreSQL user/db, .env, runs npm install
+npm run setup
 
-# Configure environment variables
-cp .env.example .env
-# Edit .env with your database URL, JWT secret, API keys, etc.
-
-# Start the development server
+# Start the development server (creates tables automatically)
 npm run dev
+
+# (Optional) populate the database with sample data
+npm run seed
 ```
+
+The setup script needs `sudo` access (for PostgreSQL user/db creation) and assumes PostgreSQL is installed and running.
 
 ### Environment Variables
 
