@@ -9,6 +9,7 @@ const mapRoutes = require('./map/map.routes');
 const moderationRoutes = require('./moderation/moderation.routes');
 const dashboardRoutes = require('./dashboard/dashboard.routes');
 const adminRoutes = require('./admin/admin.routes');
+const notificationsRoutes = require('./notifications/notifications.routes');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -32,6 +33,7 @@ app.use('/map', mapRoutes);
 app.use('/moderation', moderationRoutes);
 app.use('/dashboard', dashboardRoutes);
 app.use('/admin', adminRoutes);
+app.use('/notifications', notificationsRoutes);
 app.use(errorHandler);
 
 module.exports = app;

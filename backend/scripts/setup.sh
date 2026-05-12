@@ -69,7 +69,9 @@ GOOGLE_CLIENT_SECRET=
 APPLE_CLIENT_ID=
 
 # Firebase Cloud Messaging
-FIREBASE_SERVER_KEY=
+# Leave empty to log push notifications to console (stub mode).
+# Set to the path of your Firebase service account JSON file to enable real push.
+FIREBASE_CREDENTIALS_PATH=
 
 # Maps
 MAPS_API_KEY=

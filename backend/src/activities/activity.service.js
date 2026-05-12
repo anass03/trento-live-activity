@@ -7,6 +7,7 @@ const {
   sendActivityUpdated,
   sendActivityCancelled,
 } = require('../notifications/email.service');
+const { sendActivityJoined } = require('../notifications/push.service');
 const { buildIcs } = require('./ics');
 
 function isDatePast(data) {
@@ -170,11 +171,10 @@ async function joinActivity(userId, activityId) {
   // RF11: notify creator + send confirmation to participant
   const participant = await User.findByPk(userId, { attributes: ['email', 'nome', 'cognome'] });
   if (participant && activity.creator && activity.creator.id !== userId) {
-    sendActivityNewParticipant(
-      activity.creator.email,
-      activity.tipo,
-      `${participant.nome} ${participant.cognome}`,
-    ).catch(() => {});
+    const participantName = `${participant.nome} ${participant.cognome}`;
+    sendActivityNewParticipant(activity.creator.email, activity.tipo, participantName).catch(() => {});
+    // RF40: push notification on top of email
+    sendActivityJoined(activity.creator.id, activity.tipo, participantName).catch(() => {});
   }
   if (participant) {
     sendActivityJoinConfirmation(participant.email, activity.tipo, activity.data).catch(() => {});

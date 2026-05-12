@@ -6,6 +6,7 @@ const Event = require('./Event')(sequelize);
 const Participation = require('./Participation')(sequelize);
 const POI = require('./POI')(sequelize);
 const Report = require('./Report')(sequelize);
+const DeviceToken = require('./DeviceToken')(sequelize);
 
 // User <-> Activity (creator)
 Activity.belongsTo(User, { foreignKey: 'creatorId', as: 'creator' });
@@ -30,4 +31,8 @@ Event.hasMany(Report, { foreignKey: 'eventId', as: 'reports' });
 Activity.belongsTo(POI, { foreignKey: 'poiId', as: 'poi' });
 Event.belongsTo(POI, { foreignKey: 'poiId', as: 'poi' });
 
-module.exports = { sequelize, User, Activity, Event, Participation, POI, Report };
+// User <-> DeviceToken (FCM push)
+DeviceToken.belongsTo(User, { foreignKey: 'userId', onDelete: 'CASCADE' });
+User.hasMany(DeviceToken, { foreignKey: 'userId', as: 'deviceTokens' });
+
+module.exports = { sequelize, User, Activity, Event, Participation, POI, Report, DeviceToken };
