@@ -69,6 +69,20 @@ async function sendActivityCancelled(emails, activityTipo) {
   `)));
 }
 
+async function sendReportCreated(adminEmails, eventTitolo, reportTipo) {
+  await Promise.all(adminEmails.map((e) => send(e, `Nuova segnalazione: ${eventTitolo}`, `
+    <p>È stata ricevuta una nuova segnalazione di tipo <strong>${reportTipo}</strong> per l'evento "<strong>${eventTitolo}</strong>".</p>
+    <p>Accedi alla dashboard di moderazione per esaminarla.</p>
+  `)));
+}
+
+async function sendContentRemoved(entityEmail, eventTitolo) {
+  await send(entityEmail, `Contenuto rimosso: ${eventTitolo}`, `
+    <p>Il tuo evento "<strong>${eventTitolo}</strong>" è stato rimosso a seguito di una segnalazione.</p>
+    <p>Se ritieni che la rimozione sia avvenuta per errore, contatta il team di Trento Live Activity.</p>
+  `);
+}
+
 module.exports = {
   sendPasswordReset,
   sendActivityJoinConfirmation,
@@ -76,4 +90,6 @@ module.exports = {
   sendActivityParticipantLeft,
   sendActivityUpdated,
   sendActivityCancelled,
+  sendReportCreated,
+  sendContentRemoved,
 };
