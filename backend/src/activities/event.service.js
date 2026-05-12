@@ -1,5 +1,6 @@
 const { Op } = require('sequelize');
 const { Event, User, Report, POI } = require('../data/models');
+const { sendNewEventToInterested } = require('../notifications/push.service');
 const { serializeEvent } = require('../data/presenters');
 const { buildIcs } = require('./ics');
 
@@ -22,6 +23,10 @@ async function createEvent(entityId, { titolo, descrizione, categoria, latitudin
     titolo, descrizione, categoria, badgeVerifica: true,
     entityId, latitudine, longitudine, poiId, data, orarioInizio, orarioFine,
   });
+
+  // RF40: push notification to users with matching interest in their profile
+  sendNewEventToInterested(event.id, categoria, titolo).catch(() => {});
+
   return event;
 }
 
