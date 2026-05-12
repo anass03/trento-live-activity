@@ -84,7 +84,10 @@ async function login({ email, password, otpToken } = {}) {
   }
 
   // RNF15 / OCL C1: 2FA mandatory for AmministratoreDiSistema
-  if (user.ruolo === 'AmministratoreDiSistema' && user.twoFactorEnabled) {
+  if (user.ruolo === 'AmministratoreDiSistema') {
+    if (!user.twoFactorEnabled) {
+      throw { status: 403, code: '2FA_REQUIRED', error: '2FA is required for system administrators' };
+    }
     if (!otpToken) {
       throw { status: 401, code: '2FA_REQUIRED', error: '2FA token required' };
     }
