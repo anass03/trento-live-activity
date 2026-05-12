@@ -70,4 +70,11 @@ async function logout(req, res, next) {
   } catch (e) { next(e); }
 }
 
-module.exports = { register, login, logout, getMe, updateProfile, deleteAccount, setup2fa, verify2fa, forgotPassword, resetPassword };
+async function registerEntity(req, res, next) {
+  try {
+    const result = await service.registerEntity(req.body);
+    res.status(201).json(result);
+  } catch (e) { next(e); }
+}
+
+module.exports = { register, login, logout, getMe, updateProfile, deleteAccount, setup2fa, verify2fa, forgotPassword, resetPassword, registerEntity };

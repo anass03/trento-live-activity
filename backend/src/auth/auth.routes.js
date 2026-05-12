@@ -7,6 +7,7 @@ router.post('/register', ctrl.register);
 router.post('/login', ctrl.login);
 router.post('/forgot-password', ctrl.forgotPassword);
 router.post('/reset-password/:token', ctrl.resetPassword);
+router.post('/register/entity', ctrl.registerEntity);
 
 // Protected
 router.post('/logout', authenticate, ctrl.logout);
