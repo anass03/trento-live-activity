@@ -46,6 +46,7 @@ function validatePassword(password) {
   if (!/[A-Z]/.test(password)) return 'La password deve contenere almeno una lettera maiuscola';
   if (!/[a-z]/.test(password)) return 'La password deve contenere almeno una lettera minuscola';
   if (!/[0-9]/.test(password)) return 'La password deve contenere almeno un numero';
+  if (!/[^A-Za-z0-9]/.test(password)) return 'La password deve contenere almeno un carattere speciale (!@#$%...)';
   return null;
 }
 
