@@ -1,4 +1,4 @@
-export type CrowdingStatus = 'green' | 'yellow' | 'orange' | 'red';
+export type CrowdingStatus = 'green' | 'yellow' | 'red';
 export type MarkerType = 'poi' | 'activity' | 'event';
 export type UserRole = 'anonymous' | 'registered_user' | 'certified_entity' | 'municipal_admin' | 'system_admin';
 
@@ -22,6 +22,7 @@ export interface ApiActivity {
   category: string;
   location: string | null;
   participantCount: number;
+  participantIds?: string[];
   maxParticipants: number;
   createdAt: string | null;
   dateTime?: string | null;
@@ -36,13 +37,10 @@ export interface MapMarker {
   title: string;
   latitude: number;
   longitude: number;
-  crowdLevel: number;
   crowdingStatus: CrowdingStatus;
   isCertified: boolean;
   sourceId: string;
   category?: string | null;
-  description?: string | null;
-  dateTime?: string | null;
 }
 
 export interface CurrentUser {
@@ -227,7 +225,7 @@ export async function register(payload: RegisterPayload): Promise<AuthResponse> 
   return result;
 }
 export interface RegisterEntityPayload {
-  email: string; password: string; nomeEnte: string; nome?: string; cognome?: string;
+  email: string; password: string; nomeEnte: string;
 }
 export function registerEntity(payload: RegisterEntityPayload): Promise<{ message: string; userId: string }> {
   return request('/api/auth/register/entity', { method: 'POST', body: payload, auth: false });
@@ -275,6 +273,9 @@ export async function verify2fa(token: string): Promise<Verify2FAResponse> {
 }
 export function regenerateRecoveryCodes(): Promise<RecoveryCodesResponse> {
   return request('/api/auth/2fa/recovery-codes', { method: 'POST' });
+}
+export function verifyEmail(token: string): Promise<AuthResponse> {
+  return request(`/api/auth/verify-email?token=${encodeURIComponent(token)}`, { auth: false });
 }
 
 // ============================== Activities (write) ==============================
@@ -393,4 +394,13 @@ export function getActivityCalendarUrl(id: string): string {
 }
 export function getEventCalendarUrl(id: string): string {
   return `${API_BASE_URL}/api/events/${encodeURIComponent(id)}/calendar`;
+}
+
+function toGoogleDate(iso: string): string {
+  return iso.replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+}
+export function googleCalendarUrl(title: string, startIso: string, location?: string | null): string {
+  const start = toGoogleDate(startIso);
+  const params = new URLSearchParams({ action: 'TEMPLATE', text: title, dates: `${start}/${start}`, location: location || '' });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
