@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getActivities, getActivityCalendarUrl, getToken, joinActivity, leaveActivity, type ApiActivity } from '../lib/api';
+import { getActivities, getActivityCalendarUrl, googleCalendarUrl, getToken, joinActivity, leaveActivity, type ApiActivity } from '../lib/api';
 import type { AppUser } from '../data/mockUser';
 
 function formatDateTime(value?: string | null) {
@@ -37,7 +37,10 @@ function ActivityCard({
         <div><dt>Partecipanti</dt><dd>{activity.participantCount} / {activity.maxParticipants}</dd></div>
       </dl>
       {activity.dateTime && (
-        <a href={getActivityCalendarUrl(activity.id)} download={`attivita-${activity.id}.ics`} style={{ fontSize: 12, color: 'var(--color-text-secondary)', textDecoration: 'none' }}>📅 Aggiungi al calendario</a>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <a href={getActivityCalendarUrl(activity.id)} download={`attivita-${activity.id}.ics`} style={{ fontSize: 12, color: 'var(--color-text-secondary)', textDecoration: 'none' }}>📅 Apple / Outlook</a>
+          <a href={googleCalendarUrl(activity.title, activity.dateTime, activity.location)} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: 'var(--color-text-secondary)', textDecoration: 'none' }}>📅 Google Calendar</a>
+        </div>
       )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
         <Link className="detail-link" to={`/attivita/${activity.id}`}>Apri dettagli</Link>

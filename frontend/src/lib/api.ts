@@ -225,7 +225,7 @@ export async function register(payload: RegisterPayload): Promise<AuthResponse> 
   return result;
 }
 export interface RegisterEntityPayload {
-  email: string; password: string; nomeEnte: string; nome?: string; cognome?: string;
+  email: string; password: string; nomeEnte: string;
 }
 export function registerEntity(payload: RegisterEntityPayload): Promise<{ message: string; userId: string }> {
   return request('/api/auth/register/entity', { method: 'POST', body: payload, auth: false });
@@ -394,4 +394,13 @@ export function getActivityCalendarUrl(id: string): string {
 }
 export function getEventCalendarUrl(id: string): string {
   return `${API_BASE_URL}/api/events/${encodeURIComponent(id)}/calendar`;
+}
+
+function toGoogleDate(iso: string): string {
+  return iso.replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+}
+export function googleCalendarUrl(title: string, startIso: string, location?: string | null): string {
+  const start = toGoogleDate(startIso);
+  const params = new URLSearchParams({ action: 'TEMPLATE', text: title, dates: `${start}/${start}`, location: location || '' });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }

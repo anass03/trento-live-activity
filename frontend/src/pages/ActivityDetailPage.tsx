@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { getActivityById, getActivityCalendarUrl, getToken, joinActivity, leaveActivity, type ApiActivity } from '../lib/api';
+import { getActivityById, getActivityCalendarUrl, googleCalendarUrl, getToken, joinActivity, leaveActivity, type ApiActivity } from '../lib/api';
 import type { AppUser } from '../data/mockUser';
 
 function formatDateTime(value?: string | null) {
@@ -84,7 +84,10 @@ export function ActivityDetailPage({ user }: { user?: AppUser }) {
             <div><dt>Partecipanti</dt><dd>{activity.participantCount} / {activity.maxParticipants}</dd></div>
           </dl>
           {activity.dateTime && (
-            <a href={getActivityCalendarUrl(activity.id)} download={`attivita-${activity.id}.ics`} className="primary-button" style={{ width: 'fit-content' }}>📅 Aggiungi al calendario</a>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <a href={getActivityCalendarUrl(activity.id)} download={`attivita-${activity.id}.ics`} className="primary-button" style={{ width: 'fit-content' }}>📅 Apple / Outlook</a>
+              <a href={googleCalendarUrl(activity.title, activity.dateTime, activity.location)} target="_blank" rel="noreferrer" className="primary-button" style={{ width: 'fit-content' }}>📅 Google Calendar</a>
+            </div>
           )}
           {isLoggedIn && activity.status === 'attiva' && (
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
