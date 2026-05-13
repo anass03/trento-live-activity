@@ -29,6 +29,7 @@ function validatePasswordClient(password: string): string | null {
   if (!/[A-Z]/.test(password)) return 'Serve almeno una lettera maiuscola';
   if (!/[a-z]/.test(password)) return 'Serve almeno una lettera minuscola';
   if (!/[0-9]/.test(password)) return 'Serve almeno un numero';
+  if (!/[^A-Za-z0-9]/.test(password)) return 'Serve almeno un carattere speciale (!@#$%...)';
   return null;
 }
 
@@ -169,7 +170,7 @@ export function RegistrationPage() {
           {pwErr && <small style={{ color: '#ffd0d0' }}>{pwErr}</small>}
           {!pwErr && (
             <small style={{ color: 'var(--color-text-secondary)' }}>
-              Min. 8 caratteri, una maiuscola, una minuscola, un numero
+              Min. 8 caratteri, una maiuscola, una minuscola, un numero, un carattere speciale
             </small>
           )}
         </label>
