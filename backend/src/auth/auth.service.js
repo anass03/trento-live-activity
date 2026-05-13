@@ -4,7 +4,8 @@ const jwt = require('jsonwebtoken');
 const speakeasy = require('speakeasy');
 const { User, Consent } = require('../data/models');
 const {
-  sendPasswordReset, sendWelcome, sendEntityRegistered, sendNewEntityRequest,
+  sendPasswordReset, sendEmailVerification, sendWelcome,
+  sendEntityRegistered, sendNewEntityRequest,
 } = require('../notifications/email.service');
 const { revoke } = require('./tokenBlacklist');
 
@@ -98,8 +99,12 @@ async function register({ email, password, nome, cognome, dataNascita, consents 
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
-  // OCL C3: registration automatically authenticates the user
-  const user = await User.create({ email, passwordHash, nome, cognome, dataNascita });
+  const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+  // OCL C3: registration creates the account (login requires email verification first)
+  const user = await User.create({
+    email, passwordHash, nome, cognome, dataNascita,
+    emailVerified: false, emailVerificationToken,
+  });
 
   // RNF19: persist the consents given at registration time
   const consentRows = ['privacy_policy', 'terms_of_service', 'marketing', 'analytics']
@@ -107,9 +112,8 @@ async function register({ email, password, nome, cognome, dataNascita, consents 
     .map((type) => ({ userId: user.id, type, version: '1.0', granted: true }));
   if (consentRows.length) await Consent.bulkCreate(consentRows);
 
-  const token = signToken(user);
-  sendWelcome(email, nome).catch(() => {});
-  return { user: sanitize(user), token };
+  sendEmailVerification(email, nome, emailVerificationToken).catch(() => {});
+  return { emailVerificationRequired: true };
 }
 
 async function listConsents(userId) {
@@ -145,6 +149,10 @@ async function login({ email, password, otpToken } = {}) {
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) {
     throw { status: 401, code: 'INVALID_CREDENTIALS', error: 'Invalid email or password' };
+  }
+
+  if (!user.emailVerified) {
+    throw { status: 403, code: 'EMAIL_NOT_VERIFIED', error: 'Verifica la tua email prima di accedere. Controlla la tua casella di posta.' };
   }
 
   // RNF15 / OCL C1: 2FA mandatory for AmministratoreDiSistema.
@@ -342,9 +350,21 @@ async function registerEntity({ email, password, nomeEnte, nome, cognome }) {
     .catch(() => {});
   return { message: 'Registration request submitted. Await admin approval.', userId: user.id };
 }
+async function verifyEmail(token) {
+  if (!token) throw { status: 400, code: 'MISSING_TOKEN', error: 'Token mancante' };
+  const user = await User.findOne({ where: { emailVerificationToken: token } });
+  if (!user) {
+    throw { status: 400, code: 'TOKEN_INVALID', error: 'Link di verifica non valido o già utilizzato' };
+  }
+  await user.update({ emailVerified: true, emailVerificationToken: null });
+  sendWelcome(user.email, user.nome).catch(() => {});
+  const jwtToken = signToken(user);
+  return { user: sanitize(user), token: jwtToken };
+}
+
 module.exports = {
   register, login, logout, getMe, updateProfile, updateLocation, deleteAccount,
   setup2fa, verify2fa, regenerateRecoveryCodes,
-  forgotPassword, resetPassword, registerEntity,
+  forgotPassword, resetPassword, registerEntity, verifyEmail,
   listConsents, updateConsent,
 };

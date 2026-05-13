@@ -19,6 +19,7 @@ import { PasswordResetPage } from '../pages/PasswordResetPage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { RegistrationPage } from '../pages/RegistrationPage';
 import { Setup2FAPage } from '../pages/Setup2FAPage';
+import { VerifyEmailPage } from '../pages/VerifyEmailPage';
 
 function mapRuoloToRole(ruolo?: string): AppUser['role'] {
   switch (ruolo) {
@@ -69,6 +70,7 @@ export function App() {
         <Route path="/password-reset/:token" element={<PasswordResetPage />} />
         <Route path="/profilo" element={<ProfilePage />} />
         <Route path="/setup-2fa" element={<Setup2FAPage />} />
+        <Route path="/verifica-email" element={<VerifyEmailPage />} />
 
         <Route path="/ente/pubblica" element={<EntityPublishPage />} />
 
