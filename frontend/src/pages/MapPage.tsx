@@ -3,10 +3,11 @@ import { MapCanvas } from '../components/map/MapCanvas';
 import { getMapMarkers, type MapMarker, type MarkerType } from '../lib/api';
 import type { AppUser } from '../data/mockUser';
 
-type Filter = 'all' | MarkerType;
+type Filter = 'all' | 'preferred' | MarkerType;
 
 const filterLabels: Array<{ label: string; value: Filter }> = [
   { label: 'Tutti', value: 'all' },
+  { label: 'Preferiti', value: 'preferred' },
   { label: 'Attività', value: 'activity' },
   { label: 'Eventi', value: 'event' },
   { label: 'POI', value: 'poi' },
@@ -37,10 +38,12 @@ export function MapPage({ user }: { user?: AppUser }) {
 
   const visibleMarkers = useMemo(
     () => markers.filter((marker) => {
-      if (filter !== 'all' && marker.type !== filter) return false;
-      if (hasInterests && marker.type !== 'poi' && marker.category) {
+      if (filter === 'preferred') {
+        if (marker.type === 'poi') return true;
+        if (!hasInterests || !marker.category) return false;
         return user!.interessi!.includes(marker.category);
       }
+      if (filter !== 'all' && marker.type !== filter) return false;
       return true;
     }),
     [filter, markers, hasInterests, user],
@@ -76,7 +79,7 @@ export function MapPage({ user }: { user?: AppUser }) {
       {!isLoading && !error && visibleMarkers.length === 0 && (
         <section className="state-panel glass-panel">Nessun marker disponibile per il filtro selezionato.</section>
       )}
-      {!isLoading && !error && visibleMarkers.length > 0 && <MapCanvas markers={visibleMarkers} />}
+      {!isLoading && !error && visibleMarkers.length > 0 && <MapCanvas markers={visibleMarkers} user={user} />}
     </div>
   );
 }

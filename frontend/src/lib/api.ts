@@ -22,6 +22,7 @@ export interface ApiActivity {
   category: string;
   location: string | null;
   participantCount: number;
+  participantIds?: string[];
   maxParticipants: number;
   createdAt: string | null;
   dateTime?: string | null;

@@ -114,6 +114,7 @@ export function ProfilePage() {
     try {
       await updateProfile({ nome, cognome, interessi });
       setMessage('Profilo aggiornato');
+      window.dispatchEvent(new CustomEvent('tla:user-updated'));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Errore');
     }
