@@ -29,6 +29,9 @@ module.exports = (sequelize) => {
     // AmministratoreDiSistema only
     twoFactorSecret: { type: DataTypes.STRING, allowNull: true },
     twoFactorEnabled: { type: DataTypes.BOOLEAN, defaultValue: false },
+    // 2FA recovery codes (SHA-256 hashes of one-time codes). Plain codes are
+    // shown to the user only once at setup/regeneration.
+    twoFactorRecoveryCodes: { type: DataTypes.ARRAY(DataTypes.STRING), defaultValue: [] },
     // Password reset (RF8)
     passwordResetToken: { type: DataTypes.STRING, allowNull: true },
     passwordResetExpires: { type: DataTypes.DATE, allowNull: true },

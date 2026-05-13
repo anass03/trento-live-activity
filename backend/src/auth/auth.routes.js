@@ -19,6 +19,7 @@ router.delete('/me', authenticate, ctrl.deleteAccount);
 // 2FA (AmministratoreDiSistema)
 router.post('/2fa/setup', authenticate, ctrl.setup2fa);
 router.post('/2fa/verify', authenticate, ctrl.verify2fa);
+router.post('/2fa/recovery-codes', authenticate, ctrl.regenerateRecoveryCodes);
 
 // GDPR consent (RNF19)
 router.get('/consents', authenticate, ctrl.listConsents);
