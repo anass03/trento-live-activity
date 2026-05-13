@@ -1,4 +1,4 @@
-const { POI, Activity, Event } = require('../data/models');
+const { POI, Activity, Event, User } = require('../data/models');
 const {
   markerFromActivity,
   markerFromEvent,
@@ -49,11 +49,14 @@ async function getMapData() {
     Activity.findAll({
       where: { stato: 'attiva' },
       attributes: ['id', 'tipo', 'data', 'orarioInizio', 'maxPartecipanti', 'stato', 'latitudine', 'longitudine', 'poiId', 'createdAt'],
-      include: [{ model: POI, as: 'poi', attributes: ['id', 'nome', 'statoAffollamento'] }],
+      include: [
+        { model: POI, as: 'poi', attributes: ['id', 'nome', 'statoAffollamento'] },
+        { model: User, as: 'participants', attributes: ['id'], through: { attributes: [] } },
+      ],
       order: [['data', 'ASC']],
     }),
     Event.findAll({
-      attributes: ['id', 'titolo', 'descrizione', 'categoria', 'badgeVerifica', 'latitudine', 'longitudine', 'poiId', 'data', 'orarioInizio', 'orarioFine', 'createdAt'],
+      attributes: ['id', 'titolo', 'descrizione', 'categoria', 'badgeVerifica', 'latitudine', 'longitudine', 'poiId', 'data', 'orarioInizio', 'orarioFine', 'views', 'createdAt'],
       include: [{ model: POI, as: 'poi', attributes: ['id', 'nome', 'statoAffollamento'] }],
       order: [['data', 'ASC']],
     }),

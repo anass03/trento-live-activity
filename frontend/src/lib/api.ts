@@ -1,4 +1,4 @@
-export type CrowdingStatus = 'green' | 'yellow' | 'red';
+export type CrowdingStatus = 'green' | 'yellow' | 'orange' | 'red';
 export type MarkerType = 'poi' | 'activity' | 'event';
 export type UserRole = 'anonymous' | 'registered_user' | 'certified_entity' | 'municipal_admin' | 'system_admin';
 
@@ -36,10 +36,13 @@ export interface MapMarker {
   title: string;
   latitude: number;
   longitude: number;
+  crowdLevel: number;
   crowdingStatus: CrowdingStatus;
   isCertified: boolean;
   sourceId: string;
   category?: string | null;
+  description?: string | null;
+  dateTime?: string | null;
 }
 
 export interface CurrentUser {
