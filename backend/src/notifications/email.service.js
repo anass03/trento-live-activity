@@ -1,22 +1,40 @@
 const nodemailer = require('nodemailer');
 
+const PLACEHOLDER_HOSTS = ['smtp.example.com', 'example.com', ''];
+
 let transporter = null;
 function getTransporter() {
   if (transporter) return transporter;
-  if (!process.env.SMTP_HOST) return null;
+  const host = process.env.SMTP_HOST || '';
+  if (!host || PLACEHOLDER_HOSTS.includes(host)) return null;
   transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
+    host,
     port: Number(process.env.SMTP_PORT) || 587,
     auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
   });
   return transporter;
 }
 
+// Extracts the first <a href="..."> URL from the email HTML for dev logging.
+function extractUrl(html) {
+  const m = html.match(/href="([^"]+)"/);
+  return m ? m[1] : null;
+}
+
 async function send(to, subject, html) {
   if (!to) return;
   const t = getTransporter();
   if (!t) {
-    console.log(`[email:stub] to=${to} subject="${subject}"`);
+    const url = extractUrl(html);
+    if (url) {
+      console.log(`\n[email:dev] ──────────────────────────────────`);
+      console.log(`  To:      ${to}`);
+      console.log(`  Subject: ${subject}`);
+      console.log(`  Link:    ${url}`);
+      console.log(`────────────────────────────────────────\n`);
+    } else {
+      console.log(`[email:dev] to=${to} subject="${subject}"`);
+    }
     return;
   }
   try {
@@ -24,8 +42,12 @@ async function send(to, subject, html) {
       from: process.env.SMTP_FROM || 'Trento Live Activity <noreply@example.com>',
       to, subject, html,
     });
+    console.log(`[email] sent to=${to} subject="${subject}"`);
   } catch (e) {
-    console.error('[email] send failed:', e.message);
+    console.error(`[email] FAILED to=${to} subject="${subject}": ${e.message}`);
+    // Log the link so dev can still use it manually
+    const url = extractUrl(html);
+    if (url) console.log(`[email:dev] Link fallback: ${url}`);
   }
 }
 
@@ -83,6 +105,57 @@ async function sendContentRemoved(entityEmail, eventTitolo) {
   `);
 }
 
+async function sendEmailVerification(email, nome, token) {
+  const verifyUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verifica-email?token=${token}`;
+  await send(email, 'Verifica la tua email — Trento Live Activity', `
+    <p>Ciao <strong>${nome}</strong>,</p>
+    <p>Grazie per esserti registrato su Trento Live Activity. Clicca il link seguente per verificare la tua email e attivare l'account:</p>
+    <p><a href="${verifyUrl}">${verifyUrl}</a></p>
+    <p>Il link è valido per 24 ore. Se non hai richiesto la registrazione, ignora questa email.</p>
+  `);
+}
+
+async function sendWelcome(email, nome) {
+  await send(email, 'Email verificata — Benvenuto su Trento Live Activity!', `
+    <p>Ciao <strong>${nome}</strong>,</p>
+    <p>La tua email è stata verificata con successo. Ora puoi esplorare la mappa di Trento, partecipare ad attività e ricevere notifiche sugli eventi vicino a te.</p>
+    <p><a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}">Accedi all'app</a></p>
+  `);
+}
+
+async function sendEntityRegistered(email, nomeEnte) {
+  await send(email, 'Richiesta di registrazione ricevuta — Trento Live Activity', `
+    <p>Grazie per aver registrato <strong>${nomeEnte}</strong> su Trento Live Activity.</p>
+    <p>La tua richiesta è in fase di revisione da parte del nostro team. Riceverai un'email non appena verrà esaminata.</p>
+  `);
+}
+
+async function sendNewEntityRequest(adminEmails, nomeEnte, entityEmail) {
+  await Promise.all(adminEmails.map((e) => send(e, `Nuova richiesta ente: ${nomeEnte}`, `
+    <p>È arrivata una nuova richiesta di registrazione come ente certificato.</p>
+    <ul>
+      <li><strong>Ente:</strong> ${nomeEnte}</li>
+      <li><strong>Email:</strong> ${entityEmail}</li>
+    </ul>
+    <p>Accedi alla dashboard di amministrazione per approvare o rifiutare la richiesta.</p>
+  `)));
+}
+
+async function sendEntityApproved(email, nomeEnte) {
+  await send(email, 'Account approvato — Trento Live Activity', `
+    <p>Congratulazioni! L'account di <strong>${nomeEnte}</strong> è stato approvato.</p>
+    <p>Ora puoi accedere all'app e pubblicare eventi certificati.</p>
+    <p><a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/login">Accedi</a></p>
+  `);
+}
+
+async function sendEntityRejected(email, nomeEnte) {
+  await send(email, 'Richiesta non approvata — Trento Live Activity', `
+    <p>Ci dispiace comunicarti che la richiesta di registrazione di <strong>${nomeEnte}</strong> non è stata approvata.</p>
+    <p>Per maggiori informazioni puoi contattare il team di Trento Live Activity.</p>
+  `);
+}
+
 module.exports = {
   sendPasswordReset,
   sendActivityJoinConfirmation,
@@ -92,4 +165,10 @@ module.exports = {
   sendActivityCancelled,
   sendReportCreated,
   sendContentRemoved,
+  sendEmailVerification,
+  sendWelcome,
+  sendEntityRegistered,
+  sendNewEntityRequest,
+  sendEntityApproved,
+  sendEntityRejected,
 };

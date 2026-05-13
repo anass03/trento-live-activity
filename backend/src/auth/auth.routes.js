@@ -8,6 +8,7 @@ router.post('/login', ctrl.login);
 router.post('/forgot-password', ctrl.forgotPassword);
 router.post('/reset-password/:token', ctrl.resetPassword);
 router.post('/register/entity', ctrl.registerEntity);
+router.get('/verify-email', ctrl.verifyEmail);
 
 // Protected
 router.post('/logout', authenticate, ctrl.logout);
