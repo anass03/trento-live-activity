@@ -36,8 +36,24 @@ function locationFor(item) {
 }
 
 function crowdingStatus(statoAffollamento) {
-  const map = { verde: 'green', giallo: 'yellow', rosso: 'red' };
-  return map[statoAffollamento] || 'green';
+  return crowdingStatusForLevel(crowdLevelFromStatus(statoAffollamento));
+}
+
+function crowdLevelFromStatus(statoAffollamento) {
+  const map = { verde: 22, giallo: 52, rosso: 90 };
+  return map[statoAffollamento] || 25;
+}
+
+function crowdingStatusForLevel(level) {
+  if (level >= 82) return 'red';
+  if (level >= 62) return 'orange';
+  if (level >= 34) return 'yellow';
+  return 'green';
+}
+
+function crowdLevelFromRatio(participantCount, maxParticipants, fallback = 25) {
+  if (!participantCount || !maxParticipants) return fallback;
+  return Math.max(8, Math.min(100, Math.round((participantCount / maxParticipants) * 100)));
 }
 
 function roleForClient(ruolo) {
@@ -140,45 +156,62 @@ function serializePOI(record) {
 
 function markerFromPOI(record) {
   const poi = plain(record);
+  const crowdLevel = crowdLevelFromStatus(poi.statoAffollamento);
   return {
     id: `poi:${poi.id}`,
     type: 'poi',
     title: poi.nome,
     latitude: poi.latitudine,
     longitude: poi.longitudine,
-    crowdingStatus: crowdingStatus(poi.statoAffollamento),
+    crowdLevel,
+    crowdingStatus: crowdingStatusForLevel(crowdLevel),
     isCertified: false,
     sourceId: poi.id,
+    category: poi.tipo,
+    description: poi.descrizione || 'Punto di interesse cittadino.',
+    dateTime: null,
   };
 }
 
 function markerFromActivity(record) {
   const activity = plain(record);
+  const participants = Array.isArray(activity.participants) ? activity.participants : [];
+  const fallback = crowdLevelFromStatus(activity.poi?.statoAffollamento);
+  const crowdLevel = crowdLevelFromRatio(participants.length, activity.maxPartecipanti, fallback);
   return {
     id: `activity:${activity.id}`,
     type: 'activity',
     title: `Attività di ${capitalize(activity.tipo)}`,
     latitude: activity.latitudine,
     longitude: activity.longitudine,
-    crowdingStatus: crowdingStatus(activity.poi?.statoAffollamento),
+    crowdLevel,
+    crowdingStatus: crowdingStatusForLevel(crowdLevel),
     isCertified: false,
     sourceId: activity.id,
     category: activity.tipo,
+    description: `Attività spontanea di ${activity.tipo}. Partecipanti: ${participants.length}/${activity.maxPartecipanti}.`,
+    dateTime: dateTime(activity.data, activity.orarioInizio),
   };
 }
 
 function markerFromEvent(record) {
   const event = plain(record);
+  const baseLevel = crowdLevelFromStatus(event.poi?.statoAffollamento);
+  const popularityBoost = Math.min(18, Math.floor((event.views || 0) / 8));
+  const crowdLevel = Math.min(100, baseLevel + popularityBoost);
   return {
     id: `event:${event.id}`,
     type: 'event',
     title: event.titolo,
     latitude: event.latitudine,
     longitude: event.longitudine,
-    crowdingStatus: crowdingStatus(event.poi?.statoAffollamento),
+    crowdLevel,
+    crowdingStatus: crowdingStatusForLevel(crowdLevel),
     isCertified: Boolean(event.badgeVerifica),
     sourceId: event.id,
     category: event.categoria,
+    description: event.descrizione || 'Evento certificato su Trento Live Activity.',
+    dateTime: dateTime(event.data, event.orarioInizio),
   };
 }
 
