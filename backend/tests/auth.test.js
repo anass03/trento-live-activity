@@ -119,6 +119,62 @@ describe('Auth Service — login', () => {
     await expect(authService.login({ email: validUserData.email, password: 'Password123' }))
       .rejects.toMatchObject({ code: '2FA_REQUIRED' });
   });
+
+  test('TC-AUTH-11: admin without 2FA gets a setup-flag token instead of being rejected', async () => {
+    const hash = await bcrypt.hash('Password123', 1);
+    User.findOne.mockResolvedValue(makeFakeUser({
+      passwordHash: hash,
+      ruolo: 'AmministratoreDiSistema',
+      twoFactorEnabled: false,
+    }));
+
+    const result = await authService.login({ email: validUserData.email, password: 'Password123' });
+    expect(result.needs2faSetup).toBe(true);
+    expect(result.token).toBeTruthy();
+  });
+
+  test('TC-AUTH-12: recovery code at login consumes it, disables 2FA and forces re-setup', async () => {
+    const crypto = require('crypto');
+    const code = 'ABCD-EFGH';
+    const codeHash = crypto.createHash('sha256').update('ABCDEFGH').digest('hex');
+    const hash = await bcrypt.hash('Password123', 1);
+    const update = jest.fn().mockResolvedValue(undefined);
+    User.findOne.mockResolvedValue(makeFakeUser({
+      passwordHash: hash,
+      ruolo: 'AmministratoreDiSistema',
+      twoFactorEnabled: true,
+      twoFactorSecret: 'BASE32SECRET',
+      twoFactorRecoveryCodes: [codeHash, 'other-hash'],
+      update,
+    }));
+
+    const result = await authService.login({
+      email: validUserData.email, password: 'Password123', otpToken: code,
+    });
+    expect(result.recoveryUsed).toBe(true);
+    expect(result.needs2faSetup).toBe(true);
+    // 2FA disabled and ALL remaining recovery codes wiped
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({
+      twoFactorEnabled: false,
+      twoFactorSecret: null,
+      twoFactorRecoveryCodes: [],
+    }));
+  });
+
+  test('TC-AUTH-13: invalid recovery code is rejected', async () => {
+    const hash = await bcrypt.hash('Password123', 1);
+    User.findOne.mockResolvedValue(makeFakeUser({
+      passwordHash: hash,
+      ruolo: 'AmministratoreDiSistema',
+      twoFactorEnabled: true,
+      twoFactorSecret: 'BASE32SECRET',
+      twoFactorRecoveryCodes: ['some-other-hash'],
+    }));
+
+    await expect(authService.login({
+      email: validUserData.email, password: 'Password123', otpToken: 'WRNG-CODE',
+    })).rejects.toMatchObject({ code: '2FA_INVALID' });
+  });
 });
 
 describe('Auth Service — password reset (RF8)', () => {
