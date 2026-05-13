@@ -44,7 +44,7 @@ async function seed() {
       ruolo: 'AmministratoreComunale', emailVerified: true,
     }),
     User.create({
-      email: 'admin@trento-live.it', passwordHash: pwHash,
+      email: 'soussaneanas8@gmail.com', passwordHash: pwHash,
       nome: 'System', cognome: 'Admin', dataNascita: '1988-06-15',
       ruolo: 'AmministratoreDiSistema', emailVerified: true,
     }),
