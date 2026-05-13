@@ -15,6 +15,10 @@ jest.mock('../src/data/models', () => ({
 
 jest.mock('../src/notifications/email.service', () => ({
   sendPasswordReset: jest.fn().mockResolvedValue(undefined),
+  sendEmailVerification: jest.fn().mockResolvedValue(undefined),
+  sendWelcome: jest.fn().mockResolvedValue(undefined),
+  sendEntityRegistered: jest.fn().mockResolvedValue(undefined),
+  sendNewEntityRequest: jest.fn().mockResolvedValue(undefined),
 }));
 
 const { User } = require('../src/data/models');
@@ -39,6 +43,7 @@ function makeFakeUser(overrides = {}) {
     cognome: 'Rossi',
     ruolo: 'UtenteRegistrato',
     twoFactorEnabled: false,
+    emailVerified: true,
     ...overrides,
   };
   return { ...data, toJSON: () => ({ ...data }) };
@@ -47,14 +52,13 @@ function makeFakeUser(overrides = {}) {
 describe('Auth Service — register', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  test('TC-AUTH-01: registers a valid user and returns token', async () => {
+  test('TC-AUTH-01: registers a valid user and returns emailVerificationRequired flag', async () => {
     User.findOne.mockResolvedValue(null);
     User.create.mockResolvedValue(makeFakeUser());
 
     const result = await authService.register(validUserData);
-    expect(result.token).toBeDefined();
-    expect(result.user.email).toBe(validUserData.email);
-    expect(result.user.passwordHash).toBeUndefined();
+    expect(result.emailVerificationRequired).toBe(true);
+    expect(result.token).toBeUndefined();
   });
 
   test('TC-AUTH-02: rejects user under 13 years old (OCL C5)', async () => {
@@ -91,6 +95,14 @@ describe('Auth Service — login', () => {
 
     const result = await authService.login({ email: validUserData.email, password: 'Password123' });
     expect(result.token).toBeDefined();
+  });
+
+  test('TC-AUTH-06b: blocks login if email not verified', async () => {
+    const hash = await bcrypt.hash('Password123', 1);
+    User.findOne.mockResolvedValue(makeFakeUser({ passwordHash: hash, emailVerified: false }));
+
+    await expect(authService.login({ email: validUserData.email, password: 'Password123' }))
+      .rejects.toMatchObject({ code: 'EMAIL_NOT_VERIFIED' });
   });
 
   test('TC-AUTH-07: rejects wrong password', async () => {

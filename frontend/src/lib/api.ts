@@ -274,6 +274,9 @@ export async function verify2fa(token: string): Promise<Verify2FAResponse> {
 export function regenerateRecoveryCodes(): Promise<RecoveryCodesResponse> {
   return request('/api/auth/2fa/recovery-codes', { method: 'POST' });
 }
+export function verifyEmail(token: string): Promise<AuthResponse> {
+  return request(`/api/auth/verify-email?token=${encodeURIComponent(token)}`, { auth: false });
+}
 
 // ============================== Activities (write) ==============================
 

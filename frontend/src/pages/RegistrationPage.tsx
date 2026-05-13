@@ -98,8 +98,7 @@ export function RegistrationPage() {
           email: form.email, password: form.password, nome: form.nome,
           cognome: form.cognome, dataNascita: form.dataNascita, consents,
         });
-        navigate('/');
-        window.location.reload();
+        setSuccess(`Registrazione completata! Abbiamo inviato un'email di verifica a ${form.email}. Clicca il link nell'email per attivare il tuo account.`);
       } else {
         const result = await registerEntity({ email: form.email, password: form.password, nomeEnte: form.nomeEnte });
         setSuccess(result.message);
