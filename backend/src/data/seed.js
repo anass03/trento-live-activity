@@ -21,32 +21,32 @@ async function seed() {
     User.create({
       email: 'mario.rossi@example.com', passwordHash: pwHash,
       nome: 'Mario', cognome: 'Rossi', dataNascita: '1995-05-12',
-      ruolo: 'UtenteRegistrato', interessi: ['sport', 'musica'],
+      ruolo: 'UtenteRegistrato', interessi: ['sport', 'musica'], emailVerified: true,
     }),
     User.create({
       email: 'lucia.bianchi@example.com', passwordHash: pwHash,
       nome: 'Lucia', cognome: 'Bianchi', dataNascita: '2000-09-23',
-      ruolo: 'UtenteRegistrato', interessi: ['cultura', 'arte'],
+      ruolo: 'UtenteRegistrato', interessi: ['cultura', 'arte'], emailVerified: true,
     }),
     User.create({
       email: 'info@castellotrento.it', passwordHash: pwHash,
       nome: 'Castello', cognome: 'Buonconsiglio', dataNascita: '1990-01-01',
-      ruolo: 'EnteCertificato', approvato: true, nomeEnte: 'Castello del Buonconsiglio',
+      ruolo: 'EnteCertificato', approvato: true, nomeEnte: 'Castello del Buonconsiglio', emailVerified: true,
     }),
     User.create({
       email: 'eventi@sportclubtrento.it', passwordHash: pwHash,
       nome: 'Sport', cognome: 'Club', dataNascita: '1985-03-10',
-      ruolo: 'EnteCertificato', approvato: true, nomeEnte: 'Sport Club Trento',
+      ruolo: 'EnteCertificato', approvato: true, nomeEnte: 'Sport Club Trento', emailVerified: true,
     }),
     User.create({
       email: 'dashboard@comune.trento.it', passwordHash: pwHash,
       nome: 'Comune', cognome: 'Trento', dataNascita: '1980-01-01',
-      ruolo: 'AmministratoreComunale',
+      ruolo: 'AmministratoreComunale', emailVerified: true,
     }),
     User.create({
       email: 'admin@trento-live.it', passwordHash: pwHash,
       nome: 'System', cognome: 'Admin', dataNascita: '1988-06-15',
-      ruolo: 'AmministratoreDiSistema',
+      ruolo: 'AmministratoreDiSistema', emailVerified: true,
     }),
   ]);
 

@@ -91,6 +91,13 @@ async function registerEntity(req, res, next) {
   } catch (e) { next(e); }
 }
 
+async function verifyEmail(req, res, next) {
+  try {
+    const result = await service.verifyEmail(req.query.token);
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
 async function listConsents(req, res, next) {
   try {
     const consents = await service.listConsents(req.user.id);
@@ -108,6 +115,6 @@ async function updateConsent(req, res, next) {
 module.exports = {
   register, login, logout, getMe, updateProfile, updateLocation, deleteAccount,
   setup2fa, verify2fa, regenerateRecoveryCodes,
-  forgotPassword, resetPassword, registerEntity,
+  forgotPassword, resetPassword, registerEntity, verifyEmail,
   listConsents, updateConsent,
 };

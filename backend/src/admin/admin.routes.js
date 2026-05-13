@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const { User } = require('../data/models');
 const { authenticate, authorize } = require('../middleware/auth');
+const { sendEntityApproved, sendEntityRejected } = require('../notifications/email.service');
 
 //GET all pending entities
 router.get('/entities/pending', authenticate, authorize('AmministratoreDiSistema'), async (req, res, next) => {
@@ -20,7 +21,8 @@ router.patch('/entities/:id/approve', authenticate, authorize('AmministratoreDiS
     try {
         const entity = await User.findOne({ where: { id: req.params.id, ruolo: 'EnteCertificato' } });
         if (!entity) return res.status(404).json({ error: 'Entity not found', code: 'NOT FOUND' });
-        await entity.update({ approvato: true});
+        await entity.update({ approvato: true });
+        sendEntityApproved(entity.email, entity.nomeEnte).catch(() => {});
         res.json({ message: 'Entity approved' });
     } catch (error) {
         next(error);
@@ -32,7 +34,9 @@ router.patch('/entities/:id/reject', authenticate, authorize('AmministratoreDiSi
     try {
         const entity = await User.findOne({ where: { id: req.params.id, ruolo: 'EnteCertificato' } });
         if (!entity) return res.status(404).json({ error: 'Entity not found', code: 'NOT_FOUND' });
+        const { email, nomeEnte } = entity;
         await entity.destroy();
+        sendEntityRejected(email, nomeEnte).catch(() => {});
         res.json({ message: 'Entity rejected and deleted' });
     } catch (error) {
         next(error);
