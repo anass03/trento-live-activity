@@ -149,10 +149,10 @@ export function ProfilePage() {
 
       {user.twoFactorEnabled && (
         <div className="auth-form glass-card">
-          <h2>Codici di recupero 2FA</h2>
+          <h2>Autenticazione a due fattori</h2>
           <p>
-            Codici monouso da usare al login se perdi l'accesso al tuo authenticator.
-            Restanti: <strong>{user.twoFactorRecoveryCodesRemaining ?? 0}</strong> di 8.
+            2FA attiva. Codici di recupero monouso restanti:{' '}
+            <strong>{user.twoFactorRecoveryCodesRemaining ?? 0}</strong> di 8.
           </p>
 
           {newRecoveryCodes && (
@@ -171,9 +171,21 @@ export function ProfilePage() {
           )}
 
           {!newRecoveryCodes && (
-            <button type="button" className="primary-button" onClick={handleRegenerate} disabled={isRegenerating}>
-              {isRegenerating ? 'Generazione...' : 'Rigenera codici di recupero'}
-            </button>
+            <div className="filter-actions">
+              <button type="button" className="primary-button" onClick={handleRegenerate} disabled={isRegenerating}>
+                {isRegenerating ? 'Generazione...' : 'Rigenera codici di recupero'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('Cambiare authenticator richiede di rifare il setup 2FA con un nuovo dispositivo. Procedere?')) {
+                    navigate('/setup-2fa');
+                  }
+                }}
+              >
+                Cambia authenticator / Reimposta 2FA
+              </button>
+            </div>
           )}
         </div>
       )}

@@ -133,7 +133,7 @@ describe('Auth Service — login', () => {
     expect(result.token).toBeTruthy();
   });
 
-  test('TC-AUTH-12: recovery code at login consumes it, disables 2FA and forces re-setup', async () => {
+  test('TC-AUTH-12: recovery code at login consumes only that code, 2FA stays enabled', async () => {
     const crypto = require('crypto');
     const code = 'ABCD-EFGH';
     const codeHash = crypto.createHash('sha256').update('ABCDEFGH').digest('hex');
@@ -144,7 +144,7 @@ describe('Auth Service — login', () => {
       ruolo: 'AmministratoreDiSistema',
       twoFactorEnabled: true,
       twoFactorSecret: 'BASE32SECRET',
-      twoFactorRecoveryCodes: [codeHash, 'other-hash'],
+      twoFactorRecoveryCodes: [codeHash, 'other-hash-1', 'other-hash-2'],
       update,
     }));
 
@@ -152,13 +152,12 @@ describe('Auth Service — login', () => {
       email: validUserData.email, password: 'Password123', otpToken: code,
     });
     expect(result.recoveryUsed).toBe(true);
-    expect(result.needs2faSetup).toBe(true);
-    // 2FA disabled and ALL remaining recovery codes wiped
-    expect(update).toHaveBeenCalledWith(expect.objectContaining({
-      twoFactorEnabled: false,
-      twoFactorSecret: null,
-      twoFactorRecoveryCodes: [],
-    }));
+    expect(result.recoveryCodesRemaining).toBe(2);
+    expect(result.needs2faSetup).toBeUndefined();
+    // Only the used code is removed; secret and twoFactorEnabled untouched
+    expect(update).toHaveBeenCalledWith({
+      twoFactorRecoveryCodes: ['other-hash-1', 'other-hash-2'],
+    });
   });
 
   test('TC-AUTH-13: invalid recovery code is rejected', async () => {

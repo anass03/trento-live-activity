@@ -157,22 +157,24 @@ async function login({ email, password, otpToken } = {}) {
     }
 
     // Accept either a 6-digit TOTP code or a single-use recovery code.
-    // Recovery code path: consume the code, disable 2FA, force re-setup.
+    // Recovery code path: consume only the used code; 2FA stays enabled with
+    // the same secret. The user can keep using the authenticator app (if they
+    // still have it) or explicitly reset 2FA from their profile.
     if (looksLikeRecoveryCode(otpToken)) {
       const candidateHash = hashRecoveryCode(otpToken);
       const stored = user.twoFactorRecoveryCodes || [];
       if (!stored.includes(candidateHash)) {
         throw { status: 401, code: '2FA_INVALID', error: 'Invalid 2FA token' };
       }
-      // Invalidate ALL remaining recovery codes: if the device is gone, treat
-      // the rest as potentially compromised — user will get fresh ones at re-setup.
-      await user.update({
-        twoFactorEnabled: false,
-        twoFactorSecret: null,
-        twoFactorRecoveryCodes: [],
-      });
-      const token = signToken(user, { needs2faSetup: true });
-      return { user: sanitize(user), token, needs2faSetup: true, recoveryUsed: true };
+      const remaining = stored.filter((h) => h !== candidateHash);
+      await user.update({ twoFactorRecoveryCodes: remaining });
+      const token = signToken(user);
+      return {
+        user: sanitize(user),
+        token,
+        recoveryUsed: true,
+        recoveryCodesRemaining: remaining.length,
+      };
     }
 
     const valid2fa = speakeasy.totp.verify({

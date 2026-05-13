@@ -21,15 +21,17 @@ export function LoginPage() {
     try {
       const codeToSend = otpToken || undefined;
       const result = await login(email, password, codeToSend);
-      if (result.recoveryUsed) {
-        // Backend disabled 2FA. needs2faSetup will also be true → redirect to setup
-        // with a notice that the user must re-configure.
-        navigate('/setup-2fa', { state: { fromRecovery: true } });
-        return;
-      }
       if (result.needs2faSetup) {
         navigate('/setup-2fa');
         return;
+      }
+      if (result.recoveryUsed) {
+        const remaining = result.recoveryCodesRemaining ?? 0;
+        window.alert(
+          `Hai effettuato l'accesso con un codice di recupero. Te ne restano ${remaining}.\n\n` +
+          `Se non hai più accesso al tuo authenticator, vai sul profilo e usa ` +
+          `"Cambia authenticator / Reimposta 2FA" per riconfigurare la 2FA con un nuovo dispositivo.`,
+        );
       }
       navigate('/');
       window.location.reload();
