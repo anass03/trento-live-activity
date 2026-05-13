@@ -1,10 +1,14 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  deleteAccount, getMe, logout, regenerateRecoveryCodes, updateLocation, updateProfile,
+  deleteAccount, getMe, logout, regenerateRecoveryCodes,
+  registerDeviceToken, unregisterDeviceToken,
+  updateLocation, updateProfile,
 } from '../lib/api';
+import { onForegroundMessage, requestFcmToken } from '../lib/firebase';
 
 const AVAILABLE_INTERESTS = ['sport', 'cultura', 'musica', 'arte', 'gastronomia', 'studio'];
+const FCM_TOKEN_KEY = 'tla_fcm_token';
 
 interface MeUser {
   nome?: string;
@@ -29,6 +33,9 @@ export function ProfilePage() {
   const [newRecoveryCodes, setNewRecoveryCodes] = useState<string[] | null>(null);
   const [isRegenerating, setIsRegenerating] = useState(false);
 
+  const [pushEnabled, setPushEnabled] = useState<boolean>(() => Boolean(localStorage.getItem(FCM_TOKEN_KEY)));
+  const [isTogglingPush, setIsTogglingPush] = useState(false);
+
   useEffect(() => {
     getMe()
       .then((u) => {
@@ -41,6 +48,46 @@ export function ProfilePage() {
       .catch((e) => setError(e instanceof Error ? e.message : 'Errore'))
       .finally(() => setIsLoading(false));
   }, []);
+
+  // Listen for push messages that arrive while the page is open (foreground).
+  // When tab is in background or closed, the service worker shows them instead.
+  useEffect(() => {
+    const unsub = onForegroundMessage((payload) => {
+      const title = payload.notification?.title || 'Notifica';
+      setMessage(`🔔 ${title}: ${payload.notification?.body || ''}`);
+    });
+    return unsub;
+  }, []);
+
+  async function handleEnablePush() {
+    setError(null); setMessage(null);
+    setIsTogglingPush(true);
+    try {
+      const token = await requestFcmToken();
+      await registerDeviceToken(token, 'web');
+      localStorage.setItem(FCM_TOKEN_KEY, token);
+      setPushEnabled(true);
+      setMessage('Notifiche push attivate per questo browser');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Errore attivazione notifiche');
+    } finally { setIsTogglingPush(false); }
+  }
+
+  async function handleDisablePush() {
+    setError(null); setMessage(null);
+    setIsTogglingPush(true);
+    try {
+      const token = localStorage.getItem(FCM_TOKEN_KEY);
+      if (token) {
+        await unregisterDeviceToken(token);
+        localStorage.removeItem(FCM_TOKEN_KEY);
+      }
+      setPushEnabled(false);
+      setMessage('Notifiche push disattivate');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Errore');
+    } finally { setIsTogglingPush(false); }
+  }
 
   async function handleRegenerate() {
     if (!window.confirm('Rigenerare i codici di recupero? I vecchi codici saranno invalidati.')) return;
@@ -145,6 +192,26 @@ export function ProfilePage() {
         <h2>Posizione (per notifiche di attività vicine)</h2>
         <p>Condividi la tua posizione corrente per ricevere notifiche di attività entro 3 km dai tuoi interessi.</p>
         <button type="button" className="primary-button" onClick={handleShareLocation}>📍 Condividi posizione</button>
+      </div>
+
+      <div className="auth-form glass-card">
+        <h2>Notifiche push</h2>
+        <p>
+          Ricevi notifiche immediate sul tuo dispositivo per nuovi partecipanti alle tue attività,
+          eventi che corrispondono ai tuoi interessi e attività vicine a te.
+          {pushEnabled
+            ? ' Sono attive su questo browser.'
+            : ' Non sono attive su questo browser.'}
+        </p>
+        {pushEnabled ? (
+          <button type="button" onClick={handleDisablePush} disabled={isTogglingPush}>
+            {isTogglingPush ? '...' : 'Disattiva notifiche push'}
+          </button>
+        ) : (
+          <button type="button" className="primary-button" onClick={handleEnablePush} disabled={isTogglingPush}>
+            {isTogglingPush ? '...' : '🔔 Attiva notifiche push'}
+          </button>
+        )}
       </div>
 
       {user.twoFactorEnabled && (
