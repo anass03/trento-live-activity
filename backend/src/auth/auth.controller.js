@@ -56,6 +56,13 @@ async function verify2fa(req, res, next) {
   } catch (e) { next(e); }
 }
 
+async function regenerateRecoveryCodes(req, res, next) {
+  try {
+    const result = await service.regenerateRecoveryCodes(req.user.id);
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
 async function forgotPassword(req, res, next) {
   try {
     await service.forgotPassword(req.body.email);
@@ -100,6 +107,7 @@ async function updateConsent(req, res, next) {
 
 module.exports = {
   register, login, logout, getMe, updateProfile, updateLocation, deleteAccount,
-  setup2fa, verify2fa, forgotPassword, resetPassword, registerEntity,
+  setup2fa, verify2fa, regenerateRecoveryCodes,
+  forgotPassword, resetPassword, registerEntity,
   listConsents, updateConsent,
 };

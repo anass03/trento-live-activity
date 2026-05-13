@@ -2,11 +2,14 @@ import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ApiError, login } from '../lib/api';
 
+type CodeMode = 'totp' | 'recovery';
+
 export function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [otpToken, setOtpToken] = useState('');
+  const [codeMode, setCodeMode] = useState<CodeMode>('totp');
   const [needs2fa, setNeeds2fa] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -16,7 +19,18 @@ export function LoginPage() {
     setError(null);
     setIsLoading(true);
     try {
-      await login(email, password, otpToken || undefined);
+      const codeToSend = otpToken || undefined;
+      const result = await login(email, password, codeToSend);
+      if (result.recoveryUsed) {
+        // Backend disabled 2FA. needs2faSetup will also be true → redirect to setup
+        // with a notice that the user must re-configure.
+        navigate('/setup-2fa', { state: { fromRecovery: true } });
+        return;
+      }
+      if (result.needs2faSetup) {
+        navigate('/setup-2fa');
+        return;
+      }
       navigate('/');
       window.location.reload();
     } catch (e) {
@@ -29,6 +43,12 @@ export function LoginPage() {
     } finally {
       setIsLoading(false);
     }
+  }
+
+  function toggleMode() {
+    setCodeMode((m) => (m === 'totp' ? 'recovery' : 'totp'));
+    setOtpToken('');
+    setError(null);
   }
 
   return (
@@ -46,11 +66,43 @@ export function LoginPage() {
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
         </label>
 
-        {needs2fa && (
+        {needs2fa && codeMode === 'totp' && (
           <label>
             <span>Codice 2FA (6 cifre)</span>
-            <input type="text" inputMode="numeric" pattern="[0-9]{6}" value={otpToken} onChange={(e) => setOtpToken(e.target.value)} maxLength={6} required />
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]{6}"
+              value={otpToken}
+              onChange={(e) => setOtpToken(e.target.value.replace(/\D/g, ''))}
+              maxLength={6}
+              placeholder="000000"
+              required
+              autoFocus
+            />
           </label>
+        )}
+
+        {needs2fa && codeMode === 'recovery' && (
+          <label>
+            <span>Codice di recupero</span>
+            <input
+              type="text"
+              value={otpToken}
+              onChange={(e) => setOtpToken(e.target.value.toUpperCase())}
+              maxLength={9}
+              placeholder="XXXX-XXXX"
+              required
+              autoFocus
+            />
+            <small>Userai uno dei codici salvati al setup 2FA. Il codice verrà consumato e dovrai riconfigurare la 2FA.</small>
+          </label>
+        )}
+
+        {needs2fa && (
+          <button type="button" className="link-button" onClick={toggleMode}>
+            {codeMode === 'totp' ? 'Ho perso l\'accesso all\'authenticator — usa codice di recupero' : 'Torna al codice authenticator'}
+          </button>
         )}
 
         {error && <div className="form-error">{error}</div>}
