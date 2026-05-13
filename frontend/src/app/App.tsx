@@ -33,7 +33,7 @@ function mapRuoloToRole(ruolo?: string): AppUser['role'] {
 export function App() {
   const [user, setUser] = useState<AppUser>(mockCurrentUser);
 
-  useEffect(() => {
+  function fetchUser() {
     if (!getToken()) { setUser(mockCurrentUser); return; }
     getMe()
       .then((u) => {
@@ -51,14 +51,20 @@ export function App() {
         });
       })
       .catch(() => setUser(mockCurrentUser));
+  }
+
+  useEffect(() => {
+    fetchUser();
+    window.addEventListener('tla:user-updated', fetchUser);
+    return () => window.removeEventListener('tla:user-updated', fetchUser);
   }, []);
 
   return (
     <AppShell user={user}>
       <Routes>
         <Route path="/" element={<MapPage user={user} />} />
-        <Route path="/attivita" element={<ActivitiesPage userInterests={user.interessi} />} />
-        <Route path="/attivita/:id" element={<ActivityDetailPage />} />
+        <Route path="/attivita" element={<ActivitiesPage userInterests={user.interessi} user={user} />} />
+        <Route path="/attivita/:id" element={<ActivityDetailPage user={user} />} />
         <Route path="/eventi" element={<EventsPage user={user} />} />
         <Route path="/eventi/:id" element={<EventDetailPage user={user} />} />
         <Route path="/eventi-certificati" element={<EventsPage user={user} certifiedOnly />} />

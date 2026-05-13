@@ -108,6 +108,7 @@ function serializeActivity(record) {
     category: activity.tipo,
     location: locationFor(activity),
     participantCount: participants.length,
+    participantIds: participants.map((p) => p.id),
     maxParticipants: activity.maxPartecipanti,
     createdAt: timestamp(activity.createdAt),
     dateTime: dateTime(activity.data, activity.orarioInizio),
