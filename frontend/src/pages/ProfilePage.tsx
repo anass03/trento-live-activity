@@ -1,12 +1,24 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { deleteAccount, getMe, logout, updateLocation, updateProfile } from '../lib/api';
+import {
+  deleteAccount, getMe, logout, regenerateRecoveryCodes, updateLocation, updateProfile,
+} from '../lib/api';
 
 const AVAILABLE_INTERESTS = ['sport', 'cultura', 'musica', 'arte', 'gastronomia', 'studio'];
 
+interface MeUser {
+  nome?: string;
+  cognome?: string;
+  email?: string;
+  ruolo?: string;
+  interessi?: string[];
+  twoFactorEnabled?: boolean;
+  twoFactorRecoveryCodesRemaining?: number;
+}
+
 export function ProfilePage() {
   const navigate = useNavigate();
-  const [user, setUser] = useState<{ nome?: string; cognome?: string; email?: string; ruolo?: string; interessi?: string[] } | null>(null);
+  const [user, setUser] = useState<MeUser | null>(null);
   const [interessi, setInteressi] = useState<string[]>([]);
   const [nome, setNome] = useState('');
   const [cognome, setCognome] = useState('');
@@ -14,17 +26,36 @@ export function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const [newRecoveryCodes, setNewRecoveryCodes] = useState<string[] | null>(null);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+
   useEffect(() => {
     getMe()
       .then((u) => {
-        setUser(u as never);
-        setNome((u as { nome?: string }).nome || '');
-        setCognome((u as { cognome?: string }).cognome || '');
-        setInteressi((u as { interessi?: string[] }).interessi || []);
+        const me = u as unknown as MeUser;
+        setUser(me);
+        setNome(me.nome || '');
+        setCognome(me.cognome || '');
+        setInteressi(me.interessi || []);
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Errore'))
       .finally(() => setIsLoading(false));
   }, []);
+
+  async function handleRegenerate() {
+    if (!window.confirm('Rigenerare i codici di recupero? I vecchi codici saranno invalidati.')) return;
+    setIsRegenerating(true);
+    setError(null);
+    try {
+      const result = await regenerateRecoveryCodes();
+      setNewRecoveryCodes(result.recoveryCodes);
+      setUser((prev) => prev && { ...prev, twoFactorRecoveryCodesRemaining: result.recoveryCodes.length });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Errore');
+    } finally {
+      setIsRegenerating(false);
+    }
+  }
 
   function toggleInteresse(name: string) {
     setInteressi((prev) => (prev.includes(name) ? prev.filter((i) => i !== name) : [...prev, name]));
@@ -115,6 +146,37 @@ export function ProfilePage() {
         <p>Condividi la tua posizione corrente per ricevere notifiche di attività entro 3 km dai tuoi interessi.</p>
         <button type="button" className="primary-button" onClick={handleShareLocation}>📍 Condividi posizione</button>
       </div>
+
+      {user.twoFactorEnabled && (
+        <div className="auth-form glass-card">
+          <h2>Codici di recupero 2FA</h2>
+          <p>
+            Codici monouso da usare al login se perdi l'accesso al tuo authenticator.
+            Restanti: <strong>{user.twoFactorRecoveryCodesRemaining ?? 0}</strong> di 8.
+          </p>
+
+          {newRecoveryCodes && (
+            <>
+              <div className="warning-box">
+                <strong>⚠ Salva subito questi codici.</strong> Verranno mostrati solo ora.
+              </div>
+              <div className="recovery-codes-grid">
+                {newRecoveryCodes.map((c) => <code key={c} className="recovery-code">{c}</code>)}
+              </div>
+              <div className="filter-actions">
+                <button type="button" onClick={() => navigator.clipboard.writeText(newRecoveryCodes.join('\n'))}>Copia</button>
+                <button type="button" onClick={() => setNewRecoveryCodes(null)}>Ho salvato, chiudi</button>
+              </div>
+            </>
+          )}
+
+          {!newRecoveryCodes && (
+            <button type="button" className="primary-button" onClick={handleRegenerate} disabled={isRegenerating}>
+              {isRegenerating ? 'Generazione...' : 'Rigenera codici di recupero'}
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="auth-form glass-card danger-zone">
         <h2>Zona pericolosa</h2>

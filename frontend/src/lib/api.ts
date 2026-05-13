@@ -68,6 +68,7 @@ export interface AuthResponse {
   };
   token: string;
   needs2faSetup?: boolean;
+  recoveryUsed?: boolean;
 }
 
 export interface Setup2FAResponse {
@@ -78,6 +79,10 @@ export interface Verify2FAResponse {
   message: string;
   token: string;
   user: AuthResponse['user'];
+  recoveryCodes: string[];
+}
+export interface RecoveryCodesResponse {
+  recoveryCodes: string[];
 }
 
 export interface DashboardStats {
@@ -254,6 +259,9 @@ export async function verify2fa(token: string): Promise<Verify2FAResponse> {
   const result = await request<Verify2FAResponse>('/api/auth/2fa/verify', { method: 'POST', body: { token } });
   if (result.token) setToken(result.token);
   return result;
+}
+export function regenerateRecoveryCodes(): Promise<RecoveryCodesResponse> {
+  return request('/api/auth/2fa/recovery-codes', { method: 'POST' });
 }
 
 // ============================== Activities (write) ==============================

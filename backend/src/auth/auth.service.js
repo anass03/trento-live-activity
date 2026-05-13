@@ -17,6 +17,30 @@ function calcAge(dataNascita) {
   return age;
 }
 
+// Recovery codes: 8-char alphanumeric (avoiding ambiguous chars 0/O/1/I/L)
+// formatted as XXXX-XXXX. SHA-256 is enough since the codes are random and
+// single-use, no need for bcrypt's slowness.
+const RECOVERY_CODE_CHARSET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+function generateRecoveryCode() {
+  let code = '';
+  for (let i = 0; i < 8; i++) {
+    code += RECOVERY_CODE_CHARSET[crypto.randomInt(RECOVERY_CODE_CHARSET.length)];
+    if (i === 3) code += '-';
+  }
+  return code;
+}
+function generateRecoveryCodes(count = 8) {
+  return Array.from({ length: count }, generateRecoveryCode);
+}
+function hashRecoveryCode(input) {
+  return crypto.createHash('sha256').update(String(input).replace(/[\s-]/g, '').toUpperCase()).digest('hex');
+}
+function looksLikeRecoveryCode(input) {
+  if (typeof input !== 'string') return false;
+  const cleaned = input.replace(/[\s-]/g, '');
+  return cleaned.length === 8 && /^[A-Z0-9]+$/i.test(cleaned);
+}
+
 function signToken(user, extraClaims = {}) {
   const jti = crypto.randomUUID();
   const token = jwt.sign(
@@ -33,6 +57,11 @@ function sanitize(user) {
   delete obj.twoFactorSecret;
   delete obj.passwordResetToken;
   delete obj.passwordResetExpires;
+  // Don't expose the hashed recovery codes themselves — just how many are left.
+  if (Array.isArray(obj.twoFactorRecoveryCodes)) {
+    obj.twoFactorRecoveryCodesRemaining = obj.twoFactorRecoveryCodes.length;
+  }
+  delete obj.twoFactorRecoveryCodes;
   return obj;
 }
 
@@ -126,6 +155,26 @@ async function login({ email, password, otpToken } = {}) {
     if (!otpToken) {
       throw { status: 401, code: '2FA_REQUIRED', error: '2FA token required' };
     }
+
+    // Accept either a 6-digit TOTP code or a single-use recovery code.
+    // Recovery code path: consume the code, disable 2FA, force re-setup.
+    if (looksLikeRecoveryCode(otpToken)) {
+      const candidateHash = hashRecoveryCode(otpToken);
+      const stored = user.twoFactorRecoveryCodes || [];
+      if (!stored.includes(candidateHash)) {
+        throw { status: 401, code: '2FA_INVALID', error: 'Invalid 2FA token' };
+      }
+      // Invalidate ALL remaining recovery codes: if the device is gone, treat
+      // the rest as potentially compromised — user will get fresh ones at re-setup.
+      await user.update({
+        twoFactorEnabled: false,
+        twoFactorSecret: null,
+        twoFactorRecoveryCodes: [],
+      });
+      const token = signToken(user, { needs2faSetup: true });
+      return { user: sanitize(user), token, needs2faSetup: true, recoveryUsed: true };
+    }
+
     const valid2fa = speakeasy.totp.verify({
       secret: user.twoFactorSecret,
       encoding: 'base32',
@@ -193,10 +242,34 @@ async function verify2fa(userId, otpToken) {
     window: 1,
   });
   if (!valid) throw { status: 400, code: '2FA_INVALID', error: 'Invalid OTP token' };
-  await user.update({ twoFactorEnabled: true });
+
+  // Generate 8 single-use recovery codes. Shown to the user once in plain text,
+  // stored only as SHA-256 hashes.
+  const recoveryCodes = generateRecoveryCodes(8);
+  await user.update({
+    twoFactorEnabled: true,
+    twoFactorRecoveryCodes: recoveryCodes.map(hashRecoveryCode),
+  });
+
   // Issue a fresh JWT without the needs2faSetup flag so the user is fully logged in.
   const token = signToken(user);
-  return { message: '2FA enabled successfully', token, user: sanitize(user) };
+  return {
+    message: '2FA enabled successfully',
+    token,
+    user: sanitize(user),
+    recoveryCodes, // plain codes — must be saved by the user; never returned again
+  };
+}
+
+async function regenerateRecoveryCodes(userId) {
+  const user = await User.findByPk(userId);
+  if (!user) throw { status: 404, code: 'NOT_FOUND', error: 'User not found' };
+  if (!user.twoFactorEnabled) {
+    throw { status: 400, code: '2FA_NOT_ENABLED', error: '2FA must be enabled before generating recovery codes' };
+  }
+  const recoveryCodes = generateRecoveryCodes(8);
+  await user.update({ twoFactorRecoveryCodes: recoveryCodes.map(hashRecoveryCode) });
+  return { recoveryCodes };
 }
 
 async function forgotPassword(email) {
@@ -262,6 +335,7 @@ async function registerEntity({ email, password, nomeEnte, nome, cognome }) {
 }
 module.exports = {
   register, login, logout, getMe, updateProfile, updateLocation, deleteAccount,
-  setup2fa, verify2fa, forgotPassword, resetPassword, registerEntity,
+  setup2fa, verify2fa, regenerateRecoveryCodes,
+  forgotPassword, resetPassword, registerEntity,
   listConsents, updateConsent,
 };

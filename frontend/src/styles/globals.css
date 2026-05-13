@@ -135,3 +135,25 @@ select option { background: #1a3328; color: var(--color-text-primary); }
   border-radius: 8px; font-family: ui-monospace, monospace; font-size: 13px; word-break: break-all;
 }
 details summary { cursor: pointer; color: var(--color-text-secondary); font-size: 13px; }
+
+/* ===== Recovery codes ===== */
+.recovery-codes-grid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;
+  margin: 8px 0;
+}
+.recovery-code {
+  display: block; padding: 10px 12px; text-align: center;
+  background: rgba(255,255,255,0.06); border: 1px solid var(--color-glass-border);
+  border-radius: 8px; font-family: ui-monospace, monospace; font-size: 15px; letter-spacing: 0.04em;
+}
+.warning-box {
+  background: rgba(209,190,88,0.12); color: #f5e6a3;
+  border: 1px solid rgba(209,190,88,0.35); border-radius: 8px;
+  padding: 12px; font-size: 14px; line-height: 1.5;
+}
+.link-button {
+  background: transparent; border: none; color: var(--color-primary);
+  text-decoration: underline; cursor: pointer; padding: 4px 0; font-size: 13px;
+  text-align: left;
+}
+.link-button:hover { color: #6be0b3; }
