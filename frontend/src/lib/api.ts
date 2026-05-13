@@ -67,6 +67,17 @@ export interface AuthResponse {
     approvato?: boolean;
   };
   token: string;
+  needs2faSetup?: boolean;
+}
+
+export interface Setup2FAResponse {
+  otpauthUrl: string;
+  base32: string;
+}
+export interface Verify2FAResponse {
+  message: string;
+  token: string;
+  user: AuthResponse['user'];
 }
 
 export interface DashboardStats {
@@ -232,6 +243,17 @@ export function deleteAccount(): Promise<void> {
 }
 export function updateLocation(lat: number, lng: number): Promise<{ lat: number; lng: number }> {
   return request('/api/auth/me/location', { method: 'PUT', body: { lat, lng } });
+}
+
+// 2FA — RNF15. Two-step setup: client calls setup2fa() to get the otpauth URL +
+// secret, displays a QR code, then calls verify2fa() with the 6-digit code.
+export function setup2fa(): Promise<Setup2FAResponse> {
+  return request('/api/auth/2fa/setup', { method: 'POST' });
+}
+export async function verify2fa(token: string): Promise<Verify2FAResponse> {
+  const result = await request<Verify2FAResponse>('/api/auth/2fa/verify', { method: 'POST', body: { token } });
+  if (result.token) setToken(result.token);
+  return result;
 }
 
 // ============================== Activities (write) ==============================
