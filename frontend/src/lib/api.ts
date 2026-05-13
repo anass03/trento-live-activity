@@ -251,6 +251,15 @@ export function updateLocation(lat: number, lng: number): Promise<{ lat: number;
   return request('/api/auth/me/location', { method: 'PUT', body: { lat, lng } });
 }
 
+// Push notifications — RF40. The frontend gets an FCM token from Firebase
+// and registers it here so the backend can target this device.
+export function registerDeviceToken(token: string, platform: 'web' | 'ios' | 'android' = 'web'): Promise<{ id: string }> {
+  return request('/api/notifications/device-token', { method: 'POST', body: { token, platform } });
+}
+export function unregisterDeviceToken(token: string): Promise<void> {
+  return request('/api/notifications/device-token', { method: 'DELETE', body: { token } });
+}
+
 // 2FA — RNF15. Two-step setup: client calls setup2fa() to get the otpauth URL +
 // secret, displays a QR code, then calls verify2fa() with the 6-digit code.
 export function setup2fa(): Promise<Setup2FAResponse> {
