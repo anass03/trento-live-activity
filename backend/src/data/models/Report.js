@@ -1,6 +1,6 @@
 const { DataTypes } = require('sequelize');
 
-const REPORT_TYPES = ['contenuto_illegale', 'spam', 'informazioni_false', 'contenuto_offensivo'];
+const REPORT_TYPES = ['contenuto_inappropriato', 'spam', 'disinformazione', 'contenuto_offensivo', 'altro'];
 
 module.exports = (sequelize) => {
   return sequelize.define('Report', {
