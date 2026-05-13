@@ -19,6 +19,7 @@ import { PasswordResetPage } from '../pages/PasswordResetPage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { RegistrationPage } from '../pages/RegistrationPage';
 import { Setup2FAPage } from '../pages/Setup2FAPage';
+import { VerifyEmailPage } from '../pages/VerifyEmailPage';
 
 function mapRuoloToRole(ruolo?: string): AppUser['role'] {
   switch (ruolo) {
@@ -33,7 +34,7 @@ function mapRuoloToRole(ruolo?: string): AppUser['role'] {
 export function App() {
   const [user, setUser] = useState<AppUser>(mockCurrentUser);
 
-  useEffect(() => {
+  function fetchUser() {
     if (!getToken()) { setUser(mockCurrentUser); return; }
     getMe()
       .then((u) => {
@@ -51,14 +52,20 @@ export function App() {
         });
       })
       .catch(() => setUser(mockCurrentUser));
+  }
+
+  useEffect(() => {
+    fetchUser();
+    window.addEventListener('tla:user-updated', fetchUser);
+    return () => window.removeEventListener('tla:user-updated', fetchUser);
   }, []);
 
   return (
     <AppShell user={user}>
       <Routes>
         <Route path="/" element={<MapPage user={user} />} />
-        <Route path="/attivita" element={<ActivitiesPage userInterests={user.interessi} />} />
-        <Route path="/attivita/:id" element={<ActivityDetailPage />} />
+        <Route path="/attivita" element={<ActivitiesPage userInterests={user.interessi} user={user} />} />
+        <Route path="/attivita/:id" element={<ActivityDetailPage user={user} />} />
         <Route path="/eventi" element={<EventsPage user={user} />} />
         <Route path="/eventi/:id" element={<EventDetailPage user={user} />} />
         <Route path="/eventi-certificati" element={<EventsPage user={user} certifiedOnly />} />
@@ -69,6 +76,7 @@ export function App() {
         <Route path="/password-reset/:token" element={<PasswordResetPage />} />
         <Route path="/profilo" element={<ProfilePage />} />
         <Route path="/setup-2fa" element={<Setup2FAPage />} />
+        <Route path="/verifica-email" element={<VerifyEmailPage />} />
 
         <Route path="/ente/pubblica" element={<EntityPublishPage />} />
 

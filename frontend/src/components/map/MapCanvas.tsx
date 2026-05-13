@@ -211,6 +211,25 @@ export function MapCanvas({ markers }: { markers: MapMarker[] }) {
     window.setTimeout(() => map.invalidateSize(), 0);
   }, [markers]);
 
+  async function handleCreateActivity(e: FormEvent) {
+    e.preventDefault();
+    if (!pinned) return;
+    setSubmitting(true);
+    setFormMsg(null);
+    try {
+      await createActivity({ ...form, poiId: pinned.sourceId ?? undefined });
+      setFormMsg({ ok: true, text: 'Attività creata!' });
+      setShowForm(false);
+      setForm(defaultForm());
+    } catch (err) {
+      setFormMsg({ ok: false, text: err instanceof Error ? err.message : 'Errore nella creazione.' });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const showNavigate = !showForm && displayed && detailPath(displayed);
+
   return (
     <section className="map-area glass-panel" aria-label="Map Zone" data-testid="map-zone">
       <div ref={containerRef} className="leaflet-map" />
