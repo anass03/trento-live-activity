@@ -1,22 +1,40 @@
 const nodemailer = require('nodemailer');
 
+const PLACEHOLDER_HOSTS = ['smtp.example.com', 'example.com', ''];
+
 let transporter = null;
 function getTransporter() {
   if (transporter) return transporter;
-  if (!process.env.SMTP_HOST) return null;
+  const host = process.env.SMTP_HOST || '';
+  if (!host || PLACEHOLDER_HOSTS.includes(host)) return null;
   transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
+    host,
     port: Number(process.env.SMTP_PORT) || 587,
     auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
   });
   return transporter;
 }
 
+// Extracts the first <a href="..."> URL from the email HTML for dev logging.
+function extractUrl(html) {
+  const m = html.match(/href="([^"]+)"/);
+  return m ? m[1] : null;
+}
+
 async function send(to, subject, html) {
   if (!to) return;
   const t = getTransporter();
   if (!t) {
-    console.log(`[email:stub] to=${to} subject="${subject}"`);
+    const url = extractUrl(html);
+    if (url) {
+      console.log(`\n[email:dev] ──────────────────────────────────`);
+      console.log(`  To:      ${to}`);
+      console.log(`  Subject: ${subject}`);
+      console.log(`  Link:    ${url}`);
+      console.log(`────────────────────────────────────────\n`);
+    } else {
+      console.log(`[email:dev] to=${to} subject="${subject}"`);
+    }
     return;
   }
   try {
@@ -24,8 +42,12 @@ async function send(to, subject, html) {
       from: process.env.SMTP_FROM || 'Trento Live Activity <noreply@example.com>',
       to, subject, html,
     });
+    console.log(`[email] sent to=${to} subject="${subject}"`);
   } catch (e) {
-    console.error('[email] send failed:', e.message);
+    console.error(`[email] FAILED to=${to} subject="${subject}": ${e.message}`);
+    // Log the link so dev can still use it manually
+    const url = extractUrl(html);
+    if (url) console.log(`[email:dev] Link fallback: ${url}`);
   }
 }
 
