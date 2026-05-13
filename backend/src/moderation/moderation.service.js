@@ -56,7 +56,7 @@ async function resolveReport(reportId, { azione }) {
 
   if (azione === 'rimuovi') {
     // fetch entity email before destroying the event
-    const entity = await User.findByPk(report.event.userId, { attributes: ['email'] });
+    const entity = await User.findByPk(report.event.entityId, { attributes: ['email'] });
     const eventTitolo = report.event.titolo;
     await report.event.destroy();
     await report.update({ stato: 'risolta' });
