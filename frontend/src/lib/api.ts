@@ -69,6 +69,7 @@ export interface AuthResponse {
   token: string;
   needs2faSetup?: boolean;
   recoveryUsed?: boolean;
+  recoveryCodesRemaining?: number;
 }
 
 export interface Setup2FAResponse {
