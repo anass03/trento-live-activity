@@ -225,7 +225,7 @@ export async function register(payload: RegisterPayload): Promise<AuthResponse> 
   return result;
 }
 export interface RegisterEntityPayload {
-  email: string; password: string; nomeEnte: string; nome?: string; cognome?: string;
+  email: string; password: string; nomeEnte: string;
 }
 export function registerEntity(payload: RegisterEntityPayload): Promise<{ message: string; userId: string }> {
   return request('/api/auth/register/entity', { method: 'POST', body: payload, auth: false });

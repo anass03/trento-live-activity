@@ -41,6 +41,14 @@ function looksLikeRecoveryCode(input) {
   return cleaned.length === 8 && /^[A-Z0-9]+$/i.test(cleaned);
 }
 
+function validatePassword(password) {
+  if (!password || password.length < 8) return 'La password deve avere almeno 8 caratteri';
+  if (!/[A-Z]/.test(password)) return 'La password deve contenere almeno una lettera maiuscola';
+  if (!/[a-z]/.test(password)) return 'La password deve contenere almeno una lettera minuscola';
+  if (!/[0-9]/.test(password)) return 'La password deve contenere almeno un numero';
+  return null;
+}
+
 function signToken(user, extraClaims = {}) {
   const jti = crypto.randomUUID();
   const token = jwt.sign(
@@ -85,9 +93,8 @@ async function register({ email, password, nome, cognome, dataNascita, consents 
     throw { status: 400, code: 'INVALID_EMAIL', error: 'Invalid email format' };
   }
 
-  if (!password || password.length < 8) {
-    throw { status: 400, code: 'WEAK_PASSWORD', error: 'Password must be at least 8 characters' };
-  }
+  const pwErr = validatePassword(password);
+  if (pwErr) throw { status: 400, code: 'WEAK_PASSWORD', error: pwErr };
 
   // OCL C7: email must be unique
   const existing = await User.findOne({ where: { email } });
@@ -288,9 +295,8 @@ async function forgotPassword(email) {
 }
 
 async function resetPassword(rawToken, newPassword) {
-  if (!newPassword || newPassword.length < 8) {
-    throw { status: 400, code: 'WEAK_PASSWORD', error: 'Password must be at least 8 characters' };
-  }
+  const pwErr = validatePassword(newPassword);
+  if (pwErr) throw { status: 400, code: 'WEAK_PASSWORD', error: pwErr };
 
   const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
   const user = await User.findOne({ where: { passwordResetToken: tokenHash } });
@@ -308,32 +314,37 @@ function logout(jti) {
   revoke(jti);
 }
 
-async function registerEntity({ email, password, nomeEnte, nome, cognome }) {
+async function registerEntity({ email, password, nomeEnte }) {
   if (!email || !password || !nomeEnte) {
-    throw { status: 400, code: 'MISSING_FIELDS', error: 'email, password and nomeEnte are required' };
+    throw { status: 400, code: 'MISSING_FIELDS', error: 'email, password e nomeEnte sono obbligatori' };
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    throw { status: 400, code: 'INVALID_EMAIL', error: 'Invalid email format' };
+    throw { status: 400, code: 'INVALID_EMAIL', error: 'Formato email non valido' };
   }
-  if (password.length < 8) {
-    throw { status: 400, code: 'WEAK_PASSWORD', error: 'Password must be at least 8 characters' };
+  const pwErr = validatePassword(password);
+  if (pwErr) throw { status: 400, code: 'WEAK_PASSWORD', error: pwErr };
+
+  const existingEmail = await User.findOne({ where: { email } });
+  if (existingEmail) {
+    throw { status: 409, code: 'EMAIL_TAKEN', error: 'Email già registrata' };
   }
-  const existing = await User.findOne({ where: { email } });
-  if (existing) {
-    throw { status: 409, code: 'EMAIL_TAKEN', error: 'Email already registered' };
+  const existingEnte = await User.findOne({ where: { nomeEnte } });
+  if (existingEnte) {
+    throw { status: 409, code: 'NOME_ENTE_TAKEN', error: 'Nome ente già registrato' };
   }
+
   const passwordHash = await bcrypt.hash(password, 12);
   const user = await User.create({
     email,
     passwordHash,
-    nome: nome || nomeEnte,
-    cognome: cognome || '',
-    dataNascita: '2000-01-01', // placeholder — not meaningful for entities
+    nome: nomeEnte,
+    cognome: '',
+    dataNascita: '2000-01-01',
     ruolo: 'EnteCertificato',
     approvato: false,
     nomeEnte,
   });
-  return { message: 'Registration request submitted. Await admin approval.', userId: user.id };
+  return { message: 'Richiesta di registrazione inviata. In attesa di approvazione da parte dell\'amministratore.', userId: user.id };
 }
 module.exports = {
   register, login, logout, getMe, updateProfile, updateLocation, deleteAccount,
