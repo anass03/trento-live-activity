@@ -83,11 +83,21 @@ async function sendContentRemoved(entityEmail, eventTitolo) {
   `);
 }
 
-async function sendWelcome(email, nome) {
-  await send(email, 'Benvenuto su Trento Live Activity!', `
+async function sendEmailVerification(email, nome, token) {
+  const verifyUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verifica-email?token=${token}`;
+  await send(email, 'Verifica la tua email — Trento Live Activity', `
     <p>Ciao <strong>${nome}</strong>,</p>
-    <p>La tua registrazione è avvenuta con successo. Ora puoi esplorare la mappa di Trento, partecipare ad attività e ricevere notifiche sugli eventi vicino a te.</p>
-    <p><a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}">Accedi all'app</a></p>
+    <p>Grazie per esserti registrato su Trento Live Activity. Clicca il link seguente per verificare la tua email e attivare l'account:</p>
+    <p><a href="${verifyUrl}">${verifyUrl}</a></p>
+    <p>Il link è valido per 24 ore. Se non hai richiesto la registrazione, ignora questa email.</p>
+  `);
+}
+
+async function sendWelcome(email, nome) {
+  await send(email, 'Email verificata — Benvenuto su Trento Live Activity!', `
+    <p>Ciao <strong>${nome}</strong>,</p>
+    <p>La tua email è stata verificata con successo. Ora puoi esplorare la mappa di Trento, partecipare ad attività e ricevere notifiche sugli eventi vicino a te.</p>
+    <p><a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}">Accedi all'app</a></p>
   `);
 }
 
@@ -133,6 +143,7 @@ module.exports = {
   sendActivityCancelled,
   sendReportCreated,
   sendContentRemoved,
+  sendEmailVerification,
   sendWelcome,
   sendEntityRegistered,
   sendNewEntityRequest,
