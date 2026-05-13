@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { setup2fa, verify2fa } from '../lib/api';
 
@@ -7,8 +7,6 @@ type Phase = 'scan' | 'codes';
 
 export function Setup2FAPage() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const fromRecovery = (location.state as { fromRecovery?: boolean } | null)?.fromRecovery === true;
   const [phase, setPhase] = useState<Phase>('scan');
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [secret, setSecret] = useState<string | null>(null);
@@ -76,14 +74,7 @@ export function Setup2FAPage() {
         {phase === 'scan' && (
           <>
             <h1>Configurazione 2FA</h1>
-            {fromRecovery && (
-              <div className="warning-box">
-                Hai usato un codice di recupero. La 2FA è stata disattivata e devi
-                riconfigurarla con un nuovo authenticator prima di proseguire.
-                Tutti i codici di recupero precedenti sono stati invalidati.
-              </div>
-            )}
-            <p>Come amministratore di sistema devi attivare l'autenticazione a due fattori (RNF15) per completare l'accesso.</p>
+            <p>Configura la 2FA con il tuo authenticator. Un eventuale setup precedente verrà sostituito.</p>
 
             {isLoading && <div className="state-panel glass-panel">Generazione QR code...</div>}
             {error && <div className="form-error">{error}</div>}
