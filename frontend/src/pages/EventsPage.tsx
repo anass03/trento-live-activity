@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getEventCalendarUrl, getEvents, getToken, reportEvent, type ApiEvent } from '../lib/api';
+import { getEventCalendarUrl, googleCalendarUrl, getEvents, getToken, reportEvent, type ApiEvent } from '../lib/api';
 import type { AppUser } from '../data/mockUser';
 
 function formatDateTime(value: string | null) {
@@ -92,7 +92,10 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
                 <div><dt>Quando</dt><dd>{formatDateTime(event.dateTime)}</dd></div>
               </dl>
               {event.dateTime && (
-                <a href={getEventCalendarUrl(event.id)} download={`${event.title}.ics`} style={{ fontSize: 12, color: 'var(--color-text-secondary)', textDecoration: 'none' }}>📅 Aggiungi al calendario</a>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <a href={getEventCalendarUrl(event.id)} download={`${event.title}.ics`} style={{ fontSize: 12, color: 'var(--color-text-secondary)', textDecoration: 'none' }}>📅 Apple / Outlook</a>
+                  <a href={googleCalendarUrl(event.title, event.dateTime, event.location)} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: 'var(--color-text-secondary)', textDecoration: 'none' }}>📅 Google Calendar</a>
+                </div>
               )}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
                 <Link className="detail-link" to={`/eventi/${event.id}`}>Apri dettagli</Link>

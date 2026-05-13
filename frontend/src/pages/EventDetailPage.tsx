@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { getEventById, getEventCalendarUrl, getToken, reportEvent, type ApiEvent } from '../lib/api';
+import { getEventById, getEventCalendarUrl, googleCalendarUrl, getToken, reportEvent, type ApiEvent } from '../lib/api';
 import type { AppUser } from '../data/mockUser';
 
 const REPORT_TYPES = ['contenuto_inappropriato', 'spam', 'disinformazione', 'altro'];
@@ -66,7 +66,10 @@ export function EventDetailPage({ user }: { user?: AppUser }) {
             </div>
           </dl>
           {event.dateTime && (
-            <a href={getEventCalendarUrl(event.id)} download={`${event.title}.ics`} className="primary-button" style={{ width: 'fit-content' }}>📅 Aggiungi al calendario</a>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <a href={getEventCalendarUrl(event.id)} download={`${event.title}.ics`} className="primary-button" style={{ width: 'fit-content' }}>📅 Apple / Outlook</a>
+              <a href={googleCalendarUrl(event.title, event.dateTime, event.location)} target="_blank" rel="noreferrer" className="primary-button" style={{ width: 'fit-content' }}>📅 Google Calendar</a>
+            </div>
           )}
           {isLoggedIn && !reportMsg && (
             reporting ? (
