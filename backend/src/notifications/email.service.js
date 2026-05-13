@@ -83,6 +83,47 @@ async function sendContentRemoved(entityEmail, eventTitolo) {
   `);
 }
 
+async function sendWelcome(email, nome) {
+  await send(email, 'Benvenuto su Trento Live Activity!', `
+    <p>Ciao <strong>${nome}</strong>,</p>
+    <p>La tua registrazione è avvenuta con successo. Ora puoi esplorare la mappa di Trento, partecipare ad attività e ricevere notifiche sugli eventi vicino a te.</p>
+    <p><a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}">Accedi all'app</a></p>
+  `);
+}
+
+async function sendEntityRegistered(email, nomeEnte) {
+  await send(email, 'Richiesta di registrazione ricevuta — Trento Live Activity', `
+    <p>Grazie per aver registrato <strong>${nomeEnte}</strong> su Trento Live Activity.</p>
+    <p>La tua richiesta è in fase di revisione da parte del nostro team. Riceverai un'email non appena verrà esaminata.</p>
+  `);
+}
+
+async function sendNewEntityRequest(adminEmails, nomeEnte, entityEmail) {
+  await Promise.all(adminEmails.map((e) => send(e, `Nuova richiesta ente: ${nomeEnte}`, `
+    <p>È arrivata una nuova richiesta di registrazione come ente certificato.</p>
+    <ul>
+      <li><strong>Ente:</strong> ${nomeEnte}</li>
+      <li><strong>Email:</strong> ${entityEmail}</li>
+    </ul>
+    <p>Accedi alla dashboard di amministrazione per approvare o rifiutare la richiesta.</p>
+  `)));
+}
+
+async function sendEntityApproved(email, nomeEnte) {
+  await send(email, 'Account approvato — Trento Live Activity', `
+    <p>Congratulazioni! L'account di <strong>${nomeEnte}</strong> è stato approvato.</p>
+    <p>Ora puoi accedere all'app e pubblicare eventi certificati.</p>
+    <p><a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/login">Accedi</a></p>
+  `);
+}
+
+async function sendEntityRejected(email, nomeEnte) {
+  await send(email, 'Richiesta non approvata — Trento Live Activity', `
+    <p>Ci dispiace comunicarti che la richiesta di registrazione di <strong>${nomeEnte}</strong> non è stata approvata.</p>
+    <p>Per maggiori informazioni puoi contattare il team di Trento Live Activity.</p>
+  `);
+}
+
 module.exports = {
   sendPasswordReset,
   sendActivityJoinConfirmation,
@@ -92,4 +133,9 @@ module.exports = {
   sendActivityCancelled,
   sendReportCreated,
   sendContentRemoved,
+  sendWelcome,
+  sendEntityRegistered,
+  sendNewEntityRequest,
+  sendEntityApproved,
+  sendEntityRejected,
 };

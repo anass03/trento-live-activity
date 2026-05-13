@@ -15,6 +15,9 @@ jest.mock('../src/data/models', () => ({
 
 jest.mock('../src/notifications/email.service', () => ({
   sendPasswordReset: jest.fn().mockResolvedValue(undefined),
+  sendWelcome: jest.fn().mockResolvedValue(undefined),
+  sendEntityRegistered: jest.fn().mockResolvedValue(undefined),
+  sendNewEntityRequest: jest.fn().mockResolvedValue(undefined),
 }));
 
 const { User } = require('../src/data/models');
