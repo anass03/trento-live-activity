@@ -119,6 +119,19 @@ describe('Auth Service — login', () => {
     await expect(authService.login({ email: validUserData.email, password: 'Password123' }))
       .rejects.toMatchObject({ code: '2FA_REQUIRED' });
   });
+
+  test('TC-AUTH-11: admin without 2FA gets a setup-flag token instead of being rejected', async () => {
+    const hash = await bcrypt.hash('Password123', 1);
+    User.findOne.mockResolvedValue(makeFakeUser({
+      passwordHash: hash,
+      ruolo: 'AmministratoreDiSistema',
+      twoFactorEnabled: false,
+    }));
+
+    const result = await authService.login({ email: validUserData.email, password: 'Password123' });
+    expect(result.needs2faSetup).toBe(true);
+    expect(result.token).toBeTruthy();
+  });
 });
 
 describe('Auth Service — password reset (RF8)', () => {

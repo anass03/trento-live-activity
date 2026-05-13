@@ -124,3 +124,14 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--color-primary);
 
 select option { background: #1a3328; color: var(--color-text-primary); }
 .marker-pinned { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+/* ===== 2FA setup ===== */
+.qr-section { display: grid; gap: 12px; }
+.qr-frame { display: grid; place-items: center; padding: 16px; background: #fff; border-radius: 12px; }
+.qr-frame img { display: block; max-width: 100%; height: auto; }
+.secret-fallback {
+  display: block; margin-top: 8px; padding: 10px 12px;
+  background: rgba(255,255,255,0.06); border: 1px solid var(--color-glass-border);
+  border-radius: 8px; font-family: ui-monospace, monospace; font-size: 13px; word-break: break-all;
+}
+details summary { cursor: pointer; color: var(--color-text-secondary); font-size: 13px; }

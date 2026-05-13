@@ -17,10 +17,10 @@ function calcAge(dataNascita) {
   return age;
 }
 
-function signToken(user) {
+function signToken(user, extraClaims = {}) {
   const jti = crypto.randomUUID();
   const token = jwt.sign(
-    { id: user.id, ruolo: user.ruolo, jti },
+    { id: user.id, ruolo: user.ruolo, jti, ...extraClaims },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   );
@@ -115,10 +115,13 @@ async function login({ email, password, otpToken } = {}) {
     throw { status: 401, code: 'INVALID_CREDENTIALS', error: 'Invalid email or password' };
   }
 
-  // RNF15 / OCL C1: 2FA mandatory for AmministratoreDiSistema
+  // RNF15 / OCL C1: 2FA mandatory for AmministratoreDiSistema.
+  // First login of a brand-new admin: issue a token marked as setup-required;
+  // middleware will only let it reach /auth/2fa/* until verify succeeds.
   if (user.ruolo === 'AmministratoreDiSistema') {
     if (!user.twoFactorEnabled) {
-      throw { status: 403, code: '2FA_REQUIRED', error: '2FA is required for system administrators' };
+      const token = signToken(user, { needs2faSetup: true });
+      return { user: sanitize(user), token, needs2faSetup: true };
     }
     if (!otpToken) {
       throw { status: 401, code: '2FA_REQUIRED', error: '2FA token required' };
@@ -175,22 +178,25 @@ async function setup2fa(userId) {
     throw { status: 403, code: 'FORBIDDEN', error: '2FA setup is only for system administrators' };
   }
   const secret = speakeasy.generateSecret({ name: `TrentoLiveActivity:${user.email}` });
-  await user.update({ twoFactorSecret: secret.base32 });
-  return { otpauthUrl: secret.otpauth_url };
+  await user.update({ twoFactorSecret: secret.base32, twoFactorEnabled: false });
+  return { otpauthUrl: secret.otpauth_url, base32: secret.base32 };
 }
 
-async function verify2fa(userId, token) {
+async function verify2fa(userId, otpToken) {
   const user = await User.findByPk(userId);
   if (!user) throw { status: 404, code: 'NOT_FOUND', error: 'User not found' };
+  if (!user.twoFactorSecret) throw { status: 400, code: '2FA_NOT_INITIALISED', error: 'Run /auth/2fa/setup first' };
   const valid = speakeasy.totp.verify({
     secret: user.twoFactorSecret,
     encoding: 'base32',
-    token,
+    token: otpToken,
     window: 1,
   });
   if (!valid) throw { status: 400, code: '2FA_INVALID', error: 'Invalid OTP token' };
   await user.update({ twoFactorEnabled: true });
-  return { message: '2FA enabled successfully' };
+  // Issue a fresh JWT without the needs2faSetup flag so the user is fully logged in.
+  const token = signToken(user);
+  return { message: '2FA enabled successfully', token, user: sanitize(user) };
 }
 
 async function forgotPassword(email) {

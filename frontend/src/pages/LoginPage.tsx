@@ -16,7 +16,11 @@ export function LoginPage() {
     setError(null);
     setIsLoading(true);
     try {
-      await login(email, password, otpToken || undefined);
+      const result = await login(email, password, otpToken || undefined);
+      if (result.needs2faSetup) {
+        navigate('/setup-2fa');
+        return;
+      }
       navigate('/');
       window.location.reload();
     } catch (e) {
