@@ -1,215 +1,78 @@
-import { useEffect, useRef } from 'react';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-import 'leaflet.markercluster';
-import 'leaflet.markercluster/dist/MarkerCluster.css';
-import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
-import type { CrowdingStatus, MapMarker, MarkerType } from '../../lib/api';
+import { useEffect, useState, type FormEvent, type MouseEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { createActivity, getToken, type MapMarker } from '../../lib/api';
+import type { AppUser } from '../../data/mockUser';
 
-const TRENTO_CENTER: L.LatLngExpression = [46.0679, 11.1211];
+const ACTIVITY_TYPES = ['sport', 'cultura', 'musica', 'studio'] as const;
 
-const typeLabel: Record<MarkerType, string> = {
-  poi: 'POI',
-  activity: 'Attività',
-  event: 'Evento',
+interface PoiForm {
+  tipo: string;
+  data: string;
+  orarioInizio: string;
+  orarioFine: string;
+  maxPartecipanti: number;
+}
+
+const defaultForm = (): PoiForm => ({ tipo: 'sport', data: '', orarioInizio: '', orarioFine: '', maxPartecipanti: 10 });
+
+const statusLabel = { green: 'Basso affollamento', yellow: 'Medio affollamento', red: 'Alto affollamento' };
+const typeLabel = { poi: 'POI', activity: 'Attività', event: 'Evento' };
+
+const TRENTO_BOUNDS = {
+  minLat: 46.058,
+  maxLat: 46.08,
+  minLng: 11.105,
+  maxLng: 11.13,
 };
 
-const crowdLabel: Record<CrowdingStatus, string> = {
-  green: 'Basso',
-  yellow: 'Medio',
-  orange: 'Intenso',
-  red: 'Molto alto',
-};
-
-const crowdColor: Record<CrowdingStatus, string> = {
-  green: '#53e198',
-  yellow: '#d1be58',
-  orange: '#ee9144',
-  red: '#df5e5e',
-};
-
-function fallbackCrowdLevel(status: CrowdingStatus) {
-  return { green: 20, yellow: 50, orange: 72, red: 92 }[status];
+function clamp(value: number) {
+  return Math.min(92, Math.max(8, value));
 }
 
-function crowdStatusForLevel(level: number): CrowdingStatus {
-  if (level >= 82) return 'red';
-  if (level >= 62) return 'orange';
-  if (level >= 34) return 'yellow';
-  return 'green';
+function markerPosition(marker: MapMarker) {
+  const x = ((marker.longitude - TRENTO_BOUNDS.minLng) / (TRENTO_BOUNDS.maxLng - TRENTO_BOUNDS.minLng)) * 100;
+  const y = (1 - ((marker.latitude - TRENTO_BOUNDS.minLat) / (TRENTO_BOUNDS.maxLat - TRENTO_BOUNDS.minLat))) * 100;
+  return { left: `${clamp(x)}%`, top: `${clamp(y)}%` };
 }
 
-function normalizedCrowd(marker: MapMarker) {
-  const level = Math.min(100, Math.max(0, marker.crowdLevel ?? fallbackCrowdLevel(marker.crowdingStatus)));
-  const status = marker.crowdingStatus ?? crowdStatusForLevel(level);
-  return { level, status, color: crowdColor[status] };
+function detailPath(marker: MapMarker): string | null {
+  if (marker.type === 'activity') return `/attivita/${marker.sourceId}`;
+  if (marker.type === 'event') return `/eventi/${marker.sourceId}`;
+  return null;
 }
 
-function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (char) => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#039;',
-  }[char] || char));
-}
-
-function formatDateTime(value?: string | null) {
-  if (!value) return '';
-  return new Intl.DateTimeFormat('it-IT', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
-}
-
-function popupContent(marker: MapMarker) {
-  const { level, status } = normalizedCrowd(marker);
-  const dateText = marker.type === 'event' ? formatDateTime(marker.dateTime) : '';
-  const description = marker.description || 'Informazione disponibile sulla mappa cittadina.';
-
-  return `
-    <article class="leaflet-glass-popup-card">
-      <div class="leaflet-popup-kicker">
-        <span>${escapeHtml(typeLabel[marker.type])}</span>
-        <span>${Math.round(level)}/100</span>
-      </div>
-      <h3>${escapeHtml(marker.title)}</h3>
-      <p>${escapeHtml(description)}</p>
-      <dl>
-        <div><dt>Categoria</dt><dd>${escapeHtml(marker.category || typeLabel[marker.type])}</dd></div>
-        <div><dt>Affollamento</dt><dd class="crowd-${status}">${escapeHtml(crowdLabel[status])}</dd></div>
-        ${dateText ? `<div><dt>Quando</dt><dd>${escapeHtml(dateText)}</dd></div>` : ''}
-      </dl>
-      ${marker.isCertified ? '<span class="leaflet-certified-badge">Evento certificato</span>' : ''}
-    </article>
-  `;
-}
-
-function markerIcon(marker: MapMarker) {
-  const { status, color } = normalizedCrowd(marker);
-  return L.divIcon({
-    className: 'map-pin-shell',
-    html: `
-      <span class="map-pin map-pin-${status}" style="--pin-color:${color}">
-        <span class="map-pin-core"></span>
-      </span>
-    `,
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
-    popupAnchor: [0, -14],
-  });
-}
-
-function clusterIcon(cluster: L.MarkerCluster) {
-  const count = cluster.getChildCount();
-  const status: CrowdingStatus = count > 12 ? 'red' : count > 7 ? 'orange' : count > 3 ? 'yellow' : 'green';
-  return L.divIcon({
-    className: 'map-cluster-shell',
-    html: `<span class="map-cluster map-cluster-${status}">${count}</span>`,
-    iconSize: [42, 42],
-    iconAnchor: [21, 21],
-  });
-}
-
-export function MapCanvas({ markers }: { markers: MapMarker[] }) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<L.Map | null>(null);
-  const glowLayerRef = useRef<L.LayerGroup | null>(null);
-  const clusterLayerRef = useRef<L.MarkerClusterGroup | null>(null);
+export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppUser }) {
+  const navigate = useNavigate();
+  const [hovered, setHovered] = useState<MapMarker | null>(null);
+  const [pinned, setPinned] = useState<MapMarker | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState<PoiForm>(defaultForm());
+  const [submitting, setSubmitting] = useState(false);
+  const [formMsg, setFormMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const isLoggedIn = !!getToken() && user?.role !== 'anonymous';
 
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
+    if (pinned && !markers.some((m) => m.id === pinned.id)) setPinned(null);
+  }, [markers, pinned]);
 
-    const map = L.map(containerRef.current, {
-      center: TRENTO_CENTER,
-      zoom: 14,
-      minZoom: 12,
-      maxZoom: 18,
-      zoomControl: false,
-      attributionControl: false,
-      scrollWheelZoom: true,
-    });
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors',
-    }).addTo(map);
-    L.control.zoom({ position: 'bottomright' }).addTo(map);
-    L.control.attribution({ position: 'bottomleft', prefix: false }).addTo(map);
-
-    glowLayerRef.current = L.layerGroup().addTo(map);
-    clusterLayerRef.current = L.markerClusterGroup({
-      chunkedLoading: true,
-      showCoverageOnHover: false,
-      spiderfyOnMaxZoom: true,
-      maxClusterRadius: 44,
-      iconCreateFunction: clusterIcon,
-    }).addTo(map);
-
-    mapRef.current = map;
-    window.setTimeout(() => map.invalidateSize(), 0);
-
-    return () => {
-      map.remove();
-      mapRef.current = null;
-      glowLayerRef.current = null;
-      clusterLayerRef.current = null;
-    };
-  }, []);
-
+  // Reset form when pinned marker changes
   useEffect(() => {
-    const map = mapRef.current;
-    const glowLayer = glowLayerRef.current;
-    const clusterLayer = clusterLayerRef.current;
-    if (!map || !glowLayer || !clusterLayer) return;
+    setShowForm(false);
+    setForm(defaultForm());
+    setFormMsg(null);
+  }, [pinned?.id]);
 
-    glowLayer.clearLayers();
-    clusterLayer.clearLayers();
+  const displayed = pinned ?? hovered;
 
-    markers.forEach((marker) => {
-      const latLng: L.LatLngExpression = [marker.latitude, marker.longitude];
-      const { level, color, status } = normalizedCrowd(marker);
-      const outerRadius = 115 + level * 3.6;
-      const innerRadius = 54 + level * 1.65;
+  function handleMarkerClick(marker: MapMarker) {
+    setPinned((prev) => (prev?.id === marker.id ? null : marker));
+  }
 
-      L.circle(latLng, {
-        radius: outerRadius,
-        stroke: false,
-        fillColor: color,
-        fillOpacity: 0.08 + level / 900,
-        interactive: false,
-        className: `crowd-glow-path crowd-glow-${status}`,
-      }).addTo(glowLayer);
-      L.circle(latLng, {
-        radius: innerRadius,
-        stroke: false,
-        fillColor: color,
-        fillOpacity: 0.12 + level / 760,
-        interactive: false,
-        className: `crowd-glow-path crowd-glow-core crowd-glow-${status}`,
-      }).addTo(glowLayer);
-
-      const point = L.marker(latLng, {
-        icon: markerIcon(marker),
-        title: marker.title,
-        keyboard: true,
-      }).bindPopup(popupContent(marker), {
-        className: 'map-popup',
-        closeButton: true,
-        maxWidth: 300,
-        minWidth: 240,
-      });
-
-      clusterLayer.addLayer(point);
-    });
-
-    if (markers.length === 1) {
-      map.setView([markers[0].latitude, markers[0].longitude], 15, { animate: true });
-    } else if (markers.length > 1) {
-      const bounds = L.latLngBounds(markers.map((marker) => [marker.latitude, marker.longitude]));
-      map.fitBounds(bounds.pad(0.2), { maxZoom: 15, animate: true });
-    }
-
-    window.setTimeout(() => map.invalidateSize(), 0);
-  }, [markers]);
+  function handleCardClick(e: MouseEvent) {
+    if (!displayed || showForm) return;
+    const path = detailPath(displayed);
+    if (path) navigate(path);
+  }
 
   async function handleCreateActivity(e: FormEvent) {
     e.preventDefault();
@@ -231,14 +94,129 @@ export function MapCanvas({ markers }: { markers: MapMarker[] }) {
   const showNavigate = !showForm && displayed && detailPath(displayed);
 
   return (
-    <section className="map-area glass-panel" aria-label="Map Zone" data-testid="map-zone">
-      <div ref={containerRef} className="leaflet-map" />
-      <div className="map-density-legend glass-card" aria-label="Scala affollamento">
-        <span><i className="legend-green" />Basso</span>
-        <span><i className="legend-yellow" />Medio</span>
-        <span><i className="legend-orange" />Intenso</span>
-        <span><i className="legend-red" />Molto alto</span>
+    <section className="map-area glass-panel">
+      <div className="map-grid" aria-label="Placeholder mappa interattiva">
+        {markers.map((marker) => (
+          <button
+            key={marker.id}
+            className={`marker marker-${marker.crowdingStatus}${pinned?.id === marker.id ? ' marker-pinned' : ''}`}
+            style={markerPosition(marker)}
+            onMouseEnter={() => setHovered(marker)}
+            onMouseLeave={() => setHovered(null)}
+            onClick={() => handleMarkerClick(marker)}
+          >
+            <span>{marker.title}</span>
+            {marker.isCertified && <small className="badge">Verificato</small>}
+          </button>
+        ))}
       </div>
+
+      {displayed && (
+        <aside
+          className="marker-card glass-card"
+          style={{ cursor: showNavigate ? 'pointer' : 'default', overflow: 'auto', maxHeight: '80vh' }}
+          onClick={handleCardClick}
+          title={showNavigate ? 'Clicca per aprire i dettagli' : undefined}
+        >
+          <p style={{ margin: '0 0 4px', fontSize: 11, color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>
+            {typeLabel[displayed.type]}{pinned ? ' · fissato' : ''}
+          </p>
+          <h3 style={{ margin: '0 0 6px' }}>{displayed.title}</h3>
+          <p style={{ margin: '0 0 4px', fontSize: 13 }}>Affollamento: {statusLabel[displayed.crowdingStatus]}</p>
+          {displayed.isCertified && <p className="badge" style={{ margin: 0 }}>Evento certificato</p>}
+          {showNavigate && (
+            <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--color-primary)' }}>Apri dettagli →</p>
+          )}
+
+          {displayed.type === 'poi' && isLoggedIn && pinned && (
+            <div onClick={(e) => e.stopPropagation()}>
+              {!showForm ? (
+                <button
+                  className="primary-button"
+                  style={{ marginTop: 10, width: '100%', fontSize: 13 }}
+                  onClick={() => setShowForm(true)}
+                  type="button"
+                >
+                  ➕ Crea attività qui
+                </button>
+              ) : (
+                <form onSubmit={handleCreateActivity} style={{ marginTop: 10, display: 'grid', gap: 8 }}>
+                  <label style={{ fontSize: 12, display: 'grid', gap: 3 }}>
+                    <span style={{ color: 'var(--color-text-secondary)' }}>Tipo</span>
+                    <select
+                      value={form.tipo}
+                      onChange={(e) => setForm((f) => ({ ...f, tipo: e.target.value }))}
+                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--color-glass-border)', color: 'var(--color-text-primary)', borderRadius: 8, padding: '6px 8px', font: 'inherit', fontSize: 13 }}
+                      required
+                    >
+                      {ACTIVITY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </label>
+                  <label style={{ fontSize: 12, display: 'grid', gap: 3 }}>
+                    <span style={{ color: 'var(--color-text-secondary)' }}>Data</span>
+                    <input
+                      type="date"
+                      value={form.data}
+                      onChange={(e) => setForm((f) => ({ ...f, data: e.target.value }))}
+                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--color-glass-border)', color: 'var(--color-text-primary)', borderRadius: 8, padding: '6px 8px', font: 'inherit', fontSize: 13 }}
+                      required
+                    />
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                    <label style={{ fontSize: 12, display: 'grid', gap: 3 }}>
+                      <span style={{ color: 'var(--color-text-secondary)' }}>Inizio</span>
+                      <input
+                        type="time"
+                        value={form.orarioInizio}
+                        onChange={(e) => setForm((f) => ({ ...f, orarioInizio: e.target.value }))}
+                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--color-glass-border)', color: 'var(--color-text-primary)', borderRadius: 8, padding: '6px 8px', font: 'inherit', fontSize: 13 }}
+                        required
+                      />
+                    </label>
+                    <label style={{ fontSize: 12, display: 'grid', gap: 3 }}>
+                      <span style={{ color: 'var(--color-text-secondary)' }}>Fine</span>
+                      <input
+                        type="time"
+                        value={form.orarioFine}
+                        onChange={(e) => setForm((f) => ({ ...f, orarioFine: e.target.value }))}
+                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--color-glass-border)', color: 'var(--color-text-primary)', borderRadius: 8, padding: '6px 8px', font: 'inherit', fontSize: 13 }}
+                        required
+                      />
+                    </label>
+                  </div>
+                  <label style={{ fontSize: 12, display: 'grid', gap: 3 }}>
+                    <span style={{ color: 'var(--color-text-secondary)' }}>Max partecipanti (2–50)</span>
+                    <input
+                      type="number"
+                      min={2}
+                      max={50}
+                      value={form.maxPartecipanti}
+                      onChange={(e) => setForm((f) => ({ ...f, maxPartecipanti: Number(e.target.value) }))}
+                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--color-glass-border)', color: 'var(--color-text-primary)', borderRadius: 8, padding: '6px 8px', font: 'inherit', fontSize: 13 }}
+                      required
+                    />
+                  </label>
+                  {formMsg && (
+                    <p style={{ margin: 0, fontSize: 12, color: formMsg.ok ? '#d2ffe6' : '#ffd0d0' }}>{formMsg.text}</p>
+                  )}
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button className="primary-button" type="submit" disabled={submitting} style={{ flex: 1, fontSize: 13 }}>
+                      {submitting ? '...' : 'Crea'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowForm(false); setFormMsg(null); }}
+                      style={{ background: 'transparent', border: '1px solid var(--color-glass-border)', borderRadius: 999, padding: '8px 12px', cursor: 'pointer', fontSize: 13 }}
+                    >
+                      Annulla
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          )}
+        </aside>
+      )}
     </section>
   );
 }

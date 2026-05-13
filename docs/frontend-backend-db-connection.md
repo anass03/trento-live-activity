@@ -156,13 +156,9 @@ Returns markers generated from seeded POIs, activities, and events:
       "title": "Concerto al MUSE",
       "latitude": 46.0666,
       "longitude": 11.113,
-      "crowdLevel": 90,
       "crowdingStatus": "red",
       "isCertified": true,
-      "sourceId": "uuid",
-      "category": "musica",
-      "description": "Musica classica nella corte del museo.",
-      "dateTime": "2026-05-27T20:30:00"
+      "sourceId": "uuid"
     }
   ],
   "pois": [],
@@ -171,7 +167,7 @@ Returns markers generated from seeded POIs, activities, and events:
 }
 ```
 
-`crowdLevel` is a frontend-friendly 0-100 density/popularity score. `crowdingStatus` is normalized for the frontend as `green`, `yellow`, `orange`, or `red` from database crowding values, participation ratios, and event popularity.
+`crowdingStatus` is normalized for the frontend as `green`, `yellow`, or `red` from the Italian database values `verde`, `giallo`, and `rosso`.
 
 ## Frontend API Calls
 
@@ -185,10 +181,6 @@ Frontend API functions are centralized in `frontend/src/lib/api.ts`:
 - `getCurrentUser()`
 
 Pages use these helpers instead of calling `fetch` directly.
-
-## Interactive Map Provider
-
-The map UI uses Leaflet with free OpenStreetMap raster tiles and `leaflet.markercluster` for marker clustering. It does not require Google Maps or paid API credentials. The Leaflet implementation lives in `frontend/src/components/map/MapCanvas.tsx`; visual map styling, density glow overlays, marker colors, popups, and responsive behavior are defined in `frontend/src/styles/globals.css`.
 
 ## CORS and Development Proxy
 
