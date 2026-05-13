@@ -3,7 +3,9 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const speakeasy = require('speakeasy');
 const { User, Consent } = require('../data/models');
-const { sendPasswordReset } = require('../notifications/email.service');
+const {
+  sendPasswordReset, sendWelcome, sendEntityRegistered, sendNewEntityRequest,
+} = require('../notifications/email.service');
 const { revoke } = require('./tokenBlacklist');
 
 function calcAge(dataNascita) {
@@ -106,6 +108,7 @@ async function register({ email, password, nome, cognome, dataNascita, consents 
   if (consentRows.length) await Consent.bulkCreate(consentRows);
 
   const token = signToken(user);
+  sendWelcome(email, nome).catch(() => {});
   return { user: sanitize(user), token };
 }
 
@@ -333,6 +336,10 @@ async function registerEntity({ email, password, nomeEnte, nome, cognome }) {
     approvato: false,
     nomeEnte,
   });
+  sendEntityRegistered(email, nomeEnte).catch(() => {});
+  User.findAll({ where: { ruolo: 'AmministratoreDiSistema' }, attributes: ['email'] })
+    .then((admins) => sendNewEntityRequest(admins.map((a) => a.email), nomeEnte, email))
+    .catch(() => {});
   return { message: 'Registration request submitted. Await admin approval.', userId: user.id };
 }
 module.exports = {
