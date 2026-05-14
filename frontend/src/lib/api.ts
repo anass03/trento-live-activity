@@ -1,4 +1,4 @@
-export type CrowdingStatus = 'green' | 'yellow' | 'red';
+export type CrowdingStatus = 'green' | 'yellow' | 'orange' | 'red';
 export type MarkerType = 'poi' | 'activity' | 'event';
 export type UserRole = 'anonymous' | 'registered_user' | 'certified_entity' | 'municipal_admin' | 'system_admin';
 
@@ -38,10 +38,13 @@ export interface MapMarker {
   title: string;
   latitude: number;
   longitude: number;
+  crowdLevel: number;
   crowdingStatus: CrowdingStatus;
   isCertified: boolean;
   sourceId: string;
   category?: string | null;
+  description?: string | null;
+  dateTime?: string | null;
 }
 
 export interface CurrentUser {
@@ -181,7 +184,7 @@ function arrayFromPayload<T>(payload: unknown, key: string): T[] {
 
 // ============================== Public data ==============================
 
-export async function getEvents(params?: { q?: string; categoria?: string }): Promise<ApiEvent[]> {
+export async function getEvents(params?: { q?: string; categoria?: string; page?: number; limit?: number }): Promise<ApiEvent[]> {
   const qs = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : '';
   const payload = await request<EventsResponse | ApiEvent[]>(`/api/events${qs}`);
   return arrayFromPayload<ApiEvent>(payload, 'events');
@@ -189,7 +192,7 @@ export async function getEvents(params?: { q?: string; categoria?: string }): Pr
 export function getEventById(id: string): Promise<ApiEvent> {
   return request<ApiEvent>(`/api/events/${encodeURIComponent(id)}`);
 }
-export async function getActivities(params?: { q?: string; tipo?: string }): Promise<ApiActivity[]> {
+export async function getActivities(params?: { q?: string; tipo?: string; page?: number; limit?: number; mine?: 'interests' }): Promise<ApiActivity[]> {
   const qs = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : '';
   const payload = await request<ActivitiesResponse | ApiActivity[]>(`/api/activities${qs}`);
   return arrayFromPayload<ApiActivity>(payload, 'activities');
@@ -220,13 +223,15 @@ export interface RegisterPayload {
   email: string; password: string; nome: string; cognome: string; dataNascita: string;
   consents: { privacy_policy: boolean; terms_of_service: boolean; marketing?: boolean; analytics?: boolean; };
 }
-export async function register(payload: RegisterPayload): Promise<AuthResponse> {
-  const result = await request<AuthResponse>('/api/auth/register', { method: 'POST', body: payload, auth: false });
-  setToken(result.token);
+export type RegisterResponse = AuthResponse | { emailVerificationRequired: boolean };
+export async function register(payload: RegisterPayload): Promise<RegisterResponse> {
+  const result = await request<RegisterResponse>('/api/auth/register', { method: 'POST', body: payload, auth: false });
+  if ('token' in result && result.token) setToken(result.token);
   return result;
 }
 export interface RegisterEntityPayload {
   email: string; password: string; nomeEnte: string;
+  nome?: string; cognome?: string;
 }
 export function registerEntity(payload: RegisterEntityPayload): Promise<{ message: string; userId: string }> {
   return request('/api/auth/register/entity', { method: 'POST', body: payload, auth: false });
@@ -323,7 +328,7 @@ export function deleteEvent(eventId: string): Promise<void> {
 
 // ============================== Dashboard (municipal admin) ==============================
 
-export function getDashboardStats(params?: Record<string, string | number>): Promise<DashboardStats & { filters?: unknown }> {
+export function getDashboardStats(params?: DashboardFilters | Record<string, string | number>): Promise<DashboardStats & { filters?: unknown }> {
   const qs = params ? `?${new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])).toString()}` : '';
   return request(`/api/dashboard/stats${qs}`);
 }
@@ -331,6 +336,30 @@ export function getDashboardExportUrl(format: 'csv' | 'pdf', params?: Record<str
   const allParams = { ...(params || {}), format };
   const qs = new URLSearchParams(Object.entries(allParams).map(([k, v]) => [k, String(v)])).toString();
   return `${API_BASE_URL}/api/dashboard/stats/export?${qs}`;
+}
+export interface DashboardFilters {
+  tipo?: string;
+  da?: string;
+  a?: string;
+  centerLat?: string | number;
+  centerLng?: string | number;
+  radiusKm?: string | number;
+  poiId?: string;
+}
+export async function downloadDashboardExport(format: 'csv' | 'pdf', params?: DashboardFilters): Promise<Blob> {
+  const allParams: Record<string, string> = { format };
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== '') allParams[k] = String(v);
+    }
+  }
+  const qs = new URLSearchParams(allParams).toString();
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`${API_BASE_URL}/api/dashboard/stats/export?${qs}`, { headers });
+  if (!res.ok) throw new Error(`Export fallito (${res.status})`);
+  return res.blob();
 }
 
 // ============================== Admin ==============================

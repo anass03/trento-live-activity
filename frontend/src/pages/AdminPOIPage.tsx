@@ -38,11 +38,11 @@ export function AdminPOIPage() {
 
   return (
     <section className="data-page">
-      <header className="utility-strip glass-card">
+      <header className="utility-strip liquid-card">
         <div><h1>Gestione POI</h1><p>Punti di interesse sulla mappa</p></div>
       </header>
 
-      <form className="auth-form glass-card" onSubmit={handleSubmit}>
+      <form className="auth-form liquid-card" onSubmit={handleSubmit}>
         <h2>{editing.id ? 'Modifica POI' : 'Nuovo POI'}</h2>
         <label><span>Nome</span><input type="text" value={editing.nome || ''} onChange={(e) => setEditing({ ...editing, nome: e.target.value })} required /></label>
         <div className="filter-row">
@@ -70,7 +70,7 @@ export function AdminPOIPage() {
         </div>
       </form>
 
-      <div className="glass-card">
+      <div className="liquid-card">
         <h2>POI esistenti ({pois.length})</h2>
         <table className="stats-table">
           <thead><tr><th>Nome</th><th>Coordinate</th><th>Cap.</th><th>Stato</th><th>Azioni</th></tr></thead>

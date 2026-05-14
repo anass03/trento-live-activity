@@ -190,12 +190,12 @@ export function ProfilePage() {
     window.location.reload();
   }
 
-  if (isLoading) return <section className="data-page"><div className="state-panel glass-panel">Caricamento...</div></section>;
-  if (!user) return <section className="data-page"><div className="state-panel glass-panel">Non autenticato. <a href="/login">Accedi</a></div></section>;
+  if (isLoading) return <section className="data-page"><div className="state-panel liquid-panel">Caricamento...</div></section>;
+  if (!user) return <section className="data-page"><div className="state-panel liquid-panel">Non autenticato. <a href="/login">Accedi</a></div></section>;
 
   return (
     <section className="data-page">
-      <header className="utility-strip glass-card">
+      <header className="utility-strip liquid-card">
         <div>
           <h1>Il mio profilo</h1>
           <p>{user.email} — {user.ruolo}</p>
@@ -203,7 +203,7 @@ export function ProfilePage() {
         <button type="button" className="primary-button" onClick={handleLogout}>Logout</button>
       </header>
 
-      <form className="auth-form glass-card" onSubmit={handleSave}>
+      <form className="auth-form liquid-card" onSubmit={handleSave}>
         <label>
           <span>Nome</span>
           <input type="text" value={nome} onChange={(e) => setNome(e.target.value)} />
@@ -231,7 +231,7 @@ export function ProfilePage() {
         <button className="primary-button" type="submit">Salva modifiche</button>
       </form>
 
-      <div className="auth-form glass-card">
+      <div className="auth-form liquid-card">
         <h2>Posizione (per notifiche di attività vicine)</h2>
         <p>Condividi la tua posizione corrente per ricevere notifiche di attività entro 50 km dai tuoi interessi.</p>
         {locationMessage && <div className="form-success">{locationMessage}</div>}
@@ -241,7 +241,7 @@ export function ProfilePage() {
         </button>
       </div>
 
-      <div className="auth-form glass-card">
+      <div className="auth-form liquid-card">
         <h2>Notifiche push</h2>
         <p>
           Ricevi notifiche immediate sul tuo dispositivo per nuovi partecipanti alle tue attività,
@@ -281,7 +281,7 @@ export function ProfilePage() {
       </div>
 
       {user.twoFactorEnabled && (
-        <div className="auth-form glass-card">
+        <div className="auth-form liquid-card">
           <h2>Autenticazione a due fattori</h2>
           <p>
             2FA attiva. Codici di recupero monouso restanti:{' '}
@@ -323,7 +323,7 @@ export function ProfilePage() {
         </div>
       )}
 
-      <div className="auth-form glass-card danger-zone">
+      <div className="auth-form liquid-card danger-zone">
         <h2>Zona pericolosa</h2>
         <p>Elimina permanentemente il tuo account e tutti i tuoi dati personali (GDPR art. 17 — diritto all'oblio).</p>
         <button type="button" className="danger-button" onClick={handleDelete}>Elimina account</button>

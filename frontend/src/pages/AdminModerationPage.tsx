@@ -30,14 +30,14 @@ export function AdminModerationPage() {
 
   return (
     <section className="data-page">
-      <header className="utility-strip glass-card">
+      <header className="utility-strip liquid-card">
         <div>
           <h1>Moderazione segnalazioni</h1>
           <p>Flow conforme al Digital Services Act (EU 2022/2065)</p>
         </div>
       </header>
 
-      <div className="glass-card filter-bar">
+      <div className="liquid-card filter-bar">
         <div className="filter-row">
           <label>
             <span>Filtra per stato</span>
@@ -49,15 +49,15 @@ export function AdminModerationPage() {
         </div>
       </div>
 
-      {error && <div className="state-panel glass-panel"><p>{error}</p></div>}
-      {message && <div className="state-panel glass-panel"><p>{message}</p></div>}
-      {isLoading && <div className="state-panel glass-panel">Caricamento...</div>}
-      {!isLoading && reports.length === 0 && <div className="state-panel glass-panel">Nessuna segnalazione.</div>}
+      {error && <div className="state-panel liquid-panel"><p>{error}</p></div>}
+      {message && <div className="state-panel liquid-panel"><p>{message}</p></div>}
+      {isLoading && <div className="state-panel liquid-panel">Caricamento...</div>}
+      {!isLoading && reports.length === 0 && <div className="state-panel liquid-panel">Nessuna segnalazione.</div>}
 
       {reports.length > 0 && (
         <div className="data-grid">
           {reports.map((r) => (
-            <article className="data-card glass-card" key={r.id}>
+            <article className="data-card liquid-card" key={r.id}>
               <div className="data-card-header"><span>{r.tipo}</span><small>{r.stato}</small></div>
               <h2>{r.event?.titolo || 'Evento sconosciuto'}</h2>
               <p>{r.descrizione || 'Senza descrizione aggiuntiva'}</p>

@@ -1,71 +1,22 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { getActivities, getActivityCalendarUrl, googleCalendarUrl, getToken, joinActivity, leaveActivity, type ApiActivity } from '../lib/api';
-import type { AppUser } from '../data/mockUser';
+import { useEffect, useMemo, useState } from 'react';
+import { activityCrowdLevel } from '../components/map/CardMapPreview';
+import { InteractiveMapCard } from '../components/ui/InteractiveMapCard';
+import { getActivities, getActivityCalendarUrl, type ApiActivity } from '../lib/api';
 
 function formatDateTime(value?: string | null) {
   if (!value) return 'Data da definire';
   return new Intl.DateTimeFormat('it-IT', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
 }
 
-function ActivityCard({
-  activity, isLoggedIn, userId,
-  onJoin, onLeave, joining, joinMsg,
-}: {
-  activity: ApiActivity;
-  isLoggedIn: boolean;
-  userId: string | null;
-  onJoin: (id: string) => void;
-  onLeave: (id: string) => void;
-  joining: string | null;
-  joinMsg?: { ok: boolean; text: string };
-}) {
-  const isParticipating = !!userId && !!activity.participantIds?.includes(userId);
-  const isFull = activity.participantCount >= activity.maxParticipants;
-
-  return (
-    <article className="data-card glass-card" key={activity.id}>
-      <div className="data-card-header">
-        <span>{activity.category}</span>
-        <small>{activity.status || 'attiva'}</small>
-      </div>
-      <h2>{activity.title}</h2>
-      <p>{activity.description || 'Attività spontanea organizzata dalla community.'}</p>
-      <dl>
-        <div><dt>Luogo</dt><dd>{activity.location || 'Non specificato'}</dd></div>
-        <div><dt>Quando</dt><dd>{formatDateTime(activity.dateTime)}</dd></div>
-        <div><dt>Partecipanti</dt><dd>{activity.participantCount} / {activity.maxParticipants}</dd></div>
-      </dl>
-      {activity.dateTime && (
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <a href={getActivityCalendarUrl(activity.id)} download={`attivita-${activity.id}.ics`} style={{ fontSize: 12, color: 'var(--color-text-secondary)', textDecoration: 'none' }}>📅 Apple / Outlook</a>
-          <a href={googleCalendarUrl(activity.title, activity.dateTime, activity.location)} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: 'var(--color-text-secondary)', textDecoration: 'none' }}>📅 Google Calendar</a>
-        </div>
-      )}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-        <Link className="detail-link" to={`/attivita/${activity.id}`}>Apri dettagli</Link>
-        {isLoggedIn && (
-          isParticipating
-            ? <button onClick={() => onLeave(activity.id)} disabled={joining === activity.id} style={{ background: 'transparent', border: '1px solid var(--color-glass-border)', borderRadius: 999, padding: '6px 12px', cursor: 'pointer', fontSize: 13 }}>{joining === activity.id ? '...' : 'Abbandona'}</button>
-            : isFull
-              ? <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>Al completo</span>
-              : <button className="primary-button" style={{ padding: '6px 12px', fontSize: 13 }} disabled={joining === activity.id} onClick={() => onJoin(activity.id)}>{joining === activity.id ? '...' : 'Partecipa'}</button>
-        )}
-      </div>
-      {joinMsg && <p style={{ margin: 0, fontSize: 12, color: joinMsg.ok ? '#d2ffe6' : '#ffd0d0' }}>{joinMsg.text}</p>}
-    </article>
-  );
-}
-
-export function ActivitiesPage({ userInterests, user }: { userInterests?: string[]; user?: AppUser }) {
+export function ActivitiesPage({ userInterests }: { userInterests?: string[] }) {
   const [activities, setActivities] = useState<ApiActivity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [joinMsgs, setJoinMsgs] = useState<Record<string, { ok: boolean; text: string }>>({});
-  const [joining, setJoining] = useState<string | null>(null);
+  const [selectedActivity, setSelectedActivity] = useState<ApiActivity | null>(null);
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState<string>('all');
+  const [timeFilter, setTimeFilter] = useState<'all' | 'today' | 'open'>('all');
   const hasInterests = Array.isArray(userInterests) && userInterests.length > 0;
-  const isLoggedIn = !!getToken() && user?.role !== 'anonymous';
-  const userId = user?.id ?? null;
 
   async function loadActivities() {
     setIsLoading(true);
@@ -79,76 +30,196 @@ export function ActivitiesPage({ userInterests, user }: { userInterests?: string
     }
   }
 
-  useEffect(() => { void loadActivities(); }, []);
+  useEffect(() => {
+    void loadActivities();
+  }, []);
 
-  async function handleJoin(activityId: string) {
-    setJoining(activityId);
-    try {
-      const updated = await joinActivity(activityId);
-      setActivities((prev) => prev.map((a) => a.id === activityId ? updated : a));
-      setJoinMsgs((prev) => ({ ...prev, [activityId]: { ok: true, text: 'Iscritto!' } }));
-    } catch (e) {
-      setJoinMsgs((prev) => ({ ...prev, [activityId]: { ok: false, text: e instanceof Error ? e.message : 'Errore' } }));
-    } finally { setJoining(null); }
-  }
+  const baseActivities = useMemo(
+    () => activities.filter((activity) => !hasInterests || userInterests!.includes(activity.category)),
+    [activities, hasInterests, userInterests],
+  );
 
-  async function handleLeave(activityId: string) {
-    setJoining(activityId);
-    try {
-      await leaveActivity(activityId);
-      const updated = await getActivities();
-      setActivities(updated);
-      setJoinMsgs((prev) => ({ ...prev, [activityId]: { ok: true, text: 'Hai abbandonato l\'attività.' } }));
-    } catch (e) {
-      setJoinMsgs((prev) => ({ ...prev, [activityId]: { ok: false, text: e instanceof Error ? e.message : 'Errore' } }));
-    } finally { setJoining(null); }
-  }
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    baseActivities.forEach((activity) => counts.set(activity.category, (counts.get(activity.category) ?? 0) + 1));
+    return Array.from(counts.entries()).map(([category, count]) => ({ category, count }));
+  }, [baseActivities]);
 
-  const cardProps = { isLoggedIn, userId, onJoin: handleJoin, onLeave: handleLeave, joining };
+  const visibleActivities = useMemo(
+    () => baseActivities.filter((activity) => {
+      const q = search.trim().toLowerCase();
+      if (category !== 'all' && activity.category !== category) return false;
+      if (timeFilter === 'open' && activity.status === 'completa') return false;
+      if (timeFilter === 'today' && activity.dateTime) {
+        const eventDate = new Date(activity.dateTime);
+        const today = new Date();
+        if (
+          eventDate.getFullYear() !== today.getFullYear()
+          || eventDate.getMonth() !== today.getMonth()
+          || eventDate.getDate() !== today.getDate()
+        ) return false;
+      }
+      if (!q) return true;
+      return `${activity.title} ${activity.description || ''} ${activity.category} ${activity.location || ''}`.toLowerCase().includes(q);
+    }),
+    [baseActivities, category, search, timeFilter],
+  );
 
-  const myActivities = isLoggedIn && userId
-    ? activities.filter((a) => a.participantIds?.includes(userId))
-    : [];
+  const featuredActivity = visibleActivities[0];
 
-  const filteredActivities = activities.filter((a) => !hasInterests || userInterests!.includes(a.category));
+  const openActivities = visibleActivities.filter((activity) => activity.status !== 'completa').length;
+
+  useEffect(() => {
+    if (!selectedActivity) return undefined;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelectedActivity(null);
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [selectedActivity]);
 
   return (
-    <section className="data-page">
-      <header className="utility-strip glass-card">
-        <div>
-          <h1>Attività</h1>
-          <p>{hasInterests ? `Filtrate per i tuoi interessi: ${userInterests!.join(', ')}` : 'Attività spontanee lette dal database tramite il backend Express'}</p>
+    <section className="activities-page">
+      <header className="activities-hero">
+        <label className="city-search activity-search">
+          <span>Cerca</span>
+          <input value={search} onChange={(event) => setSearch(event.target.value)} type="search" placeholder="Cerca attività, zona, categoria" />
+        </label>
+        <div className="time-filter" aria-label="Filtro attività">
+          <button className={timeFilter === 'all' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('all')}>Tutte</button>
+          <button className={timeFilter === 'today' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('today')}>Oggi</button>
+          <button className={timeFilter === 'open' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('open')}>Aperte</button>
         </div>
-        <button className="refresh-button" onClick={loadActivities} type="button">Aggiorna</button>
+        <div className="activities-hero-stats">
+          <span><strong>{visibleActivities.length}</strong> disponibili</span>
+          <span><strong>{openActivities}</strong> aperte</span>
+          <button className="refresh-button" onClick={loadActivities} type="button">Aggiorna</button>
+        </div>
       </header>
 
-      {isLoading && <div className="state-panel glass-panel">Caricamento attività...</div>}
+      {isLoading && <div className="state-panel liquid-panel">Caricamento attività...</div>}
       {error && (
-        <div className="state-panel glass-panel">
+        <div className="state-panel liquid-panel">
           <p>{error}</p>
           <button onClick={loadActivities} type="button">Riprova</button>
         </div>
       )}
+      {!isLoading && !error && activities.length === 0 && (
+        <div className="state-panel liquid-panel">Nessuna attività trovata nel database.</div>
+      )}
+      {!isLoading && !error && visibleActivities.length > 0 && (
+        <div className="activities-layout">
+          <aside className="activity-discovery-panel">
+            <div className="category-pill-list">
+              <button className={category === 'all' ? 'active-filter' : undefined} type="button" onClick={() => setCategory('all')}>Tutte</button>
+              {categoryCounts.map((item) => (
+                <button className={category === item.category ? 'active-filter' : undefined} key={item.category} type="button" onClick={() => setCategory(item.category)}>
+                  {item.category}<strong>{item.count}</strong>
+                </button>
+              ))}
+            </div>
+            {featuredActivity && (
+              <div className="activity-focus-note">
+                <strong>Più vicina al pieno</strong>
+                <p>{featuredActivity.title}: {featuredActivity.participantCount} partecipanti su {featuredActivity.maxParticipants}.</p>
+              </div>
+            )}
+          </aside>
 
-      {!isLoading && !error && myActivities.length > 0 && (
-        <div className="glass-card" style={{ padding: 16, display: 'grid', gap: 12 }}>
-          <h2 style={{ margin: 0, fontSize: 18 }}>Le mie attività</h2>
-          <div className="data-grid">
-            {myActivities.map((activity) => (
-              <ActivityCard key={activity.id} activity={activity} joinMsg={joinMsgs[activity.id]} {...cardProps} />
-            ))}
-          </div>
+          <section className="activity-results">
+            {featuredActivity && (
+              <article className="activity-featured">
+                <div>
+                  <div className="feature-badges" aria-label="Stato attività">
+                    <span>{featuredActivity.category}</span>
+                    <span>{featuredActivity.status || 'attiva'}</span>
+                  </div>
+                  <h2>{featuredActivity.title}</h2>
+                  <p>{featuredActivity.description || 'Attività spontanea organizzata dalla community.'}</p>
+                </div>
+                <dl>
+                  <div><dt>Quando</dt><dd>{formatDateTime(featuredActivity.dateTime)}</dd></div>
+                  <div><dt>Partecipanti</dt><dd>{featuredActivity.participantCount} / {featuredActivity.maxParticipants}</dd></div>
+                </dl>
+                <button className="detail-link" type="button" onClick={() => setSelectedActivity(featuredActivity)}>Apri anteprima</button>
+              </article>
+            )}
+
+            <div className="activity-card-flow">
+              {visibleActivities.map((activity) => (
+                <InteractiveMapCard
+                  key={activity.id}
+                  id={activity.id}
+                  className="activity-card"
+                  onSelect={() => setSelectedActivity(activity)}
+                  map={{
+                    latitude: activity.latitude,
+                    longitude: activity.longitude,
+                    title: activity.title,
+                    category: activity.category,
+                    description: activity.description || 'Attività spontanea organizzata dalla community.',
+                    dateTime: activity.dateTime,
+                    type: 'activity',
+                    crowdLevel: activityCrowdLevel(activity.participantCount, activity.maxParticipants),
+                  }}
+                >
+                  <div className="interactive-map-card-header">
+                    <span>{activity.category}</span>
+                    <small>{activity.status || 'attiva'}</small>
+                  </div>
+                  <h2>{activity.title}</h2>
+                  <p>{activity.description || 'Attività spontanea organizzata dalla community.'}</p>
+                  <dl>
+                    <div>
+                      <dt>Luogo</dt>
+                      <dd>{activity.location || 'Non specificato'}</dd>
+                    </div>
+                    <div>
+                      <dt>Quando</dt>
+                      <dd>{formatDateTime(activity.dateTime)}</dd>
+                    </div>
+                    <div>
+                      <dt>Partecipanti</dt>
+                      <dd>{activity.participantCount} / {activity.maxParticipants}</dd>
+                    </div>
+                  </dl>
+                  {activity.dateTime && (
+                    <a href={getActivityCalendarUrl(activity.id)} download={`attivita-${activity.id}.ics`} className="calendar-link">Aggiungi al calendario</a>
+                  )}
+                  <button className="detail-link" type="button" onClick={() => setSelectedActivity(activity)}>Apri anteprima</button>
+                </InteractiveMapCard>
+              ))}
+            </div>
+          </section>
         </div>
       )}
-
-      {!isLoading && !error && filteredActivities.length === 0 && (
-        <div className="state-panel glass-panel">Nessuna attività trovata nel database.</div>
-      )}
-      {!isLoading && !error && filteredActivities.length > 0 && (
-        <div className="data-grid">
-          {filteredActivities.map((activity) => (
-            <ActivityCard key={activity.id} activity={activity} joinMsg={joinMsgs[activity.id]} {...cardProps} />
-          ))}
+      {selectedActivity && (
+        <div className="activity-popup-backdrop" role="presentation" onClick={() => setSelectedActivity(null)}>
+          <article
+            className="activity-popup"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="activity-popup-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button className="activity-popup-close" type="button" onClick={() => setSelectedActivity(null)} aria-label="Chiudi">
+              ×
+            </button>
+            <span className="section-eyebrow">{selectedActivity.category}</span>
+            <h2 id="activity-popup-title">{selectedActivity.title}</h2>
+            <p>{selectedActivity.description || 'Attività spontanea organizzata dalla community.'}</p>
+            <dl>
+              <div><dt>Luogo</dt><dd>{selectedActivity.location || 'Non specificato'}</dd></div>
+              <div><dt>Quando</dt><dd>{formatDateTime(selectedActivity.dateTime)}</dd></div>
+              <div><dt>Partecipanti</dt><dd>{selectedActivity.participantCount} / {selectedActivity.maxParticipants}</dd></div>
+            </dl>
+            <div className="activity-popup-actions">
+              {selectedActivity.dateTime && (
+                <a href={getActivityCalendarUrl(selectedActivity.id)} download={`attivita-${selectedActivity.id}.ics`} className="calendar-link">Aggiungi al calendario</a>
+              )}
+              <button className="ghost-button" type="button" onClick={() => setSelectedActivity(null)}>Chiudi</button>
+            </div>
+          </article>
         </div>
       )}
     </section>
