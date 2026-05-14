@@ -2,11 +2,14 @@ const eventService = require('../src/activities/event.service');
 
 jest.mock('../src/data/models', () => ({
   Event: { create: jest.fn(), findByPk: jest.fn(), findAndCountAll: jest.fn(), increment: jest.fn() },
-  User: { findByPk: jest.fn() },
+  User: { findByPk: jest.fn(), findAll: jest.fn().mockResolvedValue([]) },
   Report: { count: jest.fn() },
   POI: {},
 }));
 jest.mock('../src/notifications/push.service', () => ({
+  sendNewEventToInterested: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('../src/notifications/email.service', () => ({
   sendNewEventToInterested: jest.fn().mockResolvedValue(undefined),
 }));
 jest.mock('../src/data/presenters', () => ({

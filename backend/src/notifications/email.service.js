@@ -156,6 +156,15 @@ async function sendEntityRejected(email, nomeEnte) {
   `);
 }
 
+async function sendNewEventToInterested(emails, titolo, categoria, eventId) {
+  const appUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/eventi/${eventId}`;
+  await Promise.all(emails.map((e) => send(e, `Nuovo evento ${categoria}: ${titolo}`, `
+    <p>È stato pubblicato un nuovo evento certificato che corrisponde ai tuoi interessi (<strong>${categoria}</strong>).</p>
+    <p><strong>${titolo}</strong></p>
+    <p><a href="${appUrl}">Scopri l'evento</a></p>
+  `)));
+}
+
 module.exports = {
   sendPasswordReset,
   sendActivityJoinConfirmation,
@@ -171,4 +180,5 @@ module.exports = {
   sendNewEntityRequest,
   sendEntityApproved,
   sendEntityRejected,
+  sendNewEventToInterested,
 };
