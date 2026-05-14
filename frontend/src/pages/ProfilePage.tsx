@@ -35,6 +35,7 @@ export function ProfilePage() {
 
   const [pushEnabled, setPushEnabled] = useState<boolean>(() => Boolean(localStorage.getItem(FCM_TOKEN_KEY)));
   const [isTogglingPush, setIsTogglingPush] = useState(false);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
 
   useEffect(() => {
     getMe()
@@ -121,7 +122,9 @@ export function ProfilePage() {
   }
 
   async function handleShareLocation() {
+    if (isGettingLocation) return;
     if (!navigator.geolocation) { setError('Geolocalizzazione non supportata dal browser'); return; }
+    setIsGettingLocation(true);
     setError(null); setMessage('Rilevamento posizione in corso...');
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
@@ -130,6 +133,8 @@ export function ProfilePage() {
           setMessage(`Posizione aggiornata (${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)})`);
         } catch (e) {
           setError(e instanceof Error ? e.message : 'Errore aggiornamento posizione');
+        } finally {
+          setIsGettingLocation(false);
         }
       },
       (err) => {
@@ -139,6 +144,7 @@ export function ProfilePage() {
           3: 'Timeout: il browser non è riuscito a determinare la posizione in tempo.',
         };
         setError(reasons[err.code] ?? `Errore geolocalizzazione (codice ${err.code})`);
+        setIsGettingLocation(false);
       },
       { timeout: 10000, enableHighAccuracy: false },
     );
@@ -206,8 +212,10 @@ export function ProfilePage() {
 
       <div className="auth-form glass-card">
         <h2>Posizione (per notifiche di attività vicine)</h2>
-        <p>Condividi la tua posizione corrente per ricevere notifiche di attività entro 3 km dai tuoi interessi.</p>
-        <button type="button" className="primary-button" onClick={handleShareLocation}>📍 Condividi posizione</button>
+        <p>Condividi la tua posizione corrente per ricevere notifiche di attività entro 50 km dai tuoi interessi.</p>
+        <button type="button" className="primary-button" onClick={handleShareLocation} disabled={isGettingLocation}>
+          {isGettingLocation ? 'Rilevamento...' : '📍 Condividi posizione'}
+        </button>
       </div>
 
       <div className="auth-form glass-card">
