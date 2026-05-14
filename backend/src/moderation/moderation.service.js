@@ -58,9 +58,9 @@ async function resolveReport(reportId, { azione }) {
     const entity = await User.findByPk(report.event.entityId, { attributes: ['email'] });
     const eventTitolo = report.event.titolo;
     const eventId = report.event.id;
-    // Mark all reports for this event as resolved first, then destroy the event
-    // (avoids FK constraint violation: reports reference eventId)
-    await Report.update({ stato: 'risolta' }, { where: { eventId } });
+    // Must destroy all reports referencing the event before destroying the event
+    // (eventId FK is NOT NULL with no CASCADE DELETE)
+    await Report.destroy({ where: { eventId } });
     await report.event.destroy();
     if (entity) sendContentRemoved(entity.email, eventTitolo).catch(() => {});
     return { message: 'Event removed and report resolved' };

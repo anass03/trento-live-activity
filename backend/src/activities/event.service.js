@@ -1,6 +1,7 @@
 const { Op } = require('sequelize');
 const { Event, User, Report, POI } = require('../data/models');
-const { sendNewEventToInterested } = require('../notifications/push.service');
+const { sendNewEventToInterested: sendNewEventPush } = require('../notifications/push.service');
+const { sendNewEventToInterested: sendNewEventEmail } = require('../notifications/email.service');
 const { serializeEvent } = require('../data/presenters');
 const { buildIcs } = require('./ics');
 
@@ -24,8 +25,15 @@ async function createEvent(entityId, { titolo, descrizione, categoria, latitudin
     entityId, latitudine, longitudine, poiId, data, orarioInizio, orarioFine,
   });
 
-  // RF40: push notification to users with matching interest in their profile
-  sendNewEventToInterested(event.id, categoria, titolo).catch(() => {});
+  // RF40: push + email to users with matching interest
+  sendNewEventPush(event.id, categoria, titolo).catch(() => {});
+  User.findAll({
+    where: { ruolo: 'UtenteRegistrato', interessi: { [Op.contains]: [categoria] } },
+    attributes: ['email'],
+  }).then((users) => {
+    const emails = users.map((u) => u.email);
+    if (emails.length) sendNewEventEmail(emails, titolo, categoria, event.id).catch(() => {});
+  }).catch(() => {});
 
   return event;
 }

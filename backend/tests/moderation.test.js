@@ -1,7 +1,7 @@
 const moderationService = require('../src/moderation/moderation.service');
 
 jest.mock('../src/data/models', () => ({
-  Report: { create: jest.fn(), findAndCountAll: jest.fn(), findByPk: jest.fn(), update: jest.fn().mockResolvedValue([1]) },
+  Report: { create: jest.fn(), findAndCountAll: jest.fn(), findByPk: jest.fn(), update: jest.fn().mockResolvedValue([1]), destroy: jest.fn().mockResolvedValue(1) },
   Event: { findByPk: jest.fn() },
   User: {
     findAll: jest.fn().mockResolvedValue([]),
@@ -63,11 +63,11 @@ describe('Moderation Service — resolveReport', () => {
     };
   }
 
-  test('TC-MOD-04: rimuovi destroys the event and marks all its reports risolta', async () => {
+  test('TC-MOD-04: rimuovi destroys all reports then the event', async () => {
     const report = makeReport();
     Report.findByPk.mockResolvedValue(report);
     const result = await moderationService.resolveReport(REPORT_ID, { azione: 'rimuovi' });
-    expect(Report.update).toHaveBeenCalledWith({ stato: 'risolta' }, { where: { eventId: EVENT_ID } });
+    expect(Report.destroy).toHaveBeenCalledWith({ where: { eventId: EVENT_ID } });
     expect(report.event.destroy).toHaveBeenCalled();
     expect(result.message).toMatch(/removed/i);
   });
