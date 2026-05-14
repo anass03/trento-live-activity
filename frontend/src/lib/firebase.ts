@@ -1,5 +1,5 @@
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
-import { getMessaging, getToken, onMessage, type Messaging } from 'firebase/messaging';
+import { getMessaging, getToken, deleteToken, onMessage, type Messaging } from 'firebase/messaging';
 
 // These values are intentionally public — they identify the web client to
 // Firebase. They can be overridden via Vite env variables (VITE_FIREBASE_*).
@@ -34,14 +34,15 @@ export function getFirebaseMessaging(): Messaging | null {
   return messaging;
 }
 
-// Returns a fresh FCM device token after registering the service worker.
+// Returns a fresh FCM device token. Always forces a new token (deletes the old
+// one first) so stale tokens are replaced on every "enable" click.
 // Throws if the user denies notification permission or the browser isn't supported.
 export async function requestFcmToken(): Promise<string> {
   const m = getFirebaseMessaging();
   if (!m) throw new Error('Notifiche push non supportate da questo browser');
 
   if (Notification.permission === 'denied') {
-    throw new Error('Permesso notifiche bloccato. Riabilitalo dalle impostazioni del browser.');
+    throw new Error('Permesso notifiche bloccato. Vai nelle impostazioni del browser e riabilita le notifiche per questo sito.');
   }
   const perm = Notification.permission === 'granted'
     ? 'granted'
@@ -50,13 +51,17 @@ export async function requestFcmToken(): Promise<string> {
     throw new Error('Permesso notifiche negato');
   }
 
-  // The service worker file is served as a static asset at /firebase-messaging-sw.js
   const swRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+
+  // Delete the existing token first so Firebase issues a fresh one.
+  // This avoids stale tokens that FCM has already invalidated.
+  try { await deleteToken(m); } catch { /* ignore — no token to delete */ }
+
   const token = await getToken(m, {
     vapidKey: VAPID_KEY,
     serviceWorkerRegistration: swRegistration,
   });
-  if (!token) throw new Error('Impossibile ottenere il token FCM');
+  if (!token) throw new Error('Impossibile ottenere il token FCM. Assicurati di non avere estensioni che bloccano le notifiche.');
   return token;
 }
 
