@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { createEvent, getMyEvents, type ApiEvent } from '../lib/api';
+import { createEvent, deleteEvent, getMyEvents, type ApiEvent } from '../lib/api';
 
 const CATEGORIES = ['sport', 'cultura', 'musica', 'arte', 'gastronomia', 'altro'];
 
@@ -21,6 +21,18 @@ export function EntityPublishPage() {
       .catch((e) => setError(e instanceof Error ? e.message : 'Errore'));
   }
   useEffect(load, []);
+
+  async function handleDelete(eventId: string, titolo: string) {
+    if (!window.confirm(`Eliminare definitivamente l'evento "${titolo}"? L'azione non è reversibile.`)) return;
+    setError(null); setMessage(null);
+    try {
+      await deleteEvent(eventId);
+      setMessage('Evento eliminato.');
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Errore eliminazione');
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -89,14 +101,24 @@ export function EntityPublishPage() {
           <p>Non hai ancora pubblicato eventi.</p>
         ) : (
           <table className="stats-table">
-            <thead><tr><th>Titolo</th><th>Categoria</th><th>Data</th><th>Dettagli</th></tr></thead>
+            <thead><tr><th>Titolo</th><th>Categoria</th><th>Data</th><th>Azioni</th></tr></thead>
             <tbody>
               {myEvents.map((e) => (
                 <tr key={e.id}>
                   <td>{e.title}</td>
                   <td>{e.category}</td>
                   <td>{e.dateTime ? new Date(e.dateTime).toLocaleDateString('it-IT') : '—'}</td>
-                  <td><Link to={`/eventi/${e.id}`}>Apri</Link></td>
+                  <td style={{ display: 'flex', gap: 8 }}>
+                    <Link to={`/eventi/${e.id}`}>Apri</Link>
+                    <button
+                      type="button"
+                      className="danger-button"
+                      style={{ padding: '4px 10px', fontSize: 12 }}
+                      onClick={() => handleDelete(e.id, e.title)}
+                    >
+                      Elimina
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

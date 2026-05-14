@@ -1,6 +1,21 @@
 const { DeviceToken } = require('../data/models');
+const { sendToTokens } = require('./push.service');
 
 const VALID_PLATFORMS = ['web', 'ios', 'android'];
+
+async function sendTestPush(userId) {
+  const tokens = (await DeviceToken.findAll({ where: { userId }, attributes: ['token'] }))
+    .map((r) => r.token);
+  if (tokens.length === 0) {
+    throw { status: 400, code: 'NO_DEVICE_TOKEN', error: 'Nessun token registrato. Attiva prima le notifiche push.' };
+  }
+  await sendToTokens(tokens, {
+    title: '🔔 Notifica di test',
+    body: 'Se vedi questo messaggio, le tue notifiche push funzionano correttamente.',
+    data: { type: 'test' },
+  });
+  return { tokensTargeted: tokens.length };
+}
 
 async function registerDeviceToken(userId, { token, platform = 'web' }) {
   if (!token) {
@@ -29,4 +44,4 @@ async function unregisterDeviceToken(userId, token) {
   await DeviceToken.destroy({ where: { userId, token } });
 }
 
-module.exports = { registerDeviceToken, unregisterDeviceToken };
+module.exports = { registerDeviceToken, unregisterDeviceToken, sendTestPush };

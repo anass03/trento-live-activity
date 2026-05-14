@@ -3,8 +3,8 @@ const eventService = require('../src/activities/event.service');
 jest.mock('../src/data/models', () => ({
   Event: { create: jest.fn(), findByPk: jest.fn(), findAndCountAll: jest.fn(), increment: jest.fn() },
   User: { findByPk: jest.fn(), findAll: jest.fn().mockResolvedValue([]) },
-  Report: { count: jest.fn() },
-  POI: {},
+  Report: { count: jest.fn(), destroy: jest.fn().mockResolvedValue(0) },
+  POI: { findByPk: jest.fn() },
 }));
 jest.mock('../src/notifications/push.service', () => ({
   sendNewEventToInterested: jest.fn().mockResolvedValue(undefined),
@@ -71,6 +71,24 @@ describe('Event Service — createEvent', () => {
     User.findByPk.mockResolvedValue(makeEntity());
     await expect(eventService.createEvent(ENTITY_ID, { titolo: 'a'.repeat(101), categoria: 'arte' }))
       .rejects.toMatchObject({ status: 400, code: 'INVALID_TITLE' });
+  });
+});
+
+describe('Event Service — deleteEvent', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('TC-EV-08: entity deletes their own event (destroys reports first)', async () => {
+    const evt = makeEvent({ destroy: jest.fn() });
+    Event.findByPk.mockResolvedValue(evt);
+    await eventService.deleteEvent(ENTITY_ID, EVENT_ID);
+    expect(Report.destroy).toHaveBeenCalledWith({ where: { eventId: EVENT_ID } });
+    expect(evt.destroy).toHaveBeenCalled();
+  });
+
+  test('TC-EV-09: rejects delete from non-owner', async () => {
+    Event.findByPk.mockResolvedValue(makeEvent());
+    await expect(eventService.deleteEvent('other-entity', EVENT_ID))
+      .rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' });
   });
 });
 

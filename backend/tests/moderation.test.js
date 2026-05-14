@@ -1,7 +1,14 @@
 const moderationService = require('../src/moderation/moderation.service');
 
 jest.mock('../src/data/models', () => ({
-  Report: { create: jest.fn(), findAndCountAll: jest.fn(), findByPk: jest.fn(), update: jest.fn().mockResolvedValue([1]), destroy: jest.fn().mockResolvedValue(1) },
+  Report: {
+    create: jest.fn(),
+    findAndCountAll: jest.fn(),
+    findByPk: jest.fn(),
+    findAll: jest.fn().mockResolvedValue([]),
+    update: jest.fn().mockResolvedValue([1]),
+    destroy: jest.fn().mockResolvedValue(1),
+  },
   Event: { findByPk: jest.fn() },
   User: {
     findAll: jest.fn().mockResolvedValue([]),
@@ -11,6 +18,10 @@ jest.mock('../src/data/models', () => ({
 jest.mock('../src/notifications/email.service', () => ({
   sendReportCreated: jest.fn().mockResolvedValue(undefined),
   sendContentRemoved: jest.fn().mockResolvedValue(undefined),
+  sendReportOutcome: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('../src/notifications/push.service', () => ({
+  sendReportOutcome: jest.fn().mockResolvedValue(undefined),
 }));
 
 const { Report, Event } = require('../src/data/models');
