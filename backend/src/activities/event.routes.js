@@ -20,5 +20,6 @@ router.get('/:id/stats', authenticate, authorize('EnteCertificato'), ctrl.stats)
 // Certified entities only
 router.post('/', authenticate, authorize('EnteCertificato'), ctrl.create);
 router.put('/:id', authenticate, authorize('EnteCertificato'), ctrl.update);
+router.delete('/:id', authenticate, authorize('EnteCertificato'), ctrl.remove);
 
 module.exports = router;

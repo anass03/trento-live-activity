@@ -37,6 +37,14 @@ async function update(req, res, next) {
   } catch (e) { next(e); }
 }
 
+async function remove(req, res, next) {
+  try {
+    assertUuid(req.params.id, 'event id');
+    await service.deleteEvent(req.user.id, req.params.id);
+    res.status(204).send();
+  } catch (e) { next(e); }
+}
+
 async function stats(req, res, next) {
   try {
     assertUuid(req.params.id, 'event id');
@@ -66,4 +74,4 @@ async function calendar(req, res, next) {
   } catch (e) { next(e); }
 }
 
-module.exports = { create, list, get, update, stats, listMine, calendar };
+module.exports = { create, list, get, update, remove, stats, listMine, calendar };

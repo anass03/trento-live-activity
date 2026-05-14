@@ -105,6 +105,23 @@ async function sendContentRemoved(entityEmail, eventTitolo) {
   `);
 }
 
+// DSA (EU 2022/2065): inform the reporter about the outcome of their report.
+async function sendReportOutcome(reporterEmail, eventTitolo, outcome) {
+  const labels = {
+    rimosso: ['Segnalazione accolta — evento rimosso',
+      `<p>La tua segnalazione per l'evento "<strong>${eventTitolo}</strong>" è stata accolta. Il contenuto è stato rimosso dalla piattaforma.</p>`],
+    archiviato: ['Segnalazione archiviata',
+      `<p>La tua segnalazione per l'evento "<strong>${eventTitolo}</strong>" è stata esaminata e archiviata: non sono state riscontrate violazioni delle linee guida.</p>
+       <p>Se non sei d'accordo con la decisione, puoi contattare il team di Trento Live Activity per chiedere una revisione (DSA art. 20).</p>`],
+    in_lavorazione: ['Segnalazione in lavorazione',
+      `<p>La tua segnalazione per l'evento "<strong>${eventTitolo}</strong>" è in fase di revisione da parte dei moderatori. Ti aggiorneremo non appena verrà conclusa.</p>`],
+  };
+  const entry = labels[outcome];
+  if (!entry) return;
+  const [subject, body] = entry;
+  await send(reporterEmail, subject, body);
+}
+
 async function sendEmailVerification(email, nome, token) {
   const verifyUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verifica-email?token=${token}`;
   await send(email, 'Verifica la tua email — Trento Live Activity', `
@@ -182,6 +199,7 @@ module.exports = {
   sendActivityCancelled,
   sendReportCreated,
   sendContentRemoved,
+  sendReportOutcome,
   sendEmailVerification,
   sendWelcome,
   sendEntityRegistered,
