@@ -55,12 +55,13 @@ async function resolveReport(reportId, { azione }) {
   if (!report) throw { status: 404, code: 'NOT_FOUND', error: 'Report not found' };
 
   if (azione === 'rimuovi') {
-    // fetch entity email before destroying the event
     const entity = await User.findByPk(report.event.entityId, { attributes: ['email'] });
     const eventTitolo = report.event.titolo;
+    const eventId = report.event.id;
+    // Mark all reports for this event as resolved first, then destroy the event
+    // (avoids FK constraint violation: reports reference eventId)
+    await Report.update({ stato: 'risolta' }, { where: { eventId } });
     await report.event.destroy();
-    await report.update({ stato: 'risolta' });
-    // RNF24: notify entity that their content was removed
     if (entity) sendContentRemoved(entity.email, eventTitolo).catch(() => {});
     return { message: 'Event removed and report resolved' };
   } else if (azione === 'archivia') {
