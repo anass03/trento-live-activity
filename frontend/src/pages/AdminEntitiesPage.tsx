@@ -28,7 +28,7 @@ export function AdminEntitiesPage() {
 
   return (
     <section className="data-page">
-      <header className="utility-strip glass-card">
+      <header className="utility-strip liquid-card">
         <div>
           <h1>Richieste di registrazione enti certificati</h1>
           <p>Approva o rifiuta i nuovi enti che richiedono la verifica</p>
@@ -36,16 +36,16 @@ export function AdminEntitiesPage() {
         <button type="button" onClick={load}>Aggiorna</button>
       </header>
 
-      {error && <div className="state-panel glass-panel"><p>{error}</p></div>}
-      {message && <div className="state-panel glass-panel"><p>{message}</p></div>}
+      {error && <div className="state-panel liquid-panel"><p>{error}</p></div>}
+      {message && <div className="state-panel liquid-panel"><p>{message}</p></div>}
 
-      {isLoading && <div className="state-panel glass-panel">Caricamento...</div>}
-      {!isLoading && entities.length === 0 && <div className="state-panel glass-panel">Nessuna richiesta in attesa.</div>}
+      {isLoading && <div className="state-panel liquid-panel">Caricamento...</div>}
+      {!isLoading && entities.length === 0 && <div className="state-panel liquid-panel">Nessuna richiesta in attesa.</div>}
 
       {entities.length > 0 && (
         <div className="data-grid">
           {entities.map((e) => (
-            <article className="data-card glass-card" key={e.id}>
+            <article className="data-card liquid-card" key={e.id}>
               <div className="data-card-header"><span>Ente</span><small>{new Date(e.createdAt).toLocaleDateString('it-IT')}</small></div>
               <h2>{e.nomeEnte}</h2>
               <dl>

@@ -18,7 +18,7 @@ The database seeded by `npm run seed` is read by the Express backend through Seq
 
 ## Stack Detected
 
-- Frontend: React 18, TypeScript, Vite, React Router.
+- Frontend: React, TypeScript, Vite, React Router.
 - Backend: Node.js, Express.
 - Database: PostgreSQL.
 - Query layer: Sequelize using the `pg` driver.
@@ -158,7 +158,8 @@ Returns markers generated from seeded POIs, activities, and events:
       "longitude": 11.113,
       "crowdingStatus": "red",
       "isCertified": true,
-      "sourceId": "uuid"
+      "sourceId": "uuid",
+      "category": "musica"
     }
   ],
   "pois": [],
@@ -167,7 +168,30 @@ Returns markers generated from seeded POIs, activities, and events:
 }
 ```
 
-`crowdingStatus` is normalized for the frontend as `green`, `yellow`, or `red` from the Italian database values `verde`, `giallo`, and `rosso`.
+`crowdingStatus` is normalized for the frontend as `green`, `yellow`, `orange`, or `red`. When a backend marker does not include a numeric `crowdLevel`, the frontend maps the status to a stable 0-100 display value for the map heat/glow layer.
+
+### `GET /api/dashboard/stats`
+
+Protected by municipal-admin authentication. Returns aggregate Comune metrics:
+
+```json
+{
+  "totalUsers": 12,
+  "totalActivities": 8,
+  "totalEvents": 5,
+  "totalPOIs": 9,
+  "totalParticipations": 20,
+  "activitiesByType": [{ "tipo": "sport", "count": 3 }],
+  "poiCrowding": [{ "statoAffollamento": "verde", "count": 5 }],
+  "filters": {}
+}
+```
+
+Supported query filters are `tipo`, `da`, `a`, `centerLat`, `centerLng`, `radiusKm`, and `poiId`.
+
+### `GET /api/dashboard/stats/export`
+
+Protected by municipal-admin authentication. Accepts the same filters as `/api/dashboard/stats` plus `format=csv|pdf`. The frontend downloads this endpoint through `fetch` so the bearer token can be sent in the `Authorization` header.
 
 ## Frontend API Calls
 
@@ -179,8 +203,25 @@ Frontend API functions are centralized in `frontend/src/lib/api.ts`:
 - `getActivityById(id)`
 - `getMapMarkers()`
 - `getCurrentUser()`
+- `getDashboardStats(params)`
+- `downloadDashboardExport(format, params)`
+- admin helpers for POIs, users, entity requests, and moderation
 
 Pages use these helpers instead of calling `fetch` directly.
+
+## Interactive Map Provider
+
+The main map UI uses MapLibre GL JS with free OpenFreeMap/OpenStreetMap-derived vector tiles. It does not require Google Maps or paid API credentials. The MapLibre implementation lives in `frontend/src/components/map/MapCanvas.tsx`; visual map styling, 3D buildings, density glow overlays, marker colors, popups, and responsive behavior are defined in `frontend/src/styles/globals.css`.
+
+## Comune Pages
+
+The Comune routes are intentionally separate pages:
+
+- `/comune/dashboard` -> overview, live city status, recent activity, alerts derived from map crowding, and quick actions.
+- `/comune/statistiche` -> analytics filters, KPI metrics, activity distribution, and POI crowding trends.
+- `/comune/export` -> authenticated CSV/PDF export controls and dataset preview.
+
+They all use the shared API client in `frontend/src/lib/api.ts` and read from `/api/dashboard/stats` or `/api/dashboard/stats/export`.
 
 ## CORS and Development Proxy
 
@@ -192,5 +233,6 @@ The Vite dev server proxies frontend requests from `/api/*` to `http://localhost
 
 - `/api/users/me` is a temporary seeded-user bridge, not real authentication.
 - There is no production migration tool yet; Sequelize sync is still used for development schema management.
-- The map is still a polished local canvas placeholder, not Mapbox, Leaflet, or Google Maps.
-- Event and activity creation flows remain backend-only for now; the implemented frontend work is read-only display of seeded data.
+- Weather and city alert endpoints are not present in the backend yet. The homepage weather mood is still a local UI state, while city alerts are derived from real map crowding markers.
+- Only dashboard statistics export is available in the backend today; the frontend does not invent unsupported event/activity/user export endpoints.
+- Event and activity creation flows remain limited to the existing backend/API surfaces; most public frontend pages currently focus on display and lightweight actions.

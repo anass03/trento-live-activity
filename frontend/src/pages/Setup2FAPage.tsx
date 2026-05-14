@@ -70,13 +70,13 @@ export function Setup2FAPage() {
 
   return (
     <section className="auth-page">
-      <div className="auth-form glass-card" style={{ minWidth: 480 }}>
+      <div className="auth-form liquid-card two-factor-card">
         {phase === 'scan' && (
           <>
             <h1>Configurazione 2FA</h1>
             <p>Configura la 2FA con il tuo authenticator. Un eventuale setup precedente verrà sostituito.</p>
 
-            {isLoading && <div className="state-panel glass-panel">Generazione QR code...</div>}
+            {isLoading && <div className="state-panel liquid-panel">Generazione QR code...</div>}
             {error && <div className="form-error">{error}</div>}
 
             {!isLoading && qrDataUrl && (

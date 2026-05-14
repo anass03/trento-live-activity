@@ -2,14 +2,16 @@ import { useEffect, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from '../components/layout/AppShell';
 import { mockCurrentUser, type AppUser } from '../data/mockUser';
-import { getMe, getToken } from '../lib/api';
+import { getCurrentUser, getMe, getToken, type CurrentUser } from '../lib/api';
 import { ActivitiesPage } from '../pages/ActivitiesPage';
 import { ActivityDetailPage } from '../pages/ActivityDetailPage';
 import { AdminEntitiesPage } from '../pages/AdminEntitiesPage';
 import { AdminModerationPage } from '../pages/AdminModerationPage';
 import { AdminPOIPage } from '../pages/AdminPOIPage';
 import { AdminUsersPage } from '../pages/AdminUsersPage';
-import { DashboardComunePage } from '../pages/DashboardComunePage';
+import { ComuneDashboardPage } from '../pages/ComuneDashboardPage';
+import { ComuneExportPage } from '../pages/ComuneExportPage';
+import { ComuneStatistichePage } from '../pages/ComuneStatistichePage';
 import { EntityPublishPage } from '../pages/EntityPublishPage';
 import { EventDetailPage } from '../pages/EventDetailPage';
 import { EventsPage } from '../pages/EventsPage';
@@ -31,11 +33,30 @@ function mapRuoloToRole(ruolo?: string): AppUser['role'] {
   }
 }
 
+function clientUserToAppUser(user: CurrentUser): AppUser {
+  return {
+    id: user.id || 'anonymous',
+    name: user.name,
+    email: user.email || '',
+    role: user.role,
+    avatar: user.avatar,
+    ruolo: user.ruolo,
+    interessi: user.interessi,
+    nomeEnte: user.nomeEnte,
+    approvato: user.approvato,
+  };
+}
+
 export function App() {
   const [user, setUser] = useState<AppUser>(mockCurrentUser);
 
   function fetchUser() {
-    if (!getToken()) { setUser(mockCurrentUser); return; }
+    if (!getToken()) {
+      getCurrentUser()
+        .then((currentUser) => setUser(clientUserToAppUser(currentUser)))
+        .catch(() => setUser(mockCurrentUser));
+      return;
+    }
     getMe()
       .then((u) => {
         const me = u as unknown as { id: string; nome: string; cognome: string; email: string; ruolo: string; interessi?: string[]; nomeEnte?: string; approvato?: boolean };
@@ -64,7 +85,7 @@ export function App() {
     <AppShell user={user}>
       <Routes>
         <Route path="/" element={<MapPage user={user} />} />
-        <Route path="/attivita" element={<ActivitiesPage userInterests={user.interessi} user={user} />} />
+        <Route path="/attivita" element={<ActivitiesPage userInterests={user.interessi} />} />
         <Route path="/attivita/:id" element={<ActivityDetailPage user={user} />} />
         <Route path="/eventi" element={<EventsPage user={user} />} />
         <Route path="/eventi/:id" element={<EventDetailPage user={user} />} />
@@ -80,9 +101,9 @@ export function App() {
 
         <Route path="/ente/pubblica" element={<EntityPublishPage />} />
 
-        <Route path="/comune/dashboard" element={<DashboardComunePage />} />
-        <Route path="/comune/statistiche" element={<DashboardComunePage />} />
-        <Route path="/comune/export" element={<DashboardComunePage />} />
+        <Route path="/comune/dashboard" element={<ComuneDashboardPage />} />
+        <Route path="/comune/statistiche" element={<ComuneStatistichePage />} />
+        <Route path="/comune/export" element={<ComuneExportPage />} />
 
         <Route path="/admin/poi" element={<AdminPOIPage />} />
         <Route path="/admin/utenti" element={<AdminUsersPage />} />

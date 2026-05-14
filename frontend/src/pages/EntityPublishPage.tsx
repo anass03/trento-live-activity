@@ -58,11 +58,11 @@ export function EntityPublishPage() {
 
   return (
     <section className="data-page">
-      <header className="utility-strip glass-card">
+      <header className="utility-strip liquid-card">
         <div><h1>Pubblica evento</h1><p>Solo per enti certificati approvati</p></div>
       </header>
 
-      <form className="auth-form glass-card" onSubmit={handleSubmit}>
+      <form className="auth-form liquid-card" onSubmit={handleSubmit}>
         <label>
           <span>Titolo (max 100 caratteri)</span>
           <input type="text" maxLength={100} value={form.titolo} onChange={(e) => setForm({ ...form, titolo: e.target.value })} required />
@@ -95,7 +95,7 @@ export function EntityPublishPage() {
         </button>
       </form>
 
-      <div className="glass-card">
+      <div className="liquid-card">
         <h2>I miei eventi pubblicati ({myEvents.length})</h2>
         {myEvents.length === 0 ? (
           <p>Non hai ancora pubblicato eventi.</p>

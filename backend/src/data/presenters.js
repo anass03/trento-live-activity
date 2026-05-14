@@ -43,7 +43,7 @@ function crowdingStatus(statoAffollamento) {
 function roleForClient(ruolo) {
   const map = {
     UtenteRegistrato: 'registered_user',
-    EnteCertificato: 'registered_user',
+    EnteCertificato: 'certified_entity',
     AmministratoreComunale: 'municipal_admin',
     AmministratoreDiSistema: 'system_admin',
   };
@@ -70,6 +70,10 @@ function serializeUser(record) {
     role: roleForClient(user.ruolo),
     roleLabel: user.ruolo,
     avatar: initialsFor(user),
+    ruolo: user.ruolo,
+    interessi: user.interessi || [],
+    nomeEnte: user.nomeEnte || null,
+    approvato: user.approvato,
   };
 }
 
