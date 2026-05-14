@@ -1,5 +1,10 @@
 const { Report, Event, User } = require('../data/models');
-const { sendReportCreated, sendContentRemoved } = require('../notifications/email.service');
+const {
+  sendReportCreated,
+  sendContentRemoved,
+  sendReportOutcome: emailReportOutcome,
+} = require('../notifications/email.service');
+const { sendReportOutcome: pushReportOutcome } = require('../notifications/push.service');
 
 async function createReport(userId, eventId, { tipo, descrizione }) {
   const event = await Event.findByPk(eventId);
@@ -54,20 +59,40 @@ async function resolveReport(reportId, { azione }) {
   });
   if (!report) throw { status: 404, code: 'NOT_FOUND', error: 'Report not found' };
 
+  // Cache info needed for notifications BEFORE we mutate state
+  const reporter = report.userId ? await User.findByPk(report.userId, { attributes: ['id', 'email'] }) : null;
+  const eventTitolo = report.event?.titolo || 'evento';
+
   if (azione === 'rimuovi') {
-    // fetch entity email before destroying the event
-    const entity = await User.findByPk(report.event.userId, { attributes: ['email'] });
-    const eventTitolo = report.event.titolo;
+    const entity = await User.findByPk(report.event.entityId, { attributes: ['email'] });
+    const eventId = report.event.id;
+
+    // Reports referencing the event must be destroyed first (FK with no CASCADE)
+    // — but capture all reporter ids first so we can notify them about the outcome.
+    const allReports = await Report.findAll({ where: { eventId }, attributes: ['userId'] });
+    const reporterIds = allReports.map((r) => r.userId).filter(Boolean);
+    const reporters = await User.findAll({ where: { id: reporterIds }, attributes: ['id', 'email'] });
+
+    await Report.destroy({ where: { eventId } });
     await report.event.destroy();
-    await report.update({ stato: 'risolta' });
-    // RNF24: notify entity that their content was removed
+
     if (entity) sendContentRemoved(entity.email, eventTitolo).catch(() => {});
+
+    // DSA (RNF24): inform every reporter of the outcome.
+    reporters.forEach((r) => {
+      if (r.email) emailReportOutcome(r.email, eventTitolo, 'rimosso').catch(() => {});
+      pushReportOutcome(r.id, eventTitolo, 'rimosso').catch(() => {});
+    });
     return { message: 'Event removed and report resolved' };
   } else if (azione === 'archivia') {
     await report.update({ stato: 'risolta' });
+    if (reporter?.email) emailReportOutcome(reporter.email, eventTitolo, 'archiviato').catch(() => {});
+    if (reporter?.id) pushReportOutcome(reporter.id, eventTitolo, 'archiviato').catch(() => {});
     return { message: 'Report archived' };
   } else if (azione === 'in_lavorazione') {
     await report.update({ stato: 'in lavorazione' });
+    if (reporter?.email) emailReportOutcome(reporter.email, eventTitolo, 'in_lavorazione').catch(() => {});
+    if (reporter?.id) pushReportOutcome(reporter.id, eventTitolo, 'in_lavorazione').catch(() => {});
     return { message: 'Report marked as in progress' };
   }
 

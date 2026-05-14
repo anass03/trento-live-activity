@@ -36,30 +36,14 @@ function locationFor(item) {
 }
 
 function crowdingStatus(statoAffollamento) {
-  return crowdingStatusForLevel(crowdLevelFromStatus(statoAffollamento));
-}
-
-function crowdLevelFromStatus(statoAffollamento) {
-  const map = { verde: 22, giallo: 52, rosso: 90 };
-  return map[statoAffollamento] || 25;
-}
-
-function crowdingStatusForLevel(level) {
-  if (level >= 82) return 'red';
-  if (level >= 62) return 'orange';
-  if (level >= 34) return 'yellow';
-  return 'green';
-}
-
-function crowdLevelFromRatio(participantCount, maxParticipants, fallback = 25) {
-  if (!participantCount || !maxParticipants) return fallback;
-  return Math.max(8, Math.min(100, Math.round((participantCount / maxParticipants) * 100)));
+  const map = { verde: 'green', giallo: 'yellow', rosso: 'red' };
+  return map[statoAffollamento] || 'green';
 }
 
 function roleForClient(ruolo) {
   const map = {
     UtenteRegistrato: 'registered_user',
-    EnteCertificato: 'registered_user',
+    EnteCertificato: 'certified_entity',
     AmministratoreComunale: 'municipal_admin',
     AmministratoreDiSistema: 'system_admin',
   };
@@ -86,6 +70,10 @@ function serializeUser(record) {
     role: roleForClient(user.ruolo),
     roleLabel: user.ruolo,
     avatar: initialsFor(user),
+    ruolo: user.ruolo,
+    interessi: user.interessi || [],
+    nomeEnte: user.nomeEnte || null,
+    approvato: user.approvato,
   };
 }
 
@@ -124,6 +112,7 @@ function serializeActivity(record) {
     category: activity.tipo,
     location: locationFor(activity),
     participantCount: participants.length,
+    participantIds: participants.map((p) => p.id),
     maxParticipants: activity.maxPartecipanti,
     createdAt: timestamp(activity.createdAt),
     dateTime: dateTime(activity.data, activity.orarioInizio),
@@ -155,62 +144,45 @@ function serializePOI(record) {
 
 function markerFromPOI(record) {
   const poi = plain(record);
-  const crowdLevel = crowdLevelFromStatus(poi.statoAffollamento);
   return {
     id: `poi:${poi.id}`,
     type: 'poi',
     title: poi.nome,
     latitude: poi.latitudine,
     longitude: poi.longitudine,
-    crowdLevel,
-    crowdingStatus: crowdingStatusForLevel(crowdLevel),
+    crowdingStatus: crowdingStatus(poi.statoAffollamento),
     isCertified: false,
     sourceId: poi.id,
-    category: poi.tipo,
-    description: poi.descrizione || 'Punto di interesse cittadino.',
-    dateTime: null,
   };
 }
 
 function markerFromActivity(record) {
   const activity = plain(record);
-  const participants = Array.isArray(activity.participants) ? activity.participants : [];
-  const fallback = crowdLevelFromStatus(activity.poi?.statoAffollamento);
-  const crowdLevel = crowdLevelFromRatio(participants.length, activity.maxPartecipanti, fallback);
   return {
     id: `activity:${activity.id}`,
     type: 'activity',
     title: `Attività di ${capitalize(activity.tipo)}`,
     latitude: activity.latitudine,
     longitude: activity.longitudine,
-    crowdLevel,
-    crowdingStatus: crowdingStatusForLevel(crowdLevel),
+    crowdingStatus: crowdingStatus(activity.poi?.statoAffollamento),
     isCertified: false,
     sourceId: activity.id,
     category: activity.tipo,
-    description: `Attività spontanea di ${activity.tipo}. Partecipanti: ${participants.length}/${activity.maxPartecipanti}.`,
-    dateTime: dateTime(activity.data, activity.orarioInizio),
   };
 }
 
 function markerFromEvent(record) {
   const event = plain(record);
-  const baseLevel = crowdLevelFromStatus(event.poi?.statoAffollamento);
-  const popularityBoost = Math.min(18, Math.floor((event.views || 0) / 8));
-  const crowdLevel = Math.min(100, baseLevel + popularityBoost);
   return {
     id: `event:${event.id}`,
     type: 'event',
     title: event.titolo,
     latitude: event.latitudine,
     longitude: event.longitudine,
-    crowdLevel,
-    crowdingStatus: crowdingStatusForLevel(crowdLevel),
+    crowdingStatus: crowdingStatus(event.poi?.statoAffollamento),
     isCertified: Boolean(event.badgeVerifica),
     sourceId: event.id,
     category: event.categoria,
-    description: event.descrizione || 'Evento certificato su Trento Live Activity.',
-    dateTime: dateTime(event.data, event.orarioInizio),
   };
 }
 

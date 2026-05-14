@@ -3,7 +3,7 @@ const activityService = require('../src/activities/activity.service');
 jest.mock('../src/data/models', () => ({
   Activity: { create: jest.fn(), findByPk: jest.fn(), findAndCountAll: jest.fn() },
   Participation: { create: jest.fn(), findOne: jest.fn(), count: jest.fn() },
-  User: {},
+  User: { findByPk: jest.fn(), findAll: jest.fn().mockResolvedValue([]) },
 }));
 
 const { Activity, Participation } = require('../src/data/models');

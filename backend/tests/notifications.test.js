@@ -1,10 +1,15 @@
 const notificationsService = require('../src/notifications/notifications.service');
 
 jest.mock('../src/data/models', () => ({
-  DeviceToken: { findOne: jest.fn(), create: jest.fn(), destroy: jest.fn() },
+  DeviceToken: { findOne: jest.fn(), create: jest.fn(), destroy: jest.fn(), findAll: jest.fn() },
+  User: { findAll: jest.fn() },
+}));
+jest.mock('../src/notifications/push.service', () => ({
+  sendToTokens: jest.fn().mockResolvedValue(undefined),
 }));
 
 const { DeviceToken } = require('../src/data/models');
+const { sendToTokens } = require('../src/notifications/push.service');
 
 const USER_ID = 'user-1';
 const TOKEN = 'fcm-token-abc';
@@ -51,5 +56,23 @@ describe('Notifications Service — unregisterDeviceToken', () => {
   test('TC-NOT-06: rejects missing token', async () => {
     await expect(notificationsService.unregisterDeviceToken(USER_ID, ''))
       .rejects.toMatchObject({ status: 400, code: 'MISSING_TOKEN' });
+  });
+});
+
+describe('Notifications Service — sendTestPush', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('TC-NOT-07: sends to all of the user\'s tokens', async () => {
+    DeviceToken.findAll.mockResolvedValue([{ token: 'a' }, { token: 'b' }]);
+    const result = await notificationsService.sendTestPush(USER_ID);
+    expect(sendToTokens).toHaveBeenCalledWith(['a', 'b'], expect.objectContaining({ title: expect.any(String) }));
+    expect(result).toEqual({ tokensTargeted: 2 });
+  });
+
+  test('TC-NOT-08: rejects when user has no token', async () => {
+    DeviceToken.findAll.mockResolvedValue([]);
+    await expect(notificationsService.sendTestPush(USER_ID))
+      .rejects.toMatchObject({ status: 400, code: 'NO_DEVICE_TOKEN' });
+    expect(sendToTokens).not.toHaveBeenCalled();
   });
 });

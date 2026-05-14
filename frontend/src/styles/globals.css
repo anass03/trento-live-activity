@@ -2146,6 +2146,114 @@ dd {
   border-color: color-mix(in oklch, var(--palette-sage) 58%, var(--palette-stone));
 }
 
+.muted-copy {
+  margin: 0;
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+}
+
+.comune-page .utility-strip p {
+  max-width: 58ch;
+}
+
+.comune-overview-grid,
+.comune-analytics-grid,
+.comune-export-grid {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+}
+
+.comune-overview-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 300px;
+}
+
+.comune-analytics-grid,
+.comune-export-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.comune-panel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.quick-action-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.metric-bar-list {
+  display: grid;
+  gap: 12px;
+}
+
+.metric-bar {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.5fr) minmax(120px, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.metric-bar > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--palette-pine);
+  font-weight: 760;
+}
+
+.metric-bar > div {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--palette-sage) 28%, transparent);
+}
+
+.metric-bar i {
+  display: block;
+  min-width: 8px;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--palette-sage), var(--palette-moss));
+}
+
+.metric-bar strong {
+  color: var(--palette-deep);
+  font-variant-numeric: tabular-nums;
+}
+
+.export-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.export-preview-grid article {
+  min-height: 92px;
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  padding: 14px;
+  border: 1px solid var(--color-surface-line);
+  border-radius: 18px;
+  background: var(--color-bg-muted);
+}
+
+.export-preview-grid strong {
+  color: var(--palette-deep);
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.export-preview-grid span {
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+  font-weight: 760;
+}
+
 @media (max-width: 1180px) {
   .data-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2157,7 +2265,10 @@ dd {
 
   .home-dashboard-grid,
   .event-editorial-layout,
-  .certified-layout {
+  .certified-layout,
+  .comune-overview-grid,
+  .comune-analytics-grid,
+  .comune-export-grid {
     grid-template-columns: 1fr;
   }
 

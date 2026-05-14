@@ -101,7 +101,22 @@ export interface DashboardStats {
 
 interface EventsResponse { events: ApiEvent[]; total?: number; }
 interface ActivitiesResponse { activities: ApiActivity[]; total?: number; }
-interface MapResponse { markers: MapMarker[]; }
+export interface MapDataResponse {
+  markers: MapMarker[];
+  pois?: POI[];
+  activities?: ApiActivity[];
+  events?: ApiEvent[];
+}
+
+export interface DashboardFilters {
+  tipo?: string;
+  da?: string;
+  a?: string;
+  centerLat?: string | number;
+  centerLng?: string | number;
+  radiusKm?: string | number;
+  poiId?: string;
+}
 
 export class ApiError extends Error {
   status?: number;
@@ -114,7 +129,7 @@ export class ApiError extends Error {
   }
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 const TOKEN_KEY = 'tla_token';
 
 export function getToken(): string | null {
@@ -171,6 +186,17 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   return (opts.raw ? response : payload) as T;
 }
 
+function apiUrl(path: string): string {
+  return `${API_BASE_URL}${path}`;
+}
+
+function authHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
 function arrayFromPayload<T>(payload: unknown, key: string): T[] {
   if (Array.isArray(payload)) return payload as T[];
   if (payload && typeof payload === 'object') {
@@ -182,16 +208,16 @@ function arrayFromPayload<T>(payload: unknown, key: string): T[] {
 
 // ============================== Public data ==============================
 
-export async function getEvents(params?: { q?: string; categoria?: string }): Promise<ApiEvent[]> {
-  const qs = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : '';
+export async function getEvents(params?: { q?: string; categoria?: string; page?: number; limit?: number }): Promise<ApiEvent[]> {
+  const qs = params ? `?${new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])).toString()}` : '';
   const payload = await request<EventsResponse | ApiEvent[]>(`/api/events${qs}`);
   return arrayFromPayload<ApiEvent>(payload, 'events');
 }
 export function getEventById(id: string): Promise<ApiEvent> {
   return request<ApiEvent>(`/api/events/${encodeURIComponent(id)}`);
 }
-export async function getActivities(params?: { q?: string; tipo?: string }): Promise<ApiActivity[]> {
-  const qs = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : '';
+export async function getActivities(params?: { q?: string; tipo?: string; page?: number; limit?: number; mine?: 'interests' }): Promise<ApiActivity[]> {
+  const qs = params ? `?${new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])).toString()}` : '';
   const payload = await request<ActivitiesResponse | ApiActivity[]>(`/api/activities${qs}`);
   return arrayFromPayload<ApiActivity>(payload, 'activities');
 }
@@ -199,8 +225,11 @@ export function getActivityById(id: string): Promise<ApiActivity> {
   return request<ApiActivity>(`/api/activities/${encodeURIComponent(id)}`);
 }
 export async function getMapMarkers(): Promise<MapMarker[]> {
-  const payload = await request<MapResponse | MapMarker[]>('/api/map');
+  const payload = await request<MapDataResponse | MapMarker[]>('/api/map');
   return arrayFromPayload<MapMarker>(payload, 'markers');
+}
+export function getMapData(): Promise<MapDataResponse> {
+  return request<MapDataResponse>('/api/map');
 }
 export function getCurrentUser(): Promise<CurrentUser> {
   return request<CurrentUser>('/api/users/me');
@@ -221,9 +250,10 @@ export interface RegisterPayload {
   email: string; password: string; nome: string; cognome: string; dataNascita: string;
   consents: { privacy_policy: boolean; terms_of_service: boolean; marketing?: boolean; analytics?: boolean; };
 }
-export async function register(payload: RegisterPayload): Promise<AuthResponse> {
-  const result = await request<AuthResponse>('/api/auth/register', { method: 'POST', body: payload, auth: false });
-  setToken(result.token);
+export type RegisterResponse = AuthResponse | { emailVerificationRequired: boolean };
+export async function register(payload: RegisterPayload): Promise<RegisterResponse> {
+  const result = await request<RegisterResponse>('/api/auth/register', { method: 'POST', body: payload, auth: false });
+  if ('token' in result && result.token) setToken(result.token);
   return result;
 }
 export interface RegisterEntityPayload {
@@ -315,14 +345,35 @@ export function getEventStats(eventId: string): Promise<{ eventId: string; titol
 
 // ============================== Dashboard (municipal admin) ==============================
 
-export function getDashboardStats(params?: Record<string, string | number>): Promise<DashboardStats & { filters?: unknown }> {
+export function getDashboardStats(params?: DashboardFilters): Promise<DashboardStats & { filters?: unknown }> {
   const qs = params ? `?${new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])).toString()}` : '';
   return request(`/api/dashboard/stats${qs}`);
 }
-export function getDashboardExportUrl(format: 'csv' | 'pdf', params?: Record<string, string | number>): string {
+export function getDashboardExportUrl(format: 'csv' | 'pdf', params?: DashboardFilters): string {
   const allParams = { ...(params || {}), format };
   const qs = new URLSearchParams(Object.entries(allParams).map(([k, v]) => [k, String(v)])).toString();
-  return `${API_BASE_URL}/api/dashboard/stats/export?${qs}`;
+  return apiUrl(`/api/dashboard/stats/export?${qs}`);
+}
+export async function downloadDashboardExport(format: 'csv' | 'pdf', params?: DashboardFilters): Promise<Blob> {
+  const allParams = { ...(params || {}), format };
+  const qs = new URLSearchParams(Object.entries(allParams).map(([k, v]) => [k, String(v)])).toString();
+  let response: Response;
+  try {
+    response = await fetch(apiUrl(`/api/dashboard/stats/export?${qs}`), { headers: authHeaders() });
+  } catch {
+    throw new ApiError('API non disponibile. Verifica che il backend sia avviato.');
+  }
+  if (!response.ok) {
+    let payload: unknown = null;
+    try { payload = await response.json(); } catch { /* export endpoints may return non-json errors */ }
+    const body = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
+    throw new ApiError(
+      typeof body.error === 'string' ? body.error : `Errore ${response.status}`,
+      response.status,
+      typeof body.code === 'string' ? body.code : undefined,
+    );
+  }
+  return response.blob();
 }
 
 // ============================== Admin ==============================

@@ -28,11 +28,15 @@ export function RegistrationPage() {
         if (!consents.privacy_policy || !consents.terms_of_service) {
           throw new Error('Devi accettare privacy policy e termini di servizio per registrarti');
         }
-        await register({
+        const result = await register({
           email: form.email, password: form.password, nome: form.nome,
           cognome: form.cognome, dataNascita: form.dataNascita,
           consents,
         });
+        if ('emailVerificationRequired' in result && result.emailVerificationRequired) {
+          setSuccess('Registrazione completata. Controlla la tua email per verificare l’account prima di accedere.');
+          return;
+        }
         navigate('/');
         window.location.reload();
       } else {

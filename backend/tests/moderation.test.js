@@ -1,7 +1,14 @@
 const moderationService = require('../src/moderation/moderation.service');
 
 jest.mock('../src/data/models', () => ({
-  Report: { create: jest.fn(), findAndCountAll: jest.fn(), findByPk: jest.fn() },
+  Report: {
+    create: jest.fn(),
+    findAndCountAll: jest.fn(),
+    findByPk: jest.fn(),
+    findAll: jest.fn().mockResolvedValue([]),
+    update: jest.fn().mockResolvedValue([1]),
+    destroy: jest.fn().mockResolvedValue(1),
+  },
   Event: { findByPk: jest.fn() },
   User: {
     findAll: jest.fn().mockResolvedValue([]),
@@ -11,6 +18,10 @@ jest.mock('../src/data/models', () => ({
 jest.mock('../src/notifications/email.service', () => ({
   sendReportCreated: jest.fn().mockResolvedValue(undefined),
   sendContentRemoved: jest.fn().mockResolvedValue(undefined),
+  sendReportOutcome: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('../src/notifications/push.service', () => ({
+  sendReportOutcome: jest.fn().mockResolvedValue(undefined),
 }));
 
 const { Report, Event } = require('../src/data/models');
@@ -63,12 +74,12 @@ describe('Moderation Service — resolveReport', () => {
     };
   }
 
-  test('TC-MOD-04: rimuovi destroys the event and marks report risolta', async () => {
+  test('TC-MOD-04: rimuovi destroys all reports then the event', async () => {
     const report = makeReport();
     Report.findByPk.mockResolvedValue(report);
     const result = await moderationService.resolveReport(REPORT_ID, { azione: 'rimuovi' });
+    expect(Report.destroy).toHaveBeenCalledWith({ where: { eventId: EVENT_ID } });
     expect(report.event.destroy).toHaveBeenCalled();
-    expect(report.update).toHaveBeenCalledWith({ stato: 'risolta' });
     expect(result.message).toMatch(/removed/i);
   });
 
