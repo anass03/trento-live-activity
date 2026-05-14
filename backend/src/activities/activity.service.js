@@ -7,6 +7,7 @@ const {
   sendActivityParticipantLeft,
   sendActivityUpdated,
   sendActivityCancelled,
+  sendNewActivityToInterested,
 } = require('../notifications/email.service');
 const { sendActivityJoined, sendActivityNearby } = require('../notifications/push.service');
 const { buildIcs } = require('./ics');
@@ -55,14 +56,27 @@ async function createActivity(creatorId, { tipo, data, orarioInizio, orarioFine,
   });
   await Participation.create({ userId: creatorId, activityId: activity.id });
 
-  // RF40: notify nearby users whose interests match this activity type
+  // RF40: push to nearby users with matching interest (requires location)
   sendActivityNearby({
     activityId: activity.id,
     tipo: activity.tipo,
     lat: latitudine,
     lng: longitudine,
     creatorId,
-    radiusKm: 3,
+    radiusKm: 50,
+  }).catch(() => {});
+
+  // Email fallback: notify all users with matching interest regardless of location
+  User.findAll({
+    where: {
+      ruolo: 'UtenteRegistrato',
+      interessi: { [Op.contains]: [tipo] },
+      id: { [Op.ne]: creatorId },
+    },
+    attributes: ['email'],
+  }).then((users) => {
+    const emails = users.map((u) => u.email).filter(Boolean);
+    if (emails.length) sendNewActivityToInterested(emails, tipo, activity.id).catch(() => {});
   }).catch(() => {});
 
   return activity;
