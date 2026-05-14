@@ -103,22 +103,7 @@ export interface DashboardStats {
 
 interface EventsResponse { events: ApiEvent[]; total?: number; }
 interface ActivitiesResponse { activities: ApiActivity[]; total?: number; }
-export interface MapDataResponse {
-  markers: MapMarker[];
-  pois?: POI[];
-  activities?: ApiActivity[];
-  events?: ApiEvent[];
-}
-
-export interface DashboardFilters {
-  tipo?: string;
-  da?: string;
-  a?: string;
-  centerLat?: string | number;
-  centerLng?: string | number;
-  radiusKm?: string | number;
-  poiId?: string;
-}
+interface MapResponse { markers: MapMarker[]; }
 
 export class ApiError extends Error {
   status?: number;
@@ -131,7 +116,7 @@ export class ApiError extends Error {
   }
 }
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 const TOKEN_KEY = 'tla_token';
 
 export function getToken(): string | null {
@@ -188,17 +173,6 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   return (opts.raw ? response : payload) as T;
 }
 
-function apiUrl(path: string): string {
-  return `${API_BASE_URL}${path}`;
-}
-
-function authHeaders(): Record<string, string> {
-  const headers: Record<string, string> = { Accept: 'application/json' };
-  const token = getToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
-  return headers;
-}
-
 function arrayFromPayload<T>(payload: unknown, key: string): T[] {
   if (Array.isArray(payload)) return payload as T[];
   if (payload && typeof payload === 'object') {
@@ -211,7 +185,7 @@ function arrayFromPayload<T>(payload: unknown, key: string): T[] {
 // ============================== Public data ==============================
 
 export async function getEvents(params?: { q?: string; categoria?: string; page?: number; limit?: number }): Promise<ApiEvent[]> {
-  const qs = params ? `?${new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])).toString()}` : '';
+  const qs = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : '';
   const payload = await request<EventsResponse | ApiEvent[]>(`/api/events${qs}`);
   return arrayFromPayload<ApiEvent>(payload, 'events');
 }
@@ -219,7 +193,7 @@ export function getEventById(id: string): Promise<ApiEvent> {
   return request<ApiEvent>(`/api/events/${encodeURIComponent(id)}`);
 }
 export async function getActivities(params?: { q?: string; tipo?: string; page?: number; limit?: number; mine?: 'interests' }): Promise<ApiActivity[]> {
-  const qs = params ? `?${new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])).toString()}` : '';
+  const qs = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : '';
   const payload = await request<ActivitiesResponse | ApiActivity[]>(`/api/activities${qs}`);
   return arrayFromPayload<ApiActivity>(payload, 'activities');
 }
@@ -227,11 +201,8 @@ export function getActivityById(id: string): Promise<ApiActivity> {
   return request<ApiActivity>(`/api/activities/${encodeURIComponent(id)}`);
 }
 export async function getMapMarkers(): Promise<MapMarker[]> {
-  const payload = await request<MapDataResponse | MapMarker[]>('/api/map');
+  const payload = await request<MapResponse | MapMarker[]>('/api/map');
   return arrayFromPayload<MapMarker>(payload, 'markers');
-}
-export function getMapData(): Promise<MapDataResponse> {
-  return request<MapDataResponse>('/api/map');
 }
 export function getCurrentUser(): Promise<CurrentUser> {
   return request<CurrentUser>('/api/users/me');
@@ -259,7 +230,8 @@ export async function register(payload: RegisterPayload): Promise<RegisterRespon
   return result;
 }
 export interface RegisterEntityPayload {
-  email: string; password: string; nomeEnte: string; nome?: string; cognome?: string;
+  email: string; password: string; nomeEnte: string;
+  nome?: string; cognome?: string;
 }
 export function registerEntity(payload: RegisterEntityPayload): Promise<{ message: string; userId: string }> {
   return request('/api/auth/register/entity', { method: 'POST', body: payload, auth: false });
@@ -294,6 +266,9 @@ export function registerDeviceToken(token: string, platform: 'web' | 'ios' | 'an
 export function unregisterDeviceToken(token: string): Promise<void> {
   return request('/api/notifications/device-token', { method: 'DELETE', body: { token } });
 }
+export function sendTestPush(): Promise<{ tokensTargeted: number }> {
+  return request('/api/notifications/test', { method: 'POST' });
+}
 
 // 2FA — RNF15. Two-step setup: client calls setup2fa() to get the otpauth URL +
 // secret, displays a QR code, then calls verify2fa() with the 6-digit code.
@@ -310,17 +285,6 @@ export function regenerateRecoveryCodes(): Promise<RecoveryCodesResponse> {
 }
 export function verifyEmail(token: string): Promise<AuthResponse> {
   return request(`/api/auth/verify-email?token=${encodeURIComponent(token)}`, { auth: false });
-}
-
-// ============================== Calendar helpers ==============================
-
-function toGoogleDate(iso: string): string {
-  return iso.replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-}
-export function googleCalendarUrl(title: string, startIso: string, location?: string | null): string {
-  const start = toGoogleDate(startIso);
-  const params = new URLSearchParams({ action: 'TEMPLATE', text: title, dates: `${start}/${start}`, location: location || '' });
-  return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
 // ============================== Activities (write) ==============================
@@ -358,38 +322,44 @@ export function getMyEvents(): Promise<{ events: ApiEvent[] }> {
 export function getEventStats(eventId: string): Promise<{ eventId: string; titolo: string; views: number; reports: number }> {
   return request(`/api/events/${encodeURIComponent(eventId)}/stats`);
 }
+export function deleteEvent(eventId: string): Promise<void> {
+  return request(`/api/events/${encodeURIComponent(eventId)}`, { method: 'DELETE' });
+}
 
 // ============================== Dashboard (municipal admin) ==============================
 
-export function getDashboardStats(params?: DashboardFilters): Promise<DashboardStats & { filters?: unknown }> {
+export function getDashboardStats(params?: DashboardFilters | Record<string, string | number>): Promise<DashboardStats & { filters?: unknown }> {
   const qs = params ? `?${new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])).toString()}` : '';
   return request(`/api/dashboard/stats${qs}`);
 }
-export function getDashboardExportUrl(format: 'csv' | 'pdf', params?: DashboardFilters): string {
+export function getDashboardExportUrl(format: 'csv' | 'pdf', params?: Record<string, string | number>): string {
   const allParams = { ...(params || {}), format };
   const qs = new URLSearchParams(Object.entries(allParams).map(([k, v]) => [k, String(v)])).toString();
-  return apiUrl(`/api/dashboard/stats/export?${qs}`);
+  return `${API_BASE_URL}/api/dashboard/stats/export?${qs}`;
+}
+export interface DashboardFilters {
+  tipo?: string;
+  da?: string;
+  a?: string;
+  centerLat?: string | number;
+  centerLng?: string | number;
+  radiusKm?: string | number;
+  poiId?: string;
 }
 export async function downloadDashboardExport(format: 'csv' | 'pdf', params?: DashboardFilters): Promise<Blob> {
-  const allParams = { ...(params || {}), format };
-  const qs = new URLSearchParams(Object.entries(allParams).map(([k, v]) => [k, String(v)])).toString();
-  let response: Response;
-  try {
-    response = await fetch(apiUrl(`/api/dashboard/stats/export?${qs}`), { headers: authHeaders() });
-  } catch {
-    throw new ApiError('API non disponibile. Verifica che il backend sia avviato.');
+  const allParams: Record<string, string> = { format };
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== '') allParams[k] = String(v);
+    }
   }
-  if (!response.ok) {
-    let payload: unknown = null;
-    try { payload = await response.json(); } catch { /* export endpoints may return non-json errors */ }
-    const body = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
-    throw new ApiError(
-      typeof body.error === 'string' ? body.error : `Errore ${response.status}`,
-      response.status,
-      typeof body.code === 'string' ? body.code : undefined,
-    );
-  }
-  return response.blob();
+  const qs = new URLSearchParams(allParams).toString();
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`${API_BASE_URL}/api/dashboard/stats/export?${qs}`, { headers });
+  if (!res.ok) throw new Error(`Export fallito (${res.status})`);
+  return res.blob();
 }
 
 // ============================== Admin ==============================
@@ -460,4 +430,13 @@ export function getActivityCalendarUrl(id: string): string {
 }
 export function getEventCalendarUrl(id: string): string {
   return `${API_BASE_URL}/api/events/${encodeURIComponent(id)}/calendar`;
+}
+
+function toGoogleDate(iso: string): string {
+  return iso.replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+}
+export function googleCalendarUrl(title: string, startIso: string, location?: string | null): string {
+  const start = toGoogleDate(startIso);
+  const params = new URLSearchParams({ action: 'TEMPLATE', text: title, dates: `${start}/${start}`, location: location || '' });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
