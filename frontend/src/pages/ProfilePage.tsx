@@ -1,8 +1,8 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   deleteAccount, getMe, logout, regenerateRecoveryCodes,
-  registerDeviceToken, unregisterDeviceToken,
+  registerDeviceToken, sendTestPush, unregisterDeviceToken,
   updateLocation, updateProfile,
 } from '../lib/api';
 import { onForegroundMessage, requestFcmToken } from '../lib/firebase';
@@ -26,15 +26,23 @@ export function ProfilePage() {
   const [interessi, setInteressi] = useState<string[]>([]);
   const [nome, setNome] = useState('');
   const [cognome, setCognome] = useState('');
+  // form (profile save) feedback
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // location section — separate state so it never bleeds into the form
+  const [locationMessage, setLocationMessage] = useState<string | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const locationInFlight = useRef(false);
 
   const [newRecoveryCodes, setNewRecoveryCodes] = useState<string[] | null>(null);
   const [isRegenerating, setIsRegenerating] = useState(false);
 
   const [pushEnabled, setPushEnabled] = useState<boolean>(() => Boolean(localStorage.getItem(FCM_TOKEN_KEY)));
   const [isTogglingPush, setIsTogglingPush] = useState(false);
+  const [pushMessage, setPushMessage] = useState<string | null>(null);
+  const [pushError, setPushError] = useState<string | null>(null);
 
   useEffect(() => {
     getMe()
@@ -54,27 +62,27 @@ export function ProfilePage() {
   useEffect(() => {
     const unsub = onForegroundMessage((payload) => {
       const title = payload.notification?.title || 'Notifica';
-      setMessage(`${title}: ${payload.notification?.body || ''}`);
+      setPushMessage(`🔔 ${title}: ${payload.notification?.body || ''}`);
     });
     return unsub;
   }, []);
 
   async function handleEnablePush() {
-    setError(null); setMessage(null);
+    setPushError(null); setPushMessage(null);
     setIsTogglingPush(true);
     try {
       const token = await requestFcmToken();
       await registerDeviceToken(token, 'web');
       localStorage.setItem(FCM_TOKEN_KEY, token);
       setPushEnabled(true);
-      setMessage('Notifiche push attivate per questo browser');
+      setPushMessage('Notifiche push attivate per questo browser');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Errore attivazione notifiche');
+      setPushError(e instanceof Error ? e.message : 'Errore attivazione notifiche');
     } finally { setIsTogglingPush(false); }
   }
 
   async function handleDisablePush() {
-    setError(null); setMessage(null);
+    setPushError(null); setPushMessage(null);
     setIsTogglingPush(true);
     try {
       const token = localStorage.getItem(FCM_TOKEN_KEY);
@@ -83,10 +91,20 @@ export function ProfilePage() {
         localStorage.removeItem(FCM_TOKEN_KEY);
       }
       setPushEnabled(false);
-      setMessage('Notifiche push disattivate');
+      setPushMessage('Notifiche push disattivate');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Errore');
+      setPushError(e instanceof Error ? e.message : 'Errore');
     } finally { setIsTogglingPush(false); }
+  }
+
+  async function handleTestPush() {
+    setPushError(null); setPushMessage(null);
+    try {
+      const result = await sendTestPush();
+      setPushMessage(`Inviata notifica di test a ${result.tokensTargeted} dispositivo/i. Se non la vedi, controlla i permessi del browser e del sistema operativo.`);
+    } catch (e) {
+      setPushError(e instanceof Error ? e.message : 'Errore invio notifica di test');
+    }
   }
 
   async function handleRegenerate() {
@@ -121,21 +139,44 @@ export function ProfilePage() {
   }
 
   async function handleShareLocation() {
-    if (!navigator.geolocation) { setError('Geolocalizzazione non supportata dal browser'); return; }
+    if (locationInFlight.current) return;
+    if (!navigator.geolocation) { setLocationError('Geolocalizzazione non supportata dal browser'); return; }
+    locationInFlight.current = true;
+    setLocationError(null);
+    setLocationMessage('Rilevamento posizione in corso...');
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         try {
           await updateLocation(pos.coords.latitude, pos.coords.longitude);
-          setMessage('Posizione aggiornata');
+          setLocationMessage(`Posizione aggiornata (${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)})`);
+          setLocationError(null);
         } catch (e) {
-          setError(e instanceof Error ? e.message : 'Errore aggiornamento posizione');
+          setLocationError(e instanceof Error ? e.message : 'Errore aggiornamento posizione');
+          setLocationMessage(null);
+        } finally {
+          locationInFlight.current = false;
         }
       },
-      () => setError('Impossibile ottenere la posizione'),
+      (err) => {
+        const reasons: Record<number, string> = {
+          1: 'Permesso negato. Controlla le impostazioni del browser per la posizione.',
+          2: 'Posizione non disponibile. Assicurati che i servizi di localizzazione del sistema siano attivi.',
+          3: 'Timeout: il browser non è riuscito a determinare la posizione in tempo.',
+        };
+        setLocationError(reasons[err.code] ?? `Errore geolocalizzazione (codice ${err.code})`);
+        setLocationMessage(null);
+        locationInFlight.current = false;
+      },
+      { timeout: 10000, enableHighAccuracy: false },
     );
   }
 
   async function handleLogout() {
+    const fcmToken = localStorage.getItem(FCM_TOKEN_KEY);
+    if (fcmToken) {
+      try { await unregisterDeviceToken(fcmToken); } catch { /* ignore */ }
+      localStorage.removeItem(FCM_TOKEN_KEY);
+    }
     await logout();
     navigate('/');
     window.location.reload();
@@ -143,6 +184,7 @@ export function ProfilePage() {
 
   async function handleDelete() {
     if (!window.confirm('Sicuro di voler eliminare il tuo account? L\'operazione è irreversibile (GDPR art. 17).')) return;
+    localStorage.removeItem(FCM_TOKEN_KEY);
     await deleteAccount();
     navigate('/');
     window.location.reload();
@@ -191,8 +233,12 @@ export function ProfilePage() {
 
       <div className="auth-form liquid-card">
         <h2>Posizione (per notifiche di attività vicine)</h2>
-        <p>Condividi la tua posizione corrente per ricevere notifiche di attività entro 3 km dai tuoi interessi.</p>
-        <button type="button" className="primary-button" onClick={handleShareLocation}>Condividi posizione</button>
+        <p>Condividi la tua posizione corrente per ricevere notifiche di attività entro 50 km dai tuoi interessi.</p>
+        {locationMessage && <div className="form-success">{locationMessage}</div>}
+        {locationError && <div className="form-error">{locationError}</div>}
+        <button type="button" className="primary-button" onClick={handleShareLocation}>
+          📍 Condividi posizione
+        </button>
       </div>
 
       <div className="auth-form liquid-card">
@@ -204,15 +250,34 @@ export function ProfilePage() {
             ? ' Sono attive su questo browser.'
             : ' Non sono attive su questo browser.'}
         </p>
-        {pushEnabled ? (
-          <button type="button" onClick={handleDisablePush} disabled={isTogglingPush}>
-            {isTogglingPush ? '...' : 'Disattiva notifiche push'}
-          </button>
-        ) : (
-          <button type="button" className="primary-button" onClick={handleEnablePush} disabled={isTogglingPush}>
-            {isTogglingPush ? '...' : 'Attiva notifiche push'}
-          </button>
+        {'Notification' in window && (
+          <p style={{ fontSize: '0.85em', opacity: 0.7 }}>
+            Permesso browser:{' '}
+            <strong>
+              {Notification.permission === 'granted' ? '✅ concesso' :
+               Notification.permission === 'denied'  ? '❌ bloccato (cambialo dalle impostazioni del browser)' :
+               '⏳ non ancora richiesto'}
+            </strong>
+          </p>
         )}
+        {pushMessage && <div className="form-success">{pushMessage}</div>}
+        {pushError && <div className="form-error">{pushError}</div>}
+        <div className="filter-actions">
+          {pushEnabled ? (
+            <>
+              <button type="button" className="primary-button" onClick={handleTestPush}>
+                ✉️ Invia notifica di test
+              </button>
+              <button type="button" onClick={handleDisablePush} disabled={isTogglingPush}>
+                {isTogglingPush ? '...' : 'Disattiva notifiche push'}
+              </button>
+            </>
+          ) : (
+            <button type="button" className="primary-button" onClick={handleEnablePush} disabled={isTogglingPush}>
+              {isTogglingPush ? '...' : '🔔 Attiva notifiche push'}
+            </button>
+          )}
+        </div>
       </div>
 
       {user.twoFactorEnabled && (
@@ -226,7 +291,7 @@ export function ProfilePage() {
           {newRecoveryCodes && (
             <>
               <div className="warning-box">
-                <strong>Salva subito questi codici.</strong> Verranno mostrati solo ora.
+                <strong>⚠ Salva subito questi codici.</strong> Verranno mostrati solo ora.
               </div>
               <div className="recovery-codes-grid">
                 {newRecoveryCodes.map((c) => <code key={c} className="recovery-code">{c}</code>)}
