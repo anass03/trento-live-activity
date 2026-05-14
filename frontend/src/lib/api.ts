@@ -29,6 +29,7 @@ export interface ApiActivity {
   status?: string;
   latitude?: number | null;
   longitude?: number | null;
+  creator?: { id: string; name: string } | null;
 }
 
 export interface MapMarker {
@@ -260,6 +261,9 @@ export function registerDeviceToken(token: string, platform: 'web' | 'ios' | 'an
 export function unregisterDeviceToken(token: string): Promise<void> {
   return request('/api/notifications/device-token', { method: 'DELETE', body: { token } });
 }
+export function sendTestPush(): Promise<{ tokensTargeted: number }> {
+  return request('/api/notifications/test', { method: 'POST' });
+}
 
 // 2FA — RNF15. Two-step setup: client calls setup2fa() to get the otpauth URL +
 // secret, displays a QR code, then calls verify2fa() with the 6-digit code.
@@ -312,6 +316,9 @@ export function getMyEvents(): Promise<{ events: ApiEvent[] }> {
 }
 export function getEventStats(eventId: string): Promise<{ eventId: string; titolo: string; views: number; reports: number }> {
   return request(`/api/events/${encodeURIComponent(eventId)}/stats`);
+}
+export function deleteEvent(eventId: string): Promise<void> {
+  return request(`/api/events/${encodeURIComponent(eventId)}`, { method: 'DELETE' });
 }
 
 // ============================== Dashboard (municipal admin) ==============================

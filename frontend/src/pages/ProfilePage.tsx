@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   deleteAccount, getMe, logout, regenerateRecoveryCodes,
-  registerDeviceToken, unregisterDeviceToken,
+  registerDeviceToken, sendTestPush, unregisterDeviceToken,
   updateLocation, updateProfile,
 } from '../lib/api';
 import { onForegroundMessage, requestFcmToken } from '../lib/firebase';
@@ -41,6 +41,8 @@ export function ProfilePage() {
 
   const [pushEnabled, setPushEnabled] = useState<boolean>(() => Boolean(localStorage.getItem(FCM_TOKEN_KEY)));
   const [isTogglingPush, setIsTogglingPush] = useState(false);
+  const [pushMessage, setPushMessage] = useState<string | null>(null);
+  const [pushError, setPushError] = useState<string | null>(null);
 
   useEffect(() => {
     getMe()
@@ -60,27 +62,27 @@ export function ProfilePage() {
   useEffect(() => {
     const unsub = onForegroundMessage((payload) => {
       const title = payload.notification?.title || 'Notifica';
-      setMessage(`🔔 ${title}: ${payload.notification?.body || ''}`);
+      setPushMessage(`🔔 ${title}: ${payload.notification?.body || ''}`);
     });
     return unsub;
   }, []);
 
   async function handleEnablePush() {
-    setError(null); setMessage(null);
+    setPushError(null); setPushMessage(null);
     setIsTogglingPush(true);
     try {
       const token = await requestFcmToken();
       await registerDeviceToken(token, 'web');
       localStorage.setItem(FCM_TOKEN_KEY, token);
       setPushEnabled(true);
-      setMessage('Notifiche push attivate per questo browser');
+      setPushMessage('Notifiche push attivate per questo browser');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Errore attivazione notifiche');
+      setPushError(e instanceof Error ? e.message : 'Errore attivazione notifiche');
     } finally { setIsTogglingPush(false); }
   }
 
   async function handleDisablePush() {
-    setError(null); setMessage(null);
+    setPushError(null); setPushMessage(null);
     setIsTogglingPush(true);
     try {
       const token = localStorage.getItem(FCM_TOKEN_KEY);
@@ -89,10 +91,20 @@ export function ProfilePage() {
         localStorage.removeItem(FCM_TOKEN_KEY);
       }
       setPushEnabled(false);
-      setMessage('Notifiche push disattivate');
+      setPushMessage('Notifiche push disattivate');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Errore');
+      setPushError(e instanceof Error ? e.message : 'Errore');
     } finally { setIsTogglingPush(false); }
+  }
+
+  async function handleTestPush() {
+    setPushError(null); setPushMessage(null);
+    try {
+      const result = await sendTestPush();
+      setPushMessage(`Inviata notifica di test a ${result.tokensTargeted} dispositivo/i. Se non la vedi, controlla i permessi del browser e del sistema operativo.`);
+    } catch (e) {
+      setPushError(e instanceof Error ? e.message : 'Errore invio notifica di test');
+    }
   }
 
   async function handleRegenerate() {
@@ -248,15 +260,24 @@ export function ProfilePage() {
             </strong>
           </p>
         )}
-        {pushEnabled ? (
-          <button type="button" onClick={handleDisablePush} disabled={isTogglingPush}>
-            {isTogglingPush ? '...' : 'Disattiva notifiche push'}
-          </button>
-        ) : (
-          <button type="button" className="primary-button" onClick={handleEnablePush} disabled={isTogglingPush}>
-            {isTogglingPush ? '...' : '🔔 Attiva notifiche push'}
-          </button>
-        )}
+        {pushMessage && <div className="form-success">{pushMessage}</div>}
+        {pushError && <div className="form-error">{pushError}</div>}
+        <div className="filter-actions">
+          {pushEnabled ? (
+            <>
+              <button type="button" className="primary-button" onClick={handleTestPush}>
+                ✉️ Invia notifica di test
+              </button>
+              <button type="button" onClick={handleDisablePush} disabled={isTogglingPush}>
+                {isTogglingPush ? '...' : 'Disattiva notifiche push'}
+              </button>
+            </>
+          ) : (
+            <button type="button" className="primary-button" onClick={handleEnablePush} disabled={isTogglingPush}>
+              {isTogglingPush ? '...' : '🔔 Attiva notifiche push'}
+            </button>
+          )}
+        </div>
       </div>
 
       {user.twoFactorEnabled && (

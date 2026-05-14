@@ -9,7 +9,12 @@ const {
   sendActivityCancelled,
   sendNewActivityToInterested,
 } = require('../notifications/email.service');
-const { sendActivityJoined, sendActivityNearby } = require('../notifications/push.service');
+const {
+  sendActivityJoined, sendActivityNearby,
+  sendActivityCancelled: pushActivityCancelled,
+  sendActivityUpdated: pushActivityUpdated,
+  sendParticipantLeft: pushParticipantLeft,
+} = require('../notifications/push.service');
 const { buildIcs } = require('./ics');
 
 function isDatePast(data) {
@@ -33,6 +38,17 @@ async function getParticipantEmails(activityId, excludeUserId = null) {
     .map((u) => u.email);
 }
 
+async function getParticipantIds(activityId, excludeUserId = null) {
+  if (typeof Participation.findAll !== 'function') return [];
+  const parts = await Participation.findAll({
+    where: { activityId },
+    attributes: ['userId'],
+  });
+  return parts
+    .map((p) => p.userId)
+    .filter((id) => id && id !== excludeUserId);
+}
+
 async function createActivity(creatorId, { tipo, data, orarioInizio, orarioFine, maxPartecipanti, latitudine, longitudine, poiId }) {
   // OCL C9: start date must not be in the past
   if (isDatePast(data)) {
@@ -47,6 +63,16 @@ async function createActivity(creatorId, { tipo, data, orarioInizio, orarioFine,
   // OCL C8: maxPartecipanti 2-50 (also enforced at model level)
   if (maxPartecipanti < 2 || maxPartecipanti > 50) {
     throw { status: 400, code: 'INVALID_MAX_PARTECIPANTI', error: 'maxPartecipanti must be between 2 and 50' };
+  }
+
+  // Resolve coordinates from the linked POI when caller didn't pass explicit coords.
+  // This is the common path from the UI (user clicks a POI on the map and creates an activity).
+  if ((latitudine == null || longitudine == null) && poiId) {
+    const poi = await POI.findByPk(poiId, { attributes: ['latitudine', 'longitudine'] });
+    if (poi) {
+      latitudine = poi.latitudine;
+      longitudine = poi.longitudine;
+    }
   }
 
   // OCL C10: creator auto-joins as first participant
@@ -164,6 +190,8 @@ async function updateActivity(userId, activityId, updates) {
   // RF19: notify registered participants (excluding the creator who triggered the change)
   const emails = await getParticipantEmails(activityId, userId);
   sendActivityUpdated(emails, activity.tipo).catch(() => {});
+  const ids = await getParticipantIds(activityId, userId);
+  pushActivityUpdated(ids, activity.tipo, activity.id).catch(() => {});
 
   return activity;
 }
@@ -174,11 +202,15 @@ async function cancelActivity(userId, activityId) {
   if (activity.creatorId !== userId) {
     throw { status: 403, code: 'FORBIDDEN', error: 'Only the creator can cancel this activity' };
   }
+
+  // Capture participant ids BEFORE cancelling — we still want to reach them.
+  const ids = await getParticipantIds(activityId, userId);
+  const emails = await getParticipantEmails(activityId, userId);
+
   await activity.update({ stato: 'cancellata' });
 
-  // Notify all participants except the creator
-  const emails = await getParticipantEmails(activityId, userId);
   sendActivityCancelled(emails, activity.tipo).catch(() => {});
+  pushActivityCancelled(ids, activity.tipo, activity.id).catch(() => {});
 }
 
 async function joinActivity(userId, activityId) {
@@ -242,11 +274,14 @@ async function leaveActivity(userId, activityId) {
   // OCL C19: decrement is implicit via destroy
   await participation.destroy();
 
-  // RF17: notify other participants of the cancellation
+  // RF17: notify other participants of the cancellation (email + push)
   const leaver = await User.findByPk(userId, { attributes: ['nome', 'cognome'] });
   const emails = await getParticipantEmails(activityId);
+  const ids = await getParticipantIds(activityId);
   if (leaver) {
-    sendActivityParticipantLeft(emails, activity.tipo, `${leaver.nome} ${leaver.cognome}`).catch(() => {});
+    const leaverName = `${leaver.nome} ${leaver.cognome}`;
+    sendActivityParticipantLeft(emails, activity.tipo, leaverName).catch(() => {});
+    pushParticipantLeft(ids, activity.tipo, leaverName, activity.id).catch(() => {});
   }
 }
 
