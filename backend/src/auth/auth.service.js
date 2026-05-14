@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const speakeasy = require('speakeasy');
 const { User, Consent } = require('../data/models');
 const {
-  sendPasswordReset, sendEmailVerification, sendWelcome,
+  sendPasswordReset, sendEmailVerification,
   sendEntityRegistered, sendNewEntityRequest,
 } = require('../notifications/email.service');
 const { revoke } = require('./tokenBlacklist');
@@ -369,7 +369,6 @@ async function verifyEmail(token) {
     throw { status: 400, code: 'TOKEN_INVALID', error: 'Link di verifica non valido o già utilizzato' };
   }
   await user.update({ emailVerified: true, emailVerificationToken: null });
-  sendWelcome(user.email, user.nome).catch(() => {});
   const jwtToken = signToken(user);
   return { user: sanitize(user), token: jwtToken };
 }
