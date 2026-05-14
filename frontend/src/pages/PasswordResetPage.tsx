@@ -40,7 +40,7 @@ export function PasswordResetPage() {
   return (
     <section className="auth-page">
       {isResetting ? (
-        <form className="auth-form glass-card" onSubmit={handleReset}>
+        <form className="auth-form liquid-card" onSubmit={handleReset}>
           <h1>Imposta nuova password</h1>
           <label>
             <span>Nuova password</span>
@@ -58,7 +58,7 @@ export function PasswordResetPage() {
           <div className="auth-links"><Link to="/login">Torna al login</Link></div>
         </form>
       ) : (
-        <form className="auth-form glass-card" onSubmit={handleForgot}>
+        <form className="auth-form liquid-card" onSubmit={handleForgot}>
           <h1>Recupero password</h1>
           <p>Inserisci la tua email — ti invieremo un link per reimpostare la password.</p>
           <label>

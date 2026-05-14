@@ -55,7 +55,7 @@ export function LoginPage() {
 
   return (
     <section className="auth-page">
-      <form className="auth-form glass-card" onSubmit={handleSubmit}>
+      <form className="auth-form liquid-card" onSubmit={handleSubmit}>
         <h1>Accedi</h1>
         <p>Entra nel tuo account Trento Live Activity</p>
 

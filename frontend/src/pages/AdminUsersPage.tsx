@@ -28,12 +28,12 @@ export function AdminUsersPage() {
 
   return (
     <section className="data-page">
-      <header className="utility-strip glass-card">
+      <header className="utility-strip liquid-card">
         <div><h1>Gestione utenti</h1><p>Tutti gli account registrati ({users.length})</p></div>
         <button type="button" onClick={load}>Aggiorna</button>
       </header>
 
-      <div className="glass-card filter-bar">
+      <div className="liquid-card filter-bar">
         <div className="filter-row">
           <label>
             <span>Cerca</span>
@@ -42,11 +42,11 @@ export function AdminUsersPage() {
         </div>
       </div>
 
-      {error && <div className="state-panel glass-panel"><p>{error}</p></div>}
-      {isLoading && <div className="state-panel glass-panel">Caricamento...</div>}
+      {error && <div className="state-panel liquid-panel"><p>{error}</p></div>}
+      {isLoading && <div className="state-panel liquid-panel">Caricamento...</div>}
 
       {!isLoading && (
-        <div className="glass-card">
+        <div className="liquid-card">
           <table className="stats-table">
             <thead><tr><th>Email</th><th>Nome</th><th>Ruolo</th><th>Stato</th><th>Registrato il</th><th>Azioni</th></tr></thead>
             <tbody>

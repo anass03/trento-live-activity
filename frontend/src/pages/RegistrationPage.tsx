@@ -51,7 +51,7 @@ export function RegistrationPage() {
 
   return (
     <section className="auth-page">
-      <form className="auth-form glass-card" onSubmit={handleSubmit}>
+      <form className="auth-form liquid-card" onSubmit={handleSubmit}>
         <h1>Registrazione</h1>
 
         <div className="mode-switch">

@@ -44,7 +44,7 @@ export function DashboardComunePage() {
 
   return (
     <section className="data-page">
-      <header className="utility-strip glass-card">
+      <header className="utility-strip liquid-card">
         <div>
           <h1>Dashboard Comune di Trento</h1>
           <p>Statistiche aggregate sull'attività cittadina</p>
@@ -55,7 +55,7 @@ export function DashboardComunePage() {
         </div>
       </header>
 
-      <div className="glass-card filter-bar">
+      <div className="liquid-card filter-bar">
         <h2>Filtri</h2>
         <div className="filter-row">
           <label>
@@ -97,35 +97,35 @@ export function DashboardComunePage() {
         </div>
       </div>
 
-      {isLoading && <div className="state-panel glass-panel">Caricamento statistiche...</div>}
-      {error && <div className="state-panel glass-panel"><p>{error}</p></div>}
+      {isLoading && <div className="state-panel liquid-panel">Caricamento statistiche...</div>}
+      {error && <div className="state-panel liquid-panel"><p>{error}</p></div>}
 
       {stats && !isLoading && !error && (
         <>
           <div className="kpi-grid">
-            <article className="kpi glass-card">
+            <article className="kpi liquid-card">
               <span className="kpi-label">Utenti registrati</span>
               <strong className="kpi-value">{stats.totalUsers}</strong>
             </article>
-            <article className="kpi glass-card">
+            <article className="kpi liquid-card">
               <span className="kpi-label">Attività</span>
               <strong className="kpi-value">{stats.totalActivities}</strong>
             </article>
-            <article className="kpi glass-card">
+            <article className="kpi liquid-card">
               <span className="kpi-label">Eventi certificati</span>
               <strong className="kpi-value">{stats.totalEvents}</strong>
             </article>
-            <article className="kpi glass-card">
+            <article className="kpi liquid-card">
               <span className="kpi-label">POI</span>
               <strong className="kpi-value">{stats.totalPOIs}</strong>
             </article>
-            <article className="kpi glass-card">
+            <article className="kpi liquid-card">
               <span className="kpi-label">Partecipazioni</span>
               <strong className="kpi-value">{stats.totalParticipations}</strong>
             </article>
           </div>
 
-          <div className="dashboard-section glass-card">
+          <div className="dashboard-section liquid-card">
             <h2>Attività per tipo</h2>
             <table className="stats-table">
               <thead><tr><th>Tipo</th><th>Numero</th></tr></thead>
@@ -138,7 +138,7 @@ export function DashboardComunePage() {
             </table>
           </div>
 
-          <div className="dashboard-section glass-card">
+          <div className="dashboard-section liquid-card">
             <h2>POI per stato di affollamento</h2>
             <table className="stats-table">
               <thead><tr><th>Stato</th><th>Numero POI</th></tr></thead>
