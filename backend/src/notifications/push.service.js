@@ -77,6 +77,56 @@ async function sendActivityJoined(creatorUserId, activityTipo, participantName) 
   });
 }
 
+// Push to many user ids — used for activity cancelled/updated/left flows.
+async function sendToUsers(userIds, payload) {
+  if (!userIds || userIds.length === 0) return;
+  const rows = await DeviceToken.findAll({
+    where: { userId: { [Op.in]: userIds } },
+    attributes: ['token'],
+  });
+  const tokens = rows.map((r) => r.token);
+  if (tokens.length === 0) return;
+  return sendToTokens(tokens, payload);
+}
+
+async function sendActivityCancelled(userIds, activityTipo, activityId) {
+  return sendToUsers(userIds, {
+    title: `Attività annullata: ${activityTipo}`,
+    body: `Il creatore ha annullato l'attività di ${activityTipo} a cui partecipavi`,
+    data: { type: 'activity_cancelled', activityId: String(activityId) },
+  });
+}
+
+async function sendActivityUpdated(userIds, activityTipo, activityId) {
+  return sendToUsers(userIds, {
+    title: `Attività modificata: ${activityTipo}`,
+    body: `I dettagli dell'attività di ${activityTipo} sono cambiati. Controlla l'app.`,
+    data: { type: 'activity_updated', activityId: String(activityId) },
+  });
+}
+
+async function sendParticipantLeft(userIds, activityTipo, participantName, activityId) {
+  return sendToUsers(userIds, {
+    title: `${participantName} ha abbandonato`,
+    body: `${participantName} non parteciperà più all'attività di ${activityTipo}`,
+    data: { type: 'participant_left', activityId: String(activityId) },
+  });
+}
+
+async function sendReportOutcome(userId, eventTitolo, outcome) {
+  const tokens = await getUserTokens(userId);
+  const labels = {
+    rimosso: 'Evento rimosso',
+    archiviato: 'Segnalazione archiviata',
+    in_lavorazione: 'Segnalazione in lavorazione',
+  };
+  return sendToTokens(tokens, {
+    title: labels[outcome] || 'Aggiornamento segnalazione',
+    body: `La tua segnalazione per "${eventTitolo}" è stata gestita.`,
+    data: { type: 'report_outcome', outcome },
+  });
+}
+
 // Haversine distance between two coordinates, in kilometres
 function haversineKm(lat1, lng1, lat2, lng2) {
   const R = 6371;
@@ -165,7 +215,8 @@ async function sendNewEventToInterested(eventId, categoria, titolo) {
   return sendToTokens(tokens, {
     title: `Nuovo evento ${categoria}`,
     body: titolo,
-    data: { type: 'new_event', eventId, categoria },
+    // FCM requires every value in `data` to be a string.
+    data: { type: 'new_event', eventId: String(eventId), categoria: String(categoria) },
   });
 }
 
@@ -177,7 +228,12 @@ module.exports = {
   sendActivityJoined,
   sendNewEventToInterested,
   sendActivityNearby,
+  sendActivityCancelled,
+  sendActivityUpdated,
+  sendParticipantLeft,
+  sendReportOutcome,
   // exposed for tests / admin debug
   sendToTokens,
+  sendToUsers,
   getUserTokens,
 };

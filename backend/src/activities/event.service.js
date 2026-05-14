@@ -19,6 +19,15 @@ async function createEvent(entityId, { titolo, descrizione, categoria, latitudin
     throw { status: 400, code: 'INVALID_TITLE', error: 'Title must be between 1 and 100 characters' };
   }
 
+  // Resolve coordinates from the linked POI when caller didn't pass explicit coords.
+  if ((latitudine == null || longitudine == null) && poiId) {
+    const poi = await POI.findByPk(poiId, { attributes: ['latitudine', 'longitudine'] });
+    if (poi) {
+      latitudine = poi.latitudine;
+      longitudine = poi.longitudine;
+    }
+  }
+
   // OCL C16: badgeVerifica = true after pubblica()
   const event = await Event.create({
     titolo, descrizione, categoria, badgeVerifica: true,
@@ -87,6 +96,22 @@ async function updateEvent(entityId, eventId, updates) {
   return event;
 }
 
+// Entity cancels their own event. Reports must be destroyed first because the
+// reports.eventId FK is NOT NULL with no ON DELETE CASCADE.
+async function deleteEvent(entityId, eventId) {
+  const event = await Event.findByPk(eventId);
+  if (!event) throw { status: 404, code: 'NOT_FOUND', error: 'Event not found' };
+  if (event.entityId !== entityId) {
+    throw { status: 403, code: 'FORBIDDEN', error: 'Only the publishing entity can delete this event' };
+  }
+  const eventTitolo = event.titolo;
+  await Report.destroy({ where: { eventId } });
+  await event.destroy();
+  // The entity already knows; we only notify the entity if the deletion was
+  // moderation-driven (handled in moderation.service). No notification here.
+  return { message: 'Event deleted', titolo: eventTitolo };
+}
+
 // RF25: certified entities view stats for their own events
 async function getEventStats(entityId, eventId) {
   const event = await Event.findByPk(eventId);
@@ -137,6 +162,7 @@ module.exports = {
   listEvents,
   getEvent,
   updateEvent,
+  deleteEvent,
   getEventStats,
   listEntityEvents,
   getEventIcs,

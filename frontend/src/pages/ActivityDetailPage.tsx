@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { getActivityById, getActivityCalendarUrl, googleCalendarUrl, getToken, joinActivity, leaveActivity, type ApiActivity } from '../lib/api';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { cancelActivity, getActivityById, getActivityCalendarUrl, googleCalendarUrl, getToken, joinActivity, leaveActivity, type ApiActivity } from '../lib/api';
 import type { AppUser } from '../data/mockUser';
 
 function formatDateTime(value?: string | null) {
@@ -9,12 +9,14 @@ function formatDateTime(value?: string | null) {
 }
 
 export function ActivityDetailPage({ user }: { user?: AppUser }) {
+  const navigate = useNavigate();
   const { id } = useParams();
   const [activity, setActivity] = useState<ApiActivity | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [joinMsg, setJoinMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [joining, setJoining] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const isLoggedIn = !!getToken() && user?.role !== 'anonymous';
 
   async function loadActivity() {
@@ -56,9 +58,24 @@ export function ActivityDetailPage({ user }: { user?: AppUser }) {
     } finally { setJoining(false); }
   }
 
+  async function handleCancelActivity() {
+    if (!id) return;
+    if (!window.confirm('Annullare definitivamente questa attività? I partecipanti riceveranno una notifica.')) return;
+    setCancelling(true); setJoinMsg(null);
+    try {
+      await cancelActivity(id);
+      setJoinMsg({ ok: true, text: 'Attività annullata. Reindirizzamento...' });
+      setTimeout(() => navigate('/attivita'), 1200);
+    } catch (e) {
+      setJoinMsg({ ok: false, text: e instanceof Error ? e.message : 'Errore annullamento' });
+      setCancelling(false);
+    }
+  }
+
   const isFull = activity ? activity.participantCount >= activity.maxParticipants : false;
   const userId = user?.id ?? null;
   const isParticipating = !!userId && !!activity?.participantIds?.includes(userId);
+  const isCreator = !!userId && activity?.creator?.id === userId;
 
   return (
     <section className="detail-page glass-panel">
@@ -91,7 +108,11 @@ export function ActivityDetailPage({ user }: { user?: AppUser }) {
           )}
           {isLoggedIn && activity.status === 'attiva' && (
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              {isParticipating ? (
+              {isCreator ? (
+                <button className="danger-button" onClick={handleCancelActivity} disabled={cancelling}>
+                  {cancelling ? 'Annullamento...' : 'Annulla attività'}
+                </button>
+              ) : isParticipating ? (
                 <button onClick={handleLeave} disabled={joining} style={{ background: 'transparent', border: '1px solid var(--color-glass-border)', borderRadius: 999, padding: '10px 14px', cursor: 'pointer' }}>{joining ? '...' : 'Abbandona'}</button>
               ) : isFull ? (
                 <span style={{ color: 'var(--color-text-secondary)', fontSize: 13 }}>Attività al completo</span>

@@ -6,4 +6,7 @@ const { authenticate } = require('../middleware/auth');
 router.post('/device-token', authenticate, ctrl.registerDeviceToken);
 router.delete('/device-token', authenticate, ctrl.unregisterDeviceToken);
 
+// Send a test push to the current user — handy for verifying the setup.
+router.post('/test', authenticate, ctrl.sendTestPush);
+
 module.exports = router;

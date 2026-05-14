@@ -14,4 +14,11 @@ async function unregisterDeviceToken(req, res, next) {
   } catch (e) { next(e); }
 }
 
-module.exports = { registerDeviceToken, unregisterDeviceToken };
+async function sendTestPush(req, res, next) {
+  try {
+    const result = await service.sendTestPush(req.user.id);
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+module.exports = { registerDeviceToken, unregisterDeviceToken, sendTestPush };
