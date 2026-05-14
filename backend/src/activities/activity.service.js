@@ -63,7 +63,7 @@ async function createActivity(creatorId, { tipo, data, orarioInizio, orarioFine,
     lat: latitudine,
     lng: longitudine,
     creatorId,
-    radiusKm: 3,
+    radiusKm: 50,
   }).catch(() => {});
 
   // Email fallback: notify all users with matching interest regardless of location
