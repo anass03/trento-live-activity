@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { verifyEmail, setToken } from '../lib/api';
 
@@ -6,8 +6,14 @@ export function VerifyEmailPage() {
   const [searchParams] = useSearchParams();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [errorMsg, setErrorMsg] = useState('');
+  const called = useRef(false);
 
   useEffect(() => {
+    // React 18 StrictMode runs effects twice in dev — guard against double-call
+    // which would consume the token on the first run and fail on the second.
+    if (called.current) return;
+    called.current = true;
+
     const token = searchParams.get('token');
     if (!token) {
       setStatus('error');
