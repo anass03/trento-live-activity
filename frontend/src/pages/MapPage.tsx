@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MapCanvas } from '../components/map/MapCanvas';
-import { fallbackMapMarkers } from '../data/fallbackMapItems';
 import { getMapMarkers, type MapMarker, type MarkerType } from '../lib/api';
 import type { AppUser } from '../data/mockUser';
 
@@ -33,6 +32,11 @@ function markerTypeLabel(type: MarkerType) {
   return 'POI';
 }
 
+function crowdLevel(marker: MapMarker) {
+  if (Number.isFinite(marker.crowdLevel)) return marker.crowdLevel;
+  return { green: 20, yellow: 50, orange: 72, red: 90 }[marker.crowdingStatus] ?? 20;
+}
+
 export function MapPage({ user }: { user?: AppUser }) {
   const [markers, setMarkers] = useState<MapMarker[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
@@ -47,8 +51,8 @@ export function MapPage({ user }: { user?: AppUser }) {
     try {
       setMarkers(await getMapMarkers());
     } catch (e) {
-      setMarkers(fallbackMapMarkers);
-      setNotice(e instanceof Error ? `${e.message} Uso dati demo locali.` : 'Uso dati demo locali.');
+      setMarkers([]);
+      setNotice(e instanceof Error ? e.message : 'Errore nel caricamento dati mappa.');
     } finally {
       setIsLoading(false);
     }
@@ -71,8 +75,8 @@ export function MapPage({ user }: { user?: AppUser }) {
 
   const highCrowdMarkers = useMemo(
     () => markers
-      .filter((marker) => marker.crowdLevel >= 72 || marker.crowdingStatus === 'red' || marker.crowdingStatus === 'orange')
-      .sort((a, b) => b.crowdLevel - a.crowdLevel)
+      .filter((marker) => crowdLevel(marker) >= 72 || marker.crowdingStatus === 'red' || marker.crowdingStatus === 'orange')
+      .sort((a, b) => crowdLevel(b) - crowdLevel(a))
       .slice(0, 3),
     [markers],
   );
@@ -88,23 +92,19 @@ export function MapPage({ user }: { user?: AppUser }) {
   const featuredHotspots = useMemo(
     () => markers
       .slice()
-      .sort((a, b) => b.crowdLevel - a.crowdLevel)
+      .sort((a, b) => crowdLevel(b) - crowdLevel(a))
       .slice(0, 4),
     [markers],
   );
 
-  const cityAlerts = [
-    ...highCrowdMarkers.map((marker) => ({
+  const cityAlerts = highCrowdMarkers.map((marker) => ({
       title: `${marker.title}: affollamento elevato`,
-      meta: `${markerTypeLabel(marker.type)} · ${Math.round(marker.crowdLevel)} / 100`,
+      meta: `${markerTypeLabel(marker.type)} · ${Math.round(crowdLevel(marker))} / 100`,
       tone: marker.crowdingStatus,
-    })),
-    { title: 'Parcheggi centro storico quasi pieni', meta: 'Avviso mobilità · aggiornato da poco', tone: 'orange' },
-    { title: 'Variazioni eventi in zona Piazza Duomo', meta: 'Controlla orari prima di partire', tone: 'yellow' },
-  ].slice(0, 4);
+    }));
 
   const quickStats = [
-    { label: 'Punti live', value: markers.length || fallbackMapMarkers.length },
+    { label: 'Punti live', value: markers.length },
     { label: 'Hotspot', value: highCrowdMarkers.length },
     { label: 'Oggi', value: upcomingItems.length },
   ];
@@ -187,6 +187,7 @@ export function MapPage({ user }: { user?: AppUser }) {
               <strong>Da guardare ora</strong>
             </div>
             <div className="alert-list">
+              {cityAlerts.length === 0 && <p className="muted-copy">Nessun avviso critico dai dati live.</p>}
               {cityAlerts.map((alert) => (
                 <article className={`alert-item alert-${alert.tone}`} key={`${alert.title}-${alert.meta}`}>
                   <i aria-hidden="true" />
@@ -205,7 +206,8 @@ export function MapPage({ user }: { user?: AppUser }) {
               <strong>Vicino a te</strong>
             </div>
             <ol className="timeline-list">
-              {(upcomingItems.length > 0 ? upcomingItems : fallbackMapMarkers.filter((item) => item.type !== 'poi').slice(0, 3)).map((item) => (
+              {upcomingItems.length === 0 && <li><time>Ora</time><div><strong>Nessun evento imminente</strong><span>Dati backend aggiornati</span></div></li>}
+              {upcomingItems.map((item) => (
                 <li key={item.id}>
                   <time>{formatTime(item.dateTime)}</time>
                   <div>
@@ -237,8 +239,8 @@ export function MapPage({ user }: { user?: AppUser }) {
             {featuredHotspots.map((marker) => (
               <article key={marker.id}>
                 <span>{marker.title}</span>
-                <meter min={0} max={100} value={marker.crowdLevel} />
-                <small>{Math.round(marker.crowdLevel)} / 100</small>
+                <meter min={0} max={100} value={crowdLevel(marker)} />
+                <small>{Math.round(crowdLevel(marker))} / 100</small>
               </article>
             ))}
           </div>

@@ -1,6 +1,7 @@
 const { Op } = require('sequelize');
 const { Event, User, Report, POI } = require('../data/models');
-const { sendNewEventToInterested } = require('../notifications/push.service');
+const { sendNewEventToInterested: sendNewEventPush } = require('../notifications/push.service');
+const { sendNewEventToInterested: sendNewEventEmail } = require('../notifications/email.service');
 const { serializeEvent } = require('../data/presenters');
 const { buildIcs } = require('./ics');
 
@@ -18,14 +19,30 @@ async function createEvent(entityId, { titolo, descrizione, categoria, latitudin
     throw { status: 400, code: 'INVALID_TITLE', error: 'Title must be between 1 and 100 characters' };
   }
 
+  // Resolve coordinates from the linked POI when caller didn't pass explicit coords.
+  if ((latitudine == null || longitudine == null) && poiId) {
+    const poi = await POI.findByPk(poiId, { attributes: ['latitudine', 'longitudine'] });
+    if (poi) {
+      latitudine = poi.latitudine;
+      longitudine = poi.longitudine;
+    }
+  }
+
   // OCL C16: badgeVerifica = true after pubblica()
   const event = await Event.create({
     titolo, descrizione, categoria, badgeVerifica: true,
     entityId, latitudine, longitudine, poiId, data, orarioInizio, orarioFine,
   });
 
-  // RF40: push notification to users with matching interest in their profile
-  sendNewEventToInterested(event.id, categoria, titolo).catch(() => {});
+  // RF40: push + email to users with matching interest
+  sendNewEventPush(event.id, categoria, titolo).catch(() => {});
+  User.findAll({
+    where: { ruolo: 'UtenteRegistrato', interessi: { [Op.contains]: [categoria] } },
+    attributes: ['email'],
+  }).then((users) => {
+    const emails = users.map((u) => u.email);
+    if (emails.length) sendNewEventEmail(emails, titolo, categoria, event.id).catch(() => {});
+  }).catch(() => {});
 
   return event;
 }
@@ -79,6 +96,22 @@ async function updateEvent(entityId, eventId, updates) {
   return event;
 }
 
+// Entity cancels their own event. Reports must be destroyed first because the
+// reports.eventId FK is NOT NULL with no ON DELETE CASCADE.
+async function deleteEvent(entityId, eventId) {
+  const event = await Event.findByPk(eventId);
+  if (!event) throw { status: 404, code: 'NOT_FOUND', error: 'Event not found' };
+  if (event.entityId !== entityId) {
+    throw { status: 403, code: 'FORBIDDEN', error: 'Only the publishing entity can delete this event' };
+  }
+  const eventTitolo = event.titolo;
+  await Report.destroy({ where: { eventId } });
+  await event.destroy();
+  // The entity already knows; we only notify the entity if the deletion was
+  // moderation-driven (handled in moderation.service). No notification here.
+  return { message: 'Event deleted', titolo: eventTitolo };
+}
+
 // RF25: certified entities view stats for their own events
 async function getEventStats(entityId, eventId) {
   const event = await Event.findByPk(eventId);
@@ -129,6 +162,7 @@ module.exports = {
   listEvents,
   getEvent,
   updateEvent,
+  deleteEvent,
   getEventStats,
   listEntityEvents,
   getEventIcs,
