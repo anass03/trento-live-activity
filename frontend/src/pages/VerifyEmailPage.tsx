@@ -1,16 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { verifyEmail, setToken } from '../lib/api';
 
 export function VerifyEmailPage() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [errorMsg, setErrorMsg] = useState('');
   const called = useRef(false);
 
   useEffect(() => {
-    // React 18 StrictMode runs effects twice in dev — guard against double-call
-    // which would consume the token on the first run and fail on the second.
     if (called.current) return;
     called.current = true;
 
@@ -23,13 +22,15 @@ export function VerifyEmailPage() {
     verifyEmail(token)
       .then((result) => {
         setToken(result.token);
+        window.dispatchEvent(new Event('tla:user-updated'));
         setStatus('success');
+        setTimeout(() => navigate('/'), 2000);
       })
       .catch((e) => {
         setStatus('error');
         setErrorMsg(e instanceof Error ? e.message : 'Errore durante la verifica.');
       });
-  }, [searchParams]);
+  }, [searchParams, navigate]);
 
   return (
     <section className="auth-page">
@@ -43,10 +44,7 @@ export function VerifyEmailPage() {
         {status === 'success' && (
           <>
             <h1>Email verificata!</h1>
-            <p>Il tuo account è attivo. Benvenuto su Trento Live Activity.</p>
-            <Link to="/" className="primary-button" style={{ display: 'inline-block', marginTop: '1rem' }}>
-              Vai alla mappa
-            </Link>
+            <p>Il tuo account è attivo. Verrai reindirizzato alla mappa tra un momento...</p>
           </>
         )}
         {status === 'error' && (

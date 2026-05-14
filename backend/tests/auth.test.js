@@ -27,7 +27,7 @@ process.env.JWT_SECRET = 'test-secret';
 
 const validUserData = {
   email: 'mario@example.com',
-  password: 'Password123',
+  password: 'Password123!',
   nome: 'Mario',
   cognome: 'Rossi',
   dataNascita: '1995-06-15',
@@ -90,37 +90,37 @@ describe('Auth Service — login', () => {
   beforeEach(() => jest.clearAllMocks());
 
   test('TC-AUTH-06: returns token on valid credentials (OCL C1)', async () => {
-    const hash = await bcrypt.hash('Password123', 1);
+    const hash = await bcrypt.hash('Password123!', 1);
     User.findOne.mockResolvedValue(makeFakeUser({ passwordHash: hash }));
 
-    const result = await authService.login({ email: validUserData.email, password: 'Password123' });
+    const result = await authService.login({ email: validUserData.email, password: 'Password123!' });
     expect(result.token).toBeDefined();
   });
 
   test('TC-AUTH-06b: blocks login if email not verified', async () => {
-    const hash = await bcrypt.hash('Password123', 1);
+    const hash = await bcrypt.hash('Password123!', 1);
     User.findOne.mockResolvedValue(makeFakeUser({ passwordHash: hash, emailVerified: false }));
 
-    await expect(authService.login({ email: validUserData.email, password: 'Password123' }))
+    await expect(authService.login({ email: validUserData.email, password: 'Password123!' }))
       .rejects.toMatchObject({ code: 'EMAIL_NOT_VERIFIED' });
   });
 
   test('TC-AUTH-07: rejects wrong password', async () => {
-    const hash = await bcrypt.hash('Password123', 1);
+    const hash = await bcrypt.hash('Password123!', 1);
     User.findOne.mockResolvedValue(makeFakeUser({ passwordHash: hash }));
 
-    await expect(authService.login({ email: validUserData.email, password: 'WrongPass1' }))
+    await expect(authService.login({ email: validUserData.email, password: 'WrongPass1!' }))
       .rejects.toMatchObject({ code: 'INVALID_CREDENTIALS' });
   });
 
   test('TC-AUTH-08: rejects non-existent user', async () => {
     User.findOne.mockResolvedValue(null);
-    await expect(authService.login({ email: 'nobody@example.com', password: 'Password123' }))
+    await expect(authService.login({ email: 'nobody@example.com', password: 'Password123!' }))
       .rejects.toMatchObject({ code: 'INVALID_CREDENTIALS' });
   });
 
   test('TC-AUTH-09: requires 2FA token for AmministratoreDiSistema (RNF15)', async () => {
-    const hash = await bcrypt.hash('Password123', 1);
+    const hash = await bcrypt.hash('Password123!', 1);
     User.findOne.mockResolvedValue(makeFakeUser({
       passwordHash: hash,
       ruolo: 'AmministratoreDiSistema',
@@ -128,19 +128,19 @@ describe('Auth Service — login', () => {
       twoFactorSecret: 'BASE32SECRET',
     }));
 
-    await expect(authService.login({ email: validUserData.email, password: 'Password123' }))
+    await expect(authService.login({ email: validUserData.email, password: 'Password123!' }))
       .rejects.toMatchObject({ code: '2FA_REQUIRED' });
   });
 
   test('TC-AUTH-11: admin without 2FA gets a setup-flag token instead of being rejected', async () => {
-    const hash = await bcrypt.hash('Password123', 1);
+    const hash = await bcrypt.hash('Password123!', 1);
     User.findOne.mockResolvedValue(makeFakeUser({
       passwordHash: hash,
       ruolo: 'AmministratoreDiSistema',
       twoFactorEnabled: false,
     }));
 
-    const result = await authService.login({ email: validUserData.email, password: 'Password123' });
+    const result = await authService.login({ email: validUserData.email, password: 'Password123!' });
     expect(result.needs2faSetup).toBe(true);
     expect(result.token).toBeTruthy();
   });
@@ -149,7 +149,7 @@ describe('Auth Service — login', () => {
     const crypto = require('crypto');
     const code = 'ABCD-EFGH';
     const codeHash = crypto.createHash('sha256').update('ABCDEFGH').digest('hex');
-    const hash = await bcrypt.hash('Password123', 1);
+    const hash = await bcrypt.hash('Password123!', 1);
     const update = jest.fn().mockResolvedValue(undefined);
     User.findOne.mockResolvedValue(makeFakeUser({
       passwordHash: hash,
@@ -161,7 +161,7 @@ describe('Auth Service — login', () => {
     }));
 
     const result = await authService.login({
-      email: validUserData.email, password: 'Password123', otpToken: code,
+      email: validUserData.email, password: 'Password123!', otpToken: code,
     });
     expect(result.recoveryUsed).toBe(true);
     expect(result.recoveryCodesRemaining).toBe(2);
@@ -173,7 +173,7 @@ describe('Auth Service — login', () => {
   });
 
   test('TC-AUTH-13: invalid recovery code is rejected', async () => {
-    const hash = await bcrypt.hash('Password123', 1);
+    const hash = await bcrypt.hash('Password123!', 1);
     User.findOne.mockResolvedValue(makeFakeUser({
       passwordHash: hash,
       ruolo: 'AmministratoreDiSistema',
@@ -183,7 +183,7 @@ describe('Auth Service — login', () => {
     }));
 
     await expect(authService.login({
-      email: validUserData.email, password: 'Password123', otpToken: 'WRNG-CODE',
+      email: validUserData.email, password: 'Password123!', otpToken: 'WRNG-CODE',
     })).rejects.toMatchObject({ code: '2FA_INVALID' });
   });
 });
@@ -223,7 +223,7 @@ describe('Auth Service — password reset (RF8)', () => {
     });
     User.findOne.mockResolvedValue(fakeUser);
 
-    await authService.resetPassword(rawToken, 'NewPassword123');
+    await authService.resetPassword(rawToken, 'NewPassword123!');
     expect(fakeUser.update).toHaveBeenCalledWith(expect.objectContaining({
       passwordResetToken: null,
       passwordResetExpires: null,
@@ -241,7 +241,7 @@ describe('Auth Service — password reset (RF8)', () => {
     });
     User.findOne.mockResolvedValue(fakeUser);
 
-    await expect(authService.resetPassword(rawToken, 'NewPassword123'))
+    await expect(authService.resetPassword(rawToken, 'NewPassword123!'))
       .rejects.toMatchObject({ code: 'TOKEN_INVALID' });
   });
 
