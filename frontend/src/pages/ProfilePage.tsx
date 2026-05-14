@@ -136,6 +136,11 @@ export function ProfilePage() {
   }
 
   async function handleLogout() {
+    const fcmToken = localStorage.getItem(FCM_TOKEN_KEY);
+    if (fcmToken) {
+      try { await unregisterDeviceToken(fcmToken); } catch { /* ignore */ }
+      localStorage.removeItem(FCM_TOKEN_KEY);
+    }
     await logout();
     navigate('/');
     window.location.reload();
@@ -143,6 +148,7 @@ export function ProfilePage() {
 
   async function handleDelete() {
     if (!window.confirm('Sicuro di voler eliminare il tuo account? L\'operazione è irreversibile (GDPR art. 17).')) return;
+    localStorage.removeItem(FCM_TOKEN_KEY);
     await deleteAccount();
     navigate('/');
     window.location.reload();
