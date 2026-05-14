@@ -238,6 +238,16 @@ export function ProfilePage() {
             ? ' Sono attive su questo browser.'
             : ' Non sono attive su questo browser.'}
         </p>
+        {'Notification' in window && (
+          <p style={{ fontSize: '0.85em', opacity: 0.7 }}>
+            Permesso browser:{' '}
+            <strong>
+              {Notification.permission === 'granted' ? '✅ concesso' :
+               Notification.permission === 'denied'  ? '❌ bloccato (cambialo dalle impostazioni del browser)' :
+               '⏳ non ancora richiesto'}
+            </strong>
+          </p>
+        )}
         {pushEnabled ? (
           <button type="button" onClick={handleDisablePush} disabled={isTogglingPush}>
             {isTogglingPush ? '...' : 'Disattiva notifiche push'}
