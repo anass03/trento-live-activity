@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   deleteAccount, getMe, logout, regenerateRecoveryCodes,
@@ -26,9 +26,15 @@ export function ProfilePage() {
   const [interessi, setInteressi] = useState<string[]>([]);
   const [nome, setNome] = useState('');
   const [cognome, setCognome] = useState('');
+  // form (profile save) feedback
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // location section — separate state so it never bleeds into the form
+  const [locationMessage, setLocationMessage] = useState<string | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const locationInFlight = useRef(false);
 
   const [newRecoveryCodes, setNewRecoveryCodes] = useState<string[] | null>(null);
   const [isRegenerating, setIsRegenerating] = useState(false);
@@ -121,15 +127,22 @@ export function ProfilePage() {
   }
 
   async function handleShareLocation() {
-    if (!navigator.geolocation) { setError('Geolocalizzazione non supportata dal browser'); return; }
-    setError(null); setMessage('Rilevamento posizione in corso...');
+    if (locationInFlight.current) return;
+    if (!navigator.geolocation) { setLocationError('Geolocalizzazione non supportata dal browser'); return; }
+    locationInFlight.current = true;
+    setLocationError(null);
+    setLocationMessage('Rilevamento posizione in corso...');
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         try {
           await updateLocation(pos.coords.latitude, pos.coords.longitude);
-          setMessage(`Posizione aggiornata (${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)})`);
+          setLocationMessage(`Posizione aggiornata (${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)})`);
+          setLocationError(null);
         } catch (e) {
-          setError(e instanceof Error ? e.message : 'Errore aggiornamento posizione');
+          setLocationError(e instanceof Error ? e.message : 'Errore aggiornamento posizione');
+          setLocationMessage(null);
+        } finally {
+          locationInFlight.current = false;
         }
       },
       (err) => {
@@ -138,7 +151,9 @@ export function ProfilePage() {
           2: 'Posizione non disponibile. Assicurati che i servizi di localizzazione del sistema siano attivi.',
           3: 'Timeout: il browser non è riuscito a determinare la posizione in tempo.',
         };
-        setError(reasons[err.code] ?? `Errore geolocalizzazione (codice ${err.code})`);
+        setLocationError(reasons[err.code] ?? `Errore geolocalizzazione (codice ${err.code})`);
+        setLocationMessage(null);
+        locationInFlight.current = false;
       },
       { timeout: 10000, enableHighAccuracy: false },
     );
@@ -206,8 +221,12 @@ export function ProfilePage() {
 
       <div className="auth-form glass-card">
         <h2>Posizione (per notifiche di attività vicine)</h2>
-        <p>Condividi la tua posizione corrente per ricevere notifiche di attività entro 3 km dai tuoi interessi.</p>
-        <button type="button" className="primary-button" onClick={handleShareLocation}>📍 Condividi posizione</button>
+        <p>Condividi la tua posizione corrente per ricevere notifiche di attività entro 50 km dai tuoi interessi.</p>
+        {locationMessage && <div className="form-success">{locationMessage}</div>}
+        {locationError && <div className="form-error">{locationError}</div>}
+        <button type="button" className="primary-button" onClick={handleShareLocation}>
+          📍 Condividi posizione
+        </button>
       </div>
 
       <div className="auth-form glass-card">

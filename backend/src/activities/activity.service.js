@@ -56,15 +56,25 @@ async function createActivity(creatorId, { tipo, data, orarioInizio, orarioFine,
   });
   await Participation.create({ userId: creatorId, activityId: activity.id });
 
-  // RF40: push to nearby users with matching interest (requires location)
-  sendActivityNearby({
-    activityId: activity.id,
-    tipo: activity.tipo,
-    lat: latitudine,
-    lng: longitudine,
-    creatorId,
-    radiusKm: 50,
-  }).catch(() => {});
+  // RF40: push to nearby users with matching interest.
+  // If the activity has no explicit coords, fall back to the creator's last known location.
+  (async () => {
+    let pushLat = latitudine;
+    let pushLng = longitudine;
+    if (pushLat == null || pushLng == null) {
+      const creator = await User.findByPk(creatorId, { attributes: ['lastLat', 'lastLng'] });
+      pushLat = creator?.lastLat;
+      pushLng = creator?.lastLng;
+    }
+    sendActivityNearby({
+      activityId: activity.id,
+      tipo: activity.tipo,
+      lat: pushLat,
+      lng: pushLng,
+      creatorId,
+      radiusKm: 50,
+    }).catch(() => {});
+  })().catch(() => {});
 
   // Email fallback: notify all users with matching interest regardless of location
   User.findAll({
