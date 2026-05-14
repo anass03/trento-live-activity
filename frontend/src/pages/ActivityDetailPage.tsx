@@ -31,7 +31,7 @@ export function ActivityDetailPage() {
   }, [id]);
 
   return (
-    <section className="detail-page glass-panel">
+    <section className="detail-page liquid-panel">
       <Link className="back-link" to="/attivita">Torna alle attività</Link>
       {isLoading && <p>Caricamento attività...</p>}
       {error && (
