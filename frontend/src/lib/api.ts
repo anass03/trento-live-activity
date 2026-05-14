@@ -22,12 +22,14 @@ export interface ApiActivity {
   category: string;
   location: string | null;
   participantCount: number;
+  participantIds?: string[];
   maxParticipants: number;
   createdAt: string | null;
   dateTime?: string | null;
   status?: string;
   latitude?: number | null;
   longitude?: number | null;
+  creator?: { id: string; name: string } | null;
 }
 
 export interface MapMarker {
@@ -305,6 +307,20 @@ export async function verify2fa(token: string): Promise<Verify2FAResponse> {
 }
 export function regenerateRecoveryCodes(): Promise<RecoveryCodesResponse> {
   return request('/api/auth/2fa/recovery-codes', { method: 'POST' });
+}
+export function verifyEmail(token: string): Promise<AuthResponse> {
+  return request(`/api/auth/verify-email?token=${encodeURIComponent(token)}`, { auth: false });
+}
+
+// ============================== Calendar helpers ==============================
+
+function toGoogleDate(iso: string): string {
+  return iso.replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+}
+export function googleCalendarUrl(title: string, startIso: string, location?: string | null): string {
+  const start = toGoogleDate(startIso);
+  const params = new URLSearchParams({ action: 'TEMPLATE', text: title, dates: `${start}/${start}`, location: location || '' });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
 // ============================== Activities (write) ==============================

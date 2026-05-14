@@ -39,6 +39,8 @@ export function LoginPage() {
       if (e instanceof ApiError && e.code === '2FA_REQUIRED') {
         setNeeds2fa(true);
         setError('Inserisci il codice 2FA dal tuo authenticator');
+      } else if (e instanceof ApiError && e.code === 'EMAIL_NOT_VERIFIED') {
+        setError('Devi verificare la tua email prima di accedere. Controlla la tua casella di posta (anche lo spam).');
       } else {
         setError(e instanceof Error ? e.message : 'Errore durante il login');
       }
