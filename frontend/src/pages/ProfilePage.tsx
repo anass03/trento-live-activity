@@ -122,16 +122,25 @@ export function ProfilePage() {
 
   async function handleShareLocation() {
     if (!navigator.geolocation) { setError('Geolocalizzazione non supportata dal browser'); return; }
+    setError(null); setMessage('Rilevamento posizione in corso...');
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         try {
           await updateLocation(pos.coords.latitude, pos.coords.longitude);
-          setMessage('Posizione aggiornata');
+          setMessage(`Posizione aggiornata (${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)})`);
         } catch (e) {
           setError(e instanceof Error ? e.message : 'Errore aggiornamento posizione');
         }
       },
-      () => setError('Impossibile ottenere la posizione'),
+      (err) => {
+        const reasons: Record<number, string> = {
+          1: 'Permesso negato. Controlla le impostazioni del browser per la posizione.',
+          2: 'Posizione non disponibile. Assicurati che i servizi di localizzazione del sistema siano attivi.',
+          3: 'Timeout: il browser non è riuscito a determinare la posizione in tempo.',
+        };
+        setError(reasons[err.code] ?? `Errore geolocalizzazione (codice ${err.code})`);
+      },
+      { timeout: 10000, enableHighAccuracy: false },
     );
   }
 
