@@ -1,4 +1,4 @@
-const { sequelize, Activity, Event, Participation, POI, User } = require('../data/models');
+const { sequelize, Activity, Event, Participation, POI } = require('../data/models');
 const { Op } = require('sequelize');
 
 // RF29: filter activities/events by geographic area using a bounding box
@@ -35,16 +35,19 @@ async function getStats({ tipo, da, a, centerLat, centerLng, radiusKm, poiId } =
   const eventWhere = { ...geoFilter };
   const poiWhere = poiId ? { id: poiId } : (centerLat !== undefined ? geoFilter : {});
 
+  // SCOPE RIDOTTO (#15): il Comune NON deve vedere informazioni sui singoli
+  // utenti né conteggi che possano identificare il numero di iscritti.
+  // Restano SOLO metriche aggregate utili a migliorare la città.
   const [
-    totalUsers,
     totalActivities,
     totalEvents,
     totalPOIs,
     activitiesByType,
+    eventsByCategory,
     poiCrowding,
+    topCrowdedPOIs,
     totalParticipations,
   ] = await Promise.all([
-    User.count({ where: { ruolo: 'UtenteRegistrato' } }),
     Activity.count({ where: activityWhere }),
     Event.count({ where: eventWhere }),
     POI.count({ where: poiWhere }),
@@ -54,23 +57,41 @@ async function getStats({ tipo, da, a, centerLat, centerLng, radiusKm, poiId } =
       group: ['tipo'],
       raw: true,
     }),
+    Event.findAll({
+      attributes: ['categoria', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
+      where: eventWhere,
+      group: ['categoria'],
+      raw: true,
+    }),
     POI.findAll({
       attributes: ['statoAffollamento', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
       where: poiWhere,
       group: ['statoAffollamento'],
       raw: true,
     }),
+    // Top 10 POI per affollamento (snapshot corrente: rosso > giallo > verde)
+    POI.findAll({
+      attributes: ['id', 'nome', 'tipo', 'statoAffollamento', 'capacitaMax'],
+      where: poiWhere,
+      order: [
+        [sequelize.literal(`CASE "statoAffollamento" WHEN 'rosso' THEN 3 WHEN 'giallo' THEN 2 ELSE 1 END`), 'DESC'],
+        ['capacitaMax', 'DESC'],
+      ],
+      limit: 10,
+      raw: true,
+    }),
     Participation.count(),
   ]);
 
   return {
-    totalUsers,
     totalActivities,
     totalEvents,
     totalPOIs,
     totalParticipations,
     activitiesByType,
+    eventsByCategory,
     poiCrowding,
+    topCrowdedPOIs,
     filters: { tipo, da, a, centerLat, centerLng, radiusKm, poiId },
   };
 }

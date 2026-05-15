@@ -96,13 +96,16 @@ export interface RecoveryCodesResponse {
 }
 
 export interface DashboardStats {
-  totalUsers: number;
+  // RIMOSSO totalUsers per scope ridotto (#15) — il Comune vede solo aggregati.
+  totalUsers?: never;
   totalActivities: number;
   totalEvents: number;
   totalPOIs: number;
   totalParticipations: number;
   activitiesByType: Array<{ tipo: string; count: number }>;
+  eventsByCategory?: Array<{ categoria: string; count: number }>;
   poiCrowding: Array<{ statoAffollamento: string; count: number }>;
+  topCrowdedPOIs?: Array<{ id: string; nome: string; tipo: string | null; statoAffollamento: string; capacitaMax: number }>;
 }
 
 interface EventsResponse { events: ApiEvent[]; total?: number; }
