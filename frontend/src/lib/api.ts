@@ -325,6 +325,38 @@ export async function oauthAppleLogin(idToken: string): Promise<AuthResponse> {
   setToken(result.token);
   return result;
 }
+// ============================== Consensi ==============================
+
+export type ConsentType =
+  | 'privacy_policy' | 'terms_of_service' | 'marketing' | 'analytics'
+  | 'notif_email' | 'notif_push';
+
+export interface ConsentRecord {
+  id: string;
+  userId: string;
+  type: ConsentType;
+  granted: boolean;
+  grantedAt: string | null;
+  revokedAt: string | null;
+  version: string;
+  createdAt: string;
+}
+export function listConsents(): Promise<ConsentRecord[]> {
+  return request('/api/auth/consents');
+}
+export function updateConsent(type: ConsentType, granted: boolean): Promise<ConsentRecord> {
+  return request('/api/auth/consents', { method: 'POST', body: { type, granted } });
+}
+
+// Riassume lo stato corrente di ciascun consenso dato il log (l'ultimo record vince)
+export function summarizeConsents(records: ConsentRecord[]): Partial<Record<ConsentType, boolean>> {
+  const out: Partial<Record<ConsentType, boolean>> = {};
+  for (const r of records) {
+    if (!(r.type in out)) out[r.type] = r.granted;
+  }
+  return out;
+}
+
 export async function spidLoginStub(payload: { spidId: string; nome: string; cognome: string; email: string; ufficio?: string }): Promise<AuthResponse> {
   const result = await request<AuthResponse>('/api/auth/spid/callback', { method: 'POST', body: payload, auth: false });
   setToken(result.token);

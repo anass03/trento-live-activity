@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getStoredTheme, setTheme, type Theme } from '../lib/theme';
 import { setLanguage } from '../lib/i18n';
+import { getToken, listConsents, summarizeConsents, updateConsent } from '../lib/api';
 import i18n from 'i18next';
 
 type Lang = 'it' | 'en';
@@ -13,9 +14,23 @@ function getStoredLang(): Lang {
 export function SettingsPage() {
   const [theme, setThemeState] = useState<Theme>(() => getStoredTheme());
   const [lang, setLang] = useState<Lang>(() => getStoredLang());
-  const [notifEmail, setNotifEmail] = useState(() => window.localStorage.getItem('tla:notif:email') !== 'false');
-  const [notifPush, setNotifPush] = useState(() => window.localStorage.getItem('tla:notif:push') !== 'false');
+  const [notifEmail, setNotifEmail] = useState(true);
+  const [notifPush, setNotifPush] = useState(true);
   const [saved, setSaved] = useState(false);
+  const [notifError, setNotifError] = useState<string | null>(null);
+  const isLoggedIn = !!getToken();
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    listConsents()
+      .then((records) => {
+        const summary = summarizeConsents(records);
+        // Default true: se non c'è un record esplicito di revoca, notifiche attive.
+        setNotifEmail(summary.notif_email !== false);
+        setNotifPush(summary.notif_push !== false);
+      })
+      .catch(() => { /* offline → mantieni default */ });
+  }, [isLoggedIn]);
 
   useEffect(() => {
     if (!saved) return;
@@ -35,11 +50,25 @@ export function SettingsPage() {
     setSaved(true);
   }
 
-  function toggleNotif(kind: 'email' | 'push', value: boolean) {
+  async function toggleNotif(kind: 'email' | 'push', value: boolean) {
+    setNotifError(null);
     if (kind === 'email') setNotifEmail(value);
     else setNotifPush(value);
-    window.localStorage.setItem(`tla:notif:${kind}`, String(value));
-    setSaved(true);
+    if (!isLoggedIn) {
+      // Per ospiti tieni in localStorage; verranno applicati al primo login.
+      window.localStorage.setItem(`tla:notif:${kind}`, String(value));
+      setSaved(true);
+      return;
+    }
+    try {
+      await updateConsent(kind === 'email' ? 'notif_email' : 'notif_push', value);
+      setSaved(true);
+    } catch (e) {
+      setNotifError(e instanceof Error ? e.message : 'Errore salvataggio preferenza');
+      // Rollback ottimistico
+      if (kind === 'email') setNotifEmail(!value);
+      else setNotifPush(!value);
+    }
   }
 
   return (
@@ -95,7 +124,11 @@ export function SettingsPage() {
 
       <div className="liquid-card settings-card">
         <h2>Notifiche</h2>
-        <p>Scegli come ricevere gli aggiornamenti dalle attività ed eventi.</p>
+        <p>
+          Scegli come ricevere gli aggiornamenti.{' '}
+          {!isLoggedIn && <em>(Accedi per salvare le preferenze sul tuo account.)</em>}
+        </p>
+        {notifError && <div className="form-error">{notifError}</div>}
         <label className="settings-row settings-row-toggle">
           <div>
             <strong>Email</strong>
@@ -106,7 +139,7 @@ export function SettingsPage() {
         <label className="settings-row settings-row-toggle">
           <div>
             <strong>Push (browser)</strong>
-            <small>Notifiche in tempo reale via Firebase Cloud Messaging</small>
+            <small>Notifiche in tempo reale via Firebase Cloud Messaging. Disattivare revoca tutti i token dei tuoi dispositivi.</small>
           </div>
           <input type="checkbox" checked={notifPush} onChange={(e) => toggleNotif('push', e.target.checked)} />
         </label>
