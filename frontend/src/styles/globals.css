@@ -2931,3 +2931,121 @@ select option {
 @media (max-width: 760px) {
   .moderation-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ── Fullscreen mode: section is the fullscreen target ── */
+.map-area:fullscreen,
+.map-area:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+  border: 0;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+.map-area:fullscreen .maplibre-map,
+.map-area:-webkit-full-screen .maplibre-map {
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Settings page ── */
+.settings-saved {
+  background: color-mix(in oklch, var(--color-success) 18%, transparent);
+  color: var(--color-success);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 13px;
+}
+.settings-card {
+  display: grid;
+  gap: 12px;
+}
+.settings-card h2 { margin: 0; font-size: 1.15rem; }
+.settings-card > p { margin: 0; color: var(--color-text-secondary); font-size: 14px; }
+
+.settings-theme-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 4px;
+}
+.settings-theme-switch button {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--color-surface-line);
+  background: var(--color-bg-elevated);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+.settings-theme-switch button.active {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-primary) 22%, transparent);
+}
+.settings-theme-switch strong { display: block; font-size: 15px; }
+.settings-theme-switch small { color: var(--color-text-secondary); font-size: 12.5px; }
+.settings-theme-swatch {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--color-surface-line);
+  flex-shrink: 0;
+}
+.settings-theme-swatch-light {
+  background: linear-gradient(135deg, #edf7ed 50%, #b7d0b8 50%);
+}
+.settings-theme-swatch-dark {
+  background: linear-gradient(135deg, #1a1f1c 50%, #88c88a 50%);
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-surface-line);
+}
+.settings-row > span { font-weight: 600; }
+.settings-row > select { max-width: 260px; }
+.settings-row-toggle strong { display: block; font-size: 14.5px; }
+.settings-row-toggle small { display: block; color: var(--color-text-secondary); font-size: 12.5px; }
+.settings-row-toggle input[type='checkbox'] {
+  width: 44px;
+  height: 24px;
+  appearance: none;
+  background: var(--color-surface-line);
+  border-radius: 999px;
+  position: relative;
+  cursor: pointer;
+  transition: background 180ms;
+}
+.settings-row-toggle input[type='checkbox']::before {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 180ms;
+}
+.settings-row-toggle input[type='checkbox']:checked { background: var(--color-primary); }
+.settings-row-toggle input[type='checkbox']:checked::before { transform: translateX(20px); }
+
+@media (max-width: 600px) {
+  .settings-theme-switch { grid-template-columns: 1fr; }
+}
+
+/* ── Dark mode tweaks: invertire colori map-area background overlay glow ── */
+:root[data-theme='dark'] .map-area::after { opacity: 0.35; mix-blend-mode: overlay; }
+:root[data-theme='dark'] img,
+:root[data-theme='dark'] .qr-frame img {
+  filter: brightness(0.9) contrast(1.05);
+}

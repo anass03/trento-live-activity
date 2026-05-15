@@ -60,6 +60,15 @@ async function seed() {
     POI.create({ nome: 'Doss Trento', latitudine: 46.0750, longitudine: 11.1100, capacitaMax: 300, statoAffollamento: 'verde', tipo: 'panoramico', descrizione: 'Collina panoramica' }),
     POI.create({ nome: 'Piazza Fiera', latitudine: 46.0664, longitudine: 11.1227, capacitaMax: 1000, statoAffollamento: 'verde', tipo: 'piazza' }),
     POI.create({ nome: 'Biblioteca Universitaria', latitudine: 46.0680, longitudine: 11.1250, capacitaMax: 400, statoAffollamento: 'giallo', tipo: 'biblioteca' }),
+    // Parcheggi (per gli avvisi di affollamento parcheggi)
+    POI.create({ nome: 'Parcheggio Buonconsiglio', latitudine: 46.0722, longitudine: 11.1245, capacitaMax: 320, statoAffollamento: 'rosso', tipo: 'parcheggio', descrizione: 'Parcheggio multipiano centro storico' }),
+    POI.create({ nome: 'Parcheggio Centro Europa', latitudine: 46.0686, longitudine: 11.1186, capacitaMax: 480, statoAffollamento: 'giallo', tipo: 'parcheggio', descrizione: 'Parcheggio interrato' }),
+    POI.create({ nome: 'Parcheggio Zuffo (Park & Ride)', latitudine: 46.0820, longitudine: 11.1050, capacitaMax: 850, statoAffollamento: 'verde', tipo: 'parcheggio', descrizione: 'Park & Ride a nord' }),
+    // Università
+    POI.create({ nome: 'Università di Trento — Dipartimento Lettere', latitudine: 46.0671, longitudine: 11.1212, capacitaMax: 600, statoAffollamento: 'giallo', tipo: 'universita', descrizione: 'Polo umanistico Lettere e Filosofia' }),
+    POI.create({ nome: 'Polo Scientifico Povo', latitudine: 46.0666, longitudine: 11.1503, capacitaMax: 1200, statoAffollamento: 'rosso', tipo: 'universita', descrizione: 'Aule e laboratori DISI/Fisica' }),
+    // Trasporti
+    POI.create({ nome: 'Stazione FS Trento', latitudine: 46.0707, longitudine: 11.1196, capacitaMax: 2500, statoAffollamento: 'giallo', tipo: 'stazione', descrizione: 'Stazione ferroviaria principale' }),
   ]);
 
   // Date helper: today + N days as 'YYYY-MM-DD'
