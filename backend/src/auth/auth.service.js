@@ -241,16 +241,106 @@ async function login({ email, password, otpToken } = {}) {
 }
 
 async function getMe(userId) {
-  const user = await User.findByPk(userId);
+  // Carica User + profilo specifico del ruolo per esporli al frontend.
+  // Il profilo permette la vista role-aware nella ProfilePage.
+  const {
+    CittadinoProfile: _CittadinoProfile,
+    EnteProfile: _EnteProfile,
+    AmministratoreComunaleProfile: _ComunaleProfile,
+    AmministratoreSistemaProfile: _SistemaProfile,
+  } = require('../data/models');
+  const user = await User.findByPk(userId, {
+    include: [
+      { model: _CittadinoProfile, as: 'cittadinoProfile' },
+      { model: _EnteProfile, as: 'enteProfile' },
+      { model: _ComunaleProfile, as: 'comunaleProfile' },
+      { model: _SistemaProfile, as: 'sistemaProfile' },
+    ],
+  });
   if (!user) throw { status: 404, code: 'NOT_FOUND', error: 'User not found' };
-  return sanitize(user);
+
+  const base = sanitize(user);
+  // Profilo del ruolo corrente — il client legge solo questo, non i 4 separati.
+  let profile = null;
+  if (user.ruolo === 'UtenteRegistrato' && user.cittadinoProfile) {
+    profile = {
+      kind: 'cittadino',
+      nome: user.cittadinoProfile.nome,
+      cognome: user.cittadinoProfile.cognome,
+      dataNascita: user.cittadinoProfile.dataNascita,
+      codiceFiscale: user.cittadinoProfile.codiceFiscale,
+      interessi: user.cittadinoProfile.interessi || [],
+      onboardingComplete: !!user.cittadinoProfile.onboardingComplete,
+    };
+  } else if (user.ruolo === 'EnteCertificato' && user.enteProfile) {
+    profile = {
+      kind: 'ente',
+      nomeEnte: user.enteProfile.nomeEnte,
+      pec: user.enteProfile.pec,
+      approvato: user.enteProfile.approvato,
+      noteAdmin: user.enteProfile.noteAdmin,
+    };
+  } else if (user.ruolo === 'AmministratoreComunale' && user.comunaleProfile) {
+    profile = {
+      kind: 'comunale',
+      nome: user.comunaleProfile.nome,
+      cognome: user.comunaleProfile.cognome,
+      ufficio: user.comunaleProfile.ufficio,
+      spidId: user.comunaleProfile.spidId,
+    };
+  } else if (user.ruolo === 'AmministratoreDiSistema' && user.sistemaProfile) {
+    profile = {
+      kind: 'sistema',
+      nome: user.sistemaProfile.nome,
+      cognome: user.sistemaProfile.cognome,
+      superAdmin: user.sistemaProfile.superAdmin,
+    };
+  }
+
+  return { ...base, profile };
 }
 
 async function updateProfile(userId, { nome, cognome, interessi }) {
+  const { CittadinoProfile: _CittadinoProfile } = require('../data/models');
   const user = await User.findByPk(userId);
   if (!user) throw { status: 404, code: 'NOT_FOUND', error: 'User not found' };
+
+  // Mantieni i campi legacy su User per retrocompatibilità con presenter/seed.
   await user.update({ nome, cognome, interessi });
+
+  // Sincronizza il profilo cittadino se esiste (i nuovi cittadini ce l'hanno).
+  if (user.ruolo === 'UtenteRegistrato') {
+    const profile = await _CittadinoProfile.findOne({ where: { userId } });
+    if (profile) {
+      await profile.update({ nome, cognome, interessi });
+    }
+  }
+
   return sanitize(user);
+}
+
+// Aggiorna la descrizione/note di un ente certificato (campo modificabile dall'ente)
+async function updateEnteProfile(userId, { noteAdmin }) {
+  const { EnteProfile: _EnteProfile } = require('../data/models');
+  const profile = await _EnteProfile.findOne({ where: { userId } });
+  if (!profile) throw { status: 404, code: 'NOT_FOUND', error: 'Ente profile not found' };
+  await profile.update({ noteAdmin: typeof noteAdmin === 'string' ? noteAdmin : profile.noteAdmin });
+  return profile;
+}
+
+// Marca onboarding interessi come completato (cittadini)
+async function completeOnboarding(userId, interessi) {
+  const { CittadinoProfile: _CittadinoProfile } = require('../data/models');
+  const profile = await _CittadinoProfile.findOne({ where: { userId } });
+  if (!profile) throw { status: 404, code: 'NOT_FOUND', error: 'Cittadino profile not found' };
+  await profile.update({
+    interessi: Array.isArray(interessi) ? interessi : profile.interessi,
+    onboardingComplete: true,
+  });
+  // Sync legacy su User
+  const user = await User.findByPk(userId);
+  if (user) await user.update({ interessi: profile.interessi });
+  return profile;
 }
 
 async function updateLocation(userId, { lat, lng }) {
@@ -433,7 +523,8 @@ async function verifyEmail(token) {
 }
 
 module.exports = {
-  register, login, logout, getMe, updateProfile, updateLocation, deleteAccount,
+  register, login, logout, getMe, updateProfile, updateEnteProfile, completeOnboarding,
+  updateLocation, deleteAccount,
   setup2fa, verify2fa, regenerateRecoveryCodes,
   forgotPassword, resetPassword, registerEntity, verifyEmail,
   listConsents, updateConsent,

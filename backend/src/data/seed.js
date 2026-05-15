@@ -71,12 +71,12 @@ async function seed() {
     CittadinoProfile.create({
       userId: mario.id, nome: 'Mario', cognome: 'Rossi',
       dataNascita: '1995-05-12', codiceFiscale: 'RSSMRA85T10A562S',
-      interessi: ['sport', 'musica'],
+      interessi: ['sport', 'musica'], onboardingComplete: true,
     }),
     CittadinoProfile.create({
       userId: lucia.id, nome: 'Lucia', cognome: 'Bianchi',
       dataNascita: '2000-09-23', codiceFiscale: 'BNCLCU00P63L378I',
-      interessi: ['cultura', 'arte'],
+      interessi: ['cultura', 'arte'], onboardingComplete: true,
     }),
     EnteProfile.create({
       userId: castello.id, nomeEnte: 'Castello del Buonconsiglio',

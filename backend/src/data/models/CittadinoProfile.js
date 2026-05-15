@@ -11,6 +11,9 @@ module.exports = (sequelize) => sequelize.define('CittadinoProfile', {
   dataNascita: { type: DataTypes.DATEONLY, allowNull: false },
   codiceFiscale: { type: DataTypes.STRING(16), allowNull: false, unique: true },
   interessi: { type: DataTypes.ARRAY(DataTypes.STRING), defaultValue: [] },
+  // Onboarding: dopo email-verify il cittadino sceglie i suoi interessi.
+  // Finché false, dopo il login viene rediretto alla pagina di onboarding.
+  onboardingComplete: { type: DataTypes.BOOLEAN, defaultValue: false },
 }, {
   tableName: 'cittadino_profiles',
   timestamps: true,

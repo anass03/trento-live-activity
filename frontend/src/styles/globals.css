@@ -3206,3 +3206,159 @@ select option {
   outline: 2px solid var(--color-primary);
   outline-offset: 1px;
 }
+
+/* ── Profile hero ── */
+.profile-hero {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.profile-avatar-big {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
+  color: #fff;
+  font-size: 28px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 14px rgba(0,0,0,.15);
+}
+.profile-hero-info { flex: 1 1 200px; }
+.profile-hero-info h1 { margin: 0 0 4px; font-size: 1.6rem; }
+.profile-hero-info p { margin: 2px 0; }
+.role-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--color-primary) 12%, transparent);
+  color: var(--color-primary);
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+}
+
+/* ── Elimina account fuori card, in fondo ── */
+.profile-delete-footer {
+  margin-top: 28px;
+  display: flex;
+  justify-content: flex-end;
+}
+.danger-text {
+  color: var(--color-danger) !important;
+  border-color: color-mix(in oklch, var(--color-danger) 35%, transparent) !important;
+}
+.danger-text:hover {
+  background: color-mix(in oklch, var(--color-danger) 8%, transparent) !important;
+  border-color: var(--color-danger) !important;
+}
+.profile-delete-confirm {
+  width: min(100%, 480px);
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid color-mix(in oklch, var(--color-danger) 40%, transparent) !important;
+  background: color-mix(in oklch, var(--color-danger) 6%, var(--color-bg-elevated));
+}
+.profile-delete-confirm strong { font-size: 1.05rem; }
+.profile-delete-confirm code {
+  background: var(--color-bg-elevated);
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.profile-delete-confirm input { min-height: 38px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--color-surface-line); }
+
+/* ── Onboarding interessi ── */
+.onboarding-page .onboarding-card {
+  width: min(100%, 760px);
+  padding: 36px 36px;
+}
+.onboarding-header {
+  text-align: center;
+  display: grid;
+  gap: 6px;
+}
+.onboarding-header h1 {
+  font-size: 2rem;
+  margin: 4px 0;
+}
+.onboarding-header p {
+  color: var(--color-text-secondary);
+  max-width: 520px;
+  margin: 0 auto;
+}
+.onboarding-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+.onboarding-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 14px 16px;
+  text-align: left;
+  border: 1.5px solid var(--color-surface-line);
+  border-radius: 14px;
+  background: var(--color-bg-elevated);
+  cursor: pointer;
+  transition: border-color 140ms, transform 140ms, box-shadow 140ms;
+}
+.onboarding-tile:hover { transform: translateY(-2px); border-color: var(--color-primary); }
+.onboarding-tile.active {
+  border-color: var(--color-primary);
+  background: color-mix(in oklch, var(--color-primary) 10%, var(--color-bg-elevated));
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-primary) 22%, transparent);
+}
+.onboarding-emoji { font-size: 26px; }
+.onboarding-tile strong { font-size: 15px; }
+.onboarding-tile small { color: var(--color-text-secondary); font-size: 12.5px; }
+
+.onboarding-suggestions {
+  margin-top: 6px;
+  padding: 12px 14px;
+  background: color-mix(in oklch, var(--color-primary) 6%, var(--color-bg-elevated));
+  border: 1px dashed color-mix(in oklch, var(--color-primary) 35%, transparent);
+  border-radius: 12px;
+  display: grid;
+  gap: 8px;
+}
+.onboarding-suggestions strong {
+  font-size: 13.5px;
+  color: var(--color-text-secondary);
+}
+.onboarding-suggestions > div { display: flex; gap: 8px; flex-wrap: wrap; }
+.onboarding-suggestions .chip {
+  border: 1px solid var(--color-primary);
+  background: var(--color-bg-elevated);
+  color: var(--color-primary);
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 13px;
+}
+.onboarding-suggestions .chip[aria-pressed='true'] {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.onboarding-actions {
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 720px) {
+  .onboarding-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .onboarding-page .onboarding-card { padding: 22px 18px; }
+}
+@media (max-width: 420px) {
+  .onboarding-grid { grid-template-columns: 1fr; }
+}

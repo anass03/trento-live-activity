@@ -17,6 +17,11 @@ router.put('/me', authenticate, ctrl.updateProfile);
 router.put('/me/location', authenticate, ctrl.updateLocation);
 router.delete('/me', authenticate, ctrl.deleteAccount);
 
+// Profilo specifico per ruolo
+router.patch('/me/ente', authenticate, ctrl.updateEnteProfile);
+router.post('/me/onboarding', authenticate, ctrl.completeOnboarding);
+router.get('/suggested-interests', authenticate, ctrl.suggestedInterests);
+
 // 2FA (AmministratoreDiSistema)
 router.post('/2fa/setup', authenticate, ctrl.setup2fa);
 router.post('/2fa/verify', authenticate, ctrl.verify2fa);
