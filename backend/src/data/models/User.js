@@ -23,9 +23,13 @@ module.exports = (sequelize) => {
       defaultValue: 'UtenteRegistrato',
     },
     interessi: { type: DataTypes.ARRAY(DataTypes.STRING), defaultValue: [] },
+    // UtenteRegistrato — codice fiscale (16 chars uppercase, validated server-side)
+    codiceFiscale: { type: DataTypes.STRING(16), allowNull: true, unique: true },
     // EnteCertificato only
     approvato: { type: DataTypes.BOOLEAN, defaultValue: false },
     nomeEnte: { type: DataTypes.STRING, allowNull: true },
+    // EnteCertificato — PEC (Posta Elettronica Certificata)
+    pec: { type: DataTypes.STRING, allowNull: true },
     // AmministratoreDiSistema only
     twoFactorSecret: { type: DataTypes.STRING, allowNull: true },
     twoFactorEnabled: { type: DataTypes.BOOLEAN, defaultValue: false },

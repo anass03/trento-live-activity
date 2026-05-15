@@ -221,6 +221,7 @@ export async function login(email: string, password: string, otpToken?: string):
 }
 export interface RegisterPayload {
   email: string; password: string; nome: string; cognome: string; dataNascita: string;
+  codiceFiscale: string;
   consents: { privacy_policy: boolean; terms_of_service: boolean; marketing?: boolean; analytics?: boolean; };
 }
 export type RegisterResponse = AuthResponse | { emailVerificationRequired: boolean };
@@ -230,7 +231,7 @@ export async function register(payload: RegisterPayload): Promise<RegisterRespon
   return result;
 }
 export interface RegisterEntityPayload {
-  email: string; password: string; nomeEnte: string;
+  email: string; password: string; nomeEnte: string; pec: string;
   nome?: string; cognome?: string;
 }
 export function registerEntity(payload: RegisterEntityPayload): Promise<{ message: string; userId: string }> {

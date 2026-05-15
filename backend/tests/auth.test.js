@@ -31,6 +31,7 @@ const validUserData = {
   nome: 'Mario',
   cognome: 'Rossi',
   dataNascita: '1995-06-15',
+  codiceFiscale: 'RSSMRA85T10A562S',
   consents: { privacy_policy: true, terms_of_service: true },
 };
 
