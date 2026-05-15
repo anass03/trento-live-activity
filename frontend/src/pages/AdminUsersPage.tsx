@@ -30,7 +30,9 @@ export function AdminUsersPage() {
     <section className="data-page">
       <header className="utility-strip liquid-card">
         <div><h1>Gestione utenti</h1><p>Tutti gli account registrati ({users.length})</p></div>
-        <button type="button" onClick={load}>Aggiorna</button>
+        <button type="button" className="refresh-button" onClick={load} disabled={isLoading}>
+          {isLoading ? 'Aggiornamento…' : 'Aggiorna'}
+        </button>
       </header>
 
       <div className="liquid-card filter-bar">
