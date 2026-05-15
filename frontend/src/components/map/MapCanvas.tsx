@@ -502,7 +502,9 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
           if (current?.locked && current.props.id === props.id) {
             // Already locked on this marker → navigate on single click
             if (props.type !== 'poi') {
-              navigateRef.current(`/${props.type === 'event' ? 'eventi' : 'attivita'}/${props.id}`);
+              navigateRef.current(
+                `/${props.type === 'event' ? 'eventi' : 'attivita'}?open=${encodeURIComponent(props.id)}`,
+              );
             }
           } else {
             // First click → lock the popup
@@ -526,7 +528,9 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
         if (!feature) return;
         const props = feature.properties as MarkerProperties;
         if (props.type !== 'poi') {
-          navigateRef.current(`/${props.type === 'event' ? 'eventi' : 'attivita'}/${props.id}`);
+          navigateRef.current(
+            `/${props.type === 'event' ? 'eventi' : 'attivita'}?open=${encodeURIComponent(props.id)}`,
+          );
         }
       };
 
@@ -646,7 +650,9 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
                 <button
                   className="detail-link"
                   type="button"
-                  onClick={() => navigate(`/${popup!.props.type === 'event' ? 'eventi' : 'attivita'}/${popup!.props.id}`)}
+                  onClick={() => navigate(
+                    `/${popup!.props.type === 'event' ? 'eventi' : 'attivita'}?open=${encodeURIComponent(popup!.props.id)}`,
+                  )}
                 >
                   Apri dettaglio →
                 </button>
