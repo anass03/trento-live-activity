@@ -8,6 +8,10 @@ const POI = require('./POI')(sequelize);
 const Report = require('./Report')(sequelize);
 const DeviceToken = require('./DeviceToken')(sequelize);
 const Consent = require('./Consent')(sequelize);
+const CittadinoProfile = require('./CittadinoProfile')(sequelize);
+const EnteProfile = require('./EnteProfile')(sequelize);
+const AmministratoreComunaleProfile = require('./AmministratoreComunaleProfile')(sequelize);
+const AmministratoreSistemaProfile = require('./AmministratoreSistemaProfile')(sequelize);
 
 // User <-> Activity (creator)
 Activity.belongsTo(User, { foreignKey: 'creatorId', as: 'creator' });
@@ -40,4 +44,21 @@ User.hasMany(DeviceToken, { foreignKey: 'userId', as: 'deviceTokens' });
 Consent.belongsTo(User, { foreignKey: 'userId', onDelete: 'CASCADE' });
 User.hasMany(Consent, { foreignKey: 'userId', as: 'consents' });
 
-module.exports = { sequelize, User, Activity, Event, Participation, POI, Report, DeviceToken, Consent };
+// User <-> Profili 1:1 separati per ruolo
+// (tabelle separate per chiarezza del modello dati e privacy GDPR)
+CittadinoProfile.belongsTo(User, { foreignKey: 'userId', onDelete: 'CASCADE' });
+User.hasOne(CittadinoProfile, { foreignKey: 'userId', as: 'cittadinoProfile' });
+
+EnteProfile.belongsTo(User, { foreignKey: 'userId', onDelete: 'CASCADE' });
+User.hasOne(EnteProfile, { foreignKey: 'userId', as: 'enteProfile' });
+
+AmministratoreComunaleProfile.belongsTo(User, { foreignKey: 'userId', onDelete: 'CASCADE' });
+User.hasOne(AmministratoreComunaleProfile, { foreignKey: 'userId', as: 'comunaleProfile' });
+
+AmministratoreSistemaProfile.belongsTo(User, { foreignKey: 'userId', onDelete: 'CASCADE' });
+User.hasOne(AmministratoreSistemaProfile, { foreignKey: 'userId', as: 'sistemaProfile' });
+
+module.exports = {
+  sequelize, User, Activity, Event, Participation, POI, Report, DeviceToken, Consent,
+  CittadinoProfile, EnteProfile, AmministratoreComunaleProfile, AmministratoreSistemaProfile,
+};
