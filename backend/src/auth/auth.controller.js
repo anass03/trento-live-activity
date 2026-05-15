@@ -1,4 +1,5 @@
 const service = require('./auth.service');
+const oauth = require('./oauth.service');
 
 async function register(req, res, next) {
   try {
@@ -153,10 +154,40 @@ async function suggestedInterests(req, res, next) {
   } catch (e) { next(e); }
 }
 
+const sanitizeForResponse = (u) => ({
+  id: u.id, email: u.email, ruolo: u.ruolo, emailVerified: u.emailVerified,
+});
+
+async function oauthGoogle(req, res, next) {
+  try {
+    const { idToken } = req.body || {};
+    if (!idToken) return res.status(400).json({ error: 'idToken required', code: 'MISSING_TOKEN' });
+    const { user, token } = await oauth.loginWithGoogle(idToken);
+    res.json({ user: sanitizeForResponse(user), token });
+  } catch (e) { next(e); }
+}
+
+async function oauthApple(req, res, next) {
+  try {
+    const { idToken } = req.body || {};
+    if (!idToken) return res.status(400).json({ error: 'idToken required', code: 'MISSING_TOKEN' });
+    const { user, token } = await oauth.loginWithApple(idToken);
+    res.json({ user: sanitizeForResponse(user), token });
+  } catch (e) { next(e); }
+}
+
+async function spidCallback(req, res, next) {
+  try {
+    const { user, token } = await oauth.loginWithSpidStub(req.body || {});
+    res.json({ user: sanitizeForResponse(user), token });
+  } catch (e) { next(e); }
+}
+
 module.exports = {
   register, login, logout, getMe, updateProfile, updateLocation, deleteAccount,
   setup2fa, verify2fa, regenerateRecoveryCodes,
   forgotPassword, resetPassword, registerEntity, verifyEmail,
   listConsents, updateConsent,
   updateEnteProfile, completeOnboarding, suggestedInterests,
+  oauthGoogle, oauthApple, spidCallback,
 };

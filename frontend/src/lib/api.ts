@@ -313,6 +313,24 @@ export function suggestActivityAi(payload: { description: string; location?: str
   return request('/api/ai/suggest-activity', { method: 'POST', body: payload });
 }
 
+// ============================== Social OAuth ==============================
+
+export async function oauthGoogleLogin(idToken: string): Promise<AuthResponse> {
+  const result = await request<AuthResponse>('/api/auth/oauth/google', { method: 'POST', body: { idToken }, auth: false });
+  setToken(result.token);
+  return result;
+}
+export async function oauthAppleLogin(idToken: string): Promise<AuthResponse> {
+  const result = await request<AuthResponse>('/api/auth/oauth/apple', { method: 'POST', body: { idToken }, auth: false });
+  setToken(result.token);
+  return result;
+}
+export async function spidLoginStub(payload: { spidId: string; nome: string; cognome: string; email: string; ufficio?: string }): Promise<AuthResponse> {
+  const result = await request<AuthResponse>('/api/auth/spid/callback', { method: 'POST', body: payload, auth: false });
+  setToken(result.token);
+  return result;
+}
+
 // ============================== Favorites ==============================
 
 export type FavoriteType = 'poi' | 'activity' | 'event';

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { register, registerEntity } from '../lib/api';
 import { PasswordInput } from '../components/ui/PasswordInput';
+import { SocialButtons } from '../components/auth/SocialButtons';
 
 type Mode = 'user' | 'entity';
 type PasswordStrength = {
@@ -168,6 +169,13 @@ export function RegistrationPage() {
     <section className="auth-page">
       <form className="auth-form liquid-card" onSubmit={handleSubmit}>
         <h1>Registrazione</h1>
+
+        {mode === 'user' && (
+          <>
+            <SocialButtons />
+            <div className="social-divider">oppure crea con email</div>
+          </>
+        )}
 
         <div className="mode-switch">
           <button type="button" className={mode === 'user' ? 'active' : ''} onClick={() => setMode('user')}>Cittadino</button>
