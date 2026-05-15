@@ -9,14 +9,15 @@ async function getStats(req, res, next) {
 }
 
 function buildRows(stats) {
+  // Solo metriche aggregate (#15): mai numero utenti.
   return [
     ['metric', 'value'],
-    ['totalUsers', stats.totalUsers],
     ['totalActivities', stats.totalActivities],
     ['totalEvents', stats.totalEvents],
     ['totalPOIs', stats.totalPOIs],
     ['totalParticipations', stats.totalParticipations],
     ...stats.activitiesByType.map((r) => [`activities_${r.tipo}`, r.count]),
+    ...(stats.eventsByCategory || []).map((r) => [`events_${r.categoria}`, r.count]),
     ...stats.poiCrowding.map((r) => [`poi_${r.statoAffollamento}`, r.count]),
   ];
 }

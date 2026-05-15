@@ -3646,3 +3646,57 @@ select option {
 .toast-activity { border-left: 3px solid var(--color-orange); }
 .toast-success { border-left: 3px solid var(--color-success); }
 .toast-error { border-left: 3px solid var(--color-danger); }
+
+/* ── Comune dashboard: liste e bar charts ── */
+.comune-poi-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.comune-poi-list li {
+  display: grid;
+  grid-template-columns: 28px 1fr auto 16px auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-surface-line);
+  border-radius: 10px;
+  background: var(--color-bg-elevated);
+  font-size: 13.5px;
+}
+.comune-rank {
+  font-weight: 800;
+  color: var(--color-primary);
+  font-size: 12px;
+}
+.comune-poi-name { font-weight: 700; }
+
+.comune-bar-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+.comune-bar-list li {
+  display: grid;
+  grid-template-columns: 110px 1fr 36px;
+  align-items: center;
+  gap: 12px;
+  font-size: 13.5px;
+}
+.comune-bar {
+  height: 8px;
+  background: color-mix(in oklch, var(--color-primary) 10%, transparent);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.comune-bar-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-primary-hover));
+  border-radius: 999px;
+}
+.comune-bar-list strong { text-align: right; }
