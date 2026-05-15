@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { InteractiveMapCard } from '../components/ui/InteractiveMapCard';
-import { getEventCalendarUrl, getEvents, getToken, googleCalendarUrl, reportEvent, type ApiEvent } from '../lib/api';
+import {
+  getEventCalendarUrl, getEvents, getToken, googleCalendarUrl,
+  joinEvent, leaveEvent, reportEvent,
+  type ApiEvent,
+} from '../lib/api';
 import { CalendarButton } from '../components/ui/CalendarButton';
 import type { AppUser } from '../data/mockUser';
 
@@ -33,8 +37,12 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
   const [selectedEvent, setSelectedEvent] = useState<ApiEvent | null>(null);
   const [search, setSearch] = useState('');
   const [timeFilter, setTimeFilter] = useState<'all' | 'today' | 'certified'>('all');
+  const [partLoading, setPartLoading] = useState<string | null>(null);
+  const [partError, setPartError] = useState<{ id: string; text: string } | null>(null);
 
   const isLoggedIn = !!getToken() && user?.role !== 'anonymous';
+  const userId = user?.id;
+  const isCitizen = user?.role === 'registered_user';
   const hasInterests = Array.isArray(user?.interessi) && (user!.interessi!.length ?? 0) > 0;
 
   async function loadEvents() {
@@ -90,6 +98,62 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
     [certifiedOnly, events, hasInterests, search, timeFilter, user],
   );
 
+  async function handleJoinEvent(eventId: string) {
+    setPartLoading(eventId); setPartError(null);
+    try {
+      const result = await joinEvent(eventId);
+      setEvents((prev) => prev.map((ev) => ev.id === eventId && userId
+        ? { ...ev, participantCount: result.participantCount, participantIds: [...(ev.participantIds || []), userId] }
+        : ev));
+    } catch (e) {
+      setPartError({ id: eventId, text: e instanceof Error ? e.message : 'Errore' });
+    } finally { setPartLoading(null); }
+  }
+
+  async function handleLeaveEvent(eventId: string) {
+    setPartLoading(eventId); setPartError(null);
+    try {
+      const result = await leaveEvent(eventId);
+      setEvents((prev) => prev.map((ev) => ev.id === eventId && userId
+        ? { ...ev, participantCount: result.participantCount, participantIds: (ev.participantIds || []).filter((p) => p !== userId) }
+        : ev));
+    } catch (e) {
+      setPartError({ id: eventId, text: e instanceof Error ? e.message : 'Errore' });
+    } finally { setPartLoading(null); }
+  }
+
+  function participateButton(event: ApiEvent) {
+    if (!isCitizen) return null;
+    const isJoined = !!(userId && event.participantIds?.includes(userId));
+    const isPast = event.dateTime ? new Date(event.dateTime) < new Date() : false;
+    const isFull = !!(event.maxPartecipanti && event.participantCount !== undefined
+      && event.participantCount >= event.maxPartecipanti);
+    if (isPast) return <span className="muted-copy" style={{ fontSize: 12 }}>Concluso</span>;
+    if (isJoined) {
+      return (
+        <button
+          type="button"
+          className="ghost-button compact-button"
+          disabled={partLoading === event.id}
+          onClick={(e) => { e.stopPropagation(); handleLeaveEvent(event.id); }}
+        >
+          {partLoading === event.id ? '...' : 'Annulla partecipazione'}
+        </button>
+      );
+    }
+    if (isFull) return <span className="muted-copy" style={{ fontSize: 12 }}>Posti esauriti</span>;
+    return (
+      <button
+        type="button"
+        className="primary-button compact-button"
+        disabled={partLoading === event.id}
+        onClick={(e) => { e.stopPropagation(); handleJoinEvent(event.id); }}
+      >
+        {partLoading === event.id ? '...' : 'Partecipa'}
+      </button>
+    );
+  }
+
   async function submitReport(eventId: string) {
     try {
       await reportEvent(eventId, reportTipo);
@@ -101,8 +165,30 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
     }
   }
 
-  const featuredEvent = visibleEvents[0];
-  const timelineEvents = visibleEvents.slice(0, 5);
+  const now = new Date();
+  const upcomingVisible = visibleEvents.filter((ev) => !ev.dateTime || new Date(ev.dateTime) >= now);
+  const pastVisible = visibleEvents.filter((ev) => ev.dateTime && new Date(ev.dateTime) < now);
+
+  const myEvents = useMemo(
+    () => events.filter((ev) => userId && ev.participantIds?.includes(userId)),
+    [events, userId],
+  );
+
+  const featuredEvent = upcomingVisible[0];
+  // Timeline: prossimi 5 eventi raggruppati per giorno
+  const timelineEvents = upcomingVisible.slice(0, 5);
+  const timelineByDay = useMemo(() => {
+    const groups = new Map<string, typeof timelineEvents>();
+    timelineEvents.forEach((ev) => {
+      const key = ev.dateTime ? new Date(ev.dateTime).toISOString().slice(0, 10) : 'unknown';
+      const arr = groups.get(key) || [];
+      arr.push(ev);
+      groups.set(key, arr);
+    });
+    return Array.from(groups.entries());
+  }, [timelineEvents]);
+
+  const [showPast, setShowPast] = useState(false);
 
   function renderEventCard(event: ApiEvent, className = '') {
     return (
@@ -139,7 +225,14 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
             googleUrl={googleCalendarUrl(event.title, event.dateTime, event.location)}
           />
         )}
+        {(event.maxPartecipanti !== null && event.maxPartecipanti !== undefined) && (
+          <small className="muted-copy" style={{ display: 'block', marginTop: 4 }}>
+            {event.participantCount ?? 0} / {event.maxPartecipanti} partecipanti
+          </small>
+        )}
         <div className="card-actions-row">
+          {participateButton(event)}
+          {partError?.id === event.id && <small className="error-message">{partError.text}</small>}
           {isLoggedIn && reportMsg?.id !== event.id && (
             reportingId === event.id ? (
               <div className="report-controls">
@@ -204,6 +297,7 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
               googleUrl={googleCalendarUrl(selectedEvent.title, selectedEvent.dateTime, selectedEvent.location)}
             />
           )}
+          {participateButton(selectedEvent)}
           {isLoggedIn && reportMsg?.id !== selectedEvent.id && (
             reportingId === selectedEvent.id ? (
               <div className="report-controls">
@@ -279,7 +373,17 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
 
       {stateContent}
 
-      {!isLoading && !error && visibleEvents.length > 0 && (
+      {/* Eventi a cui partecipo (solo cittadini) */}
+      {isCitizen && myEvents.length > 0 && (
+        <section className="my-activities-section" aria-label="Eventi a cui partecipo">
+          <h2>Eventi a cui partecipo <span className="section-count">{myEvents.length}</span></h2>
+          <div className="event-card-strip">
+            {myEvents.map((event) => renderEventCard(event, 'event-explorer-card'))}
+          </div>
+        </section>
+      )}
+
+      {!isLoading && !error && upcomingVisible.length > 0 && (
         <div className="event-editorial-layout">
           {featuredEvent && (
             <article className="event-feature-story">
@@ -300,21 +404,45 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
 
           <aside className="event-timeline-panel">
             <span className="section-eyebrow">Timeline</span>
-            <ol>
-              {timelineEvents.map((event) => (
-                <li key={event.id}>
-                  <time>{formatDay(event.dateTime)}</time>
-                  <span>{event.title}</span>
+            <ol className="event-timeline-grouped">
+              {timelineByDay.map(([day, evs]) => (
+                <li key={day} className="event-timeline-day">
+                  <time>{day !== 'unknown' ? formatDay(day) : 'Data da definire'}</time>
+                  <ul>
+                    {evs.map((event) => (
+                      <li key={event.id}>{event.title}</li>
+                    ))}
+                  </ul>
                 </li>
               ))}
             </ol>
           </aside>
 
           <div className="event-card-strip">
-            {visibleEvents.map((event) => renderEventCard(event, 'event-explorer-card'))}
+            {upcomingVisible.map((event) => renderEventCard(event, 'event-explorer-card'))}
           </div>
         </div>
       )}
+
+      {/* Eventi passati - collassabili */}
+      {!isLoading && pastVisible.length > 0 && (
+        <section className="my-activities-section" aria-label="Eventi passati">
+          <button
+            type="button"
+            className="ghost-button compact-button"
+            onClick={() => setShowPast((v) => !v)}
+            aria-expanded={showPast}
+          >
+            {showPast ? '▾' : '▸'} Eventi passati <span className="section-count">{pastVisible.length}</span>
+          </button>
+          {showPast && (
+            <div className="event-card-strip" style={{ marginTop: 14, opacity: 0.85 }}>
+              {pastVisible.map((event) => renderEventCard(event, 'event-explorer-card'))}
+            </div>
+          )}
+        </section>
+      )}
+
       {eventPopup}
     </section>
   );

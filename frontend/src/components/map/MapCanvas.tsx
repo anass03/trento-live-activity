@@ -9,7 +9,10 @@ import maplibregl, {
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { AppUser } from '../../data/mockUser';
-import { createActivity, type CrowdingStatus, type MapMarker, type MarkerType } from '../../lib/api';
+import {
+  createActivity, suggestActivityAi,
+  type CrowdingStatus, type MapMarker, type MarkerType,
+} from '../../lib/api';
 import { FavoriteButton } from '../ui/FavoriteButton';
 
 const TRENTO_CENTER: [number, number] = [11.1211, 46.0679];
@@ -420,6 +423,11 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
   const [formLoading, setFormLoading] = useState(false);
+  // AI suggester
+  const [aiDescription, setAiDescription] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiHint, setAiHint] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   const isLoggedIn = !!user && user.role !== 'anonymous';
 
@@ -451,6 +459,31 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
       setFormError(err instanceof Error ? err.message : 'Errore');
     } finally {
       setFormLoading(false);
+    }
+  }
+
+  async function handleAiSuggest() {
+    if (!aiDescription.trim()) return;
+    setAiError(null);
+    setAiHint(null);
+    setAiLoading(true);
+    try {
+      const result = await suggestActivityAi({
+        description: aiDescription,
+        location: activePoi?.title,
+      });
+      setForm((f) => ({
+        ...f,
+        tipo: result.tipo,
+        maxPartecipanti: result.maxPartecipanti,
+        orarioInizio: result.orarioInizio,
+        orarioFine: result.orarioFine,
+      }));
+      setAiHint(result.reasoning);
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'Errore AI');
+    } finally {
+      setAiLoading(false);
     }
   }
 
@@ -731,6 +764,32 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
       {activePoi && showForm && (
         <div className="map-create-activity-panel glass-card">
           <h3>Crea attività — {activePoi.title}</h3>
+
+          {/* ── AI suggester: descrizione libera → categoria/orario auto ── */}
+          <div className="ai-suggester-box">
+            <label>
+              <span>💡 Descrivi cosa vuoi fare (l'AI suggerisce categoria e orario)</span>
+              <textarea
+                rows={2}
+                value={aiDescription}
+                onChange={(e) => setAiDescription(e.target.value)}
+                placeholder="es. partita di calcetto domani sera"
+              />
+            </label>
+            <div className="ai-suggester-actions">
+              <button
+                type="button"
+                className="ghost-button compact-button"
+                disabled={aiLoading || !aiDescription.trim()}
+                onClick={handleAiSuggest}
+              >
+                {aiLoading ? 'Sto suggerendo…' : 'Suggerisci con AI'}
+              </button>
+              {aiHint && <small className="success-message">{aiHint}</small>}
+              {aiError && <small className="error-message">{aiError}</small>}
+            </div>
+          </div>
+
           <form onSubmit={handleCreateActivity}>
             <label>
               <span>Tipo</span>

@@ -3395,3 +3395,79 @@ select option {
   background: rgba(255, 255, 255, 0.92);
   border-color: rgba(0, 0, 0, 0.08);
 }
+
+/* ── Section count chips dentro h2 di "Le mie attività" / "Sto partecipando" / "Puoi partecipare" ── */
+.section-count {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--color-primary) 12%, transparent);
+  color: var(--color-primary);
+  font-size: 0.72em;
+  font-weight: 800;
+  vertical-align: middle;
+}
+
+/* ── Timeline eventi raggruppata per giorno (verticale con linea) ── */
+.event-timeline-grouped {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 12px;
+  position: relative;
+}
+.event-timeline-day {
+  display: grid;
+  grid-template-columns: 70px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+.event-timeline-day > time {
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  padding-top: 4px;
+}
+.event-timeline-day > ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 6px;
+  border-left: 2px solid color-mix(in oklch, var(--color-primary) 25%, transparent);
+  padding-left: 12px;
+}
+.event-timeline-day > ul > li {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+/* ── AI suggester box dentro form crea attività ── */
+.ai-suggester-box {
+  background: color-mix(in oklch, var(--color-primary) 6%, var(--color-bg-elevated));
+  border: 1px dashed color-mix(in oklch, var(--color-primary) 40%, transparent);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.ai-suggester-box textarea {
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--color-surface-line);
+  resize: vertical;
+}
+.ai-suggester-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ai-suggester-actions small { font-size: 11.5px; line-height: 1.4; }
