@@ -85,7 +85,7 @@ export function App() {
     <AppShell user={user}>
       <Routes>
         <Route path="/" element={<MapPage user={user} />} />
-        <Route path="/attivita" element={<ActivitiesPage userInterests={user.interessi} />} />
+        <Route path="/attivita" element={<ActivitiesPage user={user} />} />
         <Route path="/attivita/:id" element={<ActivityDetailPage user={user} />} />
         <Route path="/eventi" element={<EventsPage user={user} />} />
         <Route path="/eventi/:id" element={<EventDetailPage user={user} />} />
