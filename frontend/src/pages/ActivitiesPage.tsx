@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { activityCrowdLevel } from '../components/map/CardMapPreview';
 import { InteractiveMapCard } from '../components/ui/InteractiveMapCard';
 import type { AppUser } from '../data/mockUser';
-import { getActivities, getActivityCalendarUrl, googleCalendarUrl, joinActivity, leaveActivity, type ApiActivity } from '../lib/api';
+import { cancelActivity, getActivities, getActivityCalendarUrl, googleCalendarUrl, joinActivity, leaveActivity, type ApiActivity } from '../lib/api';
 import { CalendarButton } from '../components/ui/CalendarButton';
 
 function formatDateTime(value?: string | null) {
@@ -56,6 +56,20 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
     setActionLoading(activityId);
     try {
       await leaveActivity(activityId);
+      await loadActivities();
+      setSelectedActivity(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Errore');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleCancel(activityId: string) {
+    if (!window.confirm('Vuoi cancellare questa attività? L\'operazione è irreversibile.')) return;
+    setActionLoading(activityId);
+    try {
+      await cancelActivity(activityId);
       await loadActivities();
       setSelectedActivity(null);
     } catch (e) {
@@ -168,7 +182,11 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
                   </dl>
                   <div className="card-actions-row">
                     <button className="detail-link" type="button" onClick={() => setSelectedActivity(activity)}>Apri</button>
-                    {activity.participantIds?.includes(userId) && activity.creator?.id !== userId && (
+                    {activity.creator?.id === userId ? (
+                      <button className="danger-button compact-button" type="button" disabled={actionLoading === activity.id} onClick={() => handleCancel(activity.id)}>
+                        {actionLoading === activity.id ? '...' : 'Cancella'}
+                      </button>
+                    ) : activity.participantIds?.includes(userId) && (
                       <button className="ghost-button compact-button" type="button" disabled={actionLoading === activity.id} onClick={() => handleLeave(activity.id)}>
                         {actionLoading === activity.id ? '...' : 'Abbandona'}
                       </button>
@@ -307,11 +325,13 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
                 />
               )}
               {userId && (
-                selectedActivity.participantIds?.includes(userId)
-                  ? <button className="ghost-button" type="button" disabled={actionLoading === selectedActivity.id} onClick={() => handleLeave(selectedActivity.id)}>{actionLoading === selectedActivity.id ? '...' : 'Abbandona'}</button>
-                  : selectedActivity.status !== 'completa'
-                    ? <button className="primary-button" type="button" disabled={actionLoading === selectedActivity.id} onClick={() => handleJoin(selectedActivity.id)}>{actionLoading === selectedActivity.id ? '...' : 'Partecipa'}</button>
-                    : <span className="muted-copy">Al completo</span>
+                selectedActivity.creator?.id === userId
+                  ? <button className="danger-button" type="button" disabled={actionLoading === selectedActivity.id} onClick={() => handleCancel(selectedActivity.id)}>{actionLoading === selectedActivity.id ? '...' : 'Cancella attività'}</button>
+                  : selectedActivity.participantIds?.includes(userId)
+                    ? <button className="ghost-button" type="button" disabled={actionLoading === selectedActivity.id} onClick={() => handleLeave(selectedActivity.id)}>{actionLoading === selectedActivity.id ? '...' : 'Abbandona'}</button>
+                    : selectedActivity.status !== 'completa'
+                      ? <button className="primary-button" type="button" disabled={actionLoading === selectedActivity.id} onClick={() => handleJoin(selectedActivity.id)}>{actionLoading === selectedActivity.id ? '...' : 'Partecipa'}</button>
+                      : <span className="muted-copy">Al completo</span>
               )}
               <button className="ghost-button" type="button" onClick={() => setSelectedActivity(null)}>Chiudi</button>
             </div>
