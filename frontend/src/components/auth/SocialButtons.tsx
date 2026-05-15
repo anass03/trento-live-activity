@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import AppleSignin from 'react-apple-signin-auth';
 import { useNavigate } from 'react-router-dom';
-import { oauthAppleLogin, oauthGoogleLogin } from '../../lib/api';
+import { getMe, oauthAppleLogin, oauthGoogleLogin } from '../../lib/api';
 
 const GOOGLE_CLIENT_ID = (import.meta as ImportMeta & { env: { VITE_GOOGLE_CLIENT_ID?: string } }).env.VITE_GOOGLE_CLIENT_ID || '';
 const APPLE_CLIENT_ID = (import.meta as ImportMeta & { env: { VITE_APPLE_CLIENT_ID?: string } }).env.VITE_APPLE_CLIENT_ID || '';
@@ -17,6 +17,20 @@ export function SocialButtons({ onSpidClick, showSpid = false }: Props) {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
 
+  // Dopo OAuth: se è un nuovo cittadino (o uno esistente senza interessi),
+  // manda all'onboarding. Stessa logica usata in VerifyEmailPage.
+  async function redirectAfterLogin() {
+    try {
+      const me = await getMe();
+      const target = me.profile?.kind === 'cittadino' && !me.profile.onboardingComplete
+        ? '/onboarding/interessi'
+        : '/';
+      navigate(target);
+    } catch {
+      navigate('/');
+    }
+  }
+
   async function handleGoogleSuccess(credentialResponse: { credential?: string }) {
     setError(null);
     if (!credentialResponse.credential) {
@@ -25,7 +39,7 @@ export function SocialButtons({ onSpidClick, showSpid = false }: Props) {
     }
     try {
       await oauthGoogleLogin(credentialResponse.credential);
-      navigate('/');
+      await redirectAfterLogin();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Errore login Google');
     }
@@ -37,7 +51,7 @@ export function SocialButtons({ onSpidClick, showSpid = false }: Props) {
     if (!idToken) { setError('Apple non ha restituito un idToken'); return; }
     try {
       await oauthAppleLogin(idToken);
-      navigate('/');
+      await redirectAfterLogin();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Errore login Apple');
     }

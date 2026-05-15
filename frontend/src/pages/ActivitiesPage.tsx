@@ -287,7 +287,7 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
                   <h2>{featuredActivity.title}</h2>
                   <p>{featuredActivity.description || 'Attività spontanea organizzata dalla community.'}</p>
                 </div>
-                <dl>
+                <dl className="activity-featured-meta">
                   <div><dt>Quando</dt><dd>{formatDateTime(featuredActivity.dateTime)}</dd></div>
                   <div><dt>Partecipanti</dt><dd>{featuredActivity.participantCount} / {featuredActivity.maxParticipants}</dd></div>
                 </dl>

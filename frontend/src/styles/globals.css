@@ -3099,7 +3099,19 @@ select option {
   border: 1px solid var(--color-surface-line);
 }
 .settings-row > span { font-weight: 600; }
-.settings-row > select { max-width: 260px; }
+.settings-row > select {
+  max-width: 260px;
+  width: 220px;
+  min-height: 42px;
+  border: 1px solid var(--color-surface-line);
+  border-radius: 12px;
+  padding: 0 12px;
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-elevated);
+  font-size: 14px;
+  font-weight: 700;
+}
+.settings-row > select:hover { border-color: var(--color-primary); }
 .settings-row-toggle strong { display: block; font-size: 14.5px; }
 .settings-row-toggle small { display: block; color: var(--color-text-secondary); font-size: 12.5px; }
 .settings-row-toggle input[type='checkbox'] {
@@ -3751,4 +3763,31 @@ select option {
 
 @media (max-width: 880px) {
   .publish-layout { grid-template-columns: 1fr; }
+}
+
+/* ── Activity featured: label e valore in riga ── */
+.activity-featured-meta {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+}
+.activity-featured-meta > div {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.activity-featured-meta dt {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  min-width: 110px;
+}
+.activity-featured-meta dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-primary);
 }
