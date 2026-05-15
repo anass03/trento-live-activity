@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { activityCrowdLevel } from '../components/map/CardMapPreview';
 import { InteractiveMapCard } from '../components/ui/InteractiveMapCard';
 import type { AppUser } from '../data/mockUser';
-import { getActivities, getActivityCalendarUrl, googleCalendarUrl, joinActivity, leaveActivity, type ApiActivity } from '../lib/api';
+import { cancelActivity, getActivities, getActivityCalendarUrl, googleCalendarUrl, joinActivity, leaveActivity, type ApiActivity } from '../lib/api';
+import { CalendarButton } from '../components/ui/CalendarButton';
 
 function formatDateTime(value?: string | null) {
   if (!value) return 'Data da definire';
@@ -12,6 +14,8 @@ function formatDateTime(value?: string | null) {
 export function ActivitiesPage({ user }: { user?: AppUser }) {
   const userInterests = user?.interessi;
   const userId = user?.id;
+  const [searchParams] = useSearchParams();
+  const openId = searchParams.get('open');
   const [activities, setActivities] = useState<ApiActivity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +42,13 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
     void loadActivities();
   }, []);
 
+  // Auto-open popup when navigating from the map with ?open=<id>
+  useEffect(() => {
+    if (!openId || activities.length === 0) return;
+    const target = activities.find((a) => String(a.id) === openId);
+    if (target) setSelectedActivity(target);
+  }, [activities, openId]);
+
   async function handleJoin(activityId: string) {
     setActionLoading(activityId);
     try {
@@ -55,6 +66,20 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
     setActionLoading(activityId);
     try {
       await leaveActivity(activityId);
+      await loadActivities();
+      setSelectedActivity(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Errore');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleCancel(activityId: string) {
+    if (!window.confirm('Vuoi cancellare questa attività? L\'operazione è irreversibile.')) return;
+    setActionLoading(activityId);
+    try {
+      await cancelActivity(activityId);
       await loadActivities();
       setSelectedActivity(null);
     } catch (e) {
@@ -145,6 +170,47 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
       {!isLoading && !error && activities.length === 0 && (
         <div className="state-panel liquid-panel">Nessuna attività trovata nel database.</div>
       )}
+
+      {/* ── Le mie attività (always shown when logged in) ── */}
+      {userId && !isLoading && (
+        <section className="my-activities-section">
+          <h2>Le mie attività</h2>
+          {myActivities.length === 0 ? (
+            <p className="muted-copy">Non hai ancora creato o a cui partecipi a nessuna attività.</p>
+          ) : (
+            <div className="activity-card-flow">
+              {myActivities.map((activity) => (
+                <article key={activity.id} className="activity-card">
+                  <div className="interactive-map-card-header">
+                    <span>{activity.category}</span>
+                    <small className={activity.creator?.id === userId ? 'badge' : undefined}>
+                      {activity.creator?.id === userId ? 'Creata da te' : 'Partecipante'}
+                    </small>
+                  </div>
+                  <h2>{activity.title}</h2>
+                  <dl>
+                    <div><dt>Quando</dt><dd>{formatDateTime(activity.dateTime)}</dd></div>
+                    <div><dt>Partecipanti</dt><dd>{activity.participantCount} / {activity.maxParticipants}</dd></div>
+                    <div><dt>Stato</dt><dd>{activity.status || 'attiva'}</dd></div>
+                  </dl>
+                  <div className="card-actions-row">
+                    {activity.creator?.id === userId ? (
+                      <button className="danger-button compact-button" type="button" disabled={actionLoading === activity.id} onClick={() => handleCancel(activity.id)}>
+                        {actionLoading === activity.id ? '...' : 'Cancella'}
+                      </button>
+                    ) : activity.participantIds?.includes(userId) && (
+                      <button className="ghost-button compact-button" type="button" disabled={actionLoading === activity.id} onClick={() => handleLeave(activity.id)}>
+                        {actionLoading === activity.id ? '...' : 'Abbandona'}
+                      </button>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
       {!isLoading && !error && visibleActivities.length > 0 && (
         <div className="activities-layout">
           <aside className="activity-discovery-panel">
@@ -179,7 +245,6 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
                   <div><dt>Quando</dt><dd>{formatDateTime(featuredActivity.dateTime)}</dd></div>
                   <div><dt>Partecipanti</dt><dd>{featuredActivity.participantCount} / {featuredActivity.maxParticipants}</dd></div>
                 </dl>
-                <button className="detail-link" type="button" onClick={() => setSelectedActivity(featuredActivity)}>Apri anteprima</button>
               </article>
             )}
 
@@ -222,10 +287,11 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
                     </div>
                   </dl>
                   {activity.dateTime && (
-                    <div className="calendar-actions">
-                      <a href={getActivityCalendarUrl(activity.id)} download={`attivita-${activity.id}.ics`} className="calendar-link">📅 Apple / Outlook</a>
-                      <a href={googleCalendarUrl(activity.title, activity.dateTime, activity.location)} target="_blank" rel="noopener noreferrer" className="calendar-link">📅 Google Calendar</a>
-                    </div>
+                    <CalendarButton
+                      icsUrl={getActivityCalendarUrl(activity.id)}
+                      icsFilename={`attivita-${activity.id}.ics`}
+                      googleUrl={googleCalendarUrl(activity.title, activity.dateTime, activity.location)}
+                    />
                   )}
                   {userId && (
                     activity.participantIds?.includes(userId)
@@ -234,37 +300,12 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
                         ? <button className="primary-button" type="button" disabled={actionLoading === activity.id} onClick={() => handleJoin(activity.id)}>{actionLoading === activity.id ? '...' : 'Partecipa'}</button>
                         : <span className="muted-copy">Al completo</span>
                   )}
-                  <button className="detail-link" type="button" onClick={() => setSelectedActivity(activity)}>Apri anteprima</button>
                 </InteractiveMapCard>
               ))}
             </div>
           </section>
         </div>
       )}
-      {userId && myActivities.length > 0 && (
-        <section className="my-activities-section">
-          <h2>Le mie attività</h2>
-          <div className="activity-card-flow">
-            {myActivities.map((activity) => (
-              <article key={activity.id} className="activity-card">
-                <div className="interactive-map-card-header">
-                  <span>{activity.category}</span>
-                  <small>{activity.creator?.id === userId ? 'Creata da te' : 'Partecipante'}</small>
-                </div>
-                <h2>{activity.title}</h2>
-                <dl>
-                  <div><dt>Quando</dt><dd>{formatDateTime(activity.dateTime)}</dd></div>
-                  <div><dt>Partecipanti</dt><dd>{activity.participantCount} / {activity.maxParticipants}</dd></div>
-                </dl>
-                {activity.participantIds?.includes(userId) && activity.creator?.id !== userId && (
-                  <button className="ghost-button" type="button" disabled={actionLoading === activity.id} onClick={() => handleLeave(activity.id)}>{actionLoading === activity.id ? '...' : 'Abbandona'}</button>
-                )}
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
-
       {selectedActivity && (
         <div className="activity-popup-backdrop" role="presentation" onClick={() => setSelectedActivity(null)}>
           <article
@@ -287,17 +328,20 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
             </dl>
             <div className="activity-popup-actions">
               {selectedActivity.dateTime && (
-                <>
-                  <a href={getActivityCalendarUrl(selectedActivity.id)} download={`attivita-${selectedActivity.id}.ics`} className="calendar-link">📅 Apple / Outlook</a>
-                  <a href={googleCalendarUrl(selectedActivity.title, selectedActivity.dateTime, selectedActivity.location)} target="_blank" rel="noopener noreferrer" className="calendar-link">📅 Google Calendar</a>
-                </>
+                <CalendarButton
+                  icsUrl={getActivityCalendarUrl(selectedActivity.id)}
+                  icsFilename={`attivita-${selectedActivity.id}.ics`}
+                  googleUrl={googleCalendarUrl(selectedActivity.title, selectedActivity.dateTime, selectedActivity.location)}
+                />
               )}
               {userId && (
-                selectedActivity.participantIds?.includes(userId)
-                  ? <button className="ghost-button" type="button" disabled={actionLoading === selectedActivity.id} onClick={() => handleLeave(selectedActivity.id)}>{actionLoading === selectedActivity.id ? '...' : 'Abbandona'}</button>
-                  : selectedActivity.status !== 'completa'
-                    ? <button className="primary-button" type="button" disabled={actionLoading === selectedActivity.id} onClick={() => handleJoin(selectedActivity.id)}>{actionLoading === selectedActivity.id ? '...' : 'Partecipa'}</button>
-                    : <span className="muted-copy">Al completo</span>
+                selectedActivity.creator?.id === userId
+                  ? <button className="danger-button" type="button" disabled={actionLoading === selectedActivity.id} onClick={() => handleCancel(selectedActivity.id)}>{actionLoading === selectedActivity.id ? '...' : 'Cancella attività'}</button>
+                  : selectedActivity.participantIds?.includes(userId)
+                    ? <button className="ghost-button" type="button" disabled={actionLoading === selectedActivity.id} onClick={() => handleLeave(selectedActivity.id)}>{actionLoading === selectedActivity.id ? '...' : 'Abbandona'}</button>
+                    : selectedActivity.status !== 'completa'
+                      ? <button className="primary-button" type="button" disabled={actionLoading === selectedActivity.id} onClick={() => handleJoin(selectedActivity.id)}>{actionLoading === selectedActivity.id ? '...' : 'Partecipa'}</button>
+                      : <span className="muted-copy">Al completo</span>
               )}
               <button className="ghost-button" type="button" onClick={() => setSelectedActivity(null)}>Chiudi</button>
             </div>
