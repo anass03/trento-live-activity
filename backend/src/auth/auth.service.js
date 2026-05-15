@@ -158,9 +158,18 @@ async function listConsents(userId) {
 }
 
 async function updateConsent(userId, type, granted) {
-  const validTypes = ['privacy_policy', 'terms_of_service', 'marketing', 'analytics'];
+  const validTypes = [
+    'privacy_policy', 'terms_of_service', 'marketing', 'analytics',
+    // Preferenze notifiche (RNF19 + RF40)
+    'notif_email', 'notif_push',
+  ];
   if (!validTypes.includes(type)) {
     throw { status: 400, code: 'INVALID_CONSENT_TYPE', error: `type must be one of ${validTypes.join(', ')}` };
+  }
+  // Disattivare push → revoca tutti i DeviceToken dell'utente
+  if (type === 'notif_push' && !granted) {
+    const { DeviceToken } = require('../data/models');
+    await DeviceToken.destroy({ where: { userId } });
   }
   // RNF19: keep audit trail. Don't update old rows; insert a new one to record the change.
   return Consent.create({

@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import {
-  deleteAccount, getMe, logout, regenerateRecoveryCodes,
-  registerDeviceToken, sendTestPush, unregisterDeviceToken,
+  deleteAccount, getMe, listConsents, logout, regenerateRecoveryCodes,
+  registerDeviceToken, sendTestPush, summarizeConsents, unregisterDeviceToken,
   updateEnteProfile, updateLocation, updateProfile,
-  type MeProfile,
+  type ConsentType, type MeProfile,
 } from '../lib/api';
-import { onForegroundMessage, requestFcmToken } from '../lib/firebase';
+import { requestFcmToken } from '../lib/firebase';
 
 const AVAILABLE_INTERESTS = ['sport', 'cultura', 'musica', 'arte', 'gastronomia', 'studio', 'natura', 'tecnologia', 'volontariato'];
 const FCM_TOKEN_KEY = 'tla_fcm_token';
@@ -80,6 +80,9 @@ export function ProfilePage() {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleteEmailConfirm, setDeleteEmailConfirm] = useState('');
 
+  // Riepilogo notifiche (sola lettura — la gestione vera è in /impostazioni)
+  const [notifSummary, setNotifSummary] = useState<Partial<Record<ConsentType, boolean>>>({});
+
   useEffect(() => {
     getMe()
       .then((u) => {
@@ -98,11 +101,7 @@ export function ProfilePage() {
   }, []);
 
   useEffect(() => {
-    const unsub = onForegroundMessage((payload) => {
-      const title = payload.notification?.title || 'Notifica';
-      setPushMessage(`🔔 ${title}: ${payload.notification?.body || ''}`);
-    });
-    return unsub;
+    listConsents().then((records) => setNotifSummary(summarizeConsents(records))).catch(() => { /* ignore */ });
   }, []);
 
   async function handleEnablePush() {
@@ -408,12 +407,17 @@ export function ProfilePage() {
         </div>
 
         <div className="profile-col">
-          {/* ── Notifiche push: cittadini + enti ── */}
+          {/* ── Riepilogo notifiche (gestione completa in /impostazioni) ── */}
           {(isCittadino || isEnte) && (
             <div className="auth-form liquid-card">
-              <h2>Notifiche push</h2>
+              <h2>Notifiche</h2>
+              <p className="muted-copy" style={{ marginTop: 0, fontSize: 13 }}>
+                <strong>Email:</strong> {notifSummary.notif_email === false ? 'OFF' : 'ON'}{' · '}
+                <strong>Push:</strong> {notifSummary.notif_push === false ? 'OFF' : 'ON'}
+                {' '}<a href="/impostazioni" style={{ marginLeft: 8 }}>Gestisci in Impostazioni →</a>
+              </p>
+              <h3 style={{ marginTop: 10, fontSize: '1rem' }}>Stato push su questo dispositivo</h3>
               <p>
-                Ricevi notifiche immediate sul tuo dispositivo.{' '}
                 {pushEnabled ? 'Attive su questo browser.' : 'Non attive su questo browser.'}
               </p>
               {'Notification' in window && (
