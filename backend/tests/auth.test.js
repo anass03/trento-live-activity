@@ -11,6 +11,18 @@ jest.mock('../src/data/models', () => ({
     findAll: jest.fn(),
     create: jest.fn(),
   },
+  CittadinoProfile: {
+    findOne: jest.fn().mockResolvedValue(null),
+    create: jest.fn().mockResolvedValue({}),
+  },
+  EnteProfile: {
+    findOne: jest.fn().mockResolvedValue(null),
+    create: jest.fn().mockResolvedValue({}),
+  },
+  // sequelize.transaction(cb) — esegue il callback senza un vero DB
+  sequelize: {
+    transaction: (cb) => cb({}),
+  },
 }));
 
 jest.mock('../src/notifications/email.service', () => ({
