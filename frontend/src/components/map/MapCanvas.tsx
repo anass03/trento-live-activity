@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import maplibregl, {
   type GeoJSONSource,
   type LayerSpecification,
   type Map as MapLibreMap,
   type MapLayerMouseEvent,
+  type MapMouseEvent,
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import type { CrowdingStatus, MapMarker, MarkerType } from '../../lib/api';
+import type { AppUser } from '../../data/mockUser';
+import { createActivity, type CrowdingStatus, type MapMarker, type MarkerType } from '../../lib/api';
 
 const TRENTO_CENTER: [number, number] = [11.1211, 46.0679];
 const CITY_STYLE = 'https://tiles.openfreemap.org/styles/bright';
@@ -57,6 +60,12 @@ type MarkerFeatureCollection = {
   }>;
 };
 
+type PopupState = {
+  props: MarkerProperties;
+  lngLat: [number, number]; // [lng, lat]
+  locked: boolean;
+};
+
 const crowdColorExpression = [
   'interpolate',
   ['linear'],
@@ -88,16 +97,6 @@ function normalizedCrowd(marker: MapMarker) {
   return { level, status, color: crowdColor[status] };
 }
 
-function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (char) => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#039;',
-  }[char] || char));
-}
-
 function formatDateTime(value?: string | null) {
   if (!value) return '';
   return new Intl.DateTimeFormat('it-IT', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
@@ -110,7 +109,6 @@ function markerCollection(markers: MapMarker[]): MarkerFeatureCollection {
       .filter((marker) => Number.isFinite(marker.latitude) && Number.isFinite(marker.longitude))
       .map((marker) => {
         const { level, status } = normalizedCrowd(marker);
-
         return {
           type: 'Feature',
           properties: {
@@ -134,34 +132,13 @@ function markerCollection(markers: MapMarker[]): MarkerFeatureCollection {
   };
 }
 
-function popupContent(properties: MarkerProperties) {
-  const dateText = properties.type === 'event' ? formatDateTime(properties.dateTime) : '';
-
-  return `
-    <article class="maplibre-city-popup-card">
-      <div class="maplibre-popup-kicker">
-        <span>${escapeHtml(typeLabel[properties.type])}</span>
-        <span>${Math.round(properties.crowdLevel)}/100</span>
-      </div>
-      <h3>${escapeHtml(properties.title)}</h3>
-      <p>${escapeHtml(properties.description)}</p>
-      <dl>
-        <div><dt>Categoria</dt><dd>${escapeHtml(properties.category)}</dd></div>
-        <div><dt>Affollamento</dt><dd class="crowd-${properties.crowdingStatus}">${escapeHtml(crowdLabel[properties.crowdingStatus])}</dd></div>
-        ${dateText ? `<div><dt>Quando</dt><dd>${escapeHtml(dateText)}</dd></div>` : ''}
-      </dl>
-      ${properties.isCertified ? '<span class="maplibre-certified-badge">Evento certificato</span>' : ''}
-    </article>
-  `;
-}
-
 function firstSymbolLayerId(map: MapLibreMap) {
   return map.getStyle().layers?.find((layer) => layer.type === 'symbol' && layer.layout?.['text-field'])?.id;
 }
 
 function add3dBuildings(map: MapLibreMap) {
   const labelLayerId = firstSymbolLayerId(map);
-  const sourceId = map.getSource(BUILDING_SOURCE_ID) ? BUILDING_SOURCE_ID : BUILDING_SOURCE_ID;
+  const sourceId = BUILDING_SOURCE_ID;
 
   if (!map.getSource(sourceId)) {
     map.addSource(sourceId, {
@@ -213,7 +190,6 @@ function addMarkerSources(map: MapLibreMap, data: MarkerFeatureCollection) {
   if (!map.getSource(HEAT_SOURCE_ID)) {
     map.addSource(HEAT_SOURCE_ID, { type: 'geojson', data });
   }
-
   if (!map.getSource(POINT_SOURCE_ID)) {
     map.addSource(POINT_SOURCE_ID, {
       type: 'geojson',
@@ -371,23 +347,69 @@ function fitMapToMarkers(map: MapLibreMap, markers: MapMarker[]) {
   });
 }
 
-export function MapCanvas({ markers }: { markers: MapMarker[] }) {
+type PoiForm = { tipo: string; data: string; orarioInizio: string; orarioFine: string; maxPartecipanti: number };
+const defaultForm = (): PoiForm => ({ tipo: 'sport', data: '', orarioInizio: '', orarioFine: '', maxPartecipanti: 10 });
+const ACTIVITY_TYPES = ['sport', 'cultura', 'musica', 'arte', 'gastronomia', 'studio'];
+
+export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppUser }) {
+  const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const isLoadedRef = useRef(false);
   const latestMarkersRef = useRef(markers);
   const data = useMemo(() => markerCollection(markers), [markers]);
 
+  // React popup state
+  const [popup, setPopup] = useState<PopupState | null>(null);
+  const [popupPos, setPopupPos] = useState({ x: 0, y: 0 });
+  // Refs so map event handlers (stale closures) always see current values
+  const popupStateRef = useRef<PopupState | null>(null);
+  const singleClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isLoggedInRef = useRef(false);
+  const navigateRef = useRef(navigate);
+
+  // Create-activity form state
+  const [activePoi, setActivePoi] = useState<{ id: string; title: string } | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState<PoiForm>(defaultForm());
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formSuccess, setFormSuccess] = useState<string | null>(null);
+  const [formLoading, setFormLoading] = useState(false);
+
+  const isLoggedIn = !!user && user.role !== 'anonymous';
+
+  // Keep refs in sync with latest render values
+  useEffect(() => { navigateRef.current = navigate; }, [navigate]);
+  useEffect(() => { isLoggedInRef.current = isLoggedIn; }, [isLoggedIn]);
+  useEffect(() => { latestMarkersRef.current = markers; }, [markers]);
+
+  function closePopup() {
+    popupStateRef.current = null;
+    setPopup(null);
+  }
+
   function resetView() {
-    if (mapRef.current) {
-      fitMapToMarkers(mapRef.current, latestMarkersRef.current);
+    if (mapRef.current) fitMapToMarkers(mapRef.current, latestMarkersRef.current);
+  }
+
+  async function handleCreateActivity(e: React.FormEvent) {
+    e.preventDefault();
+    if (!activePoi) return;
+    setFormError(null);
+    setFormLoading(true);
+    try {
+      await createActivity({ ...form, poiId: activePoi.id });
+      setFormSuccess('Attività creata!');
+      setForm(defaultForm());
+      setTimeout(() => { setShowForm(false); setActivePoi(null); setFormSuccess(null); }, 1800);
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Errore');
+    } finally {
+      setFormLoading(false);
     }
   }
 
-  useEffect(() => {
-    latestMarkersRef.current = markers;
-  }, [markers]);
-
+  // Map initialisation — runs once on mount
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
@@ -421,79 +443,275 @@ export function MapCanvas({ markers }: { markers: MapMarker[] }) {
       addMarkerSources(map, markerCollection(latestMarkersRef.current));
       addMarkerLayers(map);
       fitMapToMarkers(map, latestMarkersRef.current);
+
+      // ── Cluster click: expand ──────────────────────────────────────────────
+      const handleClusterClick = async (event: MapLayerMouseEvent) => {
+        const features = map.queryRenderedFeatures(event.point, { layers: ['trento-marker-clusters'] });
+        const clusterId = features[0]?.properties?.cluster_id;
+        const geometry = features[0]?.geometry;
+        if (typeof clusterId !== 'number' || geometry.type !== 'Point') return;
+        const source = map.getSource(POINT_SOURCE_ID) as GeoJSONSource | undefined;
+        const zoom = await source?.getClusterExpansionZoom(clusterId);
+        if (zoom) map.easeTo({ center: geometry.coordinates as [number, number], zoom, pitch: 66, duration: 550 });
+      };
+
+      // ── Hover: show popup (un-locked) ──────────────────────────────────────
+      const handleMouseEnter = (event: MapLayerMouseEvent) => {
+        map.getCanvas().style.cursor = 'pointer';
+        const feature = event.features?.[0];
+        if (!feature || feature.geometry.type !== 'Point') return;
+        // Don't override a locked popup with a hover popup
+        if (popupStateRef.current?.locked) return;
+        const props = feature.properties as MarkerProperties;
+        const lngLat = feature.geometry.coordinates as [number, number];
+        const newState: PopupState = { props, lngLat, locked: false };
+        popupStateRef.current = newState;
+        setPopup(newState);
+        const pt = map.project(lngLat);
+        setPopupPos({ x: pt.x, y: pt.y });
+      };
+
+      // ── Mouse leave: hide hover popup ──────────────────────────────────────
+      const handleMouseLeave = () => {
+        map.getCanvas().style.cursor = '';
+        if (!popupStateRef.current?.locked) {
+          popupStateRef.current = null;
+          setPopup(null);
+        }
+      };
+
+      // ── Single / double click on a marker ─────────────────────────────────
+      const handlePointClick = (event: MapLayerMouseEvent) => {
+        const feature = event.features?.[0];
+        if (!feature || feature.geometry.type !== 'Point') return;
+        const props = feature.properties as MarkerProperties;
+        const lngLat = feature.geometry.coordinates as [number, number];
+
+        // If a double-click is in progress the first click already set the
+        // timer; cancel it so the dblclick handler can navigate cleanly.
+        if (singleClickTimerRef.current) {
+          clearTimeout(singleClickTimerRef.current);
+          singleClickTimerRef.current = null;
+          return;
+        }
+
+        singleClickTimerRef.current = setTimeout(() => {
+          singleClickTimerRef.current = null;
+          const current = popupStateRef.current;
+
+          if (current?.locked && current.props.id === props.id) {
+            // Already locked on this marker → navigate on single click
+            if (props.type !== 'poi') {
+              navigateRef.current(`/${props.type === 'event' ? 'eventi' : 'attivita'}/${props.id}`);
+            }
+          } else {
+            // First click → lock the popup
+            const newState: PopupState = { props, lngLat, locked: true };
+            popupStateRef.current = newState;
+            setPopup(newState);
+            const pt = map.project(lngLat);
+            setPopupPos({ x: pt.x, y: pt.y });
+          }
+        }, 230);
+      };
+
+      // ── Double click: navigate immediately (no lock step) ─────────────────
+      const handlePointDblClick = (event: MapLayerMouseEvent) => {
+        event.preventDefault(); // prevent map zoom
+        if (singleClickTimerRef.current) {
+          clearTimeout(singleClickTimerRef.current);
+          singleClickTimerRef.current = null;
+        }
+        const feature = event.features?.[0];
+        if (!feature) return;
+        const props = feature.properties as MarkerProperties;
+        if (props.type !== 'poi') {
+          navigateRef.current(`/${props.type === 'event' ? 'eventi' : 'attivita'}/${props.id}`);
+        }
+      };
+
+      // ── Click on map background: dismiss locked popup ─────────────────────
+      const handleMapClick = (e: MapMouseEvent) => {
+        const hits = map.queryRenderedFeatures(e.point, { layers: ['trento-unclustered-point'] });
+        if (hits.length === 0 && popupStateRef.current?.locked) {
+          popupStateRef.current = null;
+          setPopup(null);
+        }
+      };
+
+      // ── Map move/zoom: keep popup anchored to its marker ──────────────────
+      const handleMapMove = () => {
+        const state = popupStateRef.current;
+        if (state) {
+          const pt = map.project(state.lngLat);
+          setPopupPos({ x: pt.x, y: pt.y });
+        }
+      };
+
       map.on('click', 'trento-marker-clusters', handleClusterClick);
+      map.on('mouseenter', 'trento-unclustered-point', handleMouseEnter);
+      map.on('mouseleave', 'trento-unclustered-point', handleMouseLeave);
       map.on('click', 'trento-unclustered-point', handlePointClick);
-      map.on('mouseenter', 'trento-marker-clusters', setPointer);
-      map.on('mouseenter', 'trento-unclustered-point', setPointer);
-      map.on('mouseleave', 'trento-marker-clusters', unsetPointer);
-      map.on('mouseleave', 'trento-unclustered-point', unsetPointer);
+      map.on('dblclick', 'trento-unclustered-point', handlePointDblClick);
+      map.on('click', handleMapClick);
+      map.on('move', handleMapMove);
+
       isLoadedRef.current = true;
     };
 
-    const handleClusterClick = async (event: MapLayerMouseEvent) => {
-      const features = map.queryRenderedFeatures(event.point, { layers: ['trento-marker-clusters'] });
-      const clusterId = features[0]?.properties?.cluster_id;
-      const geometry = features[0]?.geometry;
-      if (typeof clusterId !== 'number' || geometry.type !== 'Point') return;
-
-      const source = map.getSource(POINT_SOURCE_ID) as GeoJSONSource | undefined;
-      const zoom = await source?.getClusterExpansionZoom(clusterId);
-      if (zoom) {
-        map.easeTo({ center: geometry.coordinates as [number, number], zoom, pitch: 66, duration: 550 });
-      }
-    };
-
-    const handlePointClick = (event: MapLayerMouseEvent) => {
-      const feature = event.features?.[0];
-      if (!feature || feature.geometry.type !== 'Point') return;
-
-      new maplibregl.Popup({ offset: 18, closeButton: true, maxWidth: 'none' })
-        .setLngLat(feature.geometry.coordinates as [number, number])
-        .setHTML(popupContent(feature.properties as MarkerProperties))
-        .addTo(map);
-    };
-
-    const setPointer = () => {
-      map.getCanvas().style.cursor = 'pointer';
-    };
-    const unsetPointer = () => {
-      map.getCanvas().style.cursor = '';
-    };
-
     map.on('load', handleLoad);
-
     mapRef.current = map;
 
     return () => {
+      if (singleClickTimerRef.current) {
+        clearTimeout(singleClickTimerRef.current);
+        singleClickTimerRef.current = null;
+      }
       map.off('load', handleLoad);
-      if (map.getLayer('trento-marker-clusters')) {
-        map.off('click', 'trento-marker-clusters', handleClusterClick);
-        map.off('mouseenter', 'trento-marker-clusters', setPointer);
-        map.off('mouseleave', 'trento-marker-clusters', unsetPointer);
-      }
-      if (map.getLayer('trento-unclustered-point')) {
-        map.off('click', 'trento-unclustered-point', handlePointClick);
-        map.off('mouseenter', 'trento-unclustered-point', setPointer);
-        map.off('mouseleave', 'trento-unclustered-point', unsetPointer);
-      }
       map.remove();
       mapRef.current = null;
       isLoadedRef.current = false;
     };
   }, []);
 
+  // Update sources when markers change
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !isLoadedRef.current) return;
-
     (map.getSource(HEAT_SOURCE_ID) as GeoJSONSource | undefined)?.setData(data);
     (map.getSource(POINT_SOURCE_ID) as GeoJSONSource | undefined)?.setData(data);
     fitMapToMarkers(map, markers);
   }, [data, markers]);
 
+  const canNavigate = popup && popup.props.type !== 'poi';
+
   return (
     <section className="map-area map-area-3d" aria-label="Map Zone 3D" data-testid="map-zone">
       <div ref={containerRef} className="maplibre-map" />
+
+      {/* ── React popup overlay ─────────────────────────────────────────── */}
+      {popup && (
+        <div
+          className="map-react-popup-anchor"
+          style={{ left: popupPos.x, top: popupPos.y }}
+        >
+          <article
+            className={`map-react-popup maplibre-city-popup-card${popup.locked ? ' map-react-popup--locked' : ''}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="maplibre-popup-kicker">
+              <span>{typeLabel[popup.props.type]}</span>
+              <span className={`crowd-${popup.props.crowdingStatus}`}>
+                {crowdLabel[popup.props.crowdingStatus]} · {Math.round(popup.props.crowdLevel)}/100
+              </span>
+              <button
+                className="maplibregl-popup-close-button map-popup-close-btn"
+                type="button"
+                aria-label="Chiudi"
+                onClick={closePopup}
+              >
+                ×
+              </button>
+            </div>
+
+            <h3>{popup.props.title}</h3>
+            <p>{popup.props.description}</p>
+
+            <dl>
+              <div><dt>Categoria</dt><dd>{popup.props.category}</dd></div>
+              {popup.props.dateTime && (
+                <div><dt>Quando</dt><dd>{formatDateTime(popup.props.dateTime)}</dd></div>
+              )}
+            </dl>
+
+            {popup.props.isCertified && (
+              <span className="maplibre-certified-badge">Evento certificato</span>
+            )}
+
+            <div className="map-popup-actions">
+              {popup.props.type === 'poi' && isLoggedIn && (
+                <button
+                  className="primary-button"
+                  type="button"
+                  onClick={() => {
+                    setActivePoi({ id: popup!.props.sourceId, title: popup!.props.title });
+                    setShowForm(true);
+                    closePopup();
+                  }}
+                >
+                  ➕ Crea attività qui
+                </button>
+              )}
+              {canNavigate && (
+                <button
+                  className="detail-link"
+                  type="button"
+                  onClick={() => navigate(`/${popup!.props.type === 'event' ? 'eventi' : 'attivita'}/${popup!.props.id}`)}
+                >
+                  Apri dettaglio →
+                </button>
+              )}
+            </div>
+
+            {canNavigate && (
+              <p className="map-popup-hint">
+                {popup.locked
+                  ? 'Clic sul marker per aprire · Clic altrove per chiudere'
+                  : 'Clic per bloccare · Doppio clic per aprire'}
+              </p>
+            )}
+          </article>
+        </div>
+      )}
+
+      {/* ── Create-activity form panel ──────────────────────────────────── */}
+      {activePoi && showForm && (
+        <div className="map-create-activity-panel glass-card">
+          <h3>Crea attività — {activePoi.title}</h3>
+          <form onSubmit={handleCreateActivity}>
+            <label>
+              <span>Tipo</span>
+              <select value={form.tipo} onChange={(e) => setForm((f) => ({ ...f, tipo: e.target.value }))}>
+                {ACTIVITY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </label>
+            <label>
+              <span>Data</span>
+              <input type="date" required value={form.data} onChange={(e) => setForm((f) => ({ ...f, data: e.target.value }))} />
+            </label>
+            <label>
+              <span>Inizio</span>
+              <input type="time" required value={form.orarioInizio} onChange={(e) => setForm((f) => ({ ...f, orarioInizio: e.target.value }))} />
+            </label>
+            <label>
+              <span>Fine</span>
+              <input type="time" required value={form.orarioFine} onChange={(e) => setForm((f) => ({ ...f, orarioFine: e.target.value }))} />
+            </label>
+            <label>
+              <span>Max partecipanti (2–50)</span>
+              <input
+                type="number"
+                min={2}
+                max={50}
+                required
+                value={form.maxPartecipanti}
+                onChange={(e) => setForm((f) => ({ ...f, maxPartecipanti: Number(e.target.value) }))}
+              />
+            </label>
+            {formError && <p className="form-error">{formError}</p>}
+            {formSuccess && <p className="form-success">{formSuccess}</p>}
+            <div className="filter-actions">
+              <button className="primary-button" type="submit" disabled={formLoading}>
+                {formLoading ? '...' : 'Crea'}
+              </button>
+              <button type="button" onClick={() => { setShowForm(false); setActivePoi(null); }}>
+                Annulla
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       <div className="map-3d-hud" aria-hidden="true">
         <strong>Vista 3D Trento</strong>
         <span>Trascina per muovere, ruota con bussola o tasto destro</span>

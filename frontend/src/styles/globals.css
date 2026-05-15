@@ -2500,3 +2500,92 @@ dd {
     display: none;
   }
 }
+
+/* ── Password strength bar ── */
+.password-strength { display: flex; flex-direction: column; gap: 4px; margin-top: -8px; }
+.password-strength-bar { display: flex; gap: 4px; }
+.password-strength-segment { flex: 1; height: 4px; border-radius: 2px; transition: background-color 0.2s; }
+
+/* ── Calendar dual links ── */
+.calendar-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ── React map popup ── */
+.map-react-popup-anchor {
+  position: absolute;
+  pointer-events: none;
+  z-index: 20;
+}
+.map-react-popup {
+  position: absolute;
+  /* center horizontally, place above the pin with a small gap */
+  transform: translate(-50%, calc(-100% - 12px));
+  width: 280px;
+  pointer-events: auto;
+  cursor: default;
+  /* reuse existing popup-card vars from maplibregl */
+  background: var(--color-bg-elevated, #fff);
+  border: 1px solid var(--color-surface-line, #e5e7eb);
+  border-radius: 20px;
+  box-shadow: var(--shadow-soft, 0 6px 24px rgba(0,0,0,.14));
+  padding: 16px;
+}
+/* caret pointing down to the pin */
+.map-react-popup::after {
+  content: '';
+  position: absolute;
+  bottom: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0; height: 0;
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-top: 9px solid var(--color-bg-elevated, #fff);
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,.08));
+}
+.map-react-popup--locked {
+  border-color: var(--color-primary, #3b82f6);
+  box-shadow: 0 0 0 2px var(--color-primary-soft, #dbeafe), var(--shadow-soft, 0 6px 24px rgba(0,0,0,.14));
+}
+.map-popup-close-btn {
+  margin-left: auto;
+  padding: 0 4px;
+  line-height: 1;
+  font-size: 18px;
+}
+.map-popup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.map-popup-hint {
+  margin: 8px 0 0;
+  font-size: 0.68rem;
+  color: var(--color-text-muted, #9ca3af);
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* ── Map POI action bar (kept for compat) ── */
+.map-poi-action-bar {
+  position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
+  background: var(--surface, #fff); border-radius: 12px; padding: 10px 16px;
+  display: flex; align-items: center; gap: 12px; box-shadow: 0 4px 20px rgba(0,0,0,.18);
+  z-index: 10;
+}
+
+/* ── Map create activity panel ── */
+.map-create-activity-panel {
+  position: absolute; top: 12px; right: 12px; width: 300px;
+  background: var(--surface, #fff); border-radius: 16px; padding: 16px;
+  box-shadow: 0 4px 24px rgba(0,0,0,.22); z-index: 10;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.map-create-activity-panel h3 { margin: 0; font-size: 1rem; }
+.map-create-activity-panel label { display: flex; flex-direction: column; gap: 4px; font-size: .85rem; }
+.map-create-activity-panel input,
+.map-create-activity-panel select { padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border, #ddd); }
+
+/* ── Le mie attività section ── */
+.my-activities-section { padding: 24px; }
+.my-activities-section h2 { margin-bottom: 16px; }
