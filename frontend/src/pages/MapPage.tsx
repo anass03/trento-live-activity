@@ -38,6 +38,13 @@ function crowdLevel(marker: MapMarker) {
   return { green: 20, yellow: 50, orange: 72, red: 90 }[marker.crowdingStatus] ?? 20;
 }
 
+function crowdBarColor(level: number): string {
+  if (level >= 82) return 'var(--color-danger)';
+  if (level >= 62) return 'var(--color-orange)';
+  if (level >= 34) return 'var(--color-warning)';
+  return 'var(--color-success)';
+}
+
 export function MapPage({ user }: { user?: AppUser }) {
   const [markers, setMarkers] = useState<MapMarker[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
@@ -266,13 +273,18 @@ export function MapPage({ user }: { user?: AppUser }) {
             <strong>Aree più attive</strong>
           </div>
           <div className="hotspot-list">
-            {featuredHotspots.map((marker) => (
-              <article key={marker.id}>
-                <span>{marker.title}</span>
-                <meter min={0} max={100} value={crowdLevel(marker)} />
-                <small>{Math.round(crowdLevel(marker))} / 100</small>
-              </article>
-            ))}
+            {featuredHotspots.map((marker) => {
+              const level = Math.round(crowdLevel(marker));
+              return (
+                <article key={marker.id}>
+                  <span>{marker.title}</span>
+                  <div className="crowd-bar" role="progressbar" aria-valuenow={level} aria-valuemin={0} aria-valuemax={100}>
+                    <div className="crowd-bar-fill" style={{ width: `${level}%`, background: crowdBarColor(level) }} />
+                  </div>
+                  <small style={{ color: crowdBarColor(level) }}>{level} / 100</small>
+                </article>
+              );
+            })}
           </div>
         </section>
       </section>

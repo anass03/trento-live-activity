@@ -27,7 +27,9 @@ export function AdminUsersPage() {
   const [sistema, setSistema] = useState<AdminSistema[]>([]);
   const [filter, setFilter] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setIsLoading(true);
@@ -46,9 +48,21 @@ export function AdminUsersPage() {
   useEffect(load, [load]);
 
   async function handleDelete(id: string, label: string) {
-    if (!window.confirm(`Eliminare ${label}? L'operazione è irreversibile (GDPR art. 17).`)) return;
-    try { await deleteAdminUser(id); load(); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Errore'); }
+    if (!window.confirm(
+      `Eliminare "${label}"?\nL'operazione elimina anche attività, eventi, partecipazioni e profili associati (GDPR art. 17).`,
+    )) return;
+    setError(null);
+    setSuccess(null);
+    setDeletingId(id);
+    try {
+      await deleteAdminUser(id);
+      setSuccess(`Utente "${label}" eliminato.`);
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Errore durante l\'eliminazione');
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   const tabCounts: Record<Tab, number> = {
@@ -71,6 +85,19 @@ export function AdminUsersPage() {
   const visibleSistema = useMemo(() =>
     sistema.filter((u) => !lc || [u.email, u.nome, u.cognome].some((v) => (v || '').toLowerCase().includes(lc))),
     [sistema, lc]);
+
+  function deleteBtn(id: string, label: string) {
+    return (
+      <button
+        type="button"
+        className="danger-button compact-button"
+        disabled={deletingId === id}
+        onClick={() => handleDelete(id, label)}
+      >
+        {deletingId === id ? '...' : 'Elimina'}
+      </button>
+    );
+  }
 
   return (
     <section className="data-page">
@@ -108,7 +135,9 @@ export function AdminUsersPage() {
         </div>
       </div>
 
-      {error && <div className="state-panel liquid-panel"><p>{error}</p></div>}
+      {error && <div className="state-panel liquid-panel form-error"><p>{error}</p></div>}
+      {success && <div className="state-panel liquid-panel form-success"><p>{success}</p></div>}
+      {isLoading && <div className="state-panel liquid-panel">Caricamento...</div>}
 
       {tab === 'cittadini' && (
         <div className="liquid-card">
@@ -128,7 +157,7 @@ export function AdminUsersPage() {
                   <td>{formatDate(u.dataNascita)}</td>
                   <td>{u.emailVerified ? '✓' : '—'}</td>
                   <td>{formatDate(u.createdAt)}</td>
-                  <td><button type="button" className="danger-button" onClick={() => handleDelete(u.id, u.email)}>Elimina</button></td>
+                  <td>{deleteBtn(u.id, u.email)}</td>
                 </tr>
               ))}
               {visibleCittadini.length === 0 && (
@@ -160,7 +189,7 @@ export function AdminUsersPage() {
                       : <span className="report-stato report-stato-open">In attesa</span>}
                   </td>
                   <td>{formatDate(u.createdAt)}</td>
-                  <td><button type="button" className="danger-button" onClick={() => handleDelete(u.id, u.nomeEnte || u.email)}>Elimina</button></td>
+                  <td>{deleteBtn(u.id, u.nomeEnte || u.email)}</td>
                 </tr>
               ))}
               {visibleEnti.length === 0 && (
@@ -188,7 +217,7 @@ export function AdminUsersPage() {
                   <td>{u.ufficio || '—'}</td>
                   <td><code>{u.spidId ? u.spidId.slice(0, 12) : '—'}</code></td>
                   <td>{formatDate(u.createdAt)}</td>
-                  <td><button type="button" className="danger-button" onClick={() => handleDelete(u.id, u.email)}>Elimina</button></td>
+                  <td>{deleteBtn(u.id, u.email)}</td>
                 </tr>
               ))}
               {visibleComunali.length === 0 && (
@@ -220,7 +249,7 @@ export function AdminUsersPage() {
                   </td>
                   <td>{u.superAdmin ? '✓' : '—'}</td>
                   <td>{formatDate(u.createdAt)}</td>
-                  <td><button type="button" className="danger-button" onClick={() => handleDelete(u.id, u.email)}>Elimina</button></td>
+                  <td>{deleteBtn(u.id, u.email)}</td>
                 </tr>
               ))}
               {visibleSistema.length === 0 && (
