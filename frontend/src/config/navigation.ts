@@ -8,7 +8,6 @@ export const primaryNav: NavItem[] = [
   { label: 'Mappa', path: '/', roles: ALL_ROLES },
   { label: 'Attività', path: '/attivita', roles: ALL_ROLES },
   { label: 'Eventi', path: '/eventi', roles: ALL_ROLES },
-  { label: 'Eventi certificati', path: '/eventi-certificati', roles: ALL_ROLES },
   { label: 'Profilo', path: '/profilo', roles: ['registered_user', 'certified_entity', 'municipal_admin', 'system_admin'] },
   { label: 'Accedi / Registrati', path: '/login', roles: ['anonymous'] },
 ];

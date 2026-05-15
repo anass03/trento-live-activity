@@ -3,6 +3,30 @@ import { Link, useNavigate } from 'react-router-dom';
 import { register, registerEntity } from '../lib/api';
 
 type Mode = 'user' | 'entity';
+type PasswordStrength = { score: 1 | 2 | 3; label: string; color: string };
+
+function getPasswordStrength(password: string): PasswordStrength | null {
+  if (!password) return null;
+  let score = 0;
+  if (password.length >= 8) score++;
+  if (password.length >= 12) score++;
+  if (/[A-Z]/.test(password)) score++;
+  if (/[a-z]/.test(password)) score++;
+  if (/[0-9]/.test(password)) score++;
+  if (/[^A-Za-z0-9]/.test(password)) score++;
+  if (score <= 2) return { score: 1, label: 'Debole', color: '#df5e5e' };
+  if (score <= 4) return { score: 2, label: 'Media', color: '#d1be58' };
+  return { score: 3, label: 'Forte', color: '#53e198' };
+}
+
+function validatePassword(password: string): string | null {
+  if (password.length < 8) return 'La password deve avere almeno 8 caratteri';
+  if (!/[A-Z]/.test(password)) return 'La password deve contenere almeno una lettera maiuscola';
+  if (!/[a-z]/.test(password)) return 'La password deve contenere almeno una lettera minuscola';
+  if (!/[0-9]/.test(password)) return 'La password deve contenere almeno un numero';
+  if (!/[^A-Za-z0-9]/.test(password)) return 'La password deve contenere almeno un carattere speciale (!@#$%...)';
+  return null;
+}
 
 export function RegistrationPage() {
   const navigate = useNavigate();
@@ -14,6 +38,7 @@ export function RegistrationPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const passwordStrength = getPasswordStrength(form.password);
 
   function update<K extends keyof typeof form>(key: K, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -22,6 +47,8 @@ export function RegistrationPage() {
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
+    const pwError = validatePassword(form.password);
+    if (pwError) { setError(pwError); return; }
     setIsLoading(true);
     try {
       if (mode === 'user') {
@@ -34,7 +61,7 @@ export function RegistrationPage() {
           consents,
         });
         if ('emailVerificationRequired' in result && result.emailVerificationRequired) {
-          setSuccess('Registrazione completata. Controlla la tua email per verificare l’account prima di accedere.');
+          setSuccess('Registrazione completata. Controlla la tua email per verificare l\'account prima di accedere.');
           return;
         }
         navigate('/');
@@ -42,7 +69,6 @@ export function RegistrationPage() {
       } else {
         const result = await registerEntity({
           email: form.email, password: form.password, nomeEnte: form.nomeEnte,
-          nome: form.nome, cognome: form.cognome,
         });
         setSuccess(result.message);
       }
@@ -72,9 +98,23 @@ export function RegistrationPage() {
           <input type="email" value={form.email} onChange={(e) => update('email', e.target.value)} required />
         </label>
         <label>
-          <span>Password (min 8 caratteri)</span>
-          <input type="password" value={form.password} onChange={(e) => update('password', e.target.value)} minLength={8} required />
+          <span>Password</span>
+          <input type="password" value={form.password} onChange={(e) => update('password', e.target.value)} required />
         </label>
+        {passwordStrength && (
+          <div className="password-strength">
+            <div className="password-strength-bar">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="password-strength-segment"
+                  style={{ backgroundColor: i <= passwordStrength.score ? passwordStrength.color : '#e0e0e0' }}
+                />
+              ))}
+            </div>
+            <small style={{ color: passwordStrength.color }}>{passwordStrength.label}</small>
+          </div>
+        )}
 
         {mode === 'user' ? (
           <>
@@ -113,14 +153,6 @@ export function RegistrationPage() {
             <label>
               <span>Nome dell'ente</span>
               <input type="text" value={form.nomeEnte} onChange={(e) => update('nomeEnte', e.target.value)} required />
-            </label>
-            <label>
-              <span>Referente — Nome</span>
-              <input type="text" value={form.nome} onChange={(e) => update('nome', e.target.value)} />
-            </label>
-            <label>
-              <span>Referente — Cognome</span>
-              <input type="text" value={form.cognome} onChange={(e) => update('cognome', e.target.value)} />
             </label>
           </>
         )}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import {
   deleteAccount, getMe, logout, regenerateRecoveryCodes,
   registerDeviceToken, sendTestPush, unregisterDeviceToken,
@@ -191,7 +191,7 @@ export function ProfilePage() {
   }
 
   if (isLoading) return <section className="data-page"><div className="state-panel liquid-panel">Caricamento...</div></section>;
-  if (!user) return <section className="data-page"><div className="state-panel liquid-panel">Non autenticato. <a href="/login">Accedi</a></div></section>;
+  if (!user) return <Navigate to="/login" replace />;
 
   return (
     <section className="data-page">

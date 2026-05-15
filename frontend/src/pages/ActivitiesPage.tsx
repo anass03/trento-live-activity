@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { activityCrowdLevel } from '../components/map/CardMapPreview';
 import { InteractiveMapCard } from '../components/ui/InteractiveMapCard';
-import { getActivities, getActivityCalendarUrl, type ApiActivity } from '../lib/api';
+import type { AppUser } from '../data/mockUser';
+import { getActivities, getActivityCalendarUrl, googleCalendarUrl, joinActivity, leaveActivity, type ApiActivity } from '../lib/api';
 
 function formatDateTime(value?: string | null) {
   if (!value) return 'Data da definire';
   return new Intl.DateTimeFormat('it-IT', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
 }
 
-export function ActivitiesPage({ userInterests }: { userInterests?: string[] }) {
+export function ActivitiesPage({ user }: { user?: AppUser }) {
+  const userInterests = user?.interessi;
+  const userId = user?.id;
   const [activities, setActivities] = useState<ApiActivity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -16,6 +19,7 @@ export function ActivitiesPage({ userInterests }: { userInterests?: string[] }) 
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<string>('all');
   const [timeFilter, setTimeFilter] = useState<'all' | 'today' | 'open'>('all');
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
   const hasInterests = Array.isArray(userInterests) && userInterests.length > 0;
 
   async function loadActivities() {
@@ -33,6 +37,32 @@ export function ActivitiesPage({ userInterests }: { userInterests?: string[] }) 
   useEffect(() => {
     void loadActivities();
   }, []);
+
+  async function handleJoin(activityId: string) {
+    setActionLoading(activityId);
+    try {
+      const updated = await joinActivity(activityId);
+      setActivities((prev) => prev.map((a) => (a.id === activityId ? { ...a, ...updated } : a)));
+      setSelectedActivity((prev) => (prev?.id === activityId ? { ...prev, ...updated } : prev));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Errore');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleLeave(activityId: string) {
+    setActionLoading(activityId);
+    try {
+      await leaveActivity(activityId);
+      await loadActivities();
+      setSelectedActivity(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Errore');
+    } finally {
+      setActionLoading(null);
+    }
+  }
 
   const baseActivities = useMemo(
     () => activities.filter((activity) => !hasInterests || userInterests!.includes(activity.category)),
@@ -63,6 +93,11 @@ export function ActivitiesPage({ userInterests }: { userInterests?: string[] }) 
       return `${activity.title} ${activity.description || ''} ${activity.category} ${activity.location || ''}`.toLowerCase().includes(q);
     }),
     [baseActivities, category, search, timeFilter],
+  );
+
+  const myActivities = useMemo(
+    () => activities.filter((a) => userId && (a.participantIds?.includes(userId) || a.creator?.id === userId)),
+    [activities, userId],
   );
 
   const featuredActivity = visibleActivities[0];
@@ -184,7 +219,17 @@ export function ActivitiesPage({ userInterests }: { userInterests?: string[] }) 
                     </div>
                   </dl>
                   {activity.dateTime && (
-                    <a href={getActivityCalendarUrl(activity.id)} download={`attivita-${activity.id}.ics`} className="calendar-link">Aggiungi al calendario</a>
+                    <div className="calendar-actions">
+                      <a href={getActivityCalendarUrl(activity.id)} download={`attivita-${activity.id}.ics`} className="calendar-link">📅 Apple / Outlook</a>
+                      <a href={googleCalendarUrl(activity.title, activity.dateTime, activity.location)} target="_blank" rel="noopener noreferrer" className="calendar-link">📅 Google Calendar</a>
+                    </div>
+                  )}
+                  {userId && (
+                    activity.participantIds?.includes(userId)
+                      ? <button className="ghost-button" type="button" disabled={actionLoading === activity.id} onClick={() => handleLeave(activity.id)}>{actionLoading === activity.id ? '...' : 'Abbandona'}</button>
+                      : activity.status !== 'completa'
+                        ? <button className="primary-button" type="button" disabled={actionLoading === activity.id} onClick={() => handleJoin(activity.id)}>{actionLoading === activity.id ? '...' : 'Partecipa'}</button>
+                        : <span className="muted-copy">Al completo</span>
                   )}
                   <button className="detail-link" type="button" onClick={() => setSelectedActivity(activity)}>Apri anteprima</button>
                 </InteractiveMapCard>
@@ -193,6 +238,30 @@ export function ActivitiesPage({ userInterests }: { userInterests?: string[] }) 
           </section>
         </div>
       )}
+      {userId && myActivities.length > 0 && (
+        <section className="my-activities-section">
+          <h2>Le mie attività</h2>
+          <div className="activity-card-flow">
+            {myActivities.map((activity) => (
+              <article key={activity.id} className="activity-card">
+                <div className="interactive-map-card-header">
+                  <span>{activity.category}</span>
+                  <small>{activity.creator?.id === userId ? 'Creata da te' : 'Partecipante'}</small>
+                </div>
+                <h2>{activity.title}</h2>
+                <dl>
+                  <div><dt>Quando</dt><dd>{formatDateTime(activity.dateTime)}</dd></div>
+                  <div><dt>Partecipanti</dt><dd>{activity.participantCount} / {activity.maxParticipants}</dd></div>
+                </dl>
+                {activity.participantIds?.includes(userId) && activity.creator?.id !== userId && (
+                  <button className="ghost-button" type="button" disabled={actionLoading === activity.id} onClick={() => handleLeave(activity.id)}>{actionLoading === activity.id ? '...' : 'Abbandona'}</button>
+                )}
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
       {selectedActivity && (
         <div className="activity-popup-backdrop" role="presentation" onClick={() => setSelectedActivity(null)}>
           <article
@@ -215,7 +284,17 @@ export function ActivitiesPage({ userInterests }: { userInterests?: string[] }) 
             </dl>
             <div className="activity-popup-actions">
               {selectedActivity.dateTime && (
-                <a href={getActivityCalendarUrl(selectedActivity.id)} download={`attivita-${selectedActivity.id}.ics`} className="calendar-link">Aggiungi al calendario</a>
+                <>
+                  <a href={getActivityCalendarUrl(selectedActivity.id)} download={`attivita-${selectedActivity.id}.ics`} className="calendar-link">📅 Apple / Outlook</a>
+                  <a href={googleCalendarUrl(selectedActivity.title, selectedActivity.dateTime, selectedActivity.location)} target="_blank" rel="noopener noreferrer" className="calendar-link">📅 Google Calendar</a>
+                </>
+              )}
+              {userId && (
+                selectedActivity.participantIds?.includes(userId)
+                  ? <button className="ghost-button" type="button" disabled={actionLoading === selectedActivity.id} onClick={() => handleLeave(selectedActivity.id)}>{actionLoading === selectedActivity.id ? '...' : 'Abbandona'}</button>
+                  : selectedActivity.status !== 'completa'
+                    ? <button className="primary-button" type="button" disabled={actionLoading === selectedActivity.id} onClick={() => handleJoin(selectedActivity.id)}>{actionLoading === selectedActivity.id ? '...' : 'Partecipa'}</button>
+                    : <span className="muted-copy">Al completo</span>
               )}
               <button className="ghost-button" type="button" onClick={() => setSelectedActivity(null)}>Chiudi</button>
             </div>
