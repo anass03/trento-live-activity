@@ -13,6 +13,10 @@ export interface ApiEvent {
   createdAt: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  maxPartecipanti?: number | null;
+  participantCount?: number;
+  participantIds?: string[];
+  entity?: { id: string; name: string } | null;
 }
 
 export interface ApiActivity {
@@ -127,6 +131,11 @@ export function setToken(token: string | null): void {
     if (token) localStorage.setItem(TOKEN_KEY, token);
     else localStorage.removeItem(TOKEN_KEY);
   } catch { /* localStorage may be unavailable */ }
+  // Notifica i listener che l'identità è cambiata (login o logout).
+  // App.tsx::fetchUser ricarica lo stato utente in risposta.
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('tla:user-updated'));
+  }
 }
 
 interface RequestOptions {
@@ -192,6 +201,12 @@ export async function getEvents(params?: { q?: string; categoria?: string; page?
 export function getEventById(id: string): Promise<ApiEvent> {
   return request<ApiEvent>(`/api/events/${encodeURIComponent(id)}`);
 }
+export function joinEvent(id: string): Promise<{ eventId: string; joined: true; participantCount: number; maxPartecipanti: number | null }> {
+  return request(`/api/events/${encodeURIComponent(id)}/participate`, { method: 'POST' });
+}
+export function leaveEvent(id: string): Promise<{ eventId: string; joined: false; participantCount: number }> {
+  return request(`/api/events/${encodeURIComponent(id)}/participate`, { method: 'DELETE' });
+}
 export async function getActivities(params?: { q?: string; tipo?: string; page?: number; limit?: number; mine?: 'interests' }): Promise<ApiActivity[]> {
   const qs = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : '';
   const payload = await request<ActivitiesResponse | ApiActivity[]>(`/api/activities${qs}`);
@@ -244,7 +259,15 @@ export function resetPassword(token: string, password: string): Promise<{ messag
   return request(`/api/auth/reset-password/${encodeURIComponent(token)}`, { method: 'POST', body: { password }, auth: false });
 }
 export async function logout(): Promise<void> {
-  try { await request('/api/auth/logout', { method: 'POST' }); } finally { setToken(null); }
+  // setToken(null) viene chiamato comunque nel finally, anche se la richiesta
+  // al backend fallisce (rete offline, token già revocato, ecc.).
+  try {
+    await request('/api/auth/logout', { method: 'POST' });
+  } catch {
+    /* ignore: il logout deve riuscire lato client comunque */
+  } finally {
+    setToken(null);
+  }
 }
 export function getMe(): Promise<CurrentUser & { id: string }> {
   return request('/api/auth/me');

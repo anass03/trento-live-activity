@@ -1,11 +1,11 @@
 const { Op } = require('sequelize');
-const { Event, User, Report, POI } = require('../data/models');
+const { Event, User, Report, POI, EventParticipation } = require('../data/models');
 const { sendNewEventToInterested: sendNewEventPush } = require('../notifications/push.service');
 const { sendNewEventToInterested: sendNewEventEmail } = require('../notifications/email.service');
 const { serializeEvent } = require('../data/presenters');
 const { buildIcs } = require('./ics');
 
-async function createEvent(entityId, { titolo, descrizione, categoria, latitudine, longitudine, poiId, data, orarioInizio, orarioFine }) {
+async function createEvent(entityId, { titolo, descrizione, categoria, latitudine, longitudine, poiId, data, orarioInizio, orarioFine, maxPartecipanti }) {
   const entity = await User.findByPk(entityId);
   if (!entity) throw { status: 404, code: 'NOT_FOUND', error: 'User not found' };
 
@@ -32,6 +32,7 @@ async function createEvent(entityId, { titolo, descrizione, categoria, latitudin
   const event = await Event.create({
     titolo, descrizione, categoria, badgeVerifica: true,
     entityId, latitudine, longitudine, poiId, data, orarioInizio, orarioFine,
+    maxPartecipanti: maxPartecipanti && maxPartecipanti > 0 ? maxPartecipanti : null,
   });
 
   // RF40: push + email to users with matching interest
@@ -62,7 +63,9 @@ async function listEvents({ categoria, q, page = 1, limit = 20 }) {
     include: [
       { model: User, as: 'entity', attributes: ['id', 'nome', 'cognome', 'nomeEnte'] },
       { model: POI, as: 'poi', attributes: ['id', 'nome'] },
+      { model: User, as: 'eventParticipants', attributes: ['id'], through: { attributes: [] } },
     ],
+    distinct: true,
     limit,
     offset: (page - 1) * limit,
     order: [['createdAt', 'DESC']],
@@ -75,6 +78,7 @@ async function getEvent(id) {
     include: [
       { model: User, as: 'entity', attributes: ['id', 'nome', 'cognome', 'nomeEnte'] },
       { model: POI, as: 'poi', attributes: ['id', 'nome'] },
+      { model: User, as: 'eventParticipants', attributes: ['id'], through: { attributes: [] } },
     ],
   });
   if (!event) throw { status: 404, code: 'NOT_FOUND', error: 'Event not found' };
@@ -141,6 +145,41 @@ async function listEntityEvents(entityId, { page = 1, limit = 20 } = {}) {
   return { events: rows.map(serializeEvent), total: count, page, limit };
 }
 
+// Iscrizione di un cittadino a un evento certificato.
+// Vincoli:
+//   - evento esistente e non passato
+//   - utente non già iscritto (l'indice UNIQUE su (userId, eventId) lo garantisce a livello DB)
+//   - se l'evento ha maxPartecipanti, non si superi il limite
+async function joinEvent(userId, eventId) {
+  const event = await Event.findByPk(eventId);
+  if (!event) throw { status: 404, code: 'NOT_FOUND', error: 'Event not found' };
+  if (event.data && new Date(event.data) < new Date(new Date().toISOString().slice(0, 10))) {
+    throw { status: 400, code: 'EVENT_PAST', error: 'Non puoi partecipare a un evento passato' };
+  }
+  const existing = await EventParticipation.findOne({ where: { userId, eventId } });
+  if (existing) {
+    throw { status: 409, code: 'ALREADY_PARTICIPATING', error: 'Sei già iscritto a questo evento' };
+  }
+  if (event.maxPartecipanti) {
+    const count = await EventParticipation.count({ where: { eventId } });
+    if (count >= event.maxPartecipanti) {
+      throw { status: 409, code: 'EVENT_FULL', error: 'Posti esauriti per questo evento' };
+    }
+  }
+  await EventParticipation.create({ userId, eventId });
+  const participantCount = await EventParticipation.count({ where: { eventId } });
+  return { eventId, joined: true, participantCount, maxPartecipanti: event.maxPartecipanti };
+}
+
+async function leaveEvent(userId, eventId) {
+  const removed = await EventParticipation.destroy({ where: { userId, eventId } });
+  if (!removed) {
+    throw { status: 404, code: 'NOT_PARTICIPATING', error: 'Non sei iscritto a questo evento' };
+  }
+  const participantCount = await EventParticipation.count({ where: { eventId } });
+  return { eventId, joined: false, participantCount };
+}
+
 // RF12 / RF49: calendar export
 async function getEventIcs(id) {
   const event = await Event.findByPk(id, { include: [{ model: POI, as: 'poi', attributes: ['nome'] }] });
@@ -166,4 +205,6 @@ module.exports = {
   getEventStats,
   listEntityEvents,
   getEventIcs,
+  joinEvent,
+  leaveEvent,
 };

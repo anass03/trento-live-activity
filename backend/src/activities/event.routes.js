@@ -22,4 +22,8 @@ router.post('/', authenticate, authorize('EnteCertificato'), ctrl.create);
 router.put('/:id', authenticate, authorize('EnteCertificato'), ctrl.update);
 router.delete('/:id', authenticate, authorize('EnteCertificato'), ctrl.remove);
 
+// Citizen participation
+router.post('/:id/participate', authenticate, authorize('UtenteRegistrato'), ctrl.join);
+router.delete('/:id/participate', authenticate, authorize('UtenteRegistrato'), ctrl.leave);
+
 module.exports = router;
