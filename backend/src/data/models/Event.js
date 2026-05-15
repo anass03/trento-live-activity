@@ -23,6 +23,9 @@ module.exports = (sequelize) => {
     orarioInizio: { type: DataTypes.STRING(5), allowNull: true },
     orarioFine: { type: DataTypes.STRING(5), allowNull: true },
     views: { type: DataTypes.INTEGER, defaultValue: 0 },
+    // Capienza massima opzionale. null = evento aperto a tutti senza limite.
+    // Quando valorizzato, il backend rifiuta nuove partecipazioni una volta raggiunto.
+    maxPartecipanti: { type: DataTypes.INTEGER, allowNull: true, validate: { min: 1 } },
   }, {
     tableName: 'events',
     timestamps: true,

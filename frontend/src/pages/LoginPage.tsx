@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ApiError, login } from '../lib/api';
+import { PasswordInput } from '../components/ui/PasswordInput';
 
 type CodeMode = 'totp' | 'recovery';
 
@@ -67,7 +68,7 @@ export function LoginPage() {
         </label>
         <label>
           <span>Password</span>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
+          <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
         </label>
 
         {needs2fa && codeMode === 'totp' && (

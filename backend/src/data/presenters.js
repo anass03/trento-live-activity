@@ -79,6 +79,7 @@ function serializeUser(record) {
 
 function serializeEvent(record) {
   const event = plain(record);
+  const participants = Array.isArray(event.eventParticipants) ? event.eventParticipants : [];
   return {
     id: event.id,
     title: event.titolo,
@@ -92,6 +93,9 @@ function serializeEvent(record) {
     longitude: event.longitudine,
     startTime: event.orarioInizio,
     endTime: event.orarioFine,
+    maxPartecipanti: event.maxPartecipanti ?? null,
+    participantCount: typeof event.participantCount === 'number' ? event.participantCount : participants.length,
+    participantIds: participants.map((p) => p.id),
     entity: event.entity
       ? {
           id: event.entity.id,
