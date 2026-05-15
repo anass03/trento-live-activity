@@ -52,9 +52,9 @@ export function AdminPOIPage() {
         <div className="filter-row">
           <label><span>Capacità max</span><input type="number" min="1" value={editing.capacitaMax ?? ''} onChange={(e) => setEditing({ ...editing, capacitaMax: Number(e.target.value) })} required /></label>
           <label>
-            <span>Stato affollamento</span>
+            <span>Affollamento</span>
             <select value={editing.statoAffollamento || 'verde'} onChange={(e) => setEditing({ ...editing, statoAffollamento: e.target.value })}>
-              <option value="verde">verde</option><option value="giallo">giallo</option><option value="rosso">rosso</option>
+              <option value="verde">Basso</option><option value="giallo">Medio</option><option value="rosso">Elevato</option>
             </select>
           </label>
           <label><span>Tipo</span><input type="text" value={editing.tipo || ''} onChange={(e) => setEditing({ ...editing, tipo: e.target.value })} placeholder="piazza, museo, parco..." /></label>
@@ -73,14 +73,14 @@ export function AdminPOIPage() {
       <div className="liquid-card">
         <h2>POI esistenti ({pois.length})</h2>
         <table className="stats-table">
-          <thead><tr><th>Nome</th><th>Coordinate</th><th>Cap.</th><th>Stato</th><th>Azioni</th></tr></thead>
+          <thead><tr><th>Nome</th><th>Coordinate</th><th>Cap.</th><th>Affollamento</th><th>Azioni</th></tr></thead>
           <tbody>
             {pois.map((p) => (
               <tr key={p.id}>
                 <td>{p.nome}</td>
                 <td>{p.latitudine.toFixed(4)}, {p.longitudine.toFixed(4)}</td>
                 <td>{p.capacitaMax}</td>
-                <td><span className={`crowding-dot ${p.statoAffollamento}`} /> {p.statoAffollamento}</td>
+                <td><span className={`crowding-dot ${p.statoAffollamento}`} /> {{ verde: 'Basso', giallo: 'Medio', rosso: 'Elevato' }[p.statoAffollamento] ?? p.statoAffollamento}</td>
                 <td>
                   <button type="button" onClick={() => setEditing(p)}>Modifica</button>
                   <button type="button" className="danger-button" onClick={() => handleDelete(p.id)}>Elimina</button>

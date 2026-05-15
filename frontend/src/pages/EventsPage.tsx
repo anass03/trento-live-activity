@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { InteractiveMapCard } from '../components/ui/InteractiveMapCard';
 import { getEventCalendarUrl, getEvents, getToken, googleCalendarUrl, reportEvent, type ApiEvent } from '../lib/api';
+import { CalendarButton } from '../components/ui/CalendarButton';
 import type { AppUser } from '../data/mockUser';
 
 function formatDateTime(value: string | null) {
@@ -20,6 +22,8 @@ function eventCrowdLevel(event: ApiEvent) {
 }
 
 export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: boolean; user?: AppUser }) {
+  const [searchParams] = useSearchParams();
+  const openId = searchParams.get('open');
   const [events, setEvents] = useState<ApiEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +50,13 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
   }
 
   useEffect(() => { void loadEvents(); }, []);
+
+  // Auto-open popup when navigating from the map with ?open=<id>
+  useEffect(() => {
+    if (!openId || events.length === 0) return;
+    const target = events.find((e) => String(e.id) === openId);
+    if (target) setSelectedEvent(target);
+  }, [events, openId]);
 
   useEffect(() => {
     if (!selectedEvent) return undefined;
@@ -122,13 +133,13 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
           <div><dt>Quando</dt><dd>{formatDateTime(event.dateTime)}</dd></div>
         </dl>
         {event.dateTime && (
-          <div className="calendar-actions">
-            <a href={getEventCalendarUrl(event.id)} download={`${event.title}.ics`} className="calendar-link">📅 Apple / Outlook</a>
-            <a href={googleCalendarUrl(event.title, event.dateTime, event.location)} target="_blank" rel="noopener noreferrer" className="calendar-link">📅 Google Calendar</a>
-          </div>
+          <CalendarButton
+            icsUrl={getEventCalendarUrl(event.id)}
+            icsFilename={`${event.title}.ics`}
+            googleUrl={googleCalendarUrl(event.title, event.dateTime, event.location)}
+          />
         )}
         <div className="card-actions-row">
-          <button className="detail-link" type="button" onClick={() => setSelectedEvent(event)}>Apri anteprima</button>
           {isLoggedIn && reportMsg?.id !== event.id && (
             reportingId === event.id ? (
               <div className="report-controls">
@@ -187,10 +198,11 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
         </dl>
         <div className="activity-popup-actions">
           {selectedEvent.dateTime && (
-            <>
-              <a href={getEventCalendarUrl(selectedEvent.id)} download={`${selectedEvent.title}.ics`} className="calendar-link">📅 Apple / Outlook</a>
-              <a href={googleCalendarUrl(selectedEvent.title, selectedEvent.dateTime, selectedEvent.location)} target="_blank" rel="noopener noreferrer" className="calendar-link">📅 Google Calendar</a>
-            </>
+            <CalendarButton
+              icsUrl={getEventCalendarUrl(selectedEvent.id)}
+              icsFilename={`${selectedEvent.title}.ics`}
+              googleUrl={googleCalendarUrl(selectedEvent.title, selectedEvent.dateTime, selectedEvent.location)}
+            />
           )}
           {isLoggedIn && reportMsg?.id !== selectedEvent.id && (
             reportingId === selectedEvent.id ? (
@@ -282,7 +294,6 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
                 </div>
                 <h2>{featuredEvent.title}</h2>
                 <p>{featuredEvent.description || 'Nessuna descrizione disponibile.'}</p>
-                <button className="detail-link" type="button" onClick={() => setSelectedEvent(featuredEvent)}>Apri anteprima</button>
               </div>
             </article>
           )}
