@@ -197,6 +197,11 @@ function addMarkerSources(map: MapLibreMap, data: MarkerFeatureCollection) {
       cluster: true,
       clusterMaxZoom: 15,
       clusterRadius: 42,
+      clusterProperties: {
+        count_poi: ['+', ['case', ['==', ['get', 'type'], 'poi'], 1, 0]],
+        count_event: ['+', ['case', ['==', ['get', 'type'], 'event'], 1, 0]],
+        count_activity: ['+', ['case', ['==', ['get', 'type'], 'activity'], 1, 0]],
+      },
     });
   }
 }
@@ -269,12 +274,16 @@ function addMarkerLayers(map: MapLibreMap) {
       source: POINT_SOURCE_ID,
       filter: ['has', 'point_count'],
       layout: {
-        'text-field': ['get', 'point_count_abbreviated'],
-        'text-size': 13,
-        'text-font': ['Noto Sans Regular'],
+        'text-field': ['to-string', ['get', 'point_count']],
+        'text-size': 15,
+        'text-font': ['Noto Sans Bold'],
+        'text-allow-overlap': true,
+        'text-ignore-placement': true,
       },
       paint: {
-        'text-color': '#f8fafc',
+        'text-color': '#ffffff',
+        'text-halo-color': 'rgba(0,0,0,0.35)',
+        'text-halo-width': 1.2,
       },
     },
     {
@@ -353,6 +362,7 @@ const ACTIVITY_TYPES = ['sport', 'cultura', 'musica', 'arte', 'gastronomia', 'st
 
 export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppUser }) {
   const navigate = useNavigate();
+  const sectionRef = useRef<HTMLElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const isLoadedRef = useRef(false);
@@ -429,7 +439,12 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
     });
 
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true, showCompass: true }), 'bottom-right');
-    map.addControl(new maplibregl.FullscreenControl(), 'bottom-right');
+    // Fullscreen the whole <section> (which contains the popup overlay and HUD)
+    // so React-managed popups remain visible while in fullscreen.
+    map.addControl(
+      new maplibregl.FullscreenControl({ container: sectionRef.current ?? undefined }),
+      'bottom-right',
+    );
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left');
 
     const handleLoad = () => {
@@ -590,7 +605,7 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
   const canNavigate = popup && popup.props.type !== 'poi';
 
   return (
-    <section className="map-area map-area-3d" aria-label="Map Zone 3D" data-testid="map-zone">
+    <section ref={sectionRef} className="map-area map-area-3d" aria-label="Map Zone 3D" data-testid="map-zone">
       <div ref={containerRef} className="maplibre-map" />
 
       {/* ── React popup overlay ─────────────────────────────────────────── */}

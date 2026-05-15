@@ -1,6 +1,10 @@
 require('dotenv').config();
 const bcrypt = require('bcryptjs');
-const { sequelize, User, POI, Activity, Event, Participation } = require('./models');
+const {
+  sequelize, User, POI, Activity, Event, Participation,
+  CittadinoProfile, EnteProfile,
+  AmministratoreComunaleProfile, AmministratoreSistemaProfile,
+} = require('./models');
 
 async function seed() {
   await sequelize.authenticate();
@@ -12,31 +16,43 @@ async function seed() {
   await Activity.destroy({ where: {}, truncate: true, cascade: true });
   await Event.destroy({ where: {}, truncate: true, cascade: true });
   await POI.destroy({ where: {}, truncate: true, cascade: true });
+  await CittadinoProfile.destroy({ where: {}, truncate: true, cascade: true });
+  await EnteProfile.destroy({ where: {}, truncate: true, cascade: true });
+  await AmministratoreComunaleProfile.destroy({ where: {}, truncate: true, cascade: true });
+  await AmministratoreSistemaProfile.destroy({ where: {}, truncate: true, cascade: true });
   await User.destroy({ where: {}, truncate: true, cascade: true });
 
   const pwHash = await bcrypt.hash('password123', 12);
 
-  console.log('Creating users...');
+  console.log('Creating users + profili separati per ruolo...');
   const [mario, lucia, castello, sportclub, comune, sysadmin] = await Promise.all([
     User.create({
       email: 'mario.rossi@example.com', passwordHash: pwHash,
       nome: 'Mario', cognome: 'Rossi', dataNascita: '1995-05-12',
+      codiceFiscale: 'RSSMRA85T10A562S',
       ruolo: 'UtenteRegistrato', interessi: ['sport', 'musica'], emailVerified: true,
     }),
     User.create({
       email: 'lucia.bianchi@example.com', passwordHash: pwHash,
       nome: 'Lucia', cognome: 'Bianchi', dataNascita: '2000-09-23',
+      codiceFiscale: 'BNCLCU00P63L378I',
       ruolo: 'UtenteRegistrato', interessi: ['cultura', 'arte'], emailVerified: true,
     }),
     User.create({
       email: 'info@castellotrento.it', passwordHash: pwHash,
       nome: 'Castello', cognome: 'Buonconsiglio', dataNascita: '1990-01-01',
-      ruolo: 'EnteCertificato', approvato: true, nomeEnte: 'Castello del Buonconsiglio', emailVerified: true,
+      ruolo: 'EnteCertificato', approvato: true,
+      nomeEnte: 'Castello del Buonconsiglio',
+      pec: 'castello.buonconsiglio@pec.it',
+      emailVerified: true,
     }),
     User.create({
       email: 'eventi@sportclubtrento.it', passwordHash: pwHash,
       nome: 'Sport', cognome: 'Club', dataNascita: '1985-03-10',
-      ruolo: 'EnteCertificato', approvato: true, nomeEnte: 'Sport Club Trento', emailVerified: true,
+      ruolo: 'EnteCertificato', approvato: true,
+      nomeEnte: 'Sport Club Trento',
+      pec: 'sportclub.trento@pec.it',
+      emailVerified: true,
     }),
     User.create({
       email: 'dashboard@comune.trento.it', passwordHash: pwHash,
@@ -50,6 +66,35 @@ async function seed() {
     }),
   ]);
 
+  // Profili 1:1 (schema "serio" con dati specifici per ruolo)
+  await Promise.all([
+    CittadinoProfile.create({
+      userId: mario.id, nome: 'Mario', cognome: 'Rossi',
+      dataNascita: '1995-05-12', codiceFiscale: 'RSSMRA85T10A562S',
+      interessi: ['sport', 'musica'],
+    }),
+    CittadinoProfile.create({
+      userId: lucia.id, nome: 'Lucia', cognome: 'Bianchi',
+      dataNascita: '2000-09-23', codiceFiscale: 'BNCLCU00P63L378I',
+      interessi: ['cultura', 'arte'],
+    }),
+    EnteProfile.create({
+      userId: castello.id, nomeEnte: 'Castello del Buonconsiglio',
+      pec: 'castello.buonconsiglio@pec.it', approvato: true,
+    }),
+    EnteProfile.create({
+      userId: sportclub.id, nomeEnte: 'Sport Club Trento',
+      pec: 'sportclub.trento@pec.it', approvato: true,
+    }),
+    AmministratoreComunaleProfile.create({
+      userId: comune.id, nome: 'Maria', cognome: 'Bianchi',
+      ufficio: 'Ufficio Statistica e Open Data', spidId: 'SPID-TN-0001',
+    }),
+    AmministratoreSistemaProfile.create({
+      userId: sysadmin.id, nome: 'Anas', cognome: 'Soussane', superAdmin: true,
+    }),
+  ]);
+
   console.log('Creating POIs (Trento)...');
   const [piazzaDuomo, castelloPoi, briamasco, museumPoi, parcoAlbere, dossTrento, piazzaFiera, biblioteca] = await Promise.all([
     POI.create({ nome: 'Piazza Duomo', latitudine: 46.0664, longitudine: 11.1216, capacitaMax: 2000, statoAffollamento: 'giallo', tipo: 'piazza', descrizione: 'Cuore storico della città' }),
@@ -60,6 +105,15 @@ async function seed() {
     POI.create({ nome: 'Doss Trento', latitudine: 46.0750, longitudine: 11.1100, capacitaMax: 300, statoAffollamento: 'verde', tipo: 'panoramico', descrizione: 'Collina panoramica' }),
     POI.create({ nome: 'Piazza Fiera', latitudine: 46.0664, longitudine: 11.1227, capacitaMax: 1000, statoAffollamento: 'verde', tipo: 'piazza' }),
     POI.create({ nome: 'Biblioteca Universitaria', latitudine: 46.0680, longitudine: 11.1250, capacitaMax: 400, statoAffollamento: 'giallo', tipo: 'biblioteca' }),
+    // Parcheggi (per gli avvisi di affollamento parcheggi)
+    POI.create({ nome: 'Parcheggio Buonconsiglio', latitudine: 46.0722, longitudine: 11.1245, capacitaMax: 320, statoAffollamento: 'rosso', tipo: 'parcheggio', descrizione: 'Parcheggio multipiano centro storico' }),
+    POI.create({ nome: 'Parcheggio Centro Europa', latitudine: 46.0686, longitudine: 11.1186, capacitaMax: 480, statoAffollamento: 'giallo', tipo: 'parcheggio', descrizione: 'Parcheggio interrato' }),
+    POI.create({ nome: 'Parcheggio Zuffo (Park & Ride)', latitudine: 46.0820, longitudine: 11.1050, capacitaMax: 850, statoAffollamento: 'verde', tipo: 'parcheggio', descrizione: 'Park & Ride a nord' }),
+    // Università
+    POI.create({ nome: 'Università di Trento — Dipartimento Lettere', latitudine: 46.0671, longitudine: 11.1212, capacitaMax: 600, statoAffollamento: 'giallo', tipo: 'universita', descrizione: 'Polo umanistico Lettere e Filosofia' }),
+    POI.create({ nome: 'Polo Scientifico Povo', latitudine: 46.0666, longitudine: 11.1503, capacitaMax: 1200, statoAffollamento: 'rosso', tipo: 'universita', descrizione: 'Aule e laboratori DISI/Fisica' }),
+    // Trasporti
+    POI.create({ nome: 'Stazione FS Trento', latitudine: 46.0707, longitudine: 11.1196, capacitaMax: 2500, statoAffollamento: 'giallo', tipo: 'stazione', descrizione: 'Stazione ferroviaria principale' }),
   ]);
 
   // Date helper: today + N days as 'YYYY-MM-DD'

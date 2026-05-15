@@ -1,5 +1,9 @@
 const router = require('express').Router();
-const { User, Activity, Event, Report, Participation } = require('../data/models');
+const {
+  User, Activity, Event, Report, Participation,
+  CittadinoProfile, EnteProfile,
+  AmministratoreComunaleProfile, AmministratoreSistemaProfile,
+} = require('../data/models');
 const { authenticate, authorize } = require('../middleware/auth');
 const { sendEntityApproved, sendEntityRejected } = require('../notifications/email.service');
 
@@ -47,14 +51,102 @@ router.patch('/entities/:id/reject', authenticate, authorize('AmministratoreDiSi
 router.get('/users', authenticate, authorize('AmministratoreDiSistema'), async (req, res, next) => {
     try {
         const users = await User.findAll({
-            attributes: ['id', 'email', 'nome', 'cognome', 'ruolo', 'approvato', 'nomeEnte', 'createdAt'],
+            attributes: ['id', 'email', 'nome', 'cognome', 'ruolo', 'approvato', 'nomeEnte', 'codiceFiscale', 'pec', 'createdAt'],
             order: [['createdAt', 'DESC']],
         });
         res.json(users);
     } catch (error) { next(error); }
 });
 
+// GET cittadini (con join al profilo) — pagina admin a tabs
+router.get('/users/cittadini', authenticate, authorize('AmministratoreDiSistema'), async (req, res, next) => {
+    try {
+        const rows = await User.findAll({
+            where: { ruolo: 'UtenteRegistrato' },
+            attributes: ['id', 'email', 'createdAt', 'emailVerified'],
+            include: [{ model: CittadinoProfile, as: 'cittadinoProfile' }],
+            order: [['createdAt', 'DESC']],
+        });
+        res.json(rows.map((u) => ({
+            id: u.id,
+            email: u.email,
+            createdAt: u.createdAt,
+            emailVerified: u.emailVerified,
+            nome: u.cittadinoProfile?.nome,
+            cognome: u.cittadinoProfile?.cognome,
+            dataNascita: u.cittadinoProfile?.dataNascita,
+            codiceFiscale: u.cittadinoProfile?.codiceFiscale,
+            interessi: u.cittadinoProfile?.interessi || [],
+        })));
+    } catch (error) { next(error); }
+});
+
+// GET enti certificati (con join al profilo)
+router.get('/users/enti', authenticate, authorize('AmministratoreDiSistema'), async (req, res, next) => {
+    try {
+        const rows = await User.findAll({
+            where: { ruolo: 'EnteCertificato' },
+            attributes: ['id', 'email', 'createdAt', 'emailVerified'],
+            include: [{ model: EnteProfile, as: 'enteProfile' }],
+            order: [['createdAt', 'DESC']],
+        });
+        res.json(rows.map((u) => ({
+            id: u.id,
+            email: u.email,
+            createdAt: u.createdAt,
+            emailVerified: u.emailVerified,
+            nomeEnte: u.enteProfile?.nomeEnte,
+            pec: u.enteProfile?.pec,
+            approvato: u.enteProfile?.approvato ?? false,
+            noteAdmin: u.enteProfile?.noteAdmin,
+        })));
+    } catch (error) { next(error); }
+});
+
+// GET amministratori comunali
+router.get('/users/comunali', authenticate, authorize('AmministratoreDiSistema'), async (req, res, next) => {
+    try {
+        const rows = await User.findAll({
+            where: { ruolo: 'AmministratoreComunale' },
+            attributes: ['id', 'email', 'createdAt'],
+            include: [{ model: AmministratoreComunaleProfile, as: 'comunaleProfile' }],
+            order: [['createdAt', 'DESC']],
+        });
+        res.json(rows.map((u) => ({
+            id: u.id,
+            email: u.email,
+            createdAt: u.createdAt,
+            nome: u.comunaleProfile?.nome,
+            cognome: u.comunaleProfile?.cognome,
+            ufficio: u.comunaleProfile?.ufficio,
+            spidId: u.comunaleProfile?.spidId,
+        })));
+    } catch (error) { next(error); }
+});
+
+// GET amministratori di sistema
+router.get('/users/sistema', authenticate, authorize('AmministratoreDiSistema'), async (req, res, next) => {
+    try {
+        const rows = await User.findAll({
+            where: { ruolo: 'AmministratoreDiSistema' },
+            attributes: ['id', 'email', 'createdAt', 'twoFactorEnabled'],
+            include: [{ model: AmministratoreSistemaProfile, as: 'sistemaProfile' }],
+            order: [['createdAt', 'DESC']],
+        });
+        res.json(rows.map((u) => ({
+            id: u.id,
+            email: u.email,
+            createdAt: u.createdAt,
+            twoFactorEnabled: u.twoFactorEnabled,
+            nome: u.sistemaProfile?.nome,
+            cognome: u.sistemaProfile?.cognome,
+            superAdmin: u.sistemaProfile?.superAdmin ?? false,
+        })));
+    } catch (error) { next(error); }
+});
+
 // DELETE a user account (system admin only). Manually cascades all related data.
+// DeviceToken/Consent/*Profile sono ON DELETE CASCADE nell'associazione.
 router.delete('/users/:id', authenticate, authorize('AmministratoreDiSistema'), async (req, res, next) => {
     try {
         const user = await User.findByPk(req.params.id);
@@ -84,7 +176,7 @@ router.delete('/users/:id', authenticate, authorize('AmministratoreDiSistema'), 
         // 5. Participations this user has joined
         await Participation.destroy({ where: { userId: user.id } });
 
-        // DeviceToken and Consent are CASCADE in the association; user.destroy() handles them.
+        // DeviceToken, Consent e i profili 1:1 sono CASCADE: user.destroy() li elimina.
         await user.destroy();
         res.status(204).send();
     } catch (error) { next(error); }

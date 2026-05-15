@@ -151,8 +151,11 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
           <button className={timeFilter === 'open' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('open')}>Aperte</button>
         </div>
         <div className="activities-hero-stats">
-          <span><strong>{visibleActivities.length}</strong> disponibili</span>
-          <span><strong>{openActivities}</strong> aperte</span>
+          <span>
+            <strong>{timeFilter === 'open' ? openActivities : visibleActivities.length}</strong>
+            {' '}
+            {timeFilter === 'open' ? 'aperte' : timeFilter === 'today' ? 'oggi' : 'attività'}
+          </span>
           <button className="refresh-button" onClick={loadActivities} type="button">Aggiorna</button>
         </div>
       </header>

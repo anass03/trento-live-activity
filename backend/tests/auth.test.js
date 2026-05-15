@@ -11,6 +11,18 @@ jest.mock('../src/data/models', () => ({
     findAll: jest.fn(),
     create: jest.fn(),
   },
+  CittadinoProfile: {
+    findOne: jest.fn().mockResolvedValue(null),
+    create: jest.fn().mockResolvedValue({}),
+  },
+  EnteProfile: {
+    findOne: jest.fn().mockResolvedValue(null),
+    create: jest.fn().mockResolvedValue({}),
+  },
+  // sequelize.transaction(cb) — esegue il callback senza un vero DB
+  sequelize: {
+    transaction: (cb) => cb({}),
+  },
 }));
 
 jest.mock('../src/notifications/email.service', () => ({
@@ -31,6 +43,7 @@ const validUserData = {
   nome: 'Mario',
   cognome: 'Rossi',
   dataNascita: '1995-06-15',
+  codiceFiscale: 'RSSMRA85T10A562S',
   consents: { privacy_policy: true, terms_of_service: true },
 };
 

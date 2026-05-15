@@ -7,6 +7,27 @@ jest.mock('../src/data/models', () => ({
     findOne: jest.fn(),
     findByPk: jest.fn(),
   },
+  // Modelli usati dal cascade manuale di DELETE /admin/users/:id
+  Activity: {
+    findAll: jest.fn().mockResolvedValue([]),
+    destroy: jest.fn().mockResolvedValue(0),
+  },
+  Event: {
+    findAll: jest.fn().mockResolvedValue([]),
+    destroy: jest.fn().mockResolvedValue(0),
+  },
+  Report: {
+    destroy: jest.fn().mockResolvedValue(0),
+  },
+  Participation: {
+    destroy: jest.fn().mockResolvedValue(0),
+  },
+  // I 4 modelli profilo non sono usati direttamente nei test attivi, ma li
+  // esportiamo per evitare ReferenceError negli `include` di altri endpoint.
+  CittadinoProfile: {},
+  EnteProfile: {},
+  AmministratoreComunaleProfile: {},
+  AmministratoreSistemaProfile: {},
 }));
 jest.mock('../src/middleware/auth', () => ({
   authenticate: (req, _res, next) => { req.user = { id: 'admin-1', ruolo: 'AmministratoreDiSistema', jti: 'jti-1' }; next(); },

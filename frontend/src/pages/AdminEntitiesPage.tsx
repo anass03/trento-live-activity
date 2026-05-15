@@ -33,7 +33,9 @@ export function AdminEntitiesPage() {
           <h1>Richieste di registrazione enti certificati</h1>
           <p>Approva o rifiuta i nuovi enti che richiedono la verifica</p>
         </div>
-        <button type="button" className="ghost-button" onClick={load}>Aggiorna</button>
+        <button type="button" className="refresh-button" onClick={load} disabled={isLoading}>
+          {isLoading ? 'Aggiornamento…' : 'Aggiorna'}
+        </button>
       </header>
 
       {error && <div className="state-panel liquid-panel"><p>{error}</p></div>}
