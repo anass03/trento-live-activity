@@ -1,0 +1,126 @@
+import { useEffect, useState } from 'react';
+import { getStoredTheme, setTheme, type Theme } from '../lib/theme';
+
+type Lang = 'it' | 'en';
+
+const STORAGE_LANG = 'tla:lang';
+
+function getStoredLang(): Lang {
+  const v = window.localStorage.getItem(STORAGE_LANG);
+  return v === 'en' ? 'en' : 'it';
+}
+
+export function SettingsPage() {
+  const [theme, setThemeState] = useState<Theme>(() => getStoredTheme());
+  const [lang, setLang] = useState<Lang>(() => getStoredLang());
+  const [notifEmail, setNotifEmail] = useState(() => window.localStorage.getItem('tla:notif:email') !== 'false');
+  const [notifPush, setNotifPush] = useState(() => window.localStorage.getItem('tla:notif:push') !== 'false');
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (!saved) return;
+    const t = setTimeout(() => setSaved(false), 2200);
+    return () => clearTimeout(t);
+  }, [saved]);
+
+  function changeTheme(next: Theme) {
+    setThemeState(next);
+    setTheme(next);
+    setSaved(true);
+  }
+
+  function changeLang(next: Lang) {
+    setLang(next);
+    window.localStorage.setItem(STORAGE_LANG, next);
+    setSaved(true);
+  }
+
+  function toggleNotif(kind: 'email' | 'push', value: boolean) {
+    if (kind === 'email') setNotifEmail(value);
+    else setNotifPush(value);
+    window.localStorage.setItem(`tla:notif:${kind}`, String(value));
+    setSaved(true);
+  }
+
+  return (
+    <section className="data-page settings-page">
+      <header className="utility-strip liquid-card">
+        <div>
+          <h1>Impostazioni</h1>
+          <p>Personalizza l'aspetto e le notifiche dell'app</p>
+        </div>
+        {saved && <span className="settings-saved" role="status">✓ Salvato</span>}
+      </header>
+
+      <div className="liquid-card settings-card">
+        <h2>Aspetto</h2>
+        <p>Scegli il tema dell'interfaccia.</p>
+        <div className="settings-theme-switch" role="radiogroup" aria-label="Tema">
+          <button
+            type="button"
+            role="radio"
+            aria-checked={theme === 'light'}
+            className={theme === 'light' ? 'active' : ''}
+            onClick={() => changeTheme('light')}
+          >
+            <span className="settings-theme-swatch settings-theme-swatch-light" />
+            <strong>Chiaro</strong>
+            <small>Predefinito, palette verde stone</small>
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={theme === 'dark'}
+            className={theme === 'dark' ? 'active' : ''}
+            onClick={() => changeTheme('dark')}
+          >
+            <span className="settings-theme-swatch settings-theme-swatch-dark" />
+            <strong>Scuro</strong>
+            <small>Riduce l'affaticamento visivo</small>
+          </button>
+        </div>
+      </div>
+
+      <div className="liquid-card settings-card">
+        <h2>Lingua</h2>
+        <p>L'interfaccia è in italiano. La traduzione inglese è in arrivo.</p>
+        <label className="settings-row">
+          <span>Lingua dell'interfaccia</span>
+          <select value={lang} onChange={(e) => changeLang(e.target.value as Lang)}>
+            <option value="it">Italiano</option>
+            <option value="en">English (in arrivo)</option>
+          </select>
+        </label>
+      </div>
+
+      <div className="liquid-card settings-card">
+        <h2>Notifiche</h2>
+        <p>Scegli come ricevere gli aggiornamenti dalle attività ed eventi.</p>
+        <label className="settings-row settings-row-toggle">
+          <div>
+            <strong>Email</strong>
+            <small>Conferme partecipazione, modifiche eventi, segnalazioni</small>
+          </div>
+          <input type="checkbox" checked={notifEmail} onChange={(e) => toggleNotif('email', e.target.checked)} />
+        </label>
+        <label className="settings-row settings-row-toggle">
+          <div>
+            <strong>Push (browser)</strong>
+            <small>Notifiche in tempo reale via Firebase Cloud Messaging</small>
+          </div>
+          <input type="checkbox" checked={notifPush} onChange={(e) => toggleNotif('push', e.target.checked)} />
+        </label>
+      </div>
+
+      <div className="liquid-card settings-card">
+        <h2>Account</h2>
+        <p>Gestisci i tuoi dati personali e i consensi.</p>
+        <div className="filter-actions">
+          <a className="primary-button" href="/profilo">Vai al profilo</a>
+          <a href="/privacy">Informativa privacy</a>
+          <a href="/termini">Termini di servizio</a>
+        </div>
+      </div>
+    </section>
+  );
+}

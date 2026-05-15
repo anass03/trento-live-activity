@@ -85,9 +85,14 @@ export function MapPage({ user }: { user?: AppUser }) {
 
   const highCrowdMarkers = useMemo(
     () => markers
-      .filter((marker) => crowdLevel(marker) >= 72 || marker.crowdingStatus === 'red' || marker.crowdingStatus === 'orange')
+      .filter((marker) =>
+        crowdLevel(marker) >= 45
+        || marker.crowdingStatus === 'red'
+        || marker.crowdingStatus === 'orange'
+        || marker.crowdingStatus === 'yellow',
+      )
       .sort((a, b) => crowdLevel(b) - crowdLevel(a))
-      .slice(0, 3),
+      .slice(0, 5),
     [markers],
   );
 
@@ -107,11 +112,33 @@ export function MapPage({ user }: { user?: AppUser }) {
     [markers],
   );
 
-  const cityAlerts = highCrowdMarkers.map((marker) => ({
-      title: `${marker.title}: affollamento elevato`,
-      meta: `${markerTypeLabel(marker.type)} · ${Math.round(crowdLevel(marker))} / 100`,
-      tone: marker.crowdingStatus,
-    }));
+  function severityFor(marker: MapMarker): { label: string; tone: MapMarker['crowdingStatus'] } {
+    const level = crowdLevel(marker);
+    if (marker.crowdingStatus === 'red' || level >= 82) return { label: 'affollamento critico', tone: 'red' };
+    if (marker.crowdingStatus === 'orange' || level >= 62) return { label: 'affollamento intenso', tone: 'orange' };
+    if (marker.crowdingStatus === 'yellow' || level >= 34) return { label: 'affollamento moderato', tone: 'yellow' };
+    return { label: 'affollamento basso', tone: 'green' };
+  }
+
+  function categoryLabel(marker: MapMarker): string {
+    const cat = (marker.category || '').toLowerCase();
+    if (cat.includes('parcheg')) return 'Parcheggio';
+    if (cat.includes('univ') || cat.includes('biblio') || cat.includes('aula')) return 'Università';
+    if (cat.includes('piazza')) return 'Piazza';
+    if (cat.includes('parco')) return 'Parco';
+    if (cat.includes('museo')) return 'Museo';
+    if (cat.includes('stazione') || cat.includes('trasport')) return 'Trasporti';
+    return markerTypeLabel(marker.type);
+  }
+
+  const cityAlerts = highCrowdMarkers.map((marker) => {
+    const sev = severityFor(marker);
+    return {
+      title: `${marker.title}: ${sev.label}`,
+      meta: `${categoryLabel(marker)} · ${Math.round(crowdLevel(marker))} / 100`,
+      tone: sev.tone,
+    };
+  });
 
   const quickStats = [
     { label: 'Punti live', value: markers.length },

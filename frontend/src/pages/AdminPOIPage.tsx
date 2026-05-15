@@ -1,13 +1,15 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { POIMapPicker } from '../components/map/POIMapPicker';
 import { createPOI, deletePOI, getPOIs, updatePOI, type POI } from '../lib/api';
 
-const EMPTY: Partial<POI> = { nome: '', latitudine: 46.066, longitudine: 11.121, capacitaMax: 100, statoAffollamento: 'verde', tipo: '', descrizione: '' };
+const EMPTY: Partial<POI> = { nome: '', latitudine: undefined, longitudine: undefined, capacitaMax: 100, statoAffollamento: 'verde', tipo: '', descrizione: '' };
 
 export function AdminPOIPage() {
   const [pois, setPois] = useState<POI[]>([]);
   const [editing, setEditing] = useState<Partial<POI>>(EMPTY);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [showPicker, setShowPicker] = useState(false);
 
   function load() {
     getPOIs().then(setPois).catch((e) => setError(e.message));
@@ -17,6 +19,10 @@ export function AdminPOIPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null); setMessage(null);
+    if (typeof editing.latitudine !== 'number' || typeof editing.longitudine !== 'number') {
+      setError('Seleziona la posizione sulla mappa prima di salvare.');
+      return;
+    }
     try {
       if (editing.id) {
         await updatePOI(editing.id, editing);
@@ -45,9 +51,18 @@ export function AdminPOIPage() {
       <form className="auth-form liquid-card" onSubmit={handleSubmit}>
         <h2>{editing.id ? 'Modifica POI' : 'Nuovo POI'}</h2>
         <label><span>Nome</span><input type="text" value={editing.nome || ''} onChange={(e) => setEditing({ ...editing, nome: e.target.value })} required /></label>
-        <div className="filter-row">
-          <label><span>Latitudine</span><input type="number" step="0.000001" value={editing.latitudine ?? ''} onChange={(e) => setEditing({ ...editing, latitudine: Number(e.target.value) })} required /></label>
-          <label><span>Longitudine</span><input type="number" step="0.000001" value={editing.longitudine ?? ''} onChange={(e) => setEditing({ ...editing, longitudine: Number(e.target.value) })} required /></label>
+        <div className="poi-location-row">
+          <div className="poi-location-info">
+            <span className="poi-location-label">Posizione sulla mappa</span>
+            {typeof editing.latitudine === 'number' && typeof editing.longitudine === 'number' ? (
+              <code>{editing.latitudine.toFixed(6)}, {editing.longitudine.toFixed(6)}</code>
+            ) : (
+              <em>Nessuna posizione selezionata</em>
+            )}
+          </div>
+          <button type="button" className="primary-button" onClick={() => setShowPicker(true)}>
+            {typeof editing.latitudine === 'number' ? 'Modifica posizione' : 'Scegli sulla mappa'}
+          </button>
         </div>
         <div className="filter-row">
           <label><span>Capacità max</span><input type="number" min="1" value={editing.capacitaMax ?? ''} onChange={(e) => setEditing({ ...editing, capacitaMax: Number(e.target.value) })} required /></label>
@@ -69,6 +84,17 @@ export function AdminPOIPage() {
           {editing.id && <button type="button" onClick={() => setEditing(EMPTY)}>Annulla</button>}
         </div>
       </form>
+
+      {showPicker && (
+        <POIMapPicker
+          initial={{ latitudine: editing.latitudine, longitudine: editing.longitudine }}
+          onCancel={() => setShowPicker(false)}
+          onConfirm={(coords) => {
+            setEditing({ ...editing, ...coords });
+            setShowPicker(false);
+          }}
+        />
+      )}
 
       <div className="liquid-card">
         <h2>POI esistenti ({pois.length})</h2>

@@ -18,8 +18,11 @@ import { EventsPage } from '../pages/EventsPage';
 import { LoginPage } from '../pages/LoginPage';
 import { MapPage } from '../pages/MapPage';
 import { PasswordResetPage } from '../pages/PasswordResetPage';
+import { PrivacyPage } from '../pages/PrivacyPage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { RegistrationPage } from '../pages/RegistrationPage';
+import { SettingsPage } from '../pages/SettingsPage';
+import { TermsPage } from '../pages/TermsPage';
 import { Setup2FAPage } from '../pages/Setup2FAPage';
 import { VerifyEmailPage } from '../pages/VerifyEmailPage';
 
@@ -109,6 +112,10 @@ export function App() {
         <Route path="/admin/utenti" element={<AdminUsersPage />} />
         <Route path="/admin/enti/richieste" element={<AdminEntitiesPage />} />
         <Route path="/admin/moderazione" element={<AdminModerationPage />} />
+
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/termini" element={<TermsPage />} />
+        <Route path="/impostazioni" element={<SettingsPage />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

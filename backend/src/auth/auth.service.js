@@ -2,12 +2,19 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const speakeasy = require('speakeasy');
-const { User, Consent } = require('../data/models');
+const {
+  User, Consent, CittadinoProfile, EnteProfile,
+  sequelize,
+} = require('../data/models');
 const {
   sendPasswordReset, sendEmailVerification,
   sendEntityRegistered, sendNewEntityRequest,
 } = require('../notifications/email.service');
 const { revoke } = require('./tokenBlacklist');
+const {
+  isValidCodiceFiscale, normalizeCodiceFiscale,
+  isValidPec, normalizePec,
+} = require('./validators');
 
 function calcAge(dataNascita) {
   const today = new Date();
@@ -77,9 +84,9 @@ function sanitize(user) {
   return obj;
 }
 
-async function register({ email, password, nome, cognome, dataNascita, consents } = {}) {
-  if (!email || !password || !nome || !cognome || !dataNascita) {
-    throw { status: 400, code: 'MISSING_FIELDS', error: 'email, password, nome, cognome and dataNascita are required' };
+async function register({ email, password, nome, cognome, dataNascita, codiceFiscale, consents } = {}) {
+  if (!email || !password || !nome || !cognome || !dataNascita || !codiceFiscale) {
+    throw { status: 400, code: 'MISSING_FIELDS', error: 'email, password, nome, cognome, dataNascita e codiceFiscale sono obbligatori' };
   }
 
   // RNF19 — GDPR art. 7: explicit consent required for privacy_policy + terms_of_service
@@ -97,6 +104,11 @@ async function register({ email, password, nome, cognome, dataNascita, consents 
     throw { status: 400, code: 'INVALID_EMAIL', error: 'Invalid email format' };
   }
 
+  const cfNorm = normalizeCodiceFiscale(codiceFiscale);
+  if (!isValidCodiceFiscale(cfNorm)) {
+    throw { status: 400, code: 'INVALID_CF', error: 'Codice fiscale non valido' };
+  }
+
   const pwErr = validatePassword(password);
   if (pwErr) throw { status: 400, code: 'WEAK_PASSWORD', error: pwErr };
 
@@ -106,19 +118,36 @@ async function register({ email, password, nome, cognome, dataNascita, consents 
     throw { status: 409, code: 'EMAIL_TAKEN', error: 'Email already registered' };
   }
 
+  const existingCfOnUser = await User.findOne({ where: { codiceFiscale: cfNorm } });
+  const existingCfOnProfile = await CittadinoProfile.findOne({ where: { codiceFiscale: cfNorm } });
+  if (existingCfOnUser || existingCfOnProfile) {
+    throw { status: 409, code: 'CF_TAKEN', error: 'Codice fiscale già registrato' };
+  }
+
   const passwordHash = await bcrypt.hash(password, 12);
   const emailVerificationToken = crypto.randomBytes(32).toString('hex');
-  // OCL C3: registration creates the account (login requires email verification first)
-  const user = await User.create({
-    email, passwordHash, nome, cognome, dataNascita,
-    emailVerified: false, emailVerificationToken,
-  });
 
-  // RNF19: persist the consents given at registration time
-  const consentRows = ['privacy_policy', 'terms_of_service', 'marketing', 'analytics']
-    .filter((type) => consents[type])
-    .map((type) => ({ userId: user.id, type, version: '1.0', granted: true }));
-  if (consentRows.length) await Consent.bulkCreate(consentRows);
+  // Scriviamo User + CittadinoProfile in transazione: o vanno entrambi, o nessuno.
+  // I dati anagrafici restano anche su User per retrocompatibilità con il resto
+  // del codebase (in attesa di migrare i call site al profilo).
+  const user = await sequelize.transaction(async (t) => {
+    const u = await User.create({
+      email, passwordHash, nome, cognome, dataNascita,
+      codiceFiscale: cfNorm,
+      emailVerified: false, emailVerificationToken,
+    }, { transaction: t });
+    await CittadinoProfile.create({
+      userId: u.id,
+      nome, cognome, dataNascita,
+      codiceFiscale: cfNorm,
+      interessi: [],
+    }, { transaction: t });
+    const consentRows = ['privacy_policy', 'terms_of_service', 'marketing', 'analytics']
+      .filter((type) => consents[type])
+      .map((type) => ({ userId: u.id, type, version: '1.0', granted: true }));
+    if (consentRows.length) await Consent.bulkCreate(consentRows, { transaction: t });
+    return u;
+  });
 
   sendEmailVerification(email, nome, emailVerificationToken).catch(() => {});
   return { emailVerificationRequired: true };
@@ -326,41 +355,71 @@ function logout(jti) {
   revoke(jti);
 }
 
-async function registerEntity({ email, password, nomeEnte }) {
-  if (!email || !password || !nomeEnte) {
-    throw { status: 400, code: 'MISSING_FIELDS', error: 'email, password e nomeEnte sono obbligatori' };
+async function registerEntity({ password, nomeEnte, pec, email }) {
+  // L'ente si registra usando esclusivamente la PEC come contatto e identificativo
+  // di login. Per retrocompatibilità il client può passare `email` ma vince `pec`.
+  const pecRaw = pec || email;
+  if (!password || !nomeEnte || !pecRaw) {
+    throw { status: 400, code: 'MISSING_FIELDS', error: 'password, nomeEnte e pec sono obbligatori' };
   }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    throw { status: 400, code: 'INVALID_EMAIL', error: 'Formato email non valido' };
+  const pecNorm = normalizePec(pecRaw);
+  if (!isValidPec(pecNorm)) {
+    throw { status: 400, code: 'INVALID_PEC', error: 'Indirizzo PEC non valido: deve essere un\'email su un dominio di posta certificata' };
   }
   const pwErr = validatePassword(password);
   if (pwErr) throw { status: 400, code: 'WEAK_PASSWORD', error: pwErr };
 
-  const existingEmail = await User.findOne({ where: { email } });
+  // La PEC viene usata anche come email di login → controllo unicità su entrambi i campi.
+  const existingEmail = await User.findOne({ where: { email: pecNorm } });
   if (existingEmail) {
-    throw { status: 409, code: 'EMAIL_TAKEN', error: 'Email già registrata' };
+    throw { status: 409, code: 'EMAIL_TAKEN', error: 'PEC già registrata' };
   }
-  const existingEnte = await User.findOne({ where: { nomeEnte } });
-  if (existingEnte) {
+  const existingPec = await User.findOne({ where: { pec: pecNorm } });
+  if (existingPec) {
+    throw { status: 409, code: 'PEC_TAKEN', error: 'PEC già registrata' };
+  }
+  const existingEnteOnUser = await User.findOne({ where: { nomeEnte } });
+  const existingEnteOnProfile = await EnteProfile.findOne({ where: { nomeEnte } });
+  if (existingEnteOnUser || existingEnteOnProfile) {
     throw { status: 409, code: 'NOME_ENTE_TAKEN', error: 'Nome ente già registrato' };
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
-  const user = await User.create({
-    email,
-    passwordHash,
-    nome: nomeEnte,
-    cognome: '',
-    dataNascita: '2000-01-01',
-    ruolo: 'EnteCertificato',
-    approvato: false,
-    nomeEnte,
+  const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+  // User + EnteProfile in transazione
+  const user = await sequelize.transaction(async (t) => {
+    const u = await User.create({
+      email: pecNorm,
+      passwordHash,
+      nome: nomeEnte,
+      cognome: '',
+      dataNascita: '2000-01-01',
+      ruolo: 'EnteCertificato',
+      approvato: false,
+      nomeEnte,
+      pec: pecNorm,
+      emailVerified: false,
+      emailVerificationToken,
+    }, { transaction: t });
+    await EnteProfile.create({
+      userId: u.id,
+      nomeEnte,
+      pec: pecNorm,
+      approvato: false,
+    }, { transaction: t });
+    return u;
   });
-  sendEntityRegistered(email, nomeEnte).catch(() => {});
+  // Verifica della PEC: spediamo il token alla PEC dichiarata.
+  sendEmailVerification(pecNorm, nomeEnte, emailVerificationToken).catch(() => {});
+  sendEntityRegistered(pecNorm, nomeEnte).catch(() => {});
   User.findAll({ where: { ruolo: 'AmministratoreDiSistema' }, attributes: ['email'] })
-    .then((admins) => sendNewEntityRequest(admins.map((a) => a.email), nomeEnte, email))
+    .then((admins) => sendNewEntityRequest(admins.map((a) => a.email), nomeEnte, pecNorm))
     .catch(() => {});
-  return { message: 'Richiesta di registrazione inviata. In attesa di approvazione da parte dell\'amministratore.', userId: user.id };
+  return {
+    message: 'Registrazione ricevuta. Controlla la PEC indicata per confermare l\'indirizzo. Dopo la verifica, un amministratore approverà l\'ente.',
+    userId: user.id,
+    pecVerificationRequired: true,
+  };
 }
 async function verifyEmail(token) {
   if (!token) throw { status: 400, code: 'MISSING_TOKEN', error: 'Token mancante' };
