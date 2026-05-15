@@ -2632,6 +2632,18 @@ dd {
 /* ── Le mie attività section ── */
 .my-activities-section { padding: 0 0 8px; }
 .my-activities-section h2 { margin-bottom: 14px; font-size: 1.1rem; }
+.my-activities-section .activity-card {
+  border: 1.5px solid var(--color-surface-line, #e5e7eb);
+  border-radius: 14px;
+  padding: 14px 16px;
+  background: var(--color-surface-raised, #fafafa);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.my-activities-section .activity-card:hover {
+  border-color: var(--color-primary, #4f6ef7);
+  box-shadow: 0 4px 16px rgba(79, 110, 247, 0.12);
+}
 
 /* ── Profile 2-column grid ── */
 .profile-main-grid {

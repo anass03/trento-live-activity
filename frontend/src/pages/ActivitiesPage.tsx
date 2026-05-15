@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { activityCrowdLevel } from '../components/map/CardMapPreview';
 import { InteractiveMapCard } from '../components/ui/InteractiveMapCard';
 import type { AppUser } from '../data/mockUser';
@@ -13,6 +14,8 @@ function formatDateTime(value?: string | null) {
 export function ActivitiesPage({ user }: { user?: AppUser }) {
   const userInterests = user?.interessi;
   const userId = user?.id;
+  const [searchParams] = useSearchParams();
+  const openId = searchParams.get('open');
   const [activities, setActivities] = useState<ApiActivity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +41,13 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
   useEffect(() => {
     void loadActivities();
   }, []);
+
+  // Auto-open popup when navigating from the map with ?open=<id>
+  useEffect(() => {
+    if (!openId || activities.length === 0) return;
+    const target = activities.find((a) => String(a.id) === openId);
+    if (target) setSelectedActivity(target);
+  }, [activities, openId]);
 
   async function handleJoin(activityId: string) {
     setActionLoading(activityId);
@@ -181,7 +191,6 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
                     <div><dt>Stato</dt><dd>{activity.status || 'attiva'}</dd></div>
                   </dl>
                   <div className="card-actions-row">
-                    <button className="detail-link" type="button" onClick={() => setSelectedActivity(activity)}>Apri</button>
                     {activity.creator?.id === userId ? (
                       <button className="danger-button compact-button" type="button" disabled={actionLoading === activity.id} onClick={() => handleCancel(activity.id)}>
                         {actionLoading === activity.id ? '...' : 'Cancella'}
@@ -233,7 +242,6 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
                   <div><dt>Quando</dt><dd>{formatDateTime(featuredActivity.dateTime)}</dd></div>
                   <div><dt>Partecipanti</dt><dd>{featuredActivity.participantCount} / {featuredActivity.maxParticipants}</dd></div>
                 </dl>
-                <button className="detail-link" type="button" onClick={() => setSelectedActivity(featuredActivity)}>Apri anteprima</button>
               </article>
             )}
 
@@ -289,7 +297,6 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
                         ? <button className="primary-button" type="button" disabled={actionLoading === activity.id} onClick={() => handleJoin(activity.id)}>{actionLoading === activity.id ? '...' : 'Partecipa'}</button>
                         : <span className="muted-copy">Al completo</span>
                   )}
-                  <button className="detail-link" type="button" onClick={() => setSelectedActivity(activity)}>Apri anteprima</button>
                 </InteractiveMapCard>
               ))}
             </div>
