@@ -3,6 +3,7 @@ import { activityCrowdLevel } from '../components/map/CardMapPreview';
 import { InteractiveMapCard } from '../components/ui/InteractiveMapCard';
 import type { AppUser } from '../data/mockUser';
 import { getActivities, getActivityCalendarUrl, googleCalendarUrl, joinActivity, leaveActivity, type ApiActivity } from '../lib/api';
+import { CalendarButton } from '../components/ui/CalendarButton';
 
 function formatDateTime(value?: string | null) {
   if (!value) return 'Data da definire';
@@ -142,6 +143,44 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
       {!isLoading && !error && activities.length === 0 && (
         <div className="state-panel liquid-panel">Nessuna attività trovata nel database.</div>
       )}
+
+      {/* ── Le mie attività (always shown when logged in) ── */}
+      {userId && !isLoading && (
+        <section className="my-activities-section">
+          <h2>Le mie attività</h2>
+          {myActivities.length === 0 ? (
+            <p className="muted-copy">Non hai ancora creato o a cui partecipi a nessuna attività.</p>
+          ) : (
+            <div className="activity-card-flow">
+              {myActivities.map((activity) => (
+                <article key={activity.id} className="activity-card">
+                  <div className="interactive-map-card-header">
+                    <span>{activity.category}</span>
+                    <small className={activity.creator?.id === userId ? 'badge' : undefined}>
+                      {activity.creator?.id === userId ? 'Creata da te' : 'Partecipante'}
+                    </small>
+                  </div>
+                  <h2>{activity.title}</h2>
+                  <dl>
+                    <div><dt>Quando</dt><dd>{formatDateTime(activity.dateTime)}</dd></div>
+                    <div><dt>Partecipanti</dt><dd>{activity.participantCount} / {activity.maxParticipants}</dd></div>
+                    <div><dt>Stato</dt><dd>{activity.status || 'attiva'}</dd></div>
+                  </dl>
+                  <div className="card-actions-row">
+                    <button className="detail-link" type="button" onClick={() => setSelectedActivity(activity)}>Apri</button>
+                    {activity.participantIds?.includes(userId) && activity.creator?.id !== userId && (
+                      <button className="ghost-button compact-button" type="button" disabled={actionLoading === activity.id} onClick={() => handleLeave(activity.id)}>
+                        {actionLoading === activity.id ? '...' : 'Abbandona'}
+                      </button>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
       {!isLoading && !error && visibleActivities.length > 0 && (
         <div className="activities-layout">
           <aside className="activity-discovery-panel">
@@ -219,10 +258,11 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
                     </div>
                   </dl>
                   {activity.dateTime && (
-                    <div className="calendar-actions">
-                      <a href={getActivityCalendarUrl(activity.id)} download={`attivita-${activity.id}.ics`} className="calendar-link">📅 Apple / Outlook</a>
-                      <a href={googleCalendarUrl(activity.title, activity.dateTime, activity.location)} target="_blank" rel="noopener noreferrer" className="calendar-link">📅 Google Calendar</a>
-                    </div>
+                    <CalendarButton
+                      icsUrl={getActivityCalendarUrl(activity.id)}
+                      icsFilename={`attivita-${activity.id}.ics`}
+                      googleUrl={googleCalendarUrl(activity.title, activity.dateTime, activity.location)}
+                    />
                   )}
                   {userId && (
                     activity.participantIds?.includes(userId)
@@ -238,30 +278,6 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
           </section>
         </div>
       )}
-      {userId && myActivities.length > 0 && (
-        <section className="my-activities-section">
-          <h2>Le mie attività</h2>
-          <div className="activity-card-flow">
-            {myActivities.map((activity) => (
-              <article key={activity.id} className="activity-card">
-                <div className="interactive-map-card-header">
-                  <span>{activity.category}</span>
-                  <small>{activity.creator?.id === userId ? 'Creata da te' : 'Partecipante'}</small>
-                </div>
-                <h2>{activity.title}</h2>
-                <dl>
-                  <div><dt>Quando</dt><dd>{formatDateTime(activity.dateTime)}</dd></div>
-                  <div><dt>Partecipanti</dt><dd>{activity.participantCount} / {activity.maxParticipants}</dd></div>
-                </dl>
-                {activity.participantIds?.includes(userId) && activity.creator?.id !== userId && (
-                  <button className="ghost-button" type="button" disabled={actionLoading === activity.id} onClick={() => handleLeave(activity.id)}>{actionLoading === activity.id ? '...' : 'Abbandona'}</button>
-                )}
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
-
       {selectedActivity && (
         <div className="activity-popup-backdrop" role="presentation" onClick={() => setSelectedActivity(null)}>
           <article
@@ -284,10 +300,11 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
             </dl>
             <div className="activity-popup-actions">
               {selectedActivity.dateTime && (
-                <>
-                  <a href={getActivityCalendarUrl(selectedActivity.id)} download={`attivita-${selectedActivity.id}.ics`} className="calendar-link">📅 Apple / Outlook</a>
-                  <a href={googleCalendarUrl(selectedActivity.title, selectedActivity.dateTime, selectedActivity.location)} target="_blank" rel="noopener noreferrer" className="calendar-link">📅 Google Calendar</a>
-                </>
+                <CalendarButton
+                  icsUrl={getActivityCalendarUrl(selectedActivity.id)}
+                  icsFilename={`attivita-${selectedActivity.id}.ics`}
+                  googleUrl={googleCalendarUrl(selectedActivity.title, selectedActivity.dateTime, selectedActivity.location)}
+                />
               )}
               {userId && (
                 selectedActivity.participantIds?.includes(userId)
