@@ -2,6 +2,8 @@ import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ApiError, login } from '../lib/api';
 import { PasswordInput } from '../components/ui/PasswordInput';
+import { SocialButtons } from '../components/auth/SocialButtons';
+import { SpidModal } from '../components/auth/SpidModal';
 
 type CodeMode = 'totp' | 'recovery';
 
@@ -14,6 +16,7 @@ export function LoginPage() {
   const [needs2fa, setNeeds2fa] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [spidOpen, setSpidOpen] = useState(false);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -61,6 +64,10 @@ export function LoginPage() {
       <form className="auth-form liquid-card" onSubmit={handleSubmit}>
         <h1>Accedi</h1>
         <p>Entra nel tuo account Trento Live Activity</p>
+
+        <SocialButtons showSpid onSpidClick={() => setSpidOpen(true)} />
+
+        <div className="social-divider">oppure con email</div>
 
         <label>
           <span>Email</span>
@@ -121,6 +128,7 @@ export function LoginPage() {
           <Link to="/registrazione">Non hai un account? Registrati</Link>
         </div>
       </form>
+      <SpidModal open={spidOpen} onClose={() => setSpidOpen(false)} />
     </section>
   );
 }

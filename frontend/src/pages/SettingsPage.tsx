@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { getStoredTheme, setTheme, type Theme } from '../lib/theme';
+import { setLanguage } from '../lib/i18n';
+import i18n from 'i18next';
 
 type Lang = 'it' | 'en';
 
-const STORAGE_LANG = 'tla:lang';
-
 function getStoredLang(): Lang {
-  const v = window.localStorage.getItem(STORAGE_LANG);
-  return v === 'en' ? 'en' : 'it';
+  const v = i18n.language;
+  return v?.startsWith('en') ? 'en' : 'it';
 }
 
 export function SettingsPage() {
@@ -31,7 +31,7 @@ export function SettingsPage() {
 
   function changeLang(next: Lang) {
     setLang(next);
-    window.localStorage.setItem(STORAGE_LANG, next);
+    setLanguage(next);
     setSaved(true);
   }
 
@@ -88,7 +88,7 @@ export function SettingsPage() {
           <span>Lingua dell'interfaccia</span>
           <select value={lang} onChange={(e) => changeLang(e.target.value as Lang)}>
             <option value="it">Italiano</option>
-            <option value="en">English (in arrivo)</option>
+            <option value="en">English</option>
           </select>
         </label>
       </div>

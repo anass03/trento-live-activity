@@ -10,6 +10,11 @@ router.post('/reset-password/:token', ctrl.resetPassword);
 router.post('/register/entity', ctrl.registerEntity);
 router.get('/verify-email', ctrl.verifyEmail);
 
+// Social OAuth (RF8 / E1, E2)
+router.post('/oauth/google', ctrl.oauthGoogle);
+router.post('/oauth/apple', ctrl.oauthApple);
+router.post('/spid/callback', ctrl.spidCallback);
+
 // Protected
 router.post('/logout', authenticate, ctrl.logout);
 router.get('/me', authenticate, ctrl.getMe);

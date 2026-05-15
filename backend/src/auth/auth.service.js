@@ -528,4 +528,5 @@ module.exports = {
   setup2fa, verify2fa, regenerateRecoveryCodes,
   forgotPassword, resetPassword, registerEntity, verifyEmail,
   listConsents, updateConsent,
+  signToken,
 };

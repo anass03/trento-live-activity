@@ -24,6 +24,8 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { adminNav, entityNav, municipalityNav, primaryNav } from '../../config/navigation';
 import type { AppUser } from '../../data/mockUser';
 import { getStoredTheme, toggleTheme, type Theme } from '../../lib/theme';
+import { setLanguage } from '../../lib/i18n';
+import i18next from 'i18next';
 
 const iconMap: Record<string, LucideIcon> = {
   Mappa: Home,
@@ -73,6 +75,7 @@ export function Topbar({ user }: { user: AppUser }) {
   const role = roleBadge[user.role];
   const RoleIcon = role.icon;
   const [theme, setThemeStateLocal] = useState<Theme>(() => getStoredTheme());
+  const [lang, setLang] = useState<'it' | 'en'>(() => (i18next.language?.startsWith('en') ? 'en' : 'it'));
 
   useEffect(() => {
     const onThemeChange = (e: Event) => {
@@ -80,7 +83,12 @@ export function Topbar({ user }: { user: AppUser }) {
       if (detail) setThemeStateLocal(detail);
     };
     window.addEventListener('tla:theme-changed', onThemeChange);
-    return () => window.removeEventListener('tla:theme-changed', onThemeChange);
+    const onLangChange = (l: string) => setLang(l.startsWith('en') ? 'en' : 'it');
+    i18next.on('languageChanged', onLangChange);
+    return () => {
+      window.removeEventListener('tla:theme-changed', onThemeChange);
+      i18next.off('languageChanged', onLangChange);
+    };
   }, []);
 
   const primaryItems = primaryNav
@@ -117,6 +125,15 @@ export function Topbar({ user }: { user: AppUser }) {
         {roleItems.map((item) => (
           <TopbarLink item={item} key={item.path} compact />
         ))}
+        <button
+          className="topbar-lang-toggle topbar-icon-button"
+          type="button"
+          aria-label={lang === 'it' ? 'Switch to English' : 'Passa all\'italiano'}
+          title={lang === 'it' ? 'Switch to English' : 'Passa all\'italiano'}
+          onClick={() => setLanguage(lang === 'it' ? 'en' : 'it')}
+        >
+          <span className="topbar-lang-chip">{lang === 'it' ? 'EN' : 'IT'}</span>
+        </button>
         <button
           className="topbar-icon-button"
           type="button"

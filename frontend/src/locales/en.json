@@ -1,0 +1,78 @@
+{
+  "common": {
+    "loading": "Loading…",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "back": "Back",
+    "search": "Search",
+    "refresh": "Refresh",
+    "submit": "Submit",
+    "close": "Close",
+    "error": "Error",
+    "yes": "Yes",
+    "no": "No",
+    "or": "or"
+  },
+  "nav": {
+    "map": "Map",
+    "activities": "Activities",
+    "events": "Events",
+    "certifiedEvents": "Certified events",
+    "profile": "Profile",
+    "settings": "Settings",
+    "logout": "Logout",
+    "login": "Log in",
+    "register": "Sign up"
+  },
+  "auth": {
+    "login": "Log in",
+    "loginSubtitle": "Sign in to your Trento Live Activity account",
+    "email": "Email",
+    "password": "Password",
+    "loginAction": "Log in",
+    "logging": "Signing in…",
+    "forgotPassword": "Forgot password?",
+    "noAccount": "Don't have an account? Sign up",
+    "withEmail": "or with email",
+    "registration": "Sign up",
+    "citizen": "Citizen",
+    "entity": "Certified entity",
+    "fiscalCode": "Tax code",
+    "pec": "PEC (certified email)",
+    "passwordHidden": "Hide password",
+    "passwordShown": "Show password"
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Personalize the app's look and notifications",
+    "appearance": "Appearance",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "language": "Language",
+    "languageHint": "Interface language",
+    "notifications": "Notifications",
+    "notifEmail": "Email",
+    "notifPush": "Push (browser)",
+    "saved": "✓ Saved"
+  },
+  "weather": {
+    "sunny": "Sunny",
+    "cloudy": "Cloudy",
+    "rainy": "Rainy",
+    "stormy": "Stormy",
+    "snowy": "Snowy"
+  },
+  "filters": {
+    "all": "All",
+    "today": "Today",
+    "weekend": "Weekend",
+    "now": "Now",
+    "open": "Open",
+    "favorites": "Favorites",
+    "forYou": "For you",
+    "nearMe": "Near me",
+    "removeLocation": "✕ Remove location"
+  }
+}
