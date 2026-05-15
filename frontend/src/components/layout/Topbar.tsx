@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import {
   BarChart3,
   Building2,
@@ -5,15 +6,16 @@ import {
   CalendarCheck,
   Download,
   Home,
-  Languages,
   LayoutDashboard,
   LogIn,
   MapPin,
   MessageSquareWarning,
+  Moon,
   PenLine,
   Settings,
   ShieldCheck,
   Sparkles,
+  Sun,
   User,
   Users,
 } from 'lucide-react';
@@ -21,6 +23,7 @@ import type { LucideIcon } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { adminNav, entityNav, municipalityNav, primaryNav } from '../../config/navigation';
 import type { AppUser } from '../../data/mockUser';
+import { getStoredTheme, toggleTheme, type Theme } from '../../lib/theme';
 
 const iconMap: Record<string, LucideIcon> = {
   Mappa: Home,
@@ -69,6 +72,16 @@ export function Topbar({ user }: { user: AppUser }) {
   const canSee = (roles: AppUser['role'][]) => roles.includes(user.role);
   const role = roleBadge[user.role];
   const RoleIcon = role.icon;
+  const [theme, setThemeStateLocal] = useState<Theme>(() => getStoredTheme());
+
+  useEffect(() => {
+    const onThemeChange = (e: Event) => {
+      const detail = (e as CustomEvent<Theme>).detail;
+      if (detail) setThemeStateLocal(detail);
+    };
+    window.addEventListener('tla:theme-changed', onThemeChange);
+    return () => window.removeEventListener('tla:theme-changed', onThemeChange);
+  }, []);
 
   const primaryItems = primaryNav
     .filter((item) => canSee(item.roles))
@@ -104,10 +117,22 @@ export function Topbar({ user }: { user: AppUser }) {
         {roleItems.map((item) => (
           <TopbarLink item={item} key={item.path} compact />
         ))}
-        <button className="topbar-icon-button" type="button" aria-label="Lingua" title="Lingua">
-          <Languages size={18} aria-hidden="true" />
+        <button
+          className="topbar-icon-button"
+          type="button"
+          aria-label={theme === 'dark' ? 'Attiva tema chiaro' : 'Attiva tema scuro'}
+          title={theme === 'dark' ? 'Tema chiaro' : 'Tema scuro'}
+          onClick={() => setThemeStateLocal(toggleTheme())}
+        >
+          {theme === 'dark' ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}
         </button>
-        <button className="topbar-icon-button" type="button" aria-label="Impostazioni" title="Impostazioni">
+        <button
+          className="topbar-icon-button"
+          type="button"
+          aria-label="Impostazioni"
+          title="Impostazioni"
+          onClick={() => navigate('/impostazioni')}
+        >
           <Settings size={18} aria-hidden="true" />
         </button>
       </div>
