@@ -18,6 +18,7 @@ import { EventsPage } from '../pages/EventsPage';
 import { LoginPage } from '../pages/LoginPage';
 import { MapPage } from '../pages/MapPage';
 import { PasswordResetPage } from '../pages/PasswordResetPage';
+import { OnboardingInteressiPage } from '../pages/OnboardingInteressiPage';
 import { PrivacyPage } from '../pages/PrivacyPage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { RegistrationPage } from '../pages/RegistrationPage';
@@ -88,6 +89,7 @@ export function App() {
         <Route path="/profilo" element={<ProfilePage />} />
         <Route path="/setup-2fa" element={<Setup2FAPage />} />
         <Route path="/verifica-email" element={<VerifyEmailPage />} />
+        <Route path="/onboarding/interessi" element={<OnboardingInteressiPage />} />
 
         <Route path="/ente/pubblica" element={<EntityPublishPage />} />
 

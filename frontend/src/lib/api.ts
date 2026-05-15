@@ -269,7 +269,38 @@ export async function logout(): Promise<void> {
     setToken(null);
   }
 }
-export function getMe(): Promise<CurrentUser & { id: string }> {
+export interface MeProfileCittadino {
+  kind: 'cittadino';
+  nome?: string; cognome?: string; dataNascita?: string;
+  codiceFiscale?: string; interessi: string[];
+  onboardingComplete: boolean;
+}
+export interface MeProfileEnte {
+  kind: 'ente';
+  nomeEnte?: string; pec?: string; approvato?: boolean; noteAdmin?: string;
+}
+export interface MeProfileComunale {
+  kind: 'comunale';
+  nome?: string; cognome?: string; ufficio?: string; spidId?: string;
+}
+export interface MeProfileSistema {
+  kind: 'sistema';
+  nome?: string; cognome?: string; superAdmin?: boolean;
+}
+export type MeProfile = MeProfileCittadino | MeProfileEnte | MeProfileComunale | MeProfileSistema;
+
+export function updateEnteProfile(payload: { noteAdmin?: string }): Promise<{ noteAdmin: string | null }> {
+  return request('/api/auth/me/ente', { method: 'PATCH', body: payload });
+}
+export function completeOnboarding(interessi: string[]): Promise<{ interessi: string[]; onboardingComplete: true }> {
+  return request('/api/auth/me/onboarding', { method: 'POST', body: { interessi } });
+}
+export function getSuggestedInterests(picked: string[]): Promise<{ suggestions: string[] }> {
+  const qs = picked.length ? `?picked=${encodeURIComponent(picked.join(','))}` : '';
+  return request(`/api/auth/suggested-interests${qs}`);
+}
+
+export function getMe(): Promise<CurrentUser & { id: string; profile: MeProfile | null }> {
   return request('/api/auth/me');
 }
 export function updateProfile(data: { nome?: string; cognome?: string; interessi?: string[] }): Promise<CurrentUser> {
