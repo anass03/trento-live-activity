@@ -10,6 +10,7 @@ import maplibregl, {
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { AppUser } from '../../data/mockUser';
 import { createActivity, type CrowdingStatus, type MapMarker, type MarkerType } from '../../lib/api';
+import { FavoriteButton } from '../ui/FavoriteButton';
 
 const TRENTO_CENTER: [number, number] = [11.1211, 46.0679];
 const CITY_STYLE = 'https://tiles.openfreemap.org/styles/bright';
@@ -293,9 +294,13 @@ function addMarkerLayers(map: MapLibreMap) {
       filter: ['!', ['has', 'point_count']],
       paint: {
         'circle-color': crowdColorExpression as any,
-        'circle-radius': 16,
-        'circle-blur': 0.72,
-        'circle-opacity': 0.38,
+        'circle-radius': [
+          'interpolate', ['linear'], ['zoom'],
+          12, 14,
+          18, 26,
+        ],
+        'circle-blur': 0.85,
+        'circle-opacity': 0.42,
       },
     },
     {
@@ -305,10 +310,40 @@ function addMarkerLayers(map: MapLibreMap) {
       filter: ['!', ['has', 'point_count']],
       paint: {
         'circle-color': crowdColorExpression as any,
-        'circle-radius': 7,
-        'circle-stroke-width': 2.5,
-        'circle-stroke-color': '#f8fafc',
-        'circle-opacity': 0.98,
+        // Dimensione che scala col zoom
+        'circle-radius': [
+          'interpolate', ['linear'], ['zoom'],
+          12, 7,
+          15, 10,
+          18, 14,
+        ],
+        'circle-stroke-width': 3,
+        'circle-stroke-color': '#ffffff',
+        'circle-opacity': 1,
+      },
+    },
+    {
+      // Icona/emoji discriminata per tipo, sovrapposta al pallino
+      id: 'trento-unclustered-icon',
+      type: 'symbol',
+      source: POINT_SOURCE_ID,
+      filter: ['!', ['has', 'point_count']],
+      layout: {
+        'text-field': [
+          'match', ['get', 'type'],
+          'poi', '📍',
+          'activity', '⚡',
+          'event', '🎫',
+          '•',
+        ],
+        'text-size': [
+          'interpolate', ['linear'], ['zoom'],
+          12, 11,
+          15, 13,
+          18, 16,
+        ],
+        'text-allow-overlap': true,
+        'text-ignore-placement': true,
       },
     },
   ];
@@ -648,6 +683,13 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
             )}
 
             <div className="map-popup-actions">
+              {isLoggedIn && (
+                <FavoriteButton
+                  markerType={popup.props.type}
+                  markerId={popup.props.type === 'poi' ? popup.props.sourceId : popup.props.id}
+                  compact
+                />
+              )}
               {popup.props.type === 'poi' && isLoggedIn && (
                 <button
                   className="primary-button"

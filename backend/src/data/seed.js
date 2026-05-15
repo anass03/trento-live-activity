@@ -16,6 +16,11 @@ async function seed() {
   await Activity.destroy({ where: {}, truncate: true, cascade: true });
   await Event.destroy({ where: {}, truncate: true, cascade: true });
   await POI.destroy({ where: {}, truncate: true, cascade: true });
+  // Nota: Favorite, EventParticipation e i profili sono CASCADE quando si elimina User,
+  // ma facciamo truncate esplicito per evitare residui se le associazioni cambiano.
+  const { Favorite, EventParticipation } = require('./models');
+  await Favorite.destroy({ where: {}, truncate: true, cascade: true });
+  await EventParticipation.destroy({ where: {}, truncate: true, cascade: true });
   await CittadinoProfile.destroy({ where: {}, truncate: true, cascade: true });
   await EnteProfile.destroy({ where: {}, truncate: true, cascade: true });
   await AmministratoreComunaleProfile.destroy({ where: {}, truncate: true, cascade: true });

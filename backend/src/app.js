@@ -7,6 +7,7 @@ const activityRoutes = require('./activities/activity.routes');
 const eventRoutes = require('./activities/event.routes');
 const mapRoutes = require('./map/map.routes');
 const userRoutes = require('./users/user.routes');
+const favoritesRoutes = require('./users/favorites.routes');
 const moderationRoutes = require('./moderation/moderation.routes');
 const dashboardRoutes = require('./dashboard/dashboard.routes');
 const adminRoutes = require('./admin/admin.routes');
@@ -61,6 +62,7 @@ app.use('/api/activities', activityRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/map', mapRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/users/me/favorites', favoritesRoutes);
 app.use('/api/moderation', moderationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 
