@@ -300,6 +300,19 @@ export function getSuggestedInterests(picked: string[]): Promise<{ suggestions: 
   return request(`/api/auth/suggested-interests${qs}`);
 }
 
+// ============================== AI suggester ==============================
+
+export interface AiActivitySuggestion {
+  tipo: string;
+  maxPartecipanti: number;
+  orarioInizio: string;
+  orarioFine: string;
+  reasoning: string;
+}
+export function suggestActivityAi(payload: { description: string; location?: string; time?: string }): Promise<AiActivitySuggestion> {
+  return request('/api/ai/suggest-activity', { method: 'POST', body: payload });
+}
+
 // ============================== Favorites ==============================
 
 export type FavoriteType = 'poi' | 'activity' | 'event';

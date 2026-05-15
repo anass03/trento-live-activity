@@ -12,6 +12,7 @@ const moderationRoutes = require('./moderation/moderation.routes');
 const dashboardRoutes = require('./dashboard/dashboard.routes');
 const adminRoutes = require('./admin/admin.routes');
 const notificationsRoutes = require('./notifications/notifications.routes');
+const aiRoutes = require('./ai/ai.routes');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -70,6 +71,7 @@ app.use('/admin', adminRoutes);
 app.use('/notifications', notificationsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationsRoutes);
+app.use('/api/ai', aiRoutes);
 app.use(errorHandler);
 
 module.exports = app;
