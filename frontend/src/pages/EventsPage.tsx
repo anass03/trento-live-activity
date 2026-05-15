@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { InteractiveMapCard } from '../components/ui/InteractiveMapCard';
 import { getEventCalendarUrl, getEvents, getToken, googleCalendarUrl, reportEvent, type ApiEvent } from '../lib/api';
 import { CalendarButton } from '../components/ui/CalendarButton';
@@ -21,6 +22,8 @@ function eventCrowdLevel(event: ApiEvent) {
 }
 
 export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: boolean; user?: AppUser }) {
+  const [searchParams] = useSearchParams();
+  const openId = searchParams.get('open');
   const [events, setEvents] = useState<ApiEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +50,13 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
   }
 
   useEffect(() => { void loadEvents(); }, []);
+
+  // Auto-open popup when navigating from the map with ?open=<id>
+  useEffect(() => {
+    if (!openId || events.length === 0) return;
+    const target = events.find((e) => String(e.id) === openId);
+    if (target) setSelectedEvent(target);
+  }, [events, openId]);
 
   useEffect(() => {
     if (!selectedEvent) return undefined;
@@ -130,7 +140,6 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
           />
         )}
         <div className="card-actions-row">
-          <button className="detail-link" type="button" onClick={() => setSelectedEvent(event)}>Apri anteprima</button>
           {isLoggedIn && reportMsg?.id !== event.id && (
             reportingId === event.id ? (
               <div className="report-controls">
@@ -285,7 +294,6 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
                 </div>
                 <h2>{featuredEvent.title}</h2>
                 <p>{featuredEvent.description || 'Nessuna descrizione disponibile.'}</p>
-                <button className="detail-link" type="button" onClick={() => setSelectedEvent(featuredEvent)}>Apri anteprima</button>
               </div>
             </article>
           )}
