@@ -203,130 +203,134 @@ export function ProfilePage() {
         <button type="button" className="primary-button" onClick={handleLogout}>Logout</button>
       </header>
 
-      <form className="auth-form liquid-card" onSubmit={handleSave}>
-        <label>
-          <span>Nome</span>
-          <input type="text" value={nome} onChange={(e) => setNome(e.target.value)} />
-        </label>
-        <label>
-          <span>Cognome</span>
-          <input type="text" value={cognome} onChange={(e) => setCognome(e.target.value)} />
-        </label>
+      <div className="profile-main-grid">
+        {/* Left column: edit profile */}
+        <div className="profile-col">
+          <form className="auth-form liquid-card" onSubmit={handleSave}>
+            <h2>Profilo</h2>
+            <label>
+              <span>Nome</span>
+              <input type="text" value={nome} onChange={(e) => setNome(e.target.value)} />
+            </label>
+            <label>
+              <span>Cognome</span>
+              <input type="text" value={cognome} onChange={(e) => setCognome(e.target.value)} />
+            </label>
 
-        <fieldset>
-          <legend>Interessi</legend>
-          <div className="chips">
-            {AVAILABLE_INTERESTS.map((i) => (
-              <label key={i} className={`chip ${interessi.includes(i) ? 'active' : ''}`}>
-                <input type="checkbox" checked={interessi.includes(i)} onChange={() => toggleInteresse(i)} />
-                {i}
-              </label>
-            ))}
-          </div>
-        </fieldset>
+            <fieldset>
+              <legend>Interessi</legend>
+              <div className="chips">
+                {AVAILABLE_INTERESTS.map((i) => (
+                  <label key={i} className={`chip ${interessi.includes(i) ? 'active' : ''}`}>
+                    <input type="checkbox" checked={interessi.includes(i)} onChange={() => toggleInteresse(i)} />
+                    {i}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
 
-        {message && <div className="form-success">{message}</div>}
-        {error && <div className="form-error">{error}</div>}
+            {message && <div className="form-success">{message}</div>}
+            {error && <div className="form-error">{error}</div>}
 
-        <button className="primary-button" type="submit">Salva modifiche</button>
-      </form>
+            <button className="primary-button" type="submit">Salva modifiche</button>
+          </form>
 
-      <div className="auth-form liquid-card">
-        <h2>Posizione (per notifiche di attività vicine)</h2>
-        <p>Condividi la tua posizione corrente per ricevere notifiche di attività entro 50 km dai tuoi interessi.</p>
-        {locationMessage && <div className="form-success">{locationMessage}</div>}
-        {locationError && <div className="form-error">{locationError}</div>}
-        <button type="button" className="primary-button" onClick={handleShareLocation}>
-          📍 Condividi posizione
-        </button>
-      </div>
-
-      <div className="auth-form liquid-card">
-        <h2>Notifiche push</h2>
-        <p>
-          Ricevi notifiche immediate sul tuo dispositivo per nuovi partecipanti alle tue attività,
-          eventi che corrispondono ai tuoi interessi e attività vicine a te.
-          {pushEnabled
-            ? ' Sono attive su questo browser.'
-            : ' Non sono attive su questo browser.'}
-        </p>
-        {'Notification' in window && (
-          <p style={{ fontSize: '0.85em', opacity: 0.7 }}>
-            Permesso browser:{' '}
-            <strong>
-              {Notification.permission === 'granted' ? '✅ concesso' :
-               Notification.permission === 'denied'  ? '❌ bloccato (cambialo dalle impostazioni del browser)' :
-               '⏳ non ancora richiesto'}
-            </strong>
-          </p>
-        )}
-        {pushMessage && <div className="form-success">{pushMessage}</div>}
-        {pushError && <div className="form-error">{pushError}</div>}
-        <div className="filter-actions">
-          {pushEnabled ? (
-            <>
-              <button type="button" className="primary-button" onClick={handleTestPush}>
-                ✉️ Invia notifica di test
-              </button>
-              <button type="button" onClick={handleDisablePush} disabled={isTogglingPush}>
-                {isTogglingPush ? '...' : 'Disattiva notifiche push'}
-              </button>
-            </>
-          ) : (
-            <button type="button" className="primary-button" onClick={handleEnablePush} disabled={isTogglingPush}>
-              {isTogglingPush ? '...' : '🔔 Attiva notifiche push'}
+          <div className="auth-form liquid-card">
+            <h2>Posizione</h2>
+            <p>Condividi la tua posizione corrente per ricevere notifiche di attività entro 50 km dai tuoi interessi.</p>
+            {locationMessage && <div className="form-success">{locationMessage}</div>}
+            {locationError && <div className="form-error">{locationError}</div>}
+            <button type="button" className="primary-button" onClick={handleShareLocation}>
+              📍 Condividi posizione
             </button>
-          )}
+          </div>
         </div>
-      </div>
 
-      {user.twoFactorEnabled && (
-        <div className="auth-form liquid-card">
-          <h2>Autenticazione a due fattori</h2>
-          <p>
-            2FA attiva. Codici di recupero monouso restanti:{' '}
-            <strong>{user.twoFactorRecoveryCodesRemaining ?? 0}</strong> di 8.
-          </p>
-
-          {newRecoveryCodes && (
-            <>
-              <div className="warning-box">
-                <strong>⚠ Salva subito questi codici.</strong> Verranno mostrati solo ora.
-              </div>
-              <div className="recovery-codes-grid">
-                {newRecoveryCodes.map((c) => <code key={c} className="recovery-code">{c}</code>)}
-              </div>
-              <div className="filter-actions">
-                <button type="button" onClick={() => navigator.clipboard.writeText(newRecoveryCodes.join('\n'))}>Copia</button>
-                <button type="button" onClick={() => setNewRecoveryCodes(null)}>Ho salvato, chiudi</button>
-              </div>
-            </>
-          )}
-
-          {!newRecoveryCodes && (
+        {/* Right column: notifications + 2FA + danger */}
+        <div className="profile-col">
+          <div className="auth-form liquid-card">
+            <h2>Notifiche push</h2>
+            <p>
+              Ricevi notifiche immediate sul tuo dispositivo per nuovi partecipanti alle tue attività,
+              eventi che corrispondono ai tuoi interessi e attività vicine a te.
+              {pushEnabled ? ' Attive su questo browser.' : ' Non attive su questo browser.'}
+            </p>
+            {'Notification' in window && (
+              <p style={{ fontSize: '0.85em', opacity: 0.7 }}>
+                Permesso:{' '}
+                <strong>
+                  {Notification.permission === 'granted' ? '✅ concesso' :
+                   Notification.permission === 'denied'  ? '❌ bloccato' : '⏳ non richiesto'}
+                </strong>
+              </p>
+            )}
+            {pushMessage && <div className="form-success">{pushMessage}</div>}
+            {pushError && <div className="form-error">{pushError}</div>}
             <div className="filter-actions">
-              <button type="button" className="primary-button" onClick={handleRegenerate} disabled={isRegenerating}>
-                {isRegenerating ? 'Generazione...' : 'Rigenera codici di recupero'}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (window.confirm('Cambiare authenticator richiede di rifare il setup 2FA con un nuovo dispositivo. Procedere?')) {
-                    navigate('/setup-2fa');
-                  }
-                }}
-              >
-                Cambia authenticator / Reimposta 2FA
-              </button>
+              {pushEnabled ? (
+                <>
+                  <button type="button" className="primary-button" onClick={handleTestPush}>
+                    ✉️ Invia test
+                  </button>
+                  <button type="button" onClick={handleDisablePush} disabled={isTogglingPush}>
+                    {isTogglingPush ? '...' : 'Disattiva'}
+                  </button>
+                </>
+              ) : (
+                <button type="button" className="primary-button" onClick={handleEnablePush} disabled={isTogglingPush}>
+                  {isTogglingPush ? '...' : '🔔 Attiva notifiche push'}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {user.twoFactorEnabled && (
+            <div className="auth-form liquid-card">
+              <h2>Autenticazione a due fattori</h2>
+              <p>
+                2FA attiva. Codici di recupero restanti:{' '}
+                <strong>{user.twoFactorRecoveryCodesRemaining ?? 0}</strong> / 8.
+              </p>
+              {newRecoveryCodes && (
+                <>
+                  <div className="warning-box">
+                    <strong>⚠ Salva subito questi codici.</strong> Verranno mostrati solo ora.
+                  </div>
+                  <div className="recovery-codes-grid">
+                    {newRecoveryCodes.map((c) => <code key={c} className="recovery-code">{c}</code>)}
+                  </div>
+                  <div className="filter-actions">
+                    <button type="button" onClick={() => navigator.clipboard.writeText(newRecoveryCodes.join('\n'))}>Copia</button>
+                    <button type="button" onClick={() => setNewRecoveryCodes(null)}>Ho salvato, chiudi</button>
+                  </div>
+                </>
+              )}
+              {!newRecoveryCodes && (
+                <div className="filter-actions">
+                  <button type="button" className="primary-button" onClick={handleRegenerate} disabled={isRegenerating}>
+                    {isRegenerating ? 'Generazione...' : 'Rigenera codici'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm('Cambiare authenticator richiede di rifare il setup 2FA. Procedere?')) {
+                        navigate('/setup-2fa');
+                      }
+                    }}
+                  >
+                    Cambia authenticator
+                  </button>
+                </div>
+              )}
             </div>
           )}
-        </div>
-      )}
 
-      <div className="auth-form liquid-card danger-zone">
-        <h2>Zona pericolosa</h2>
-        <p>Elimina permanentemente il tuo account e tutti i tuoi dati personali (GDPR art. 17 — diritto all'oblio).</p>
-        <button type="button" className="danger-button" onClick={handleDelete}>Elimina account</button>
+          <div className="auth-form liquid-card danger-zone">
+            <h2>Zona pericolosa</h2>
+            <p>Elimina permanentemente il tuo account e tutti i tuoi dati (GDPR art. 17).</p>
+            <button type="button" className="danger-button" onClick={handleDelete}>Elimina account</button>
+          </div>
+        </div>
       </div>
     </section>
   );

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { InteractiveMapCard } from '../components/ui/InteractiveMapCard';
 import { getEventCalendarUrl, getEvents, getToken, googleCalendarUrl, reportEvent, type ApiEvent } from '../lib/api';
+import { CalendarButton } from '../components/ui/CalendarButton';
 import type { AppUser } from '../data/mockUser';
 
 function formatDateTime(value: string | null) {
@@ -122,10 +123,11 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
           <div><dt>Quando</dt><dd>{formatDateTime(event.dateTime)}</dd></div>
         </dl>
         {event.dateTime && (
-          <div className="calendar-actions">
-            <a href={getEventCalendarUrl(event.id)} download={`${event.title}.ics`} className="calendar-link">📅 Apple / Outlook</a>
-            <a href={googleCalendarUrl(event.title, event.dateTime, event.location)} target="_blank" rel="noopener noreferrer" className="calendar-link">📅 Google Calendar</a>
-          </div>
+          <CalendarButton
+            icsUrl={getEventCalendarUrl(event.id)}
+            icsFilename={`${event.title}.ics`}
+            googleUrl={googleCalendarUrl(event.title, event.dateTime, event.location)}
+          />
         )}
         <div className="card-actions-row">
           <button className="detail-link" type="button" onClick={() => setSelectedEvent(event)}>Apri anteprima</button>
@@ -187,10 +189,11 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
         </dl>
         <div className="activity-popup-actions">
           {selectedEvent.dateTime && (
-            <>
-              <a href={getEventCalendarUrl(selectedEvent.id)} download={`${selectedEvent.title}.ics`} className="calendar-link">📅 Apple / Outlook</a>
-              <a href={googleCalendarUrl(selectedEvent.title, selectedEvent.dateTime, selectedEvent.location)} target="_blank" rel="noopener noreferrer" className="calendar-link">📅 Google Calendar</a>
-            </>
+            <CalendarButton
+              icsUrl={getEventCalendarUrl(selectedEvent.id)}
+              icsFilename={`${selectedEvent.title}.ics`}
+              googleUrl={googleCalendarUrl(selectedEvent.title, selectedEvent.dateTime, selectedEvent.location)}
+            />
           )}
           {isLoggedIn && reportMsg?.id !== selectedEvent.id && (
             reportingId === selectedEvent.id ? (
