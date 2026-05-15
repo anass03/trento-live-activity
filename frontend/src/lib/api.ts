@@ -19,6 +19,7 @@ export interface ApiEvent {
   entity?: { id: string; name: string } | null;
 }
 
+
 export interface ApiActivity {
   id: string;
   title: string;
@@ -447,9 +448,10 @@ export function cancelActivity(activityId: string): Promise<void> {
 // ============================== Events (write) ==============================
 
 export interface CreateEventPayload {
-  titolo: string; descrizione: string; categoria: string;
+  titolo: string; descrizione?: string; categoria: string;
   data?: string; orarioInizio?: string; orarioFine?: string;
   latitudine?: number; longitudine?: number; poiId?: string;
+  maxPartecipanti?: number;
 }
 export function createEvent(payload: CreateEventPayload): Promise<ApiEvent> {
   return request('/api/events', { method: 'POST', body: payload });

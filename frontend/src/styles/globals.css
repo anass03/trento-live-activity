@@ -3700,3 +3700,55 @@ select option {
   border-radius: 999px;
 }
 .comune-bar-list strong { text-align: right; }
+
+/* ── Entity publish page: 2-column layout con riepilogo ── */
+.publish-layout {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+.publish-form { display: grid; gap: 14px; }
+.publish-location {
+  border: 1px solid var(--color-surface-line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: grid;
+  gap: 10px;
+}
+.publish-location legend {
+  font-weight: 800;
+  font-size: 13px;
+  padding: 0 6px;
+}
+.publish-summary { padding: 16px; }
+.publish-summary h3 { margin: 0 0 8px; }
+.publish-summary dl {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+.publish-summary dt {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--color-text-secondary);
+}
+.publish-summary dd { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
+
+.form-validation-list {
+  list-style: none;
+  padding: 10px 12px;
+  margin: 0;
+  background: color-mix(in oklch, var(--color-warning) 12%, transparent);
+  border: 1px solid color-mix(in oklch, var(--color-warning) 35%, transparent);
+  border-radius: 10px;
+  display: grid;
+  gap: 4px;
+  font-size: 12.5px;
+  color: oklch(0.4 0.13 75);
+}
+
+@media (max-width: 880px) {
+  .publish-layout { grid-template-columns: 1fr; }
+}
