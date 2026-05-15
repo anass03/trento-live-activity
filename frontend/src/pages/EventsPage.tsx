@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { InteractiveMapCard } from '../components/ui/InteractiveMapCard';
-import { getEventCalendarUrl, getEvents, getToken, reportEvent, type ApiEvent } from '../lib/api';
+import { getEventCalendarUrl, getEvents, getToken, googleCalendarUrl, reportEvent, type ApiEvent } from '../lib/api';
 import type { AppUser } from '../data/mockUser';
 
 function formatDateTime(value: string | null) {
@@ -122,7 +122,10 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
           <div><dt>Quando</dt><dd>{formatDateTime(event.dateTime)}</dd></div>
         </dl>
         {event.dateTime && (
-          <a href={getEventCalendarUrl(event.id)} download={`${event.title}.ics`} className="calendar-link">Aggiungi al calendario</a>
+          <div className="calendar-actions">
+            <a href={getEventCalendarUrl(event.id)} download={`${event.title}.ics`} className="calendar-link">📅 Apple / Outlook</a>
+            <a href={googleCalendarUrl(event.title, event.dateTime, event.location)} target="_blank" rel="noopener noreferrer" className="calendar-link">📅 Google Calendar</a>
+          </div>
         )}
         <div className="card-actions-row">
           <button className="detail-link" type="button" onClick={() => setSelectedEvent(event)}>Apri anteprima</button>
@@ -184,7 +187,10 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
         </dl>
         <div className="activity-popup-actions">
           {selectedEvent.dateTime && (
-            <a href={getEventCalendarUrl(selectedEvent.id)} download={`${selectedEvent.title}.ics`} className="calendar-link">Aggiungi al calendario</a>
+            <>
+              <a href={getEventCalendarUrl(selectedEvent.id)} download={`${selectedEvent.title}.ics`} className="calendar-link">📅 Apple / Outlook</a>
+              <a href={googleCalendarUrl(selectedEvent.title, selectedEvent.dateTime, selectedEvent.location)} target="_blank" rel="noopener noreferrer" className="calendar-link">📅 Google Calendar</a>
+            </>
           )}
           {isLoggedIn && reportMsg?.id !== selectedEvent.id && (
             reportingId === selectedEvent.id ? (
@@ -255,7 +261,6 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
         <div className="time-filter" aria-label="Filtri eventi">
           <button className={timeFilter === 'all' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('all')}>Tutti</button>
           <button className={timeFilter === 'today' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('today')}>Oggi</button>
-          <button className={timeFilter === 'certified' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('certified')}>Certificati</button>
         </div>
         <button className="refresh-button" onClick={loadEvents} type="button">Aggiorna</button>
       </header>
