@@ -300,6 +300,23 @@ export function getSuggestedInterests(picked: string[]): Promise<{ suggestions: 
   return request(`/api/auth/suggested-interests${qs}`);
 }
 
+// ============================== Favorites ==============================
+
+export type FavoriteType = 'poi' | 'activity' | 'event';
+export interface ApiFavorite {
+  id: string; userId: string; markerType: FavoriteType; markerId: string; createdAt: string;
+}
+export function getFavorites(): Promise<ApiFavorite[]> {
+  return request('/api/users/me/favorites');
+}
+export function addFavorite(markerType: FavoriteType, markerId: string): Promise<ApiFavorite> {
+  return request('/api/users/me/favorites', { method: 'POST', body: { markerType, markerId } });
+}
+export function removeFavorite(markerType: FavoriteType, markerId: string): Promise<void> {
+  const qs = `?markerType=${encodeURIComponent(markerType)}&markerId=${encodeURIComponent(markerId)}`;
+  return request(`/api/users/me/favorites${qs}`, { method: 'DELETE' });
+}
+
 export function getMe(): Promise<CurrentUser & { id: string; profile: MeProfile | null }> {
   return request('/api/auth/me');
 }

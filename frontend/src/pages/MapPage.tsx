@@ -1,26 +1,61 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MapCanvas } from '../components/map/MapCanvas';
 import { getMapMarkers, type MapMarker, type MarkerType } from '../lib/api';
+import { listFavorites } from '../lib/favorites';
+import { fetchWeather, type WeatherMood, type WeatherSnapshot } from '../lib/weather';
 import type { AppUser } from '../data/mockUser';
 
-type Filter = 'all' | 'preferred' | MarkerType;
-type WeatherMood = 'sunny' | 'cloudy' | 'rainy' | 'stormy' | 'snowy';
+type Filter = 'all' | 'preferred' | 'favorites' | MarkerType;
+type TimeFilter = 'now' | 'today' | 'weekend';
 
 const filterLabels: Array<{ label: string; value: Filter }> = [
   { label: 'Tutti', value: 'all' },
-  { label: 'Preferiti', value: 'preferred' },
+  { label: 'Per te', value: 'preferred' },
+  { label: 'Preferiti', value: 'favorites' },
   { label: 'Attività', value: 'activity' },
   { label: 'Eventi', value: 'event' },
   { label: 'POI', value: 'poi' },
 ];
 
-const weatherMoods: Array<{ label: string; value: WeatherMood; temp: string; meta: string }> = [
-  { label: 'Sereno', value: 'sunny', temp: '21°C', meta: 'UV 4 · vento 6 km/h' },
-  { label: 'Nuvoloso', value: 'cloudy', temp: '18°C', meta: 'Visibilità buona' },
-  { label: 'Pioggia', value: 'rainy', temp: '15°C', meta: 'Pioggia leggera' },
-  { label: 'Temporale', value: 'stormy', temp: '13°C', meta: 'Allerta meteo' },
-  { label: 'Neve', value: 'snowy', temp: '1°C', meta: 'Fondo freddo' },
-];
+const weatherMoodLabel: Record<WeatherMood, string> = {
+  sunny: 'Sereno',
+  cloudy: 'Nuvoloso',
+  rainy: 'Pioggia',
+  stormy: 'Temporale',
+  snowy: 'Neve',
+};
+
+const TRENTO: [number, number] = [46.0679, 11.1211];
+
+function haversineKm(a: [number, number], b: [number, number]): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(b[0] - a[0]);
+  const dLon = toRad(b[1] - a[1]);
+  const lat1 = toRad(a[0]);
+  const lat2 = toRad(b[0]);
+  const h = Math.sin(dLat / 2) ** 2 + Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+function isToday(d: Date, today = new Date()): boolean {
+  return d.getFullYear() === today.getFullYear()
+    && d.getMonth() === today.getMonth()
+    && d.getDate() === today.getDate();
+}
+function isInWeekend(d: Date, today = new Date()): boolean {
+  // Calcola sabato e domenica della settimana corrente (lun=1, dom=0 in JS).
+  const start = new Date(today);
+  const dow = start.getDay(); // 0..6
+  const daysUntilSaturday = (6 - dow + 7) % 7; // dom→6, lun→5, sab→0
+  const sat = new Date(start);
+  sat.setDate(start.getDate() + daysUntilSaturday);
+  sat.setHours(0, 0, 0, 0);
+  const sun = new Date(sat);
+  sun.setDate(sat.getDate() + 1);
+  sun.setHours(23, 59, 59, 999);
+  return d >= sat && d <= sun;
+}
 
 function formatTime(value?: string | null) {
   if (!value) return 'Oggi';
@@ -48,7 +83,12 @@ function crowdBarColor(level: number): string {
 export function MapPage({ user }: { user?: AppUser }) {
   const [markers, setMarkers] = useState<MapMarker[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
-  const [weatherMood, setWeatherMood] = useState<WeatherMood>('cloudy');
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('now');
+  const [weather, setWeather] = useState<WeatherSnapshot | null>(null);
+  const [favorites, setFavorites] = useState<Array<{ markerType: string; markerId: string }>>([]);
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+  const [geoLoading, setGeoLoading] = useState(false);
+  const [geoError, setGeoError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
   const hasInterests = Array.isArray(user?.interessi) && (user!.interessi!.length ?? 0) > 0;
@@ -68,20 +108,72 @@ export function MapPage({ user }: { user?: AppUser }) {
 
   useEffect(() => {
     void loadMarkers();
+    void listFavorites().then(setFavorites);
+    void fetchWeather().then(setWeather).catch(() => setWeather(null));
+    const onFavChanged = () => { void listFavorites().then(setFavorites); };
+    window.addEventListener('tla:favorites-changed', onFavChanged);
+    return () => window.removeEventListener('tla:favorites-changed', onFavChanged);
   }, []);
 
-  const visibleMarkers = useMemo(
-    () => markers.filter((marker) => {
+  function handleNearMe() {
+    if (!navigator.geolocation) { setGeoError('Geolocalizzazione non supportata dal browser'); return; }
+    setGeoLoading(true);
+    setGeoError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserLocation([pos.coords.latitude, pos.coords.longitude]);
+        setGeoLoading(false);
+      },
+      (err) => {
+        const reasons: Record<number, string> = {
+          1: 'Permesso negato. Controlla le impostazioni del browser.',
+          2: 'Posizione non disponibile.',
+          3: 'Timeout.',
+        };
+        setGeoError(reasons[err.code] ?? `Errore (codice ${err.code})`);
+        setGeoLoading(false);
+      },
+      { timeout: 10000 },
+    );
+  }
+
+  const visibleMarkers = useMemo(() => {
+    return markers.filter((marker) => {
+      // ── filtro categoria/tipo ────────────────────────────────────────
       if (filter === 'preferred') {
-        if (marker.type === 'poi') return true;
-        if (!hasInterests || !marker.category) return false;
-        return user!.interessi!.includes(marker.category);
+        if (marker.type === 'poi') {
+          /* keep POIs */
+        } else if (!hasInterests || !marker.category) {
+          return false;
+        } else if (!user!.interessi!.includes(marker.category)) {
+          return false;
+        }
+      } else if (filter === 'favorites') {
+        const fav = favorites.some((f) => f.markerType === marker.type && f.markerId === marker.id);
+        if (!fav) return false;
+      } else if (filter !== 'all' && marker.type !== filter) {
+        return false;
       }
-      if (filter !== 'all' && marker.type !== filter) return false;
+
+      // ── filtro temporale (ignora POI che non hanno dateTime) ─────────
+      if (marker.dateTime) {
+        const d = new Date(marker.dateTime);
+        if (timeFilter === 'today' && !isToday(d)) return false;
+        if (timeFilter === 'weekend' && !isInWeekend(d)) return false;
+        // 'now' = nessun filtro temporale
+      } else if (timeFilter !== 'now' && marker.type !== 'poi') {
+        // attività/eventi senza data sono fuori dai filtri temporali
+        return false;
+      }
+
+      // ── "Vicino a me" ────────────────────────────────────────────────
+      if (userLocation && Number.isFinite(marker.latitude) && Number.isFinite(marker.longitude)) {
+        const dist = haversineKm(userLocation, [marker.latitude!, marker.longitude!]);
+        if (dist > 2) return false; // 2 km
+      }
       return true;
-    }),
-    [filter, markers, hasInterests, user],
-  );
+    });
+  }, [filter, timeFilter, markers, hasInterests, user, favorites, userLocation]);
 
   const highCrowdMarkers = useMemo(
     () => markers
@@ -145,7 +237,7 @@ export function MapPage({ user }: { user?: AppUser }) {
     { label: 'Hotspot', value: highCrowdMarkers.length },
     { label: 'Oggi', value: upcomingItems.length },
   ];
-  const currentWeather = weatherMoods.find((item) => item.value === weatherMood) ?? weatherMoods[1];
+  const currentMood: WeatherMood = weather?.mood ?? 'cloudy';
 
   return (
     <div className="page-frame home-page">
@@ -154,37 +246,31 @@ export function MapPage({ user }: { user?: AppUser }) {
           <span className="live-dot" aria-hidden="true" />
           <strong>{visibleMarkers.length}</strong>
           <span>punti visibili</span>
+          {userLocation && <small className="muted-copy"> · raggio 2 km</small>}
         </div>
-        <label className="city-search">
-          <span>Cerca</span>
-          <input type="search" placeholder="Zona, evento, attività" />
-        </label>
         <div className="time-filter" aria-label="Filtro orario">
-          <button type="button" className="active-filter">Ora</button>
-          <button type="button">Oggi</button>
-          <button type="button">Weekend</button>
+          <button type="button" className={timeFilter === 'now' ? 'active-filter' : undefined} onClick={() => setTimeFilter('now')}>Ora</button>
+          <button type="button" className={timeFilter === 'today' ? 'active-filter' : undefined} onClick={() => setTimeFilter('today')}>Oggi</button>
+          <button type="button" className={timeFilter === 'weekend' ? 'active-filter' : undefined} onClick={() => setTimeFilter('weekend')}>Weekend</button>
         </div>
-        <button className="nearby-button" type="button">Vicino a me</button>
+        {userLocation ? (
+          <button className="nearby-button active-filter" type="button" onClick={() => { setUserLocation(null); setGeoError(null); }}>
+            ✕ Rimuovi posizione
+          </button>
+        ) : (
+          <button className="nearby-button" type="button" onClick={handleNearMe} disabled={geoLoading}>
+            {geoLoading ? 'Localizzazione…' : '📍 Vicino a me'}
+          </button>
+        )}
+        {geoError && <span className="form-error" style={{ margin: 0 }}>{geoError}</span>}
       </header>
 
       <section className="home-dashboard-grid">
-        <aside className={`weather-summary weather-${weatherMood}`} aria-label="Meteo Trento">
+        <aside className={`weather-summary weather-${currentMood}`} aria-label="Meteo Trento">
           <div className="weather-main">
-            <span>{currentWeather.label}</span>
-            <strong>{currentWeather.temp}</strong>
-            <small>{currentWeather.meta}</small>
-          </div>
-          <div className="weather-mood-tabs" aria-label="Stato meteo">
-            {weatherMoods.map((item) => (
-              <button
-                key={item.value}
-                className={weatherMood === item.value ? 'active-filter' : undefined}
-                type="button"
-                onClick={() => setWeatherMood(item.value)}
-              >
-                {item.label}
-              </button>
-            ))}
+            <span>{weatherMoodLabel[currentMood]}</span>
+            <strong>{weather ? `${weather.temperature}°C` : '—'}</strong>
+            <small>{weather ? `Vento ${Math.round(weather.windKmh)} km/h` : 'Caricamento meteo…'}</small>
           </div>
         </aside>
 
