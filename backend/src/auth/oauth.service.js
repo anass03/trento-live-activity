@@ -35,12 +35,40 @@ function verifyAppleIdToken(idToken, audience) {
 // Crea-o-recupera il cittadino. Per gli account social non c'è una password
 // vera (passwordHash è un random hash) e la mail è considerata verificata
 // (il provider l'ha già verificata).
+//
+// SECURITY (#bug-2025-05-15): Se l'email appartiene già a un account con ruolo
+// privilegiato (admin di sistema, comune, ente), il login social DEVE essere
+// rifiutato — altrimenti bypassiamo 2FA / SPID / verifica PEC e si entra
+// senza i controlli previsti per quel ruolo. OAuth Google/Apple è esclusivo
+// dei cittadini (UtenteRegistrato).
 async function ensureCitizenFromSocial({ email, nome, cognome, providerId, provider }) {
   if (!email) throw { status: 400, code: 'OAUTH_NO_EMAIL', error: `Il provider ${provider} non ha fornito un'email` };
 
   const existing = await User.findOne({ where: { email } });
   if (existing) {
-    // Se l'utente già esiste, marca l'email come verificata e procedi.
+    // Hardening: blocca OAuth per account non-cittadino.
+    if (existing.ruolo === 'AmministratoreDiSistema') {
+      throw {
+        status: 403,
+        code: 'OAUTH_FORBIDDEN_ADMIN',
+        error: 'Questo account è di un amministratore di sistema: accedi con email e password (2FA obbligatoria). L\'accesso social non è ammesso per ragioni di sicurezza.',
+      };
+    }
+    if (existing.ruolo === 'AmministratoreComunale') {
+      throw {
+        status: 403,
+        code: 'OAUTH_FORBIDDEN_MUNICIPAL',
+        error: 'Questo account appartiene al Comune: accedi tramite SPID, non con Google/Apple.',
+      };
+    }
+    if (existing.ruolo === 'EnteCertificato') {
+      throw {
+        status: 403,
+        code: 'OAUTH_FORBIDDEN_ENTITY',
+        error: 'Questo account è di un ente certificato: accedi con email PEC e password.',
+      };
+    }
+    // Cittadino esistente: ok, marca emailVerified e procedi.
     if (!existing.emailVerified) {
       await existing.update({ emailVerified: true, emailVerificationToken: null });
     }
@@ -121,9 +149,19 @@ async function loginWithApple(idToken) {
 
 // SPID demo: nessuna verifica vera in dev. Crea/usa un AmministratoreComunale.
 // In produzione qui si integra spid-express o un IdP SPID reale.
+// SECURITY: SPID è il canale di accesso ESCLUSIVO per AmministratoreComunale.
+// Se l'email appartiene a un account con un ruolo diverso, rifiuta — non si
+// può "promuovere" un cittadino o admin via SPID.
 async function loginWithSpidStub({ spidId, nome, cognome, email, ufficio }) {
   if (!spidId || !email) throw { status: 400, code: 'SPID_MISSING', error: 'spidId e email obbligatori' };
   let user = await User.findOne({ where: { email } });
+  if (user && user.ruolo !== 'AmministratoreComunale') {
+    throw {
+      status: 403,
+      code: 'SPID_FORBIDDEN_ROLE',
+      error: 'Questo account non è un amministratore comunale: SPID non è ammesso per il tuo ruolo.',
+    };
+  }
   if (!user) {
     const randomPw = crypto.randomBytes(24).toString('hex');
     const passwordHash = await bcrypt.hash(randomPw, 12);
