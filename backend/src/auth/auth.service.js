@@ -125,7 +125,11 @@ async function register({ email, password, nome, cognome, dataNascita, codiceFis
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
-  const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+  // #H4: il token in chiaro va all'email, in DB salviamo solo SHA-256.
+  // Un dump DB non rivela token utilizzabili. Scadenza 24h.
+  const rawVerificationToken = crypto.randomBytes(32).toString('hex');
+  const verificationTokenHash = crypto.createHash('sha256').update(rawVerificationToken).digest('hex');
+  const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
   // Scriviamo User + CittadinoProfile in transazione: o vanno entrambi, o nessuno.
   // I dati anagrafici restano anche su User per retrocompatibilità con il resto
@@ -134,7 +138,9 @@ async function register({ email, password, nome, cognome, dataNascita, codiceFis
     const u = await User.create({
       email, passwordHash, nome, cognome, dataNascita,
       codiceFiscale: cfNorm,
-      emailVerified: false, emailVerificationToken,
+      emailVerified: false,
+      emailVerificationToken: verificationTokenHash,
+      emailVerificationExpires: verificationExpires,
     }, { transaction: t });
     await CittadinoProfile.create({
       userId: u.id,
@@ -149,7 +155,7 @@ async function register({ email, password, nome, cognome, dataNascita, codiceFis
     return u;
   });
 
-  sendEmailVerification(email, nome, emailVerificationToken).catch(() => {});
+  sendEmailVerification(email, nome, rawVerificationToken).catch(() => {});
   return { emailVerificationRequired: true };
 }
 
@@ -272,6 +278,10 @@ async function getMe(userId) {
   if (!user) throw { status: 404, code: 'NOT_FOUND', error: 'User not found' };
 
   const base = sanitize(user);
+  // #M5/M7: il frontend usa questo flag per decidere se mostrare il form
+  // "cambio password" e quale conferma chiedere su deleteAccount.
+  // sanitize() ha già rimosso passwordHash, quindi lo aggiungiamo qui dopo.
+  base.hasPassword = !!user.passwordHash;
   // Profilo del ruolo corrente — il client legge solo questo, non i 4 separati.
   let profile = null;
   if (user.ruolo === 'UtenteRegistrato' && user.cittadinoProfile) {
@@ -398,11 +408,70 @@ async function updateLocation(userId, { lat, lng }) {
   return { lat, lng, updatedAt: new Date() };
 }
 
-async function deleteAccount(userId) {
-  // GDPR art. 17 — right to erasure (RF26, RNF20)
+async function deleteAccount(userId, { currentPassword, confirmEmail } = {}) {
+  // GDPR art. 17 — right to erasure (RF26, RNF20).
+  // #M7: prima richiede una re-conferma per evitare che un JWT rubato basti
+  // a cancellare l'account vittima.
   const user = await User.findByPk(userId);
   if (!user) throw { status: 404, code: 'NOT_FOUND', error: 'User not found' };
+
+  if (user.passwordHash) {
+    // Utente con password: deve fornire la password attuale.
+    if (!currentPassword) {
+      throw { status: 400, code: 'PASSWORD_REQUIRED', error: 'La password attuale è obbligatoria per cancellare l\'account.' };
+    }
+    const ok = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!ok) throw { status: 401, code: 'INVALID_CREDENTIALS', error: 'Password non corretta.' };
+  } else {
+    // Utente OAuth-only senza password: chiediamo conferma esplicita digitando
+    // "DELETE <email>" (case-insensitive). Difensivo contro JWT replay.
+    const expected = `DELETE ${user.email}`.toLowerCase().trim();
+    if (!confirmEmail || String(confirmEmail).toLowerCase().trim() !== expected) {
+      throw {
+        status: 400,
+        code: 'CONFIRMATION_REQUIRED',
+        error: `Per cancellare un account social, digita "DELETE ${user.email}" per confermare.`,
+      };
+    }
+  }
+
   await user.destroy();
+}
+
+// #M5: cambio password per utente già autenticato.
+// Diverso dal flusso forgot/reset (che parte dall'email non autenticato):
+// qui chiediamo la password attuale per il principio "qualcosa che conosci".
+async function changePassword(userId, { currentPassword, newPassword } = {}) {
+  if (!currentPassword || !newPassword) {
+    throw { status: 400, code: 'MISSING_FIELDS', error: 'currentPassword e newPassword sono obbligatori.' };
+  }
+  const pwErr = validatePassword(newPassword);
+  if (pwErr) throw { status: 400, code: 'WEAK_PASSWORD', error: pwErr };
+
+  const user = await User.findByPk(userId);
+  if (!user) throw { status: 404, code: 'NOT_FOUND', error: 'User not found' };
+  // Utenti OAuth-only non hanno una password attuale da verificare.
+  if (!user.passwordHash) {
+    throw {
+      status: 400,
+      code: 'NO_PASSWORD_SET',
+      error: 'Questo account è registrato con un provider social. Non può avere una password locale.',
+    };
+  }
+  const ok = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!ok) throw { status: 401, code: 'INVALID_CREDENTIALS', error: 'Password attuale non corretta.' };
+
+  if (currentPassword === newPassword) {
+    throw { status: 400, code: 'PASSWORD_UNCHANGED', error: 'La nuova password deve essere diversa da quella attuale.' };
+  }
+
+  const newHash = await bcrypt.hash(newPassword, 12);
+  await user.update({
+    passwordHash: newHash,
+    // Invalida token reset pendenti per non riaprire il vecchio flusso
+    passwordResetToken: null,
+    passwordResetExpires: null,
+  });
 }
 
 async function setup2fa(userId) {
@@ -459,8 +528,22 @@ async function regenerateRecoveryCodes(userId) {
 
 async function forgotPassword(email) {
   const user = await User.findOne({ where: { email } });
-  // Always return success to avoid user enumeration attacks
-  if (!user || !user.passwordHash) return;
+  // Anti-enumeration: ritorniamo sempre "ok" senza distinguere i casi sotto,
+  // così un attaccante non scopre quali email esistono o di che tipo sono.
+  if (!user) return;
+
+  // Account OAuth-only (passwordHash null): non hanno una password da resettare.
+  // L'utente DEVE accedere via Google/Apple. Silenzioso per anti-enumeration.
+  if (!user.passwordHash) return;
+
+  // SECURITY (#bug-2025-05-16): admin di sistema hanno 2FA obbligatoria (RNF15).
+  // Il reset password normale bypasserebbe il 2FA → un attaccante con accesso
+  // alla mail dell'admin potrebbe loggarsi senza fattore aggiuntivo. Blocco.
+  // In futuro questi utenti useranno un flusso dedicato (recovery code 2FA).
+  if (user.ruolo === 'AmministratoreDiSistema') return;
+
+  // Admin comunali accedono via SPID (OCL C4), non con password.
+  if (user.ruolo === 'AmministratoreComunale') return;
 
   const rawToken = crypto.randomBytes(32).toString('hex');
   const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
@@ -481,21 +564,36 @@ async function resetPassword(rawToken, newPassword) {
     throw { status: 400, code: 'TOKEN_INVALID', error: 'Reset token is invalid or has expired' };
   }
 
+  // Defense in depth: stesso gating di forgotPassword, nel caso un token sia
+  // stato emesso prima del fix o sia presente in DB per ragioni di seed/test.
+  if (user.ruolo === 'AmministratoreDiSistema' || user.ruolo === 'AmministratoreComunale') {
+    // Invalida il token e rifiuta. Niente leak di motivazione.
+    await user.update({ passwordResetToken: null, passwordResetExpires: null });
+    throw { status: 400, code: 'TOKEN_INVALID', error: 'Reset token is invalid or has expired' };
+  }
+
   const passwordHash = await bcrypt.hash(newPassword, 12);
   await user.update({ passwordHash, passwordResetToken: null, passwordResetExpires: null });
 }
 
-function logout(jti) {
+async function logout(jti, expMs) {
   if (!jti) throw { status: 400, code: 'INVALID_TOKEN', error: 'Token has no jti claim' };
-  revoke(jti);
+  // Persistiamo la revoca con la scadenza naturale del token. Il cleanup
+  // job in tokenBlacklist purgerà la riga quando passa il TTL.
+  await revoke(jti, expMs);
 }
 
-async function registerEntity({ password, nomeEnte, pec, email }) {
+async function registerEntity({ password, nomeEnte, pec, email, consents }) {
   // L'ente si registra usando esclusivamente la PEC come contatto e identificativo
   // di login. Per retrocompatibilità il client può passare `email` ma vince `pec`.
   const pecRaw = pec || email;
   if (!password || !nomeEnte || !pecRaw) {
     throw { status: 400, code: 'MISSING_FIELDS', error: 'password, nomeEnte e pec sono obbligatori' };
+  }
+  // #M6: consenso GDPR esplicito anche per gli enti (parità con i cittadini).
+  // Il rappresentante legale è comunque una persona fisica.
+  if (!consents || !consents.privacy_policy || !consents.terms_of_service) {
+    throw { status: 400, code: 'CONSENT_REQUIRED', error: 'Consent to privacy_policy and terms_of_service is required to register' };
   }
   const pecNorm = normalizePec(pecRaw);
   if (!isValidPec(pecNorm)) {
@@ -520,7 +618,10 @@ async function registerEntity({ password, nomeEnte, pec, email }) {
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
-  const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+  // #H4: hash del token in DB, plain solo nell'email, scadenza 24h.
+  const rawVerificationToken = crypto.randomBytes(32).toString('hex');
+  const verificationTokenHash = crypto.createHash('sha256').update(rawVerificationToken).digest('hex');
+  const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
   // User + EnteProfile in transazione
   const user = await sequelize.transaction(async (t) => {
     const u = await User.create({
@@ -534,7 +635,8 @@ async function registerEntity({ password, nomeEnte, pec, email }) {
       nomeEnte,
       pec: pecNorm,
       emailVerified: false,
-      emailVerificationToken,
+      emailVerificationToken: verificationTokenHash,
+      emailVerificationExpires: verificationExpires,
     }, { transaction: t });
     await EnteProfile.create({
       userId: u.id,
@@ -542,10 +644,15 @@ async function registerEntity({ password, nomeEnte, pec, email }) {
       pec: pecNorm,
       approvato: false,
     }, { transaction: t });
+    // #M6: salva audit trail dei consensi prestati dall'ente, come fatto per i cittadini.
+    const consentRows = ['privacy_policy', 'terms_of_service', 'marketing', 'analytics']
+      .filter((type) => consents[type])
+      .map((type) => ({ userId: u.id, type, version: '1.0', granted: true }));
+    if (consentRows.length) await Consent.bulkCreate(consentRows, { transaction: t });
     return u;
   });
-  // Verifica della PEC: spediamo il token alla PEC dichiarata.
-  sendEmailVerification(pecNorm, nomeEnte, emailVerificationToken).catch(() => {});
+  // Verifica della PEC: spediamo il token (in chiaro) alla PEC dichiarata.
+  sendEmailVerification(pecNorm, nomeEnte, rawVerificationToken).catch(() => {});
   sendEntityRegistered(pecNorm, nomeEnte).catch(() => {});
   User.findAll({ where: { ruolo: 'AmministratoreDiSistema' }, attributes: ['email'] })
     .then((admins) => sendNewEntityRequest(admins.map((a) => a.email), nomeEnte, pecNorm))
@@ -558,17 +665,29 @@ async function registerEntity({ password, nomeEnte, pec, email }) {
 }
 async function verifyEmail(token) {
   if (!token) throw { status: 400, code: 'MISSING_TOKEN', error: 'Token mancante' };
-  const user = await User.findOne({ where: { emailVerificationToken: token } });
+  // #H4: il client passa il token in chiaro; in DB cerchiamo il SHA-256.
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const user = await User.findOne({ where: { emailVerificationToken: tokenHash } });
   if (!user) {
     throw { status: 400, code: 'TOKEN_INVALID', error: 'Link di verifica non valido o già utilizzato' };
   }
-  await user.update({ emailVerified: true, emailVerificationToken: null });
+  // #H4: rifiuta se scaduto (oltre 24h dalla generazione).
+  // Manteniamo retro-compatibilità con utenti pre-fix che non hanno expires.
+  if (user.emailVerificationExpires && user.emailVerificationExpires < new Date()) {
+    throw { status: 400, code: 'TOKEN_EXPIRED', error: 'Link di verifica scaduto. Richiedi un nuovo invio dalla pagina di login.' };
+  }
+  await user.update({
+    emailVerified: true,
+    emailVerificationToken: null,
+    emailVerificationExpires: null,
+  });
   const jwtToken = signToken(user);
   return { user: sanitize(user), token: jwtToken };
 }
 
 module.exports = {
   register, login, logout, getMe, updateProfile, updateEnteProfile, completeOnboarding,
+  changePassword,
   updateLocation, deleteAccount,
   setup2fa, verify2fa, regenerateRecoveryCodes,
   forgotPassword, resetPassword, registerEntity, verifyEmail,

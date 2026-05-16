@@ -122,18 +122,20 @@ async function ensureCitizenFromSocial({ email, nome, cognome, providerId, provi
     return existing;
   }
 
-  // Nuovo utente social — niente password (placeholder casuale), niente CF
-  // (lo aggiungerà dal profilo). Onboarding interessi resta da fare.
-  // dataNascita arriva da People API quando l'utente ha condiviso lo scope:
-  // se manca o è incompleta usiamo un placeholder che l'utente aggiornerà.
+  // Nuovo utente social — passwordHash=null (NO random hash!).
+  // Motivazione (security): se mettessimo un random hash, `forgotPassword`
+  // permetterebbe a chiunque possieda la mail di impostare una password e
+  // bypassare il flusso OAuth (bug-2025-05-16). Con null, login con password
+  // e reset password sono bloccati lato server. L'utente DEVE usare OAuth.
+  // Niente CF reale (lo aggiungerà dal profilo). Onboarding interessi resta
+  // da fare. dataNascita arriva da People API quando l'utente ha condiviso
+  // lo scope; se manca usiamo un placeholder che l'utente aggiornerà.
   const birthdate = resolveSocialBirthdate(dataNascita);
-  const randomPw = crypto.randomBytes(24).toString('hex');
-  const passwordHash = await bcrypt.hash(randomPw, 12);
 
   const user = await sequelize.transaction(async (t) => {
     const u = await User.create({
       email,
-      passwordHash,
+      passwordHash: null,
       nome: nome || email.split('@')[0],
       cognome: cognome || '',
       dataNascita: birthdate,

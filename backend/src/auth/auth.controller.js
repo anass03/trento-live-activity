@@ -38,7 +38,23 @@ async function updateLocation(req, res, next) {
 
 async function deleteAccount(req, res, next) {
   try {
-    await service.deleteAccount(req.user.id);
+    const { currentPassword, confirmEmail } = req.body || {};
+    await service.deleteAccount(req.user.id, { currentPassword, confirmEmail });
+    // Revoca anche il JWT corrente, l'account non esiste più: il token non
+    // deve essere riutilizzabile fino alla naturale scadenza.
+    const expMs = req.user.exp ? req.user.exp * 1000 : undefined;
+    await service.logout(req.user.jti, expMs).catch(() => {});
+    res.status(204).send();
+  } catch (e) { next(e); }
+}
+
+async function changePassword(req, res, next) {
+  try {
+    const { currentPassword, newPassword } = req.body || {};
+    await service.changePassword(req.user.id, { currentPassword, newPassword });
+    // Forza re-login revocando il JWT attuale.
+    const expMs = req.user.exp ? req.user.exp * 1000 : undefined;
+    await service.logout(req.user.jti, expMs).catch(() => {});
     res.status(204).send();
   } catch (e) { next(e); }
 }
@@ -80,7 +96,9 @@ async function resetPassword(req, res, next) {
 
 async function logout(req, res, next) {
   try {
-    service.logout(req.user.jti);
+    // req.user.exp è in secondi (standard JWT) → convertito in ms per il TTL DB.
+    const expMs = req.user.exp ? req.user.exp * 1000 : undefined;
+    await service.logout(req.user.jti, expMs);
     res.status(204).send();
   } catch (e) { next(e); }
 }
@@ -190,6 +208,7 @@ async function spidCallback(req, res, next) {
 
 module.exports = {
   register, login, logout, getMe, updateProfile, updateLocation, deleteAccount,
+  changePassword,
   setup2fa, verify2fa, regenerateRecoveryCodes,
   forgotPassword, resetPassword, registerEntity, verifyEmail,
   listConsents, updateConsent,

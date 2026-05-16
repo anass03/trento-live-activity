@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import {
-  deleteAccount, getMe, listConsents, logout, regenerateRecoveryCodes,
-  registerDeviceToken, sendTestPush, summarizeConsents, unregisterDeviceToken,
+  changePassword, deleteAccount, getMe, listConsents, logout, regenerateRecoveryCodes,
+  registerDeviceToken, sendTestPush, setToken, summarizeConsents, unregisterDeviceToken,
   updateConsent, updateEnteProfile, updateLocation, updateProfile,
   type ConsentType, type MeProfile,
 } from '../lib/api';
@@ -18,6 +18,9 @@ interface MeUser {
   ruolo?: string;
   twoFactorEnabled?: boolean;
   twoFactorRecoveryCodesRemaining?: number;
+  // Backend espone hasPassword=false per account OAuth-only (Google/Apple senza
+  // password locale). Determina la UI di cambio password e di delete confirm.
+  hasPassword?: boolean;
   profile: MeProfile | null;
   // legacy fallback
   nome?: string;
@@ -80,6 +83,15 @@ export function ProfilePage() {
   // Two-step delete
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleteEmailConfirm, setDeleteEmailConfirm] = useState('');
+  const [deletePassword, setDeletePassword] = useState('');
+
+  // Cambio password (utenti con password locale)
+  const [pwdCurrent, setPwdCurrent] = useState('');
+  const [pwdNew, setPwdNew] = useState('');
+  const [pwdConfirm, setPwdConfirm] = useState('');
+  const [pwdSaving, setPwdSaving] = useState(false);
+  const [pwdMessage, setPwdMessage] = useState<string | null>(null);
+  const [pwdError, setPwdError] = useState<string | null>(null);
 
   // Riepilogo notifiche (sola lettura — la gestione vera è in /impostazioni)
   const [notifSummary, setNotifSummary] = useState<Partial<Record<ConsentType, boolean>>>({});
@@ -253,14 +265,53 @@ export function ProfilePage() {
   }
 
   async function handleDelete() {
-    if (deleteEmailConfirm.trim().toLowerCase() !== (user?.email || '').toLowerCase()) {
-      setError('La conferma email non corrisponde.');
-      return;
+    setError(null);
+    // #M7: il backend accetta currentPassword se l'utente ha password locale,
+    // altrimenti confirmEmail="DELETE <email>" per account OAuth-only.
+    const payload: { currentPassword?: string; confirmEmail?: string } = {};
+    if (user?.hasPassword) {
+      if (!deletePassword) {
+        setError('Inserisci la password attuale per confermare.');
+        return;
+      }
+      payload.currentPassword = deletePassword;
+    } else {
+      const expected = `DELETE ${user?.email || ''}`.toLowerCase().trim();
+      if (deleteEmailConfirm.trim().toLowerCase() !== expected) {
+        setError(`Per confermare, digita esattamente: DELETE ${user?.email}`);
+        return;
+      }
+      payload.confirmEmail = deleteEmailConfirm;
     }
-    localStorage.removeItem(FCM_TOKEN_KEY);
-    await deleteAccount();
-    navigate('/');
-    window.location.reload();
+    try {
+      localStorage.removeItem(FCM_TOKEN_KEY);
+      await deleteAccount(payload);
+      setToken(null);
+      navigate('/');
+      window.location.reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Errore');
+    }
+  }
+
+  async function handleChangePassword(event: FormEvent) {
+    event.preventDefault();
+    setPwdError(null); setPwdMessage(null);
+    if (pwdNew !== pwdConfirm) { setPwdError('Le nuove password non coincidono.'); return; }
+    if (pwdNew === pwdCurrent) { setPwdError('La nuova password deve essere diversa da quella attuale.'); return; }
+    setPwdSaving(true);
+    try {
+      await changePassword({ currentPassword: pwdCurrent, newPassword: pwdNew });
+      // Il backend revoca il JWT corrente al successo: dobbiamo riloggarci.
+      setPwdMessage('Password aggiornata. Effettua di nuovo il login.');
+      setPwdCurrent(''); setPwdNew(''); setPwdConfirm('');
+      setToken(null);
+      setTimeout(() => { navigate('/login'); window.location.reload(); }, 1500);
+    } catch (e) {
+      setPwdError(e instanceof Error ? e.message : 'Errore');
+    } finally {
+      setPwdSaving(false);
+    }
   }
 
   if (isLoading) return <section className="data-page"><div className="state-panel liquid-panel">Caricamento...</div></section>;
@@ -534,6 +585,58 @@ export function ProfilePage() {
         </div>
       </div>
 
+      {/* ── Cambio password (solo per chi ha una password locale) ── */}
+      {user.hasPassword && (
+        <div className="profile-delete-footer">
+          <form className="auth-form liquid-card" onSubmit={handleChangePassword}>
+            <h2>Cambia password</h2>
+            <p className="muted-copy" style={{ marginTop: 0 }}>
+              Verrà chiesto un nuovo login al termine.
+            </p>
+            <label>
+              <span>Password attuale</span>
+              <input
+                type="password"
+                value={pwdCurrent}
+                onChange={(e) => setPwdCurrent(e.target.value)}
+                autoComplete="current-password"
+                required
+              />
+            </label>
+            <label>
+              <span>Nuova password</span>
+              <input
+                type="password"
+                value={pwdNew}
+                onChange={(e) => setPwdNew(e.target.value)}
+                autoComplete="new-password"
+                minLength={8}
+                required
+              />
+            </label>
+            <label>
+              <span>Conferma nuova password</span>
+              <input
+                type="password"
+                value={pwdConfirm}
+                onChange={(e) => setPwdConfirm(e.target.value)}
+                autoComplete="new-password"
+                minLength={8}
+                required
+              />
+            </label>
+            <p className="muted-copy" style={{ fontSize: 12, margin: '4px 0 0' }}>
+              Min 8 caratteri, una maiuscola, una minuscola, un numero, un carattere speciale.
+            </p>
+            {pwdError && <div className="form-error">{pwdError}</div>}
+            {pwdMessage && <div className="form-success">{pwdMessage}</div>}
+            <button className="primary-button" type="submit" disabled={pwdSaving || !pwdCurrent || !pwdNew}>
+              {pwdSaving ? 'Salvataggio...' : 'Aggiorna password'}
+            </button>
+          </form>
+        </div>
+      )}
+
       {/* ── Elimina account: fuori dai card principali, in fondo ── */}
       <div className="profile-delete-footer">
         {!confirmingDelete ? (
@@ -543,16 +646,32 @@ export function ProfilePage() {
         ) : (
           <div className="profile-delete-confirm liquid-card">
             <strong>Conferma eliminazione</strong>
-            <p>L'azione è irreversibile (GDPR art. 17). Per procedere digita la tua email: <code>{user.email}</code></p>
-            <input
-              type="email"
-              value={deleteEmailConfirm}
-              onChange={(e) => setDeleteEmailConfirm(e.target.value)}
-              placeholder={user.email}
-              autoComplete="off"
-            />
+            <p>L'azione è irreversibile (GDPR art. 17).</p>
+            {user.hasPassword ? (
+              <label>
+                <span>Password attuale</span>
+                <input
+                  type="password"
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  autoComplete="current-password"
+                  required
+                />
+              </label>
+            ) : (
+              <label>
+                <span>Per confermare digita: <code>DELETE {user.email}</code></span>
+                <input
+                  type="text"
+                  value={deleteEmailConfirm}
+                  onChange={(e) => setDeleteEmailConfirm(e.target.value)}
+                  placeholder={`DELETE ${user.email}`}
+                  autoComplete="off"
+                />
+              </label>
+            )}
             <div className="filter-actions">
-              <button type="button" onClick={() => { setConfirmingDelete(false); setDeleteEmailConfirm(''); setError(null); }}>
+              <button type="button" onClick={() => { setConfirmingDelete(false); setDeleteEmailConfirm(''); setDeletePassword(''); setError(null); }}>
                 Annulla
               </button>
               <button type="button" className="danger-button compact-button" onClick={handleDelete}>
