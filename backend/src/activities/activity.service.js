@@ -184,8 +184,19 @@ async function updateActivity(userId, activityId, updates) {
       throw { status: 400, code: 'INVALID_TIME', error: 'End time must be after start time' };
     }
   }
+  if (updates.maxPartecipanti != null
+      && (updates.maxPartecipanti < 2 || updates.maxPartecipanti > 50)) {
+    throw { status: 400, code: 'INVALID_MAX_PARTECIPANTI', error: 'maxPartecipanti must be between 2 and 50' };
+  }
 
-  await activity.update(updates);
+  // Mass-assignment guard: solo i campi qui sotto sono modificabili.
+  // Senza whitelist, un attaccante autenticato potrebbe passare creatorId,
+  // stato, id e impossessarsi/manipolare l'attività.
+  const ALLOWED_UPDATE_FIELDS = ['tipo', 'data', 'orarioInizio', 'orarioFine', 'maxPartecipanti', 'latitudine', 'longitudine', 'poiId'];
+  const safeUpdates = Object.fromEntries(
+    Object.entries(updates).filter(([k]) => ALLOWED_UPDATE_FIELDS.includes(k))
+  );
+  await activity.update(safeUpdates);
 
   // RF19: notify registered participants (excluding the creator who triggered the change)
   const emails = await getParticipantEmails(activityId, userId);

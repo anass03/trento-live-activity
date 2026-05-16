@@ -10,6 +10,12 @@ async function createReport(userId, eventId, { tipo, descrizione }) {
   const event = await Event.findByPk(eventId);
   if (!event) throw { status: 404, code: 'NOT_FOUND', error: 'Event not found' };
 
+  // Guard #H3: TEXT in Postgres regge fino a 1 GB → un payload da MB blocca
+  // l'admin UI e gonfia il DB. Inoltre input troppo grande è quasi sempre abuse.
+  if (typeof descrizione === 'string' && descrizione.length > 2000) {
+    throw { status: 400, code: 'DESCRIPTION_TOO_LONG', error: 'La descrizione non può superare i 2000 caratteri.' };
+  }
+
   // OCL C22: one report per user per event
   let report;
   try {

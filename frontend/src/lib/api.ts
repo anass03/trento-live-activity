@@ -223,10 +223,6 @@ export async function getMapMarkers(): Promise<MapMarker[]> {
   const payload = await request<MapResponse | MapMarker[]>('/api/map');
   return arrayFromPayload<MapMarker>(payload, 'markers');
 }
-export function getCurrentUser(): Promise<CurrentUser> {
-  return request<CurrentUser>('/api/users/me');
-}
-
 // ============================== Auth ==============================
 
 export async function login(email: string, password: string, otpToken?: string): Promise<AuthResponse> {
@@ -252,6 +248,8 @@ export async function register(payload: RegisterPayload): Promise<RegisterRespon
 export interface RegisterEntityPayload {
   email: string; password: string; nomeEnte: string; pec: string;
   nome?: string; cognome?: string;
+  // #M6: il backend ora richiede consenso esplicito privacy + ToS anche per gli enti.
+  consents: { privacy_policy: boolean; terms_of_service: boolean; marketing?: boolean; analytics?: boolean; };
 }
 export function registerEntity(payload: RegisterEntityPayload): Promise<{ message: string; userId: string }> {
   return request('/api/auth/register/entity', { method: 'POST', body: payload, auth: false });
@@ -399,8 +397,17 @@ export function getMe(): Promise<CurrentUser & { id: string; profile: MeProfile 
 export function updateProfile(data: { nome?: string; cognome?: string; interessi?: string[] }): Promise<CurrentUser> {
   return request('/api/auth/me', { method: 'PUT', body: data });
 }
-export function deleteAccount(): Promise<void> {
-  return request('/api/auth/me', { method: 'DELETE' });
+// #M7: il backend ora richiede currentPassword (account con password) o
+// confirmEmail="DELETE <email>" (account OAuth-only) per impedire che un JWT
+// rubato basti a cancellare l'account.
+export function deleteAccount(payload: { currentPassword?: string; confirmEmail?: string } = {}): Promise<void> {
+  return request('/api/auth/me', { method: 'DELETE', body: payload });
+}
+
+// #M5: cambio password per utente loggato. Richiede password attuale; il backend
+// revoca il JWT corrente al successo, l'utente deve fare login di nuovo.
+export function changePassword(payload: { currentPassword: string; newPassword: string }): Promise<void> {
+  return request('/api/auth/me/password', { method: 'POST', body: payload });
 }
 export function updateLocation(lat: number, lng: number): Promise<{ lat: number; lng: number }> {
   return request('/api/auth/me/location', { method: 'PUT', body: { lat, lng } });
