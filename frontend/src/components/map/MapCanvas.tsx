@@ -475,6 +475,7 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
       setForm((f) => ({
         ...f,
         tipo: result.tipo,
+        data: result.data,
         maxPartecipanti: result.maxPartecipanti,
         orarioInizio: result.orarioInizio,
         orarioFine: result.orarioFine,

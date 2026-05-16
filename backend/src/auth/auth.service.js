@@ -340,18 +340,51 @@ async function updateEnteProfile(userId, { noteAdmin }) {
   return profile;
 }
 
-// Marca onboarding interessi come completato (cittadini)
-async function completeOnboarding(userId, interessi) {
+// Marca onboarding interessi come completato (cittadini).
+// Age gate (GDPR art. 8 / OCL C5): gli utenti social possono essere stati creati
+// col placeholder 2000-01-01 quando Google non ha condiviso la birthday.
+// In quel caso l'onboarding NON si completa finché l'utente non fornisce una
+// data reale che supera il check >=13 anni.
+const BIRTHDATE_PLACEHOLDER = '2000-01-01';
+async function completeOnboarding(userId, { interessi, dataNascita } = {}) {
   const { CittadinoProfile: _CittadinoProfile } = require('../data/models');
   const profile = await _CittadinoProfile.findOne({ where: { userId } });
   if (!profile) throw { status: 404, code: 'NOT_FOUND', error: 'Cittadino profile not found' };
-  await profile.update({
+
+  const isPlaceholder = String(profile.dataNascita).startsWith(BIRTHDATE_PLACEHOLDER);
+  let nuovaData = null;
+  if (isPlaceholder) {
+    if (!dataNascita || !/^\d{4}-\d{2}-\d{2}$/.test(dataNascita)) {
+      throw {
+        status: 400,
+        code: 'BIRTHDATE_REQUIRED',
+        error: 'La data di nascita è obbligatoria per completare la registrazione.',
+      };
+    }
+    if (calcAge(dataNascita) < 13) {
+      throw {
+        status: 403,
+        code: 'UNDERAGE',
+        error: 'Devi avere almeno 13 anni per usare il servizio (GDPR art. 8).',
+      };
+    }
+    nuovaData = dataNascita;
+  }
+
+  const updates = {
     interessi: Array.isArray(interessi) ? interessi : profile.interessi,
     onboardingComplete: true,
-  });
-  // Sync legacy su User
+  };
+  if (nuovaData) updates.dataNascita = nuovaData;
+  await profile.update(updates);
+
+  // Sync su User: interessi sempre, dataNascita solo se aggiornata
   const user = await User.findByPk(userId);
-  if (user) await user.update({ interessi: profile.interessi });
+  if (user) {
+    const userUpdates = { interessi: profile.interessi };
+    if (nuovaData) userUpdates.dataNascita = nuovaData;
+    await user.update(userUpdates);
+  }
   return profile;
 }
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { getMe, verifyEmail, setToken } from '../lib/api';
+import { getMe, isPlaceholderBirthdate, verifyEmail, setToken } from '../lib/api';
 
 export function VerifyEmailPage() {
   const [searchParams] = useSearchParams();
@@ -27,10 +27,10 @@ export function VerifyEmailPage() {
         // Se cittadino e onboarding non ancora completato, indirizzalo lì.
         try {
           const me = await getMe();
-          const target = me.profile?.kind === 'cittadino' && !me.profile.onboardingComplete
-            ? '/onboarding/interessi'
-            : '/';
-          setTimeout(() => navigate(target), 1400);
+          const profile = me.profile;
+          const needsOnboarding = profile?.kind === 'cittadino'
+            && (!profile.onboardingComplete || isPlaceholderBirthdate(profile.dataNascita));
+          setTimeout(() => navigate(needsOnboarding ? '/onboarding/interessi' : '/'), 1400);
         } catch {
           setTimeout(() => navigate('/'), 1800);
         }

@@ -32,6 +32,36 @@ function verifyAppleIdToken(idToken, audience) {
   });
 }
 
+// Calcola età da una data YYYY-MM-DD. Usato per il check anti-minori (GDPR / OCL C5).
+function ageFromIso(dateIso) {
+  const birth = new Date(dateIso);
+  if (Number.isNaN(birth.getTime())) return NaN;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age -= 1;
+  return age;
+}
+
+// Sceglie la data di nascita per un nuovo utente social.
+// - Se Google ci dà una data completa (Y+M+D) e l'utente ha >= 13 anni → la usa.
+// - Se è minore di 13 → eccezione (GDPR art. 8 / OCL C5).
+// - Se manca o è incompleta (es. Google restituisce solo M+D senza anno) → placeholder.
+const BIRTHDATE_PLACEHOLDER = '2000-01-01';
+function resolveSocialBirthdate(provided) {
+  if (!provided || !/^\d{4}-\d{2}-\d{2}$/.test(provided)) return BIRTHDATE_PLACEHOLDER;
+  const age = ageFromIso(provided);
+  if (Number.isNaN(age)) return BIRTHDATE_PLACEHOLDER;
+  if (age < 13) {
+    throw {
+      status: 403,
+      code: 'UNDERAGE',
+      error: 'Devi avere almeno 13 anni per registrarti (GDPR).',
+    };
+  }
+  return provided;
+}
+
 // Crea-o-recupera il cittadino. Per gli account social non c'è una password
 // vera (passwordHash è un random hash) e la mail è considerata verificata
 // (il provider l'ha già verificata).
@@ -41,7 +71,7 @@ function verifyAppleIdToken(idToken, audience) {
 // rifiutato — altrimenti bypassiamo 2FA / SPID / verifica PEC e si entra
 // senza i controlli previsti per quel ruolo. OAuth Google/Apple è esclusivo
 // dei cittadini (UtenteRegistrato).
-async function ensureCitizenFromSocial({ email, nome, cognome, providerId, provider }) {
+async function ensureCitizenFromSocial({ email, nome, cognome, providerId, provider, dataNascita }) {
   if (!email) throw { status: 400, code: 'OAUTH_NO_EMAIL', error: `Il provider ${provider} non ha fornito un'email` };
 
   const existing = await User.findOne({ where: { email } });
@@ -72,11 +102,31 @@ async function ensureCitizenFromSocial({ email, nome, cognome, providerId, provi
     if (!existing.emailVerified) {
       await existing.update({ emailVerified: true, emailVerificationToken: null });
     }
+    // Backfill della data di nascita: se l'account era stato creato col placeholder
+    // (es. prima dello scope birthday, o senza People API abilitata) e ora Google
+    // ci dà una data reale → aggiorniamo. Se l'utente l'aveva già cambiata a mano
+    // nel profilo, NON la tocchiamo (rispettiamo l'input manuale).
+    if (dataNascita) {
+      try {
+        const resolved = resolveSocialBirthdate(dataNascita);
+        const isPlaceholderOnUser = String(existing.dataNascita).startsWith(BIRTHDATE_PLACEHOLDER);
+        const profile = await CittadinoProfile.findOne({ where: { userId: existing.id } });
+        const isPlaceholderOnProfile = profile && String(profile.dataNascita).startsWith(BIRTHDATE_PLACEHOLDER);
+        if (isPlaceholderOnUser) await existing.update({ dataNascita: resolved });
+        if (profile && isPlaceholderOnProfile) await profile.update({ dataNascita: resolved });
+      } catch (e) {
+        // Se è UNDERAGE blocchiamo. Altri errori: best-effort, non rompiamo il login.
+        if (e && e.code === 'UNDERAGE') throw e;
+      }
+    }
     return existing;
   }
 
   // Nuovo utente social — niente password (placeholder casuale), niente CF
   // (lo aggiungerà dal profilo). Onboarding interessi resta da fare.
+  // dataNascita arriva da People API quando l'utente ha condiviso lo scope:
+  // se manca o è incompleta usiamo un placeholder che l'utente aggiornerà.
+  const birthdate = resolveSocialBirthdate(dataNascita);
   const randomPw = crypto.randomBytes(24).toString('hex');
   const passwordHash = await bcrypt.hash(randomPw, 12);
 
@@ -86,7 +136,7 @@ async function ensureCitizenFromSocial({ email, nome, cognome, providerId, provi
       passwordHash,
       nome: nome || email.split('@')[0],
       cognome: cognome || '',
-      dataNascita: '2000-01-01', // placeholder, l'utente lo aggiornerà
+      dataNascita: birthdate,
       ruolo: 'UtenteRegistrato',
       emailVerified: true,
     }, { transaction: t });
@@ -94,7 +144,7 @@ async function ensureCitizenFromSocial({ email, nome, cognome, providerId, provi
       userId: u.id,
       nome: nome || email.split('@')[0],
       cognome: cognome || '',
-      dataNascita: '2000-01-01',
+      dataNascita: birthdate,
       // CF placeholder vuoto: lo riempirà dal profilo. Lasciamo unique sull'attuale
       // colonna che è NOT NULL: usiamo un sentinel basato sul providerId per
       // non collidere fra utenti diversi. Il client dovrà chiedere il CF reale.
@@ -107,23 +157,86 @@ async function ensureCitizenFromSocial({ email, nome, cognome, providerId, provi
   return user;
 }
 
-async function loginWithGoogle(idToken) {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  if (!clientId) throw { status: 503, code: 'OAUTH_NOT_CONFIGURED', error: 'GOOGLE_CLIENT_ID non configurato' };
-  const oauth = new OAuth2Client(clientId);
-  let payload;
+// Recupera la data di nascita dell'utente Google via People API.
+// Richiede:
+//   - scope: https://www.googleapis.com/auth/user.birthday.read
+//   - People API abilitata sul progetto Google Cloud
+// Ritorna stringa YYYY-MM-DD o null se non disponibile (data parziale, non
+// condivisa, o errore di rete: in tutti i casi best-effort).
+async function fetchGoogleBirthday(accessToken) {
   try {
-    const ticket = await oauth.verifyIdToken({ idToken, audience: clientId });
-    payload = ticket.getPayload();
+    const resp = await fetch(
+      'https://people.googleapis.com/v1/people/me?personFields=birthdays',
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+    if (!resp.ok) {
+      const errBody = await resp.text().catch(() => '');
+      console.warn(`[oauth.google] People API HTTP ${resp.status}: ${errBody.slice(0, 200)}`);
+      return null;
+    }
+    const data = await resp.json();
+    const birthdays = Array.isArray(data.birthdays) ? data.birthdays : [];
+    if (birthdays.length === 0) {
+      console.log('[oauth.google] People API: nessuna birthday nel profilo utente');
+      return null;
+    }
+    // Preferisci l'entry primaria (Google la marca con metadata.primary).
+    const primary = birthdays.find((b) => b.metadata && b.metadata.primary) || birthdays[0];
+    const date = primary && primary.date;
+    // L'utente può avere solo giorno/mese senza anno: in quel caso non è usabile.
+    if (!date || !date.year || !date.month || !date.day) {
+      console.log('[oauth.google] People API: birthday senza anno (parziale, non usabile)', date);
+      return null;
+    }
+    const y = String(date.year).padStart(4, '0');
+    const m = String(date.month).padStart(2, '0');
+    const d = String(date.day).padStart(2, '0');
+    const iso = `${y}-${m}-${d}`;
+    console.log(`[oauth.google] People API: birthday recuperata ${iso}`);
+    return iso;
   } catch (e) {
-    throw { status: 401, code: 'OAUTH_INVALID_TOKEN', error: `Google idToken non valido: ${e.message}` };
+    console.warn('[oauth.google] People API fetch failed:', e.message);
+    return null;
   }
+}
+
+// Login con Google via access_token (flusso "implicit" lato frontend).
+// Vantaggio rispetto al solo idToken: con l'access_token possiamo chiamare la
+// People API per recuperare la data di nascita reale dell'utente, invece di
+// usare il placeholder 2000-01-01.
+async function loginWithGoogle(accessToken) {
+  if (!accessToken) {
+    throw { status: 400, code: 'OAUTH_NO_TOKEN', error: 'access_token mancante' };
+  }
+  if (!process.env.GOOGLE_CLIENT_ID) {
+    throw { status: 503, code: 'OAUTH_NOT_CONFIGURED', error: 'GOOGLE_CLIENT_ID non configurato' };
+  }
+
+  // Verifica identità via userinfo endpoint: Google convalida l'access_token e
+  // ci restituisce email/nome/sub solo se il token è valido e non scaduto.
+  // Equivale al check crittografico di verifyIdToken ma sull'access_token.
+  let userinfo;
+  try {
+    const resp = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    userinfo = await resp.json();
+  } catch (e) {
+    throw { status: 401, code: 'OAUTH_INVALID_TOKEN', error: `Google access_token non valido: ${e.message}` };
+  }
+
+  // Birthday best-effort: se mancano scope/People API/data nel profilo è null
+  // e ensureCitizenFromSocial userà il placeholder.
+  const dataNascita = await fetchGoogleBirthday(accessToken);
+
   const user = await ensureCitizenFromSocial({
-    email: payload.email,
-    nome: payload.given_name,
-    cognome: payload.family_name,
-    providerId: payload.sub,
+    email: userinfo.email,
+    nome: userinfo.given_name,
+    cognome: userinfo.family_name,
+    providerId: userinfo.sub,
     provider: 'google',
+    dataNascita,
   });
   return { user, token: signToken(user) };
 }
