@@ -2672,11 +2672,14 @@ select option {
 /* ── Calendar dual links ── */
 .calendar-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
-/* ── React map popup ── */
+/* ── React map popup ──
+   Renderizzato via portal su document.body con position:fixed, così sfugge a
+   overflow:hidden + isolation:isolate di .map-area e va sopra HUD/legenda
+   (z-index 500) e qualunque altro contenuto in pagina. */
 .map-react-popup-anchor {
-  position: absolute;
+  position: fixed;
   pointer-events: none;
-  z-index: 20;
+  z-index: 1200;
 }
 .map-react-popup {
   position: absolute;
