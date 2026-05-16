@@ -7,6 +7,7 @@ import {
   type ConsentType, type MeProfile,
 } from '../lib/api';
 import { requestFcmToken, revokeFcmToken } from '../lib/firebase';
+import { reverseGeocode } from '../components/ui/GeocodedLocation';
 
 const AVAILABLE_INTERESTS = ['sport', 'cultura', 'musica', 'arte', 'gastronomia', 'studio', 'natura', 'tecnologia', 'volontariato'];
 const FCM_TOKEN_KEY = 'tla_fcm_token';
@@ -218,7 +219,9 @@ export function ProfilePage() {
       async (pos) => {
         try {
           await updateLocation(pos.coords.latitude, pos.coords.longitude);
-          setLocationMessage(`Posizione aggiornata (${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)})`);
+          const coordStr = `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
+          const placeName = await reverseGeocode(coordStr).catch(() => coordStr);
+          setLocationMessage(`Posizione aggiornata: ${placeName}`);
           setLocationError(null);
         } catch (e) {
           setLocationError(e instanceof Error ? e.message : 'Errore');
@@ -322,7 +325,7 @@ export function ProfilePage() {
               </label>
               <label>
                 <span>Data di nascita</span>
-                <input type="text" value={profile.dataNascita ? new Date(profile.dataNascita).toLocaleDateString('it-IT') : '—'} disabled readOnly />
+                <input type="text" value={profile.dataNascita ? new Date(profile.dataNascita + 'T00:00:00').toLocaleDateString('it-IT') : '—'} disabled readOnly />
               </label>
 
               <fieldset>
@@ -472,7 +475,7 @@ export function ProfilePage() {
                       </>
                     ) : (
                       <button type="button" className="primary-button" onClick={handleEnablePush} disabled={isTogglingPush}>
-                        {isTogglingPush ? '...' : 'Attiva notifiche push'}
+                        {isTogglingPush ? '...' : '🔔 Attiva notifiche push'}
                       </button>
                     )}
                   </div>
