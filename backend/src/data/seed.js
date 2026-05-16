@@ -16,6 +16,11 @@ async function seed() {
   await Activity.destroy({ where: {}, truncate: true, cascade: true });
   await Event.destroy({ where: {}, truncate: true, cascade: true });
   await POI.destroy({ where: {}, truncate: true, cascade: true });
+  // Nota: Favorite, EventParticipation e i profili sono CASCADE quando si elimina User,
+  // ma facciamo truncate esplicito per evitare residui se le associazioni cambiano.
+  const { Favorite, EventParticipation } = require('./models');
+  await Favorite.destroy({ where: {}, truncate: true, cascade: true });
+  await EventParticipation.destroy({ where: {}, truncate: true, cascade: true });
   await CittadinoProfile.destroy({ where: {}, truncate: true, cascade: true });
   await EnteProfile.destroy({ where: {}, truncate: true, cascade: true });
   await AmministratoreComunaleProfile.destroy({ where: {}, truncate: true, cascade: true });
@@ -71,12 +76,12 @@ async function seed() {
     CittadinoProfile.create({
       userId: mario.id, nome: 'Mario', cognome: 'Rossi',
       dataNascita: '1995-05-12', codiceFiscale: 'RSSMRA85T10A562S',
-      interessi: ['sport', 'musica'],
+      interessi: ['sport', 'musica'], onboardingComplete: true,
     }),
     CittadinoProfile.create({
       userId: lucia.id, nome: 'Lucia', cognome: 'Bianchi',
       dataNascita: '2000-09-23', codiceFiscale: 'BNCLCU00P63L378I',
-      interessi: ['cultura', 'arte'],
+      interessi: ['cultura', 'arte'], onboardingComplete: true,
     }),
     EnteProfile.create({
       userId: castello.id, nomeEnte: 'Castello del Buonconsiglio',

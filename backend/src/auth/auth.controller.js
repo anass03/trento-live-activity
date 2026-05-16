@@ -1,4 +1,5 @@
 const service = require('./auth.service');
+const oauth = require('./oauth.service');
 
 async function register(req, res, next) {
   try {
@@ -112,9 +113,81 @@ async function updateConsent(req, res, next) {
   } catch (e) { next(e); }
 }
 
+async function updateEnteProfile(req, res, next) {
+  try {
+    const profile = await service.updateEnteProfile(req.user.id, req.body);
+    res.json(profile);
+  } catch (e) { next(e); }
+}
+
+async function completeOnboarding(req, res, next) {
+  try {
+    const profile = await service.completeOnboarding(req.user.id, req.body.interessi);
+    res.json(profile);
+  } catch (e) { next(e); }
+}
+
+// Suggerimento dinamico: data una lista di interessi già scelti, calcola le
+// categorie co-occorrenti più frequenti fra gli altri cittadini.
+// Niente ML — query SQL aggregata sulla colonna interessi (ARRAY).
+async function suggestedInterests(req, res, next) {
+  try {
+    const { sequelize } = require('../data/models');
+    const picked = String(req.query.picked || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (picked.length === 0) {
+      return res.json({ suggestions: [] });
+    }
+    const rows = await sequelize.query(
+      `SELECT i AS interesse, COUNT(*)::int AS count
+       FROM "cittadino_profiles", UNNEST("interessi") AS i
+       WHERE "interessi" && ARRAY[:picked]::varchar[]
+         AND NOT (i = ANY(ARRAY[:picked]::varchar[]))
+       GROUP BY i
+       ORDER BY count DESC
+       LIMIT 3`,
+      { replacements: { picked }, type: sequelize.QueryTypes.SELECT },
+    );
+    res.json({ suggestions: rows.map((r) => r.interesse) });
+  } catch (e) { next(e); }
+}
+
+const sanitizeForResponse = (u) => ({
+  id: u.id, email: u.email, ruolo: u.ruolo, emailVerified: u.emailVerified,
+});
+
+async function oauthGoogle(req, res, next) {
+  try {
+    const { idToken } = req.body || {};
+    if (!idToken) return res.status(400).json({ error: 'idToken required', code: 'MISSING_TOKEN' });
+    const { user, token } = await oauth.loginWithGoogle(idToken);
+    res.json({ user: sanitizeForResponse(user), token });
+  } catch (e) { next(e); }
+}
+
+async function oauthApple(req, res, next) {
+  try {
+    const { idToken } = req.body || {};
+    if (!idToken) return res.status(400).json({ error: 'idToken required', code: 'MISSING_TOKEN' });
+    const { user, token } = await oauth.loginWithApple(idToken);
+    res.json({ user: sanitizeForResponse(user), token });
+  } catch (e) { next(e); }
+}
+
+async function spidCallback(req, res, next) {
+  try {
+    const { user, token } = await oauth.loginWithSpidStub(req.body || {});
+    res.json({ user: sanitizeForResponse(user), token });
+  } catch (e) { next(e); }
+}
+
 module.exports = {
   register, login, logout, getMe, updateProfile, updateLocation, deleteAccount,
   setup2fa, verify2fa, regenerateRecoveryCodes,
   forgotPassword, resetPassword, registerEntity, verifyEmail,
   listConsents, updateConsent,
+  updateEnteProfile, completeOnboarding, suggestedInterests,
+  oauthGoogle, oauthApple, spidCallback,
 };

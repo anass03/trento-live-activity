@@ -4,10 +4,14 @@ export interface NavItem { label: string; path: string; roles: UserRole[]; }
 
 const ALL_ROLES: UserRole[] = ['anonymous', 'registered_user', 'certified_entity', 'municipal_admin', 'system_admin'];
 
+// Scope ridotto per municipal_admin e system_admin: niente attività/eventi
+// (loro lavorano su dashboard/POI/moderazione, non sull'esplorazione cittadina).
+const CITIZEN_FACING_ROLES: UserRole[] = ['anonymous', 'registered_user', 'certified_entity'];
+
 export const primaryNav: NavItem[] = [
   { label: 'Mappa', path: '/', roles: ALL_ROLES },
-  { label: 'Attività', path: '/attivita', roles: ALL_ROLES },
-  { label: 'Eventi', path: '/eventi', roles: ALL_ROLES },
+  { label: 'Attività', path: '/attivita', roles: CITIZEN_FACING_ROLES },
+  { label: 'Eventi', path: '/eventi', roles: CITIZEN_FACING_ROLES },
   { label: 'Profilo', path: '/profilo', roles: ['registered_user', 'certified_entity', 'municipal_admin', 'system_admin'] },
   { label: 'Accedi / Registrati', path: '/login', roles: ['anonymous'] },
 ];

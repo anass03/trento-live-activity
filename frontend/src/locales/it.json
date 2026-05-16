@@ -1,0 +1,81 @@
+{
+  "common": {
+    "loading": "Caricamento…",
+    "save": "Salva",
+    "cancel": "Annulla",
+    "delete": "Elimina",
+    "edit": "Modifica",
+    "back": "Indietro",
+    "search": "Cerca",
+    "refresh": "Aggiorna",
+    "submit": "Invia",
+    "close": "Chiudi",
+    "error": "Errore",
+    "yes": "Sì",
+    "no": "No",
+    "or": "oppure"
+  },
+  "nav": {
+    "map": "Mappa",
+    "activities": "Attività",
+    "events": "Eventi",
+    "certifiedEvents": "Eventi certificati",
+    "profile": "Profilo",
+    "settings": "Impostazioni",
+    "logout": "Logout",
+    "login": "Accedi",
+    "register": "Registrati"
+  },
+  "auth": {
+    "login": "Accedi",
+    "loginSubtitle": "Entra nel tuo account Trento Live Activity",
+    "email": "Email",
+    "password": "Password",
+    "loginAction": "Accedi",
+    "logging": "Accesso in corso…",
+    "forgotPassword": "Password dimenticata?",
+    "noAccount": "Non hai un account? Registrati",
+    "withEmail": "oppure con email",
+    "registration": "Registrazione",
+    "citizen": "Cittadino",
+    "entity": "Ente certificato",
+    "fiscalCode": "Codice fiscale",
+    "pec": "PEC (Posta Elettronica Certificata)",
+    "passwordHidden": "Nascondi password",
+    "passwordShown": "Mostra password",
+    "code2fa": "Codice 2FA (6 cifre)",
+    "code2faAuthApp": "Inserisci il codice dal tuo authenticator",
+    "recoveryCode": "Codice di recupero"
+  },
+  "settings": {
+    "title": "Impostazioni",
+    "subtitle": "Personalizza l'aspetto e le notifiche dell'app",
+    "appearance": "Aspetto",
+    "themeLight": "Chiaro",
+    "themeDark": "Scuro",
+    "language": "Lingua",
+    "languageHint": "Lingua dell'interfaccia",
+    "notifications": "Notifiche",
+    "notifEmail": "Email",
+    "notifPush": "Push (browser)",
+    "saved": "✓ Salvato"
+  },
+  "weather": {
+    "sunny": "Sereno",
+    "cloudy": "Nuvoloso",
+    "rainy": "Pioggia",
+    "stormy": "Temporale",
+    "snowy": "Neve"
+  },
+  "filters": {
+    "all": "Tutti",
+    "today": "Oggi",
+    "weekend": "Weekend",
+    "now": "Ora",
+    "open": "Aperte",
+    "favorites": "Preferiti",
+    "forYou": "Per te",
+    "nearMe": "Vicino a me",
+    "removeLocation": "✕ Rimuovi posizione"
+  }
+}

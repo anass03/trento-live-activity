@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { forgotPassword, resetPassword } from '../lib/api';
+import { PasswordInput } from '../components/ui/PasswordInput';
 
 export function PasswordResetPage() {
   const { token } = useParams<{ token?: string }>();
@@ -44,11 +45,11 @@ export function PasswordResetPage() {
           <h1>Imposta nuova password</h1>
           <label>
             <span>Nuova password</span>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} required />
+            <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} required autoComplete="new-password" />
           </label>
           <label>
             <span>Conferma password</span>
-            <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} minLength={8} required />
+            <PasswordInput value={confirm} onChange={(e) => setConfirm(e.target.value)} minLength={8} required autoComplete="new-password" />
           </label>
           {error && <div className="form-error">{error}</div>}
           {message && <div className="form-success">{message}</div>}

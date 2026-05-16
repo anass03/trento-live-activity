@@ -12,6 +12,8 @@ const CittadinoProfile = require('./CittadinoProfile')(sequelize);
 const EnteProfile = require('./EnteProfile')(sequelize);
 const AmministratoreComunaleProfile = require('./AmministratoreComunaleProfile')(sequelize);
 const AmministratoreSistemaProfile = require('./AmministratoreSistemaProfile')(sequelize);
+const EventParticipation = require('./EventParticipation')(sequelize);
+const Favorite = require('./Favorite')(sequelize);
 
 // User <-> Activity (creator)
 Activity.belongsTo(User, { foreignKey: 'creatorId', as: 'creator' });
@@ -58,7 +60,18 @@ User.hasOne(AmministratoreComunaleProfile, { foreignKey: 'userId', as: 'comunale
 AmministratoreSistemaProfile.belongsTo(User, { foreignKey: 'userId', onDelete: 'CASCADE' });
 User.hasOne(AmministratoreSistemaProfile, { foreignKey: 'userId', as: 'sistemaProfile' });
 
+// Event participation N:N — cittadini ↔ eventi certificati
+Event.belongsToMany(User, { through: EventParticipation, foreignKey: 'eventId', as: 'eventParticipants' });
+User.belongsToMany(Event, { through: EventParticipation, foreignKey: 'userId', as: 'joinedEvents' });
+EventParticipation.belongsTo(User, { foreignKey: 'userId', onDelete: 'CASCADE' });
+EventParticipation.belongsTo(Event, { foreignKey: 'eventId', onDelete: 'CASCADE' });
+
+// Favorites — polimorfico (markerType discrimina poi/activity/event)
+Favorite.belongsTo(User, { foreignKey: 'userId', onDelete: 'CASCADE' });
+User.hasMany(Favorite, { foreignKey: 'userId', as: 'favorites' });
+
 module.exports = {
   sequelize, User, Activity, Event, Participation, POI, Report, DeviceToken, Consent,
   CittadinoProfile, EnteProfile, AmministratoreComunaleProfile, AmministratoreSistemaProfile,
+  EventParticipation, Favorite,
 };
