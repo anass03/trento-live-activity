@@ -428,51 +428,61 @@ export function ProfilePage() {
         </div>
 
         <div className="profile-col">
-          {/* ── Riepilogo notifiche (gestione completa in /impostazioni) ── */}
-          {(isCittadino || isEnte) && (
-            <div className="auth-form liquid-card">
-              <h2>Notifiche</h2>
-              <p className="muted-copy" style={{ marginTop: 0, fontSize: 13 }}>
-                <strong>Email:</strong> {notifSummary.notif_email === false ? 'OFF' : 'ON'}{' · '}
-                <strong>Push:</strong> {notifSummary.notif_push === false ? 'OFF' : 'ON'}
-                {' '}<a href="/impostazioni" style={{ marginLeft: 8 }}>Gestisci in Impostazioni →</a>
-              </p>
-              <h3 style={{ marginTop: 10, fontSize: '1rem' }}>Stato push su questo dispositivo</h3>
-              <p>
-                {pushEnabled ? 'Attive su questo browser.' : 'Non attive su questo browser.'}
-              </p>
-              {'Notification' in window && (
-                <p style={{ fontSize: '0.85em', opacity: 0.7 }}>
-                  Permesso:{' '}
-                  <strong>
-                    {Notification.permission === 'granted' ? '✅ concesso' :
-                     Notification.permission === 'denied'  ? '❌ bloccato' : '⏳ non richiesto'}
-                  </strong>
-                </p>
-              )}
-              {pushMessage && <div className="form-success">{pushMessage}</div>}
-              {pushError && <div className="form-error">{pushError}</div>}
-              <div className="filter-actions">
-                {pushEnabled ? (
-                  <>
-                    <button type="button" className="primary-button" onClick={handleTestPush}>
-                      ✉️ Invia test
-                    </button>
-                    <button type="button" onClick={handleDisablePush} disabled={isTogglingPush}>
-                      {isTogglingPush ? '...' : 'Disattiva'}
-                    </button>
-                  </>
+          {/* ── Notifiche: una sola stato chiaro ── */}
+          {(isCittadino || isEnte) && (() => {
+            // Stato unificato: l'utente vede UNA situazione, non 3 righe contraddittorie.
+            const browserBlocked = 'Notification' in window && Notification.permission === 'denied';
+            const consentDenied = notifSummary.notif_push === false;
+            const pushActive = pushEnabled && !consentDenied && !browserBlocked;
+            return (
+              <div className="auth-form liquid-card">
+                <h2>Notifiche push</h2>
+                {browserBlocked ? (
+                  <p className="form-error" style={{ margin: 0 }}>
+                    Il browser ha bloccato le notifiche per questo sito. Riattivale dalle impostazioni del browser
+                    (icona del lucchetto accanto all'URL) e ricarica la pagina.
+                  </p>
+                ) : pushActive ? (
+                  <p className="muted-copy" style={{ marginTop: 0 }}>
+                    Notifiche attive su questo browser. Riceverai aggiornamenti su eventi e attività vicine.
+                  </p>
                 ) : (
-                  <button type="button" className="primary-button" onClick={handleEnablePush} disabled={isTogglingPush}>
-                    {isTogglingPush ? '...' : '🔔 Attiva notifiche push'}
-                  </button>
+                  <p className="muted-copy" style={{ marginTop: 0 }}>
+                    Notifiche push <strong>non attive</strong> su questo browser.
+                  </p>
                 )}
+
+                {pushMessage && <div className="form-success">{pushMessage}</div>}
+                {pushError && <div className="form-error">{pushError}</div>}
+
+                {!browserBlocked && (
+                  <div className="filter-actions">
+                    {pushActive ? (
+                      <>
+                        <button type="button" className="primary-button" onClick={handleTestPush}>
+                          Invia notifica di test
+                        </button>
+                        <button type="button" onClick={handleDisablePush} disabled={isTogglingPush}>
+                          {isTogglingPush ? '...' : 'Disattiva'}
+                        </button>
+                      </>
+                    ) : (
+                      <button type="button" className="primary-button" onClick={handleEnablePush} disabled={isTogglingPush}>
+                        {isTogglingPush ? '...' : 'Attiva notifiche push'}
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                <p className="muted-copy" style={{ fontSize: 12, margin: '6px 0 0' }}>
+                  Email: <strong>{notifSummary.notif_email === false ? 'OFF' : 'ON'}</strong>
+                  {' · '}
+                  Gestisci tutte le preferenze in{' '}
+                  <a href="/impostazioni">Impostazioni</a>.
+                </p>
               </div>
-              <p className="muted-copy" style={{ fontSize: 12 }}>
-                Preferenze più granulari in <a href="/impostazioni">Impostazioni</a>.
-              </p>
-            </div>
-          )}
+            );
+          })()}
 
           {/* ── 2FA: solo sistema (obbligatoria) o se attiva ── */}
           {(isSistema || user.twoFactorEnabled) && (
