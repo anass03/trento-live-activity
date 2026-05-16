@@ -129,7 +129,7 @@ async function seed() {
   };
 
   console.log('Creating activities...');
-  const [calcio, visitaMuse, aperitivo, studio] = await Promise.all([
+  const [calcio, visitaMuse, aperitivo, studio, laboratorioArte, degustazione] = await Promise.all([
     Activity.create({
       tipo: 'sport', data: addDays(3), orarioInizio: '18:00', orarioFine: '19:30',
       maxPartecipanti: 10, creatorId: mario.id, poiId: briamasco.id,
@@ -150,6 +150,16 @@ async function seed() {
       maxPartecipanti: 4, creatorId: lucia.id, poiId: biblioteca.id,
       latitudine: biblioteca.latitudine, longitudine: biblioteca.longitudine,
     }),
+    Activity.create({
+      tipo: 'arte', data: addDays(4), orarioInizio: '14:00', orarioFine: '16:30',
+      maxPartecipanti: 8, creatorId: lucia.id, poiId: castelloPoi.id,
+      latitudine: castelloPoi.latitudine, longitudine: castelloPoi.longitudine,
+    }),
+    Activity.create({
+      tipo: 'gastronomia', data: addDays(6), orarioInizio: '11:00', orarioFine: '13:00',
+      maxPartecipanti: 12, creatorId: mario.id, poiId: piazzaFiera.id,
+      latitudine: piazzaFiera.latitudine, longitudine: piazzaFiera.longitudine,
+    }),
   ]);
 
   console.log('Creating participations (creators auto-join)...');
@@ -158,9 +168,13 @@ async function seed() {
     Participation.create({ userId: lucia.id, activityId: visitaMuse.id }),
     Participation.create({ userId: mario.id, activityId: aperitivo.id }),
     Participation.create({ userId: lucia.id, activityId: studio.id }),
+    Participation.create({ userId: lucia.id, activityId: laboratorioArte.id }),
+    Participation.create({ userId: mario.id, activityId: degustazione.id }),
     // Cross-participation
     Participation.create({ userId: lucia.id, activityId: calcio.id }),
     Participation.create({ userId: mario.id, activityId: studio.id }),
+    Participation.create({ userId: mario.id, activityId: laboratorioArte.id }),
+    Participation.create({ userId: lucia.id, activityId: degustazione.id }),
   ]);
 
   console.log('Creating certified events...');

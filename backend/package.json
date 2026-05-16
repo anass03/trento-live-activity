@@ -11,6 +11,7 @@
     "setup": "bash scripts/setup.sh",
     "seed": "node src/data/seed.js",
     "migrate:consents": "node scripts/migrate-consent-types.js",
+    "migrate:activity-types": "node scripts/migrate-activity-types.js",
     "db:sync": "node -e \"require('./src/data/db').sync({ force: true }).then(() => { console.log('DB synced'); process.exit(0); })\""
   },
   "dependencies": {

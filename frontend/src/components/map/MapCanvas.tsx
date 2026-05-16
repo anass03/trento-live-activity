@@ -396,7 +396,7 @@ function fitMapToMarkers(map: MapLibreMap, markers: MapMarker[]) {
 
 type PoiForm = { tipo: string; data: string; orarioInizio: string; orarioFine: string; maxPartecipanti: number };
 const defaultForm = (): PoiForm => ({ tipo: 'sport', data: '', orarioInizio: '', orarioFine: '', maxPartecipanti: 10 });
-const ACTIVITY_TYPES = ['sport', 'cultura', 'musica', 'arte', 'gastronomia', 'studio'];
+const ACTIVITY_TYPES = ['sport', 'cultura', 'musica', 'studio', 'arte', 'gastronomia'];
 
 export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppUser }) {
   const navigate = useNavigate();
