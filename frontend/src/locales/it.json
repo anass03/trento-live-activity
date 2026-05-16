@@ -42,7 +42,10 @@
     "fiscalCode": "Codice fiscale",
     "pec": "PEC (Posta Elettronica Certificata)",
     "passwordHidden": "Nascondi password",
-    "passwordShown": "Mostra password"
+    "passwordShown": "Mostra password",
+    "code2fa": "Codice 2FA (6 cifre)",
+    "code2faAuthApp": "Inserisci il codice dal tuo authenticator",
+    "recoveryCode": "Codice di recupero"
   },
   "settings": {
     "title": "Impostazioni",

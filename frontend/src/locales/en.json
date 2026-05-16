@@ -42,7 +42,10 @@
     "fiscalCode": "Tax code",
     "pec": "PEC (certified email)",
     "passwordHidden": "Hide password",
-    "passwordShown": "Show password"
+    "passwordShown": "Show password",
+    "code2fa": "2FA code (6 digits)",
+    "code2faAuthApp": "Enter the code from your authenticator app",
+    "recoveryCode": "Recovery code"
   },
   "settings": {
     "title": "Settings",

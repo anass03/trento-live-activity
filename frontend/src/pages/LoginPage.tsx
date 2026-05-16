@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ApiError, login } from '../lib/api';
 import { PasswordInput } from '../components/ui/PasswordInput';
 import { SocialButtons } from '../components/auth/SocialButtons';
@@ -9,6 +10,7 @@ type CodeMode = 'totp' | 'recovery';
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [otpToken, setOtpToken] = useState('');
@@ -62,19 +64,19 @@ export function LoginPage() {
   return (
     <section className="auth-page">
       <form className="auth-form liquid-card" onSubmit={handleSubmit}>
-        <h1>Accedi</h1>
-        <p>Entra nel tuo account Trento Live Activity</p>
+        <h1>{t('auth.login')}</h1>
+        <p>{t('auth.loginSubtitle')}</p>
 
         <SocialButtons showSpid onSpidClick={() => setSpidOpen(true)} />
 
-        <div className="social-divider">oppure con email</div>
+        <div className="social-divider">{t('auth.withEmail')}</div>
 
         <label>
-          <span>Email</span>
+          <span>{t('auth.email')}</span>
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
         </label>
         <label>
-          <span>Password</span>
+          <span>{t('auth.password')}</span>
           <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
         </label>
 
@@ -120,12 +122,12 @@ export function LoginPage() {
         {error && <div className="form-error">{error}</div>}
 
         <button className="primary-button" type="submit" disabled={isLoading}>
-          {isLoading ? 'Accesso in corso...' : 'Accedi'}
+          {isLoading ? t('auth.logging') : t('auth.loginAction')}
         </button>
 
         <div className="auth-links">
-          <Link to="/password-reset">Password dimenticata?</Link>
-          <Link to="/registrazione">Non hai un account? Registrati</Link>
+          <Link to="/password-reset">{t('auth.forgotPassword')}</Link>
+          <Link to="/registrazione">{t('auth.noAccount')}</Link>
         </div>
       </form>
       <SpidModal open={spidOpen} onClose={() => setSpidOpen(false)} />
