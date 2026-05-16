@@ -84,6 +84,7 @@ export function MapPage({ user }: { user?: AppUser }) {
   const [markers, setMarkers] = useState<MapMarker[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('now');
+  const [search, setSearch] = useState('');
   const [weather, setWeather] = useState<WeatherSnapshot | null>(null);
   const [favorites, setFavorites] = useState<Array<{ markerType: string; markerId: string }>>([]);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
@@ -138,6 +139,7 @@ export function MapPage({ user }: { user?: AppUser }) {
   }
 
   const visibleMarkers = useMemo(() => {
+    const q = search.trim().toLowerCase();
     return markers.filter((marker) => {
       // ── filtro categoria/tipo ────────────────────────────────────────
       if (filter === 'preferred') {
@@ -171,9 +173,15 @@ export function MapPage({ user }: { user?: AppUser }) {
         const dist = haversineKm(userLocation, [marker.latitude!, marker.longitude!]);
         if (dist > 2) return false; // 2 km
       }
+
+      // ── ricerca testuale: matcha titolo, categoria, descrizione ──────
+      if (q) {
+        const hay = `${marker.title} ${marker.category || ''} ${marker.description || ''}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
       return true;
     });
-  }, [filter, timeFilter, markers, hasInterests, user, favorites, userLocation]);
+  }, [filter, timeFilter, search, markers, hasInterests, user, favorites, userLocation]);
 
   const highCrowdMarkers = useMemo(
     () => markers
@@ -248,6 +256,15 @@ export function MapPage({ user }: { user?: AppUser }) {
           <span>punti visibili</span>
           {userLocation && <small className="muted-copy"> · raggio 2 km</small>}
         </div>
+        <label className="city-search">
+          <span className="visually-hidden">Cerca</span>
+          <input
+            type="search"
+            placeholder="Cerca zona, evento, attività…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </label>
         <div className="time-filter" aria-label="Filtro orario">
           <button type="button" className={timeFilter === 'now' ? 'active-filter' : undefined} onClick={() => setTimeFilter('now')}>Ora</button>
           <button type="button" className={timeFilter === 'today' ? 'active-filter' : undefined} onClick={() => setTimeFilter('today')}>Oggi</button>
@@ -255,11 +272,11 @@ export function MapPage({ user }: { user?: AppUser }) {
         </div>
         {userLocation ? (
           <button className="nearby-button active-filter" type="button" onClick={() => { setUserLocation(null); setGeoError(null); }}>
-            ✕ Rimuovi posizione
+            Rimuovi posizione
           </button>
         ) : (
           <button className="nearby-button" type="button" onClick={handleNearMe} disabled={geoLoading}>
-            {geoLoading ? 'Localizzazione…' : '📍 Vicino a me'}
+            {geoLoading ? 'Localizzazione…' : 'Vicino a me'}
           </button>
         )}
         {geoError && <span className="form-error" style={{ margin: 0 }}>{geoError}</span>}

@@ -3801,3 +3801,16 @@ select option {
   font-weight: 700;
   color: var(--color-text-primary);
 }
+
+/* ── Visually hidden (accessibilità: label nascosta agli occhi, visibile a SR) ── */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
