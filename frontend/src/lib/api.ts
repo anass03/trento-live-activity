@@ -296,8 +296,16 @@ export type MeProfile = MeProfileCittadino | MeProfileEnte | MeProfileComunale |
 export function updateEnteProfile(payload: { noteAdmin?: string }): Promise<{ noteAdmin: string | null }> {
   return request('/api/auth/me/ente', { method: 'PATCH', body: payload });
 }
-export function completeOnboarding(interessi: string[]): Promise<{ interessi: string[]; onboardingComplete: true }> {
-  return request('/api/auth/me/onboarding', { method: 'POST', body: { interessi } });
+export function completeOnboarding(payload: { interessi: string[]; dataNascita?: string }): Promise<{ interessi: string[]; onboardingComplete: true }> {
+  return request('/api/auth/me/onboarding', { method: 'POST', body: payload });
+}
+
+// Placeholder usato lato server quando un signup OAuth non riesce a ottenere
+// la data di nascita reale. Lo controlliamo per capire se chiedere all'utente
+// di completare l'age verification.
+export const BIRTHDATE_PLACEHOLDER = '2000-01-01';
+export function isPlaceholderBirthdate(dataNascita: string | undefined | null): boolean {
+  return !!dataNascita && String(dataNascita).startsWith(BIRTHDATE_PLACEHOLDER);
 }
 export function getSuggestedInterests(picked: string[]): Promise<{ suggestions: string[] }> {
   const qs = picked.length ? `?picked=${encodeURIComponent(picked.join(','))}` : '';
@@ -308,6 +316,7 @@ export function getSuggestedInterests(picked: string[]): Promise<{ suggestions: 
 
 export interface AiActivitySuggestion {
   tipo: string;
+  data: string;
   maxPartecipanti: number;
   orarioInizio: string;
   orarioFine: string;
@@ -319,8 +328,8 @@ export function suggestActivityAi(payload: { description: string; location?: str
 
 // ============================== Social OAuth ==============================
 
-export async function oauthGoogleLogin(idToken: string): Promise<AuthResponse> {
-  const result = await request<AuthResponse>('/api/auth/oauth/google', { method: 'POST', body: { idToken }, auth: false });
+export async function oauthGoogleLogin(accessToken: string): Promise<AuthResponse> {
+  const result = await request<AuthResponse>('/api/auth/oauth/google', { method: 'POST', body: { accessToken }, auth: false });
   setToken(result.token);
   return result;
 }
