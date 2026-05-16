@@ -74,4 +74,20 @@ async function calendar(req, res, next) {
   } catch (e) { next(e); }
 }
 
-module.exports = { create, list, get, update, remove, stats, listMine, calendar };
+async function join(req, res, next) {
+  try {
+    assertUuid(req.params.id, 'event id');
+    const result = await service.joinEvent(req.user.id, req.params.id);
+    res.status(200).json(result);
+  } catch (e) { next(e); }
+}
+
+async function leave(req, res, next) {
+  try {
+    assertUuid(req.params.id, 'event id');
+    const result = await service.leaveEvent(req.user.id, req.params.id);
+    res.status(200).json(result);
+  } catch (e) { next(e); }
+}
+
+module.exports = { create, list, get, update, remove, stats, listMine, calendar, join, leave };

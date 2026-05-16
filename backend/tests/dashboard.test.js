@@ -1,34 +1,39 @@
 const dashboardService = require('../src/dashboard/dashboard.service');
 
 jest.mock('../src/data/models', () => ({
-  sequelize: { fn: jest.fn(), col: jest.fn() },
+  sequelize: { fn: jest.fn(), col: jest.fn(), literal: jest.fn() },
   Activity: { count: jest.fn(), findAll: jest.fn() },
-  Event: { count: jest.fn() },
+  Event: { count: jest.fn(), findAll: jest.fn() },
   Participation: { count: jest.fn() },
   POI: { count: jest.fn(), findAll: jest.fn() },
-  User: { count: jest.fn() },
 }));
 
-const { Activity, Event, Participation, POI, User } = require('../src/data/models');
+const { Activity, Event, Participation, POI } = require('../src/data/models');
 
 describe('Dashboard Service — getStats', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    User.count.mockResolvedValue(10);
     Activity.count.mockResolvedValue(5);
     Event.count.mockResolvedValue(3);
     POI.count.mockResolvedValue(8);
     Activity.findAll.mockResolvedValue([{ tipo: 'sport', count: 3 }, { tipo: 'cultura', count: 2 }]);
-    POI.findAll.mockResolvedValue([{ statoAffollamento: 'verde', count: 5 }]);
+    Event.findAll.mockResolvedValue([{ categoria: 'musica', count: 2 }]);
+    POI.findAll
+      // 1° call: poiCrowding (group by)
+      .mockResolvedValueOnce([{ statoAffollamento: 'verde', count: 5 }])
+      // 2° call: topCrowdedPOIs (lista)
+      .mockResolvedValueOnce([]);
     Participation.count.mockResolvedValue(12);
   });
 
-  test('TC-DASH-01: aggregates basic stats', async () => {
+  test('TC-DASH-01: aggregates basic stats (scope ridotto — no totalUsers)', async () => {
     const stats = await dashboardService.getStats({});
-    expect(stats.totalUsers).toBe(10);
+    // Il Comune non vede MAI il totale utenti (#15)
+    expect(stats.totalUsers).toBeUndefined();
     expect(stats.totalActivities).toBe(5);
     expect(stats.totalEvents).toBe(3);
     expect(stats.activitiesByType).toHaveLength(2);
+    expect(stats.eventsByCategory).toHaveLength(1);
     expect(stats.poiCrowding).toHaveLength(1);
   });
 

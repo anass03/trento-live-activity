@@ -89,19 +89,43 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
     }
   }
 
-  const baseActivities = useMemo(
-    () => activities.filter((activity) => !hasInterests || userInterests!.includes(activity.category)),
-    [activities, hasInterests, userInterests],
+  // ── Tre gruppi distinti ────────────────────────────────────────────────
+  // 1. Create da me (sono il creator)
+  // 2. Sto partecipando (sono in participantIds, ma non sono il creator)
+  // 3. Puoi partecipare (resto, non al completo, non creata da me, futuro)
+  const createdByMe = useMemo(
+    () => activities.filter((a) => userId && a.creator?.id === userId),
+    [activities, userId],
+  );
+  const participatingIn = useMemo(
+    () => activities.filter((a) => userId
+      && a.creator?.id !== userId
+      && a.participantIds?.includes(userId)),
+    [activities, userId],
+  );
+  const availableActivities = useMemo(() => {
+    return activities.filter((a) => {
+      if (userId && a.creator?.id === userId) return false;
+      if (userId && a.participantIds?.includes(userId)) return false;
+      if (a.status === 'completa') return false;
+      return true;
+    });
+  }, [activities, userId]);
+
+  // Filtraggio + categoria/search applicati solo alla sezione "Puoi partecipare".
+  const baseAvailable = useMemo(
+    () => availableActivities.filter((a) => !hasInterests || userInterests!.includes(a.category)),
+    [availableActivities, hasInterests, userInterests],
   );
 
   const categoryCounts = useMemo(() => {
     const counts = new Map<string, number>();
-    baseActivities.forEach((activity) => counts.set(activity.category, (counts.get(activity.category) ?? 0) + 1));
+    baseAvailable.forEach((a) => counts.set(a.category, (counts.get(a.category) ?? 0) + 1));
     return Array.from(counts.entries()).map(([category, count]) => ({ category, count }));
-  }, [baseActivities]);
+  }, [baseAvailable]);
 
   const visibleActivities = useMemo(
-    () => baseActivities.filter((activity) => {
+    () => baseAvailable.filter((activity) => {
       const q = search.trim().toLowerCase();
       if (category !== 'all' && activity.category !== category) return false;
       if (timeFilter === 'open' && activity.status === 'completa') return false;
@@ -117,16 +141,10 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
       if (!q) return true;
       return `${activity.title} ${activity.description || ''} ${activity.category} ${activity.location || ''}`.toLowerCase().includes(q);
     }),
-    [baseActivities, category, search, timeFilter],
-  );
-
-  const myActivities = useMemo(
-    () => activities.filter((a) => userId && (a.participantIds?.includes(userId) || a.creator?.id === userId)),
-    [activities, userId],
+    [baseAvailable, category, search, timeFilter],
   );
 
   const featuredActivity = visibleActivities[0];
-
   const openActivities = visibleActivities.filter((activity) => activity.status !== 'completa').length;
 
   useEffect(() => {
@@ -171,43 +189,71 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
         <div className="state-panel liquid-panel">Nessuna attività trovata nel database.</div>
       )}
 
-      {/* ── Le mie attività (always shown when logged in) ── */}
+      {/* ── 3 sezioni distinte per utenti loggati ── */}
       {userId && !isLoading && (
-        <section className="my-activities-section">
-          <h2>Le mie attività</h2>
-          {myActivities.length === 0 ? (
-            <p className="muted-copy">Non hai ancora creato o a cui partecipi a nessuna attività.</p>
-          ) : (
-            <div className="activity-card-flow">
-              {myActivities.map((activity) => (
-                <article key={activity.id} className="activity-card">
-                  <div className="interactive-map-card-header">
-                    <span>{activity.category}</span>
-                    <small className={activity.creator?.id === userId ? 'badge' : undefined}>
-                      {activity.creator?.id === userId ? 'Creata da te' : 'Partecipante'}
-                    </small>
-                  </div>
-                  <h2>{activity.title}</h2>
-                  <dl>
-                    <div><dt>Quando</dt><dd>{formatDateTime(activity.dateTime)}</dd></div>
-                    <div><dt>Partecipanti</dt><dd>{activity.participantCount} / {activity.maxParticipants}</dd></div>
-                    <div><dt>Stato</dt><dd>{activity.status || 'attiva'}</dd></div>
-                  </dl>
-                  <div className="card-actions-row">
-                    {activity.creator?.id === userId ? (
-                      <button className="danger-button compact-button" type="button" disabled={actionLoading === activity.id} onClick={() => handleCancel(activity.id)}>
-                        {actionLoading === activity.id ? '...' : 'Cancella'}
+        <>
+          <section className="my-activities-section" aria-label="Attività create da me">
+            <h2>Le mie attività <span className="section-count">{createdByMe.length}</span></h2>
+            {createdByMe.length === 0 ? (
+              <p className="muted-copy">Non hai ancora creato attività. Crea una nuova attività dalla mappa cliccando su un POI.</p>
+            ) : (
+              <div className="activity-card-flow">
+                {createdByMe.map((activity) => (
+                  <article key={activity.id} className="activity-card" onClick={() => setSelectedActivity(activity)}>
+                    <div className="interactive-map-card-header">
+                      <span>{activity.category}</span>
+                      <small className="badge">Creata da te</small>
+                    </div>
+                    <h2>{activity.title}</h2>
+                    <dl>
+                      <div><dt>Quando</dt><dd>{formatDateTime(activity.dateTime)}</dd></div>
+                      <div><dt>Partecipanti</dt><dd>{activity.participantCount} / {activity.maxParticipants}</dd></div>
+                      <div><dt>Stato</dt><dd>{activity.status || 'attiva'}</dd></div>
+                    </dl>
+                    <div className="card-actions-row">
+                      <button className="danger-button compact-button" type="button" disabled={actionLoading === activity.id} onClick={(e) => { e.stopPropagation(); handleCancel(activity.id); }}>
+                        {actionLoading === activity.id ? '...' : 'Cancella attività'}
                       </button>
-                    ) : activity.participantIds?.includes(userId) && (
-                      <button className="ghost-button compact-button" type="button" disabled={actionLoading === activity.id} onClick={() => handleLeave(activity.id)}>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="my-activities-section" aria-label="Attività a cui partecipo">
+            <h2>Sto partecipando <span className="section-count">{participatingIn.length}</span></h2>
+            {participatingIn.length === 0 ? (
+              <p className="muted-copy">Non sei iscritto a nessuna attività al momento.</p>
+            ) : (
+              <div className="activity-card-flow">
+                {participatingIn.map((activity) => (
+                  <article key={activity.id} className="activity-card" onClick={() => setSelectedActivity(activity)}>
+                    <div className="interactive-map-card-header">
+                      <span>{activity.category}</span>
+                      <small>Partecipante</small>
+                    </div>
+                    <h2>{activity.title}</h2>
+                    <dl>
+                      <div><dt>Quando</dt><dd>{formatDateTime(activity.dateTime)}</dd></div>
+                      <div><dt>Partecipanti</dt><dd>{activity.participantCount} / {activity.maxParticipants}</dd></div>
+                    </dl>
+                    <div className="card-actions-row">
+                      <button className="ghost-button compact-button" type="button" disabled={actionLoading === activity.id} onClick={(e) => { e.stopPropagation(); handleLeave(activity.id); }}>
                         {actionLoading === activity.id ? '...' : 'Abbandona'}
                       </button>
-                    )}
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      )}
+
+      {!isLoading && !error && (
+        <section className="my-activities-section" aria-label="Attività disponibili">
+          <h2>Puoi partecipare <span className="section-count">{visibleActivities.length}</span></h2>
         </section>
       )}
 
@@ -241,7 +287,7 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
                   <h2>{featuredActivity.title}</h2>
                   <p>{featuredActivity.description || 'Attività spontanea organizzata dalla community.'}</p>
                 </div>
-                <dl>
+                <dl className="activity-featured-meta">
                   <div><dt>Quando</dt><dd>{formatDateTime(featuredActivity.dateTime)}</dd></div>
                   <div><dt>Partecipanti</dt><dd>{featuredActivity.participantCount} / {featuredActivity.maxParticipants}</dd></div>
                 </dl>

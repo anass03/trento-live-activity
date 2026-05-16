@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { verifyEmail, setToken } from '../lib/api';
+import { getMe, verifyEmail, setToken } from '../lib/api';
 
 export function VerifyEmailPage() {
   const [searchParams] = useSearchParams();
@@ -20,11 +20,20 @@ export function VerifyEmailPage() {
       return;
     }
     verifyEmail(token)
-      .then((result) => {
+      .then(async (result) => {
         setToken(result.token);
         window.dispatchEvent(new Event('tla:user-updated'));
         setStatus('success');
-        setTimeout(() => navigate('/'), 2000);
+        // Se cittadino e onboarding non ancora completato, indirizzalo lì.
+        try {
+          const me = await getMe();
+          const target = me.profile?.kind === 'cittadino' && !me.profile.onboardingComplete
+            ? '/onboarding/interessi'
+            : '/';
+          setTimeout(() => navigate(target), 1400);
+        } catch {
+          setTimeout(() => navigate('/'), 1800);
+        }
       })
       .catch((e) => {
         setStatus('error');

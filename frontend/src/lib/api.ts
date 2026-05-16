@@ -13,7 +13,12 @@ export interface ApiEvent {
   createdAt: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  maxPartecipanti?: number | null;
+  participantCount?: number;
+  participantIds?: string[];
+  entity?: { id: string; name: string } | null;
 }
+
 
 export interface ApiActivity {
   id: string;
@@ -92,13 +97,16 @@ export interface RecoveryCodesResponse {
 }
 
 export interface DashboardStats {
-  totalUsers: number;
+  // RIMOSSO totalUsers per scope ridotto (#15) — il Comune vede solo aggregati.
+  totalUsers?: never;
   totalActivities: number;
   totalEvents: number;
   totalPOIs: number;
   totalParticipations: number;
   activitiesByType: Array<{ tipo: string; count: number }>;
+  eventsByCategory?: Array<{ categoria: string; count: number }>;
   poiCrowding: Array<{ statoAffollamento: string; count: number }>;
+  topCrowdedPOIs?: Array<{ id: string; nome: string; tipo: string | null; statoAffollamento: string; capacitaMax: number }>;
 }
 
 interface EventsResponse { events: ApiEvent[]; total?: number; }
@@ -127,6 +135,11 @@ export function setToken(token: string | null): void {
     if (token) localStorage.setItem(TOKEN_KEY, token);
     else localStorage.removeItem(TOKEN_KEY);
   } catch { /* localStorage may be unavailable */ }
+  // Notifica i listener che l'identità è cambiata (login o logout).
+  // App.tsx::fetchUser ricarica lo stato utente in risposta.
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('tla:user-updated'));
+  }
 }
 
 interface RequestOptions {
@@ -192,6 +205,12 @@ export async function getEvents(params?: { q?: string; categoria?: string; page?
 export function getEventById(id: string): Promise<ApiEvent> {
   return request<ApiEvent>(`/api/events/${encodeURIComponent(id)}`);
 }
+export function joinEvent(id: string): Promise<{ eventId: string; joined: true; participantCount: number; maxPartecipanti: number | null }> {
+  return request(`/api/events/${encodeURIComponent(id)}/participate`, { method: 'POST' });
+}
+export function leaveEvent(id: string): Promise<{ eventId: string; joined: false; participantCount: number }> {
+  return request(`/api/events/${encodeURIComponent(id)}/participate`, { method: 'DELETE' });
+}
 export async function getActivities(params?: { q?: string; tipo?: string; page?: number; limit?: number; mine?: 'interests' }): Promise<ApiActivity[]> {
   const qs = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : '';
   const payload = await request<ActivitiesResponse | ApiActivity[]>(`/api/activities${qs}`);
@@ -244,9 +263,128 @@ export function resetPassword(token: string, password: string): Promise<{ messag
   return request(`/api/auth/reset-password/${encodeURIComponent(token)}`, { method: 'POST', body: { password }, auth: false });
 }
 export async function logout(): Promise<void> {
-  try { await request('/api/auth/logout', { method: 'POST' }); } finally { setToken(null); }
+  // setToken(null) viene chiamato comunque nel finally, anche se la richiesta
+  // al backend fallisce (rete offline, token già revocato, ecc.).
+  try {
+    await request('/api/auth/logout', { method: 'POST' });
+  } catch {
+    /* ignore: il logout deve riuscire lato client comunque */
+  } finally {
+    setToken(null);
+  }
 }
-export function getMe(): Promise<CurrentUser & { id: string }> {
+export interface MeProfileCittadino {
+  kind: 'cittadino';
+  nome?: string; cognome?: string; dataNascita?: string;
+  codiceFiscale?: string; interessi: string[];
+  onboardingComplete: boolean;
+}
+export interface MeProfileEnte {
+  kind: 'ente';
+  nomeEnte?: string; pec?: string; approvato?: boolean; noteAdmin?: string;
+}
+export interface MeProfileComunale {
+  kind: 'comunale';
+  nome?: string; cognome?: string; ufficio?: string; spidId?: string;
+}
+export interface MeProfileSistema {
+  kind: 'sistema';
+  nome?: string; cognome?: string; superAdmin?: boolean;
+}
+export type MeProfile = MeProfileCittadino | MeProfileEnte | MeProfileComunale | MeProfileSistema;
+
+export function updateEnteProfile(payload: { noteAdmin?: string }): Promise<{ noteAdmin: string | null }> {
+  return request('/api/auth/me/ente', { method: 'PATCH', body: payload });
+}
+export function completeOnboarding(interessi: string[]): Promise<{ interessi: string[]; onboardingComplete: true }> {
+  return request('/api/auth/me/onboarding', { method: 'POST', body: { interessi } });
+}
+export function getSuggestedInterests(picked: string[]): Promise<{ suggestions: string[] }> {
+  const qs = picked.length ? `?picked=${encodeURIComponent(picked.join(','))}` : '';
+  return request(`/api/auth/suggested-interests${qs}`);
+}
+
+// ============================== AI suggester ==============================
+
+export interface AiActivitySuggestion {
+  tipo: string;
+  maxPartecipanti: number;
+  orarioInizio: string;
+  orarioFine: string;
+  reasoning: string;
+}
+export function suggestActivityAi(payload: { description: string; location?: string; time?: string }): Promise<AiActivitySuggestion> {
+  return request('/api/ai/suggest-activity', { method: 'POST', body: payload });
+}
+
+// ============================== Social OAuth ==============================
+
+export async function oauthGoogleLogin(idToken: string): Promise<AuthResponse> {
+  const result = await request<AuthResponse>('/api/auth/oauth/google', { method: 'POST', body: { idToken }, auth: false });
+  setToken(result.token);
+  return result;
+}
+export async function oauthAppleLogin(idToken: string): Promise<AuthResponse> {
+  const result = await request<AuthResponse>('/api/auth/oauth/apple', { method: 'POST', body: { idToken }, auth: false });
+  setToken(result.token);
+  return result;
+}
+// ============================== Consensi ==============================
+
+export type ConsentType =
+  | 'privacy_policy' | 'terms_of_service' | 'marketing' | 'analytics'
+  | 'notif_email' | 'notif_push';
+
+export interface ConsentRecord {
+  id: string;
+  userId: string;
+  type: ConsentType;
+  granted: boolean;
+  grantedAt: string | null;
+  revokedAt: string | null;
+  version: string;
+  createdAt: string;
+}
+export function listConsents(): Promise<ConsentRecord[]> {
+  return request('/api/auth/consents');
+}
+export function updateConsent(type: ConsentType, granted: boolean): Promise<ConsentRecord> {
+  return request('/api/auth/consents', { method: 'POST', body: { type, granted } });
+}
+
+// Riassume lo stato corrente di ciascun consenso dato il log (l'ultimo record vince)
+export function summarizeConsents(records: ConsentRecord[]): Partial<Record<ConsentType, boolean>> {
+  const out: Partial<Record<ConsentType, boolean>> = {};
+  for (const r of records) {
+    if (!(r.type in out)) out[r.type] = r.granted;
+  }
+  return out;
+}
+
+export async function spidLoginStub(payload: { spidId: string; nome: string; cognome: string; email: string; ufficio?: string }): Promise<AuthResponse> {
+  const result = await request<AuthResponse>('/api/auth/spid/callback', { method: 'POST', body: payload, auth: false });
+  setToken(result.token);
+  return result;
+}
+
+// ============================== Favorites ==============================
+
+export type FavoriteType = 'poi' | 'activity' | 'event';
+export interface ApiFavorite {
+  id: string; userId: string; markerType: FavoriteType; markerId: string; createdAt: string;
+}
+export function getFavorites(): Promise<ApiFavorite[]> {
+  return request('/api/users/me/favorites');
+}
+export function addFavorite(markerType: FavoriteType, markerId: string): Promise<ApiFavorite> {
+  return request('/api/users/me/favorites', { method: 'POST', body: { markerType, markerId } });
+}
+export function removeFavorite(markerType: FavoriteType, markerId: string): Promise<void> {
+  const qs = `?markerType=${encodeURIComponent(markerType)}&markerId=${encodeURIComponent(markerId)}`;
+  return request(`/api/users/me/favorites${qs}`, { method: 'DELETE' });
+}
+
+export function getMe(): Promise<CurrentUser & { id: string; profile: MeProfile | null }> {
   return request('/api/auth/me');
 }
 export function updateProfile(data: { nome?: string; cognome?: string; interessi?: string[] }): Promise<CurrentUser> {
@@ -310,9 +448,10 @@ export function cancelActivity(activityId: string): Promise<void> {
 // ============================== Events (write) ==============================
 
 export interface CreateEventPayload {
-  titolo: string; descrizione: string; categoria: string;
+  titolo: string; descrizione?: string; categoria: string;
   data?: string; orarioInizio?: string; orarioFine?: string;
   latitudine?: number; longitudine?: number; poiId?: string;
+  maxPartecipanti?: number;
 }
 export function createEvent(payload: CreateEventPayload): Promise<ApiEvent> {
   return request('/api/events', { method: 'POST', body: payload });

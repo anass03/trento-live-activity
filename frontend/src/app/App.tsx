@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from '../components/layout/AppShell';
 import { mockCurrentUser, type AppUser } from '../data/mockUser';
-import { getCurrentUser, getMe, getToken, type CurrentUser } from '../lib/api';
+import { getMe, getToken } from '../lib/api';
 import { ActivitiesPage } from '../pages/ActivitiesPage';
 import { ActivityDetailPage } from '../pages/ActivityDetailPage';
 import { AdminEntitiesPage } from '../pages/AdminEntitiesPage';
@@ -18,6 +18,7 @@ import { EventsPage } from '../pages/EventsPage';
 import { LoginPage } from '../pages/LoginPage';
 import { MapPage } from '../pages/MapPage';
 import { PasswordResetPage } from '../pages/PasswordResetPage';
+import { OnboardingInteressiPage } from '../pages/OnboardingInteressiPage';
 import { PrivacyPage } from '../pages/PrivacyPage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { RegistrationPage } from '../pages/RegistrationPage';
@@ -36,28 +37,15 @@ function mapRuoloToRole(ruolo?: string): AppUser['role'] {
   }
 }
 
-function clientUserToAppUser(user: CurrentUser): AppUser {
-  return {
-    id: user.id || 'anonymous',
-    name: user.name,
-    email: user.email || '',
-    role: user.role,
-    avatar: user.avatar,
-    ruolo: user.ruolo,
-    interessi: user.interessi,
-    nomeEnte: user.nomeEnte,
-    approvato: user.approvato,
-  };
-}
-
 export function App() {
   const [user, setUser] = useState<AppUser>(mockCurrentUser);
 
   function fetchUser() {
     if (!getToken()) {
-      getCurrentUser()
-        .then((currentUser) => setUser(clientUserToAppUser(currentUser)))
-        .catch(() => setUser(mockCurrentUser));
+      // Nessun token = nessuna identità. Mostra Ospite, non interpellare il
+      // backend (l'endpoint pubblico /api/users/me era un mock che restituiva
+      // sempre Mario Rossi e faceva sembrare l'utente ancora loggato dopo il logout).
+      setUser(mockCurrentUser);
       return;
     }
     getMe()
@@ -101,6 +89,7 @@ export function App() {
         <Route path="/profilo" element={<ProfilePage />} />
         <Route path="/setup-2fa" element={<Setup2FAPage />} />
         <Route path="/verifica-email" element={<VerifyEmailPage />} />
+        <Route path="/onboarding/interessi" element={<OnboardingInteressiPage />} />
 
         <Route path="/ente/pubblica" element={<EntityPublishPage />} />
 

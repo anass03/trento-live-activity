@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { getEventById, getEventCalendarUrl, googleCalendarUrl, getToken, reportEvent, type ApiEvent } from '../lib/api';
+import {
+  getEventById, getEventCalendarUrl, googleCalendarUrl, getToken,
+  joinEvent, leaveEvent, reportEvent,
+  type ApiEvent,
+} from '../lib/api';
+import { CalendarButton } from '../components/ui/CalendarButton';
 import type { AppUser } from '../data/mockUser';
 
 const REPORT_TYPES = ['contenuto_inappropriato', 'spam', 'disinformazione', 'altro'];
@@ -18,7 +23,16 @@ export function EventDetailPage({ user }: { user?: AppUser }) {
   const [reporting, setReporting] = useState(false);
   const [reportTipo, setReportTipo] = useState(REPORT_TYPES[0]);
   const [reportMsg, setReportMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [participating, setParticipating] = useState(false);
+  const [partError, setPartError] = useState<string | null>(null);
   const isLoggedIn = !!getToken() && user?.role !== 'anonymous';
+  const userId = user?.id;
+  const isCitizen = user?.role === 'registered_user';
+
+  const isJoined = !!(userId && event?.participantIds?.includes(userId));
+  const isPast = event?.dateTime ? new Date(event.dateTime) < new Date() : false;
+  const isFull = !!(event?.maxPartecipanti && event.participantCount !== undefined
+    && event.participantCount >= event.maxPartecipanti);
 
   async function loadEvent() {
     if (!id) return;
@@ -36,6 +50,42 @@ export function EventDetailPage({ user }: { user?: AppUser }) {
   useEffect(() => {
     void loadEvent();
   }, [id]);
+
+  async function handleJoin() {
+    if (!id) return;
+    setPartError(null);
+    setParticipating(true);
+    try {
+      const result = await joinEvent(id);
+      setEvent((prev) => prev && userId ? {
+        ...prev,
+        participantCount: result.participantCount,
+        participantIds: [...(prev.participantIds || []), userId],
+      } : prev);
+    } catch (e) {
+      setPartError(e instanceof Error ? e.message : 'Errore');
+    } finally {
+      setParticipating(false);
+    }
+  }
+
+  async function handleLeave() {
+    if (!id) return;
+    setPartError(null);
+    setParticipating(true);
+    try {
+      const result = await leaveEvent(id);
+      setEvent((prev) => prev && userId ? {
+        ...prev,
+        participantCount: result.participantCount,
+        participantIds: (prev.participantIds || []).filter((p) => p !== userId),
+      } : prev);
+    } catch (e) {
+      setPartError(e instanceof Error ? e.message : 'Errore');
+    } finally {
+      setParticipating(false);
+    }
+  }
 
   return (
     <section className="detail-page liquid-panel">
@@ -64,12 +114,49 @@ export function EventDetailPage({ user }: { user?: AppUser }) {
               <dt>Quando</dt>
               <dd>{formatDateTime(event.dateTime)}</dd>
             </div>
+            {(event.maxPartecipanti !== null && event.maxPartecipanti !== undefined) && (
+              <div>
+                <dt>Partecipanti</dt>
+                <dd>{event.participantCount ?? 0} / {event.maxPartecipanti}</dd>
+              </div>
+            )}
           </dl>
-          {event.dateTime && (
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <a href={getEventCalendarUrl(event.id)} download={`${event.title}.ics`} className="primary-button">📅 Apple / Outlook</a>
-              <a href={googleCalendarUrl(event.title, event.dateTime, event.location)} target="_blank" rel="noreferrer" className="primary-button">📅 Google Calendar</a>
+
+          {isCitizen && (
+            <div className="event-participate-row">
+              {isPast ? (
+                <span className="muted-copy">Evento concluso</span>
+              ) : isJoined ? (
+                <button
+                  type="button"
+                  className="ghost-button"
+                  disabled={participating}
+                  onClick={handleLeave}
+                >
+                  {participating ? '...' : 'Annulla partecipazione'}
+                </button>
+              ) : isFull ? (
+                <span className="muted-copy">Posti esauriti</span>
+              ) : (
+                <button
+                  type="button"
+                  className="primary-button"
+                  disabled={participating}
+                  onClick={handleJoin}
+                >
+                  {participating ? '...' : 'Partecipa all\'evento'}
+                </button>
+              )}
+              {partError && <p className="form-error" style={{ margin: 0 }}>{partError}</p>}
             </div>
+          )}
+          {event.dateTime && (
+            <CalendarButton
+              icsUrl={getEventCalendarUrl(event.id)}
+              icsFilename={`${event.title}.ics`}
+              googleUrl={googleCalendarUrl(event.title, event.dateTime, event.location)}
+              label="Aggiungi al calendario"
+            />
           )}
           {isLoggedIn && !reportMsg && (
             reporting ? (
