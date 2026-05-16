@@ -157,15 +157,17 @@ export function MapPage({ user }: { user?: AppUser }) {
         return false;
       }
 
-      // ── filtro temporale (ignora POI che non hanno dateTime) ─────────
-      if (marker.dateTime) {
+      // ── filtro temporale ──────────────────────────────────────────────
+      // 'now' = mostra tutto (POI sempre, attività/eventi a prescindere dalla data)
+      // 'today' / 'weekend' = SOLO attività/eventi che cadono nella finestra
+      //   richiesta. I POI sono punti statici, non eventi: escludili dai
+      //   filtri temporali (così "Oggi" mostra davvero solo cose di oggi).
+      if (timeFilter !== 'now') {
+        if (marker.type === 'poi') return false;
+        if (!marker.dateTime) return false;
         const d = new Date(marker.dateTime);
         if (timeFilter === 'today' && !isToday(d)) return false;
         if (timeFilter === 'weekend' && !isInWeekend(d)) return false;
-        // 'now' = nessun filtro temporale
-      } else if (timeFilter !== 'now' && marker.type !== 'poi') {
-        // attività/eventi senza data sono fuori dai filtri temporali
-        return false;
       }
 
       // ── "Vicino a me" ────────────────────────────────────────────────

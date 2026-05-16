@@ -166,8 +166,20 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
   }
 
   const now = new Date();
-  const upcomingVisible = visibleEvents.filter((ev) => !ev.dateTime || new Date(ev.dateTime) >= now);
-  const pastVisible = visibleEvents.filter((ev) => ev.dateTime && new Date(ev.dateTime) < now);
+  // Ordina per data crescente — il backend restituisce per createdAt DESC,
+  // quindi senza riordinare la timeline mostrava 30/05 prima di 23/05.
+  const upcomingVisible = visibleEvents
+    .filter((ev) => !ev.dateTime || new Date(ev.dateTime) >= now)
+    .slice()
+    .sort((a, b) => {
+      const ta = a.dateTime ? new Date(a.dateTime).getTime() : Number.MAX_SAFE_INTEGER;
+      const tb = b.dateTime ? new Date(b.dateTime).getTime() : Number.MAX_SAFE_INTEGER;
+      return ta - tb;
+    });
+  const pastVisible = visibleEvents
+    .filter((ev) => ev.dateTime && new Date(ev.dateTime) < now)
+    .slice()
+    .sort((a, b) => new Date(b.dateTime!).getTime() - new Date(a.dateTime!).getTime()); // più recente in alto
 
   const myEvents = useMemo(
     () => events.filter((ev) => userId && ev.participantIds?.includes(userId)),
