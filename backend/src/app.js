@@ -41,9 +41,15 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Rate limit globale (RNF / API Gateway): protegge da brute force, DoS, scraping
+// e abuso di endpoint costosi (es. AI suggester che consuma quota Gemini).
+// In dev il limite è più alto perché React StrictMode + Vite HMR + DevTools
+// generano molte più richieste rispetto a un utente reale.
+const isProd = process.env.NODE_ENV === 'production';
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: isProd ? 200 : 2000,
+  skip: (req) => req.path === '/health' || req.path === '/api/health',
   standardHeaders: true,
   legacyHeaders: false,
 }));

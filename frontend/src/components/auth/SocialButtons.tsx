@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
+import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 import AppleSignin from 'react-apple-signin-auth';
 import { useNavigate } from 'react-router-dom';
-import { getMe, oauthAppleLogin, oauthGoogleLogin } from '../../lib/api';
+import { getMe, isPlaceholderBirthdate, oauthAppleLogin, oauthGoogleLogin } from '../../lib/api';
 
 const GOOGLE_CLIENT_ID = (import.meta as ImportMeta & { env: { VITE_GOOGLE_CLIENT_ID?: string } }).env.VITE_GOOGLE_CLIENT_ID || '';
 const APPLE_CLIENT_ID = (import.meta as ImportMeta & { env: { VITE_APPLE_CLIENT_ID?: string } }).env.VITE_APPLE_CLIENT_ID || '';
@@ -11,6 +11,37 @@ const APPLE_REDIRECT = (import.meta as ImportMeta & { env: { VITE_APPLE_REDIRECT
 interface Props {
   onSpidClick?: () => void;
   showSpid?: boolean;
+}
+
+// Wrapper interno che usa useGoogleLogin (hook richiede di stare dentro al provider).
+// Lo separiamo dal componente esterno per poter condizionare il render del provider
+// solo quando GOOGLE_CLIENT_ID è configurato.
+function GoogleButton({ onError, onSuccess }: { onError: (msg: string) => void; onSuccess: () => void | Promise<void> }) {
+  // Flusso "implicit" — restituisce access_token (non id_token). Lo scope
+  // `user.birthday.read` è necessario per leggere la data di nascita via People API.
+  // L'utente vedrà nel consenso Google "vedere la tua data di nascita".
+  const login = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      if (!tokenResponse.access_token) {
+        onError('Google non ha restituito un access_token');
+        return;
+      }
+      try {
+        await oauthGoogleLogin(tokenResponse.access_token);
+        await onSuccess();
+      } catch (e) {
+        onError(e instanceof Error ? e.message : 'Errore login Google');
+      }
+    },
+    onError: () => onError('Login Google annullato o non riuscito'),
+    scope: 'openid email profile https://www.googleapis.com/auth/user.birthday.read',
+  });
+
+  return (
+    <button type="button" className="social-button google" onClick={() => login()}>
+      <span className="social-icon">G</span> Continua con Google
+    </button>
+  );
 }
 
 export function SocialButtons({ onSpidClick, showSpid = false }: Props) {
@@ -22,26 +53,15 @@ export function SocialButtons({ onSpidClick, showSpid = false }: Props) {
   async function redirectAfterLogin() {
     try {
       const me = await getMe();
-      const target = me.profile?.kind === 'cittadino' && !me.profile.onboardingComplete
-        ? '/onboarding/interessi'
-        : '/';
-      navigate(target);
+      // Manda all'onboarding anche se onboardingComplete è già true ma la birthday
+      // è ancora il placeholder (es. utente OAuth pre-fix età). L'onboarding
+      // ora richiede una data reale per validare il check >=13 anni (GDPR).
+      const profile = me.profile;
+      const needsOnboarding = profile?.kind === 'cittadino'
+        && (!profile.onboardingComplete || isPlaceholderBirthdate(profile.dataNascita));
+      navigate(needsOnboarding ? '/onboarding/interessi' : '/');
     } catch {
       navigate('/');
-    }
-  }
-
-  async function handleGoogleSuccess(credentialResponse: { credential?: string }) {
-    setError(null);
-    if (!credentialResponse.credential) {
-      setError('Google non ha restituito un idToken');
-      return;
-    }
-    try {
-      await oauthGoogleLogin(credentialResponse.credential);
-      await redirectAfterLogin();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Errore login Google');
     }
   }
 
@@ -69,13 +89,9 @@ export function SocialButtons({ onSpidClick, showSpid = false }: Props) {
     <div className="social-buttons">
       {GOOGLE_CLIENT_ID ? (
         <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-          <GoogleLogin
-            onSuccess={handleGoogleSuccess}
-            onError={() => setError('Login Google annullato o non riuscito')}
-            theme="outline"
-            shape="pill"
-            text="continue_with"
-            width={280}
+          <GoogleButton
+            onError={setError}
+            onSuccess={redirectAfterLogin}
           />
         </GoogleOAuthProvider>
       ) : (
