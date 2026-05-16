@@ -6,7 +6,6 @@ const authRoutes = require('./auth/auth.routes');
 const activityRoutes = require('./activities/activity.routes');
 const eventRoutes = require('./activities/event.routes');
 const mapRoutes = require('./map/map.routes');
-const userRoutes = require('./users/user.routes');
 const favoritesRoutes = require('./users/favorites.routes');
 const moderationRoutes = require('./moderation/moderation.routes');
 const dashboardRoutes = require('./dashboard/dashboard.routes');
@@ -57,24 +56,15 @@ app.use(rateLimit({
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 
-app.use('/auth', authRoutes);
-app.use('/activities', activityRoutes);
-app.use('/events', eventRoutes);
-app.use('/map', mapRoutes);
-app.use('/moderation', moderationRoutes);
-app.use('/dashboard', dashboardRoutes);
-
+// #H5: tutte le route SOLO sotto /api/*. I mount legacy senza prefisso erano
+// raggiungibili bypassando un eventuale reverse proxy che filtra solo /api/*.
 app.use('/api/auth', authRoutes);
 app.use('/api/activities', activityRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/map', mapRoutes);
-app.use('/api/users', userRoutes);
 app.use('/api/users/me/favorites', favoritesRoutes);
 app.use('/api/moderation', moderationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
-
-app.use('/admin', adminRoutes);
-app.use('/notifications', notificationsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/ai', aiRoutes);

@@ -14,6 +14,7 @@ const AmministratoreComunaleProfile = require('./AmministratoreComunaleProfile')
 const AmministratoreSistemaProfile = require('./AmministratoreSistemaProfile')(sequelize);
 const EventParticipation = require('./EventParticipation')(sequelize);
 const Favorite = require('./Favorite')(sequelize);
+const RevokedToken = require('./RevokedToken')(sequelize);
 
 // User <-> Activity (creator)
 Activity.belongsTo(User, { foreignKey: 'creatorId', as: 'creator' });
@@ -73,5 +74,5 @@ User.hasMany(Favorite, { foreignKey: 'userId', as: 'favorites' });
 module.exports = {
   sequelize, User, Activity, Event, Participation, POI, Report, DeviceToken, Consent,
   CittadinoProfile, EnteProfile, AmministratoreComunaleProfile, AmministratoreSistemaProfile,
-  EventParticipation, Favorite,
+  EventParticipation, Favorite, RevokedToken,
 };
