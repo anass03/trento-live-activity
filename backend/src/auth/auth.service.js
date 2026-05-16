@@ -172,13 +172,16 @@ async function updateConsent(userId, type, granted) {
     await DeviceToken.destroy({ where: { userId } });
   }
   // RNF19: keep audit trail. Don't update old rows; insert a new one to record the change.
+  // grantedAt è SEMPRE valorizzato (rappresenta il timestamp del record, non
+  // "quando il consenso è attivo"). revokedAt solo se l'utente ha revocato.
+  const now = new Date();
   return Consent.create({
     userId,
     type,
     version: '1.0',
     granted: !!granted,
-    grantedAt: granted ? new Date() : null,
-    revokedAt: granted ? null : new Date(),
+    grantedAt: now,
+    revokedAt: granted ? null : now,
   });
 }
 
