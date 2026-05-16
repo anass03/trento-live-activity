@@ -122,7 +122,8 @@ async function updateEnteProfile(req, res, next) {
 
 async function completeOnboarding(req, res, next) {
   try {
-    const profile = await service.completeOnboarding(req.user.id, req.body.interessi);
+    const { interessi, dataNascita } = req.body || {};
+    const profile = await service.completeOnboarding(req.user.id, { interessi, dataNascita });
     res.json(profile);
   } catch (e) { next(e); }
 }
@@ -160,10 +161,14 @@ const sanitizeForResponse = (u) => ({
 
 async function oauthGoogle(req, res, next) {
   try {
-    const { idToken } = req.body || {};
-    if (!idToken) return res.status(400).json({ error: 'idToken required', code: 'MISSING_TOKEN' });
-    const { user, token } = await oauth.loginWithGoogle(idToken);
-    res.json({ user: sanitizeForResponse(user), token });
+    // Il frontend ora usa il flusso "implicit" e ci passa un access_token
+    // (non più un id_token), così possiamo chiamare la People API per la
+    // data di nascita. Manteniamo `idToken` come alias retro-compatibile.
+    const { accessToken, idToken } = req.body || {};
+    const token = accessToken || idToken;
+    if (!token) return res.status(400).json({ error: 'accessToken required', code: 'MISSING_TOKEN' });
+    const result = await oauth.loginWithGoogle(token);
+    res.json({ user: sanitizeForResponse(result.user), token: result.token });
   } catch (e) { next(e); }
 }
 

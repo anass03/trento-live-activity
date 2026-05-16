@@ -34,6 +34,31 @@ export function getFirebaseMessaging(): Messaging | null {
   return messaging;
 }
 
+// Promise.race con timeout: alcune chiamate FCM (specie su Firefox dopo una
+// revoca) possono restare pending indefinitamente. Senza timeout il `finally`
+// dell'handler nel componente non gira e il bottone resta bloccato su "...".
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`Timeout ${label} (${ms}ms)`)), ms),
+    ),
+  ]);
+}
+
+// Cancella il token FCM lato client. Da chiamare quando l'utente disattiva
+// le push, così la cache interna dell'SDK resta allineata col server.
+// Avvolto in timeout perché `deleteToken` può hangare su Firefox.
+export async function revokeFcmToken(): Promise<void> {
+  const m = getFirebaseMessaging();
+  if (!m) return;
+  try {
+    await withTimeout(deleteToken(m), 3000, 'deleteToken');
+  } catch {
+    /* ignore — best effort, importante è che non blocchi la UI */
+  }
+}
+
 // Returns a fresh FCM device token. Always forces a new token (deletes the old
 // one first) so stale tokens are replaced on every "enable" click.
 // Throws if the user denies notification permission or the browser isn't supported.
@@ -53,14 +78,33 @@ export async function requestFcmToken(): Promise<string> {
 
   const swRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
 
-  // Delete the existing token first so Firebase issues a fresh one.
-  // This avoids stale tokens that FCM has already invalidated.
-  try { await deleteToken(m); } catch { /* ignore — no token to delete */ }
+  // Aspetta che il service worker sia attivo: su Firefox `getToken` può
+  // hangare se il SW è ancora in stato "installing".
+  if (swRegistration.installing) {
+    await new Promise<void>((resolve) => {
+      const sw = swRegistration.installing!;
+      const onChange = () => {
+        if (sw.state === 'activated' || sw.state === 'redundant') {
+          sw.removeEventListener('statechange', onChange);
+          resolve();
+        }
+      };
+      sw.addEventListener('statechange', onChange);
+    });
+  }
 
-  const token = await getToken(m, {
-    vapidKey: VAPID_KEY,
-    serviceWorkerRegistration: swRegistration,
-  });
+  // Delete the existing token first so Firebase issues a fresh one.
+  // Con timeout: se hanga (bug Firefox post-revoca), procediamo comunque.
+  try { await withTimeout(deleteToken(m), 3000, 'deleteToken'); } catch { /* ignore */ }
+
+  const token = await withTimeout(
+    getToken(m, {
+      vapidKey: VAPID_KEY,
+      serviceWorkerRegistration: swRegistration,
+    }),
+    15000,
+    'getToken',
+  );
   if (!token) throw new Error('Impossibile ottenere il token FCM. Assicurati di non avere estensioni che bloccano le notifiche.');
   return token;
 }

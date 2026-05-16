@@ -6,7 +6,7 @@ import {
   updateConsent, updateEnteProfile, updateLocation, updateProfile,
   type ConsentType, type MeProfile,
 } from '../lib/api';
-import { requestFcmToken } from '../lib/firebase';
+import { requestFcmToken, revokeFcmToken } from '../lib/firebase';
 
 const AVAILABLE_INTERESTS = ['sport', 'cultura', 'musica', 'arte', 'gastronomia', 'studio', 'natura', 'tecnologia', 'volontariato'];
 const FCM_TOKEN_KEY = 'tla_fcm_token';
@@ -144,6 +144,10 @@ export function ProfilePage() {
         await unregisterDeviceToken(token);
         localStorage.removeItem(FCM_TOKEN_KEY);
       }
+      // Cancella anche il token lato FCM client: senza questo l'SDK resta
+      // con un token "stale" in cache e la riattivazione successiva può
+      // hangare (specie su Firefox).
+      await revokeFcmToken();
       // Revoca il consenso globale: il backend cancellerà anche eventuali
       // altri DeviceToken associati all'utente su altri dispositivi.
       try { await updateConsent('notif_push', false); } catch { /* best-effort */ }
