@@ -17,7 +17,6 @@ export function SettingsPage() {
   const [theme, setThemeState] = useState<Theme>(() => getStoredTheme());
   const [lang, setLang] = useState<Lang>(() => getStoredLang());
   const [notifEmail, setNotifEmail] = useState(true);
-  const [notifPush, setNotifPush] = useState(true);
   const [saved, setSaved] = useState(false);
   const [notifError, setNotifError] = useState<string | null>(null);
   const isLoggedIn = !!getToken();
@@ -29,7 +28,6 @@ export function SettingsPage() {
         const summary = summarizeConsents(records);
         // Default true: se non c'è un record esplicito di revoca, notifiche attive.
         setNotifEmail(summary.notif_email !== false);
-        setNotifPush(summary.notif_push !== false);
       })
       .catch(() => { /* offline → mantieni default */ });
   }, [isLoggedIn]);
@@ -52,32 +50,21 @@ export function SettingsPage() {
     setSaved(true);
   }
 
-  async function toggleNotif(kind: 'email' | 'push', value: boolean) {
+  async function toggleNotifEmail(value: boolean) {
     setNotifError(null);
-    if (kind === 'email') setNotifEmail(value);
-    else setNotifPush(value);
+    setNotifEmail(value);
     if (!isLoggedIn) {
-      // Per ospiti tieni in localStorage; verranno applicati al primo login.
-      window.localStorage.setItem(`tla:notif:${kind}`, String(value));
+      window.localStorage.setItem('tla:notif:email', String(value));
       setSaved(true);
       return;
     }
     try {
-      await updateConsent(kind === 'email' ? 'notif_email' : 'notif_push', value);
-      // Se l'utente disattiva push da qui, ripulisci anche il token FCM locale:
-      // il backend ha già revocato tutti i DeviceToken, ma il browser conserva
-      // ancora il sottoscrittore. Eviterebbe il falso "Attive su questo browser".
-      if (kind === 'push' && !value) {
-        window.localStorage.removeItem('tla_fcm_token');
-      }
-      // Notifica le altre pagine (es. ProfilePage riepilogo) per refresh.
+      await updateConsent('notif_email', value);
       window.dispatchEvent(new CustomEvent('tla:consents-changed'));
       setSaved(true);
     } catch (e) {
       setNotifError(e instanceof Error ? e.message : 'Errore salvataggio preferenza');
-      // Rollback ottimistico
-      if (kind === 'email') setNotifEmail(!value);
-      else setNotifPush(!value);
+      setNotifEmail(!value); // rollback
     }
   }
 
@@ -131,8 +118,8 @@ export function SettingsPage() {
       <div className="liquid-card settings-card">
         <h2>{t('settings.notifications')}</h2>
         <p>
-          Scegli come ricevere gli aggiornamenti.{' '}
-          {!isLoggedIn && <em>(Accedi per salvare le preferenze sul tuo account.)</em>}
+          {!isLoggedIn && <em>Accedi per salvare le preferenze sul tuo account. </em>}
+          Le notifiche push si gestiscono dal <a href="/profilo">profilo</a> (dipendono dal browser specifico).
         </p>
         {notifError && <div className="form-error">{notifError}</div>}
         <label className="settings-row settings-row-toggle">
@@ -140,14 +127,7 @@ export function SettingsPage() {
             <strong>Email</strong>
             <small>Conferme partecipazione, modifiche eventi, segnalazioni</small>
           </div>
-          <input type="checkbox" checked={notifEmail} onChange={(e) => toggleNotif('email', e.target.checked)} />
-        </label>
-        <label className="settings-row settings-row-toggle">
-          <div>
-            <strong>Push (browser)</strong>
-            <small>Notifiche in tempo reale via Firebase Cloud Messaging. Disattivare revoca tutti i token dei tuoi dispositivi.</small>
-          </div>
-          <input type="checkbox" checked={notifPush} onChange={(e) => toggleNotif('push', e.target.checked)} />
+          <input type="checkbox" checked={notifEmail} onChange={(e) => toggleNotifEmail(e.target.checked)} />
         </label>
       </div>
 
