@@ -158,10 +158,7 @@ export function MapPage({ user }: { user?: AppUser }) {
       }
 
       // ── filtro temporale ──────────────────────────────────────────────
-      // 'now' = mostra tutto (POI sempre, attività/eventi a prescindere dalla data)
-      // 'today' / 'weekend' = SOLO attività/eventi che cadono nella finestra
-      //   richiesta. I POI sono punti statici, non eventi: escludili dai
-      //   filtri temporali (così "Oggi" mostra davvero solo cose di oggi).
+      // 'now' = tutto visibile; 'today' / 'weekend' = solo attività/eventi nella finestra
       if (timeFilter !== 'now') {
         if (marker.type === 'poi') return false;
         if (!marker.dateTime) return false;
@@ -317,9 +314,11 @@ export function MapPage({ user }: { user?: AppUser }) {
           )}
           {isLoading && <section className="state-panel liquid-panel">La città si sta aggiornando...</section>}
           {!isLoading && visibleMarkers.length === 0 && (
-            <section className="state-panel liquid-panel">Nessun punto visibile per questo filtro.</section>
+            <aside className="map-notice map-notice--empty" aria-live="polite">
+              <span>Nessun punto visibile per questo filtro.</span>
+            </aside>
           )}
-          {!isLoading && visibleMarkers.length > 0 && <MapCanvas markers={visibleMarkers} user={user} />}
+          {!isLoading && <MapCanvas markers={visibleMarkers} user={user} />}
         </div>
 
         <aside className="home-live-column">
