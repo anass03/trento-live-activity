@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { getStoredTheme, setTheme, type Theme } from '../lib/theme';
 import { setLanguage } from '../lib/i18n';
 import { getToken, listConsents, summarizeConsents, updateConsent } from '../lib/api';
@@ -12,6 +13,7 @@ function getStoredLang(): Lang {
 }
 
 export function SettingsPage() {
+  const { t } = useTranslation();
   const [theme, setThemeState] = useState<Theme>(() => getStoredTheme());
   const [lang, setLang] = useState<Lang>(() => getStoredLang());
   const [notifEmail, setNotifEmail] = useState(true);
@@ -62,6 +64,14 @@ export function SettingsPage() {
     }
     try {
       await updateConsent(kind === 'email' ? 'notif_email' : 'notif_push', value);
+      // Se l'utente disattiva push da qui, ripulisci anche il token FCM locale:
+      // il backend ha già revocato tutti i DeviceToken, ma il browser conserva
+      // ancora il sottoscrittore. Eviterebbe il falso "Attive su questo browser".
+      if (kind === 'push' && !value) {
+        window.localStorage.removeItem('tla_fcm_token');
+      }
+      // Notifica le altre pagine (es. ProfilePage riepilogo) per refresh.
+      window.dispatchEvent(new CustomEvent('tla:consents-changed'));
       setSaved(true);
     } catch (e) {
       setNotifError(e instanceof Error ? e.message : 'Errore salvataggio preferenza');
@@ -75,16 +85,15 @@ export function SettingsPage() {
     <section className="data-page settings-page">
       <header className="utility-strip liquid-card">
         <div>
-          <h1>Impostazioni</h1>
-          <p>Personalizza l'aspetto e le notifiche dell'app</p>
+          <h1>{t('settings.title')}</h1>
+          <p>{t('settings.subtitle')}</p>
         </div>
-        {saved && <span className="settings-saved" role="status">✓ Salvato</span>}
+        {saved && <span className="settings-saved" role="status">{t('settings.saved')}</span>}
       </header>
 
       <div className="liquid-card settings-card">
-        <h2>Aspetto</h2>
-        <p>Scegli il tema dell'interfaccia.</p>
-        <div className="settings-theme-switch" role="radiogroup" aria-label="Tema">
+        <h2>{t('settings.appearance')}</h2>
+        <div className="settings-theme-switch" role="radiogroup" aria-label={t('settings.appearance')}>
           <button
             type="button"
             role="radio"
@@ -93,8 +102,7 @@ export function SettingsPage() {
             onClick={() => changeTheme('light')}
           >
             <span className="settings-theme-swatch settings-theme-swatch-light" />
-            <strong>Chiaro</strong>
-            <small>Predefinito, palette verde stone</small>
+            <strong>{t('settings.themeLight')}</strong>
           </button>
           <button
             type="button"
@@ -104,17 +112,15 @@ export function SettingsPage() {
             onClick={() => changeTheme('dark')}
           >
             <span className="settings-theme-swatch settings-theme-swatch-dark" />
-            <strong>Scuro</strong>
-            <small>Riduce l'affaticamento visivo</small>
+            <strong>{t('settings.themeDark')}</strong>
           </button>
         </div>
       </div>
 
       <div className="liquid-card settings-card">
-        <h2>Lingua</h2>
-        <p>L'interfaccia è in italiano. La traduzione inglese è in arrivo.</p>
+        <h2>{t('settings.language')}</h2>
         <label className="settings-row">
-          <span>Lingua dell'interfaccia</span>
+          <span>{t('settings.languageHint')}</span>
           <select value={lang} onChange={(e) => changeLang(e.target.value as Lang)}>
             <option value="it">Italiano</option>
             <option value="en">English</option>
@@ -123,7 +129,7 @@ export function SettingsPage() {
       </div>
 
       <div className="liquid-card settings-card">
-        <h2>Notifiche</h2>
+        <h2>{t('settings.notifications')}</h2>
         <p>
           Scegli come ricevere gli aggiornamenti.{' '}
           {!isLoggedIn && <em>(Accedi per salvare le preferenze sul tuo account.)</em>}

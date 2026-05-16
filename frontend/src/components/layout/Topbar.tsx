@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { adminNav, entityNav, municipalityNav, primaryNav } from '../../config/navigation';
 import type { AppUser } from '../../data/mockUser';
 import { getStoredTheme, toggleTheme, type Theme } from '../../lib/theme';
@@ -45,6 +46,16 @@ const iconMap: Record<string, LucideIcon> = {
   Moderazione: MessageSquareWarning,
 };
 
+// Mappa label-IT → chiave i18n (per i tooltip nella topbar).
+const labelToKey: Record<string, string> = {
+  Mappa: 'nav.map',
+  'Attività': 'nav.activities',
+  Eventi: 'nav.events',
+  'Eventi certificati': 'nav.certifiedEvents',
+  Profilo: 'nav.profile',
+  'Accedi / Registrati': 'nav.login',
+};
+
 const roleBadge: Record<AppUser['role'], { label: string; icon: LucideIcon }> = {
   anonymous: { label: 'Ospite', icon: LogIn },
   registered_user: { label: 'Cittadino', icon: User },
@@ -54,15 +65,18 @@ const roleBadge: Record<AppUser['role'], { label: string; icon: LucideIcon }> = 
 };
 
 function TopbarLink({ item, compact = false }: { item: { label: string; path: string }; compact?: boolean }) {
+  const { t } = useTranslation();
   const Icon = iconMap[item.label] ?? Sparkles;
+  const key = labelToKey[item.label];
+  const localized = key ? t(key) : item.label;
 
   return (
     <NavLink
       to={item.path}
       end={item.path === '/'}
       className={({ isActive }) => `topbar-link${compact ? ' compact' : ''}${isActive ? ' active' : ''}`}
-      aria-label={item.label}
-      title={item.label}
+      aria-label={localized}
+      title={localized}
     >
       <Icon size={19} strokeWidth={2.15} aria-hidden="true" />
     </NavLink>

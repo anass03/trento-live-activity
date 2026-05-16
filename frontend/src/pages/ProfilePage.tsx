@@ -3,7 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import {
   deleteAccount, getMe, listConsents, logout, regenerateRecoveryCodes,
   registerDeviceToken, sendTestPush, summarizeConsents, unregisterDeviceToken,
-  updateEnteProfile, updateLocation, updateProfile,
+  updateConsent, updateEnteProfile, updateLocation, updateProfile,
   type ConsentType, type MeProfile,
 } from '../lib/api';
 import { requestFcmToken } from '../lib/firebase';
@@ -101,7 +101,20 @@ export function ProfilePage() {
   }, []);
 
   useEffect(() => {
-    listConsents().then((records) => setNotifSummary(summarizeConsents(records))).catch(() => { /* ignore */ });
+    function refreshSummary() {
+      listConsents()
+        .then((records) => setNotifSummary(summarizeConsents(records)))
+        .catch(() => { /* ignore */ });
+    }
+    refreshSummary();
+    // Risincronizza quando l'utente cambia consensi (es. dalla SettingsPage),
+    // o quando torna sulla scheda dopo una modifica esterna.
+    window.addEventListener('tla:consents-changed', refreshSummary);
+    window.addEventListener('focus', refreshSummary);
+    return () => {
+      window.removeEventListener('tla:consents-changed', refreshSummary);
+      window.removeEventListener('focus', refreshSummary);
+    };
   }, []);
 
   async function handleEnablePush() {
@@ -111,6 +124,10 @@ export function ProfilePage() {
       const token = await requestFcmToken();
       await registerDeviceToken(token, 'web');
       localStorage.setItem(FCM_TOKEN_KEY, token);
+      // Allinea anche il consenso globale: se l'utente attiva push qui,
+      // sta dando il consenso.
+      try { await updateConsent('notif_push', true); } catch { /* best-effort */ }
+      window.dispatchEvent(new CustomEvent('tla:consents-changed'));
       setPushEnabled(true);
       setPushMessage('Notifiche push attivate per questo browser');
     } catch (e) {
@@ -127,6 +144,10 @@ export function ProfilePage() {
         await unregisterDeviceToken(token);
         localStorage.removeItem(FCM_TOKEN_KEY);
       }
+      // Revoca il consenso globale: il backend cancellerà anche eventuali
+      // altri DeviceToken associati all'utente su altri dispositivi.
+      try { await updateConsent('notif_push', false); } catch { /* best-effort */ }
+      window.dispatchEvent(new CustomEvent('tla:consents-changed'));
       setPushEnabled(false);
       setPushMessage('Notifiche push disattivate');
     } catch (e) {
