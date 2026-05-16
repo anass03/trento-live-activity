@@ -172,6 +172,7 @@ function markerFromActivity(record) {
     isCertified: false,
     sourceId: activity.id,
     category: activity.tipo,
+    dateTime: dateTime(activity.data, activity.orarioInizio),
   };
 }
 
@@ -187,6 +188,7 @@ function markerFromEvent(record) {
     isCertified: Boolean(event.badgeVerifica),
     sourceId: event.id,
     category: event.categoria,
+    dateTime: dateTime(event.data, event.orarioInizio),
   };
 }
 

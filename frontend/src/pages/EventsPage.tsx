@@ -7,6 +7,7 @@ import {
   type ApiEvent,
 } from '../lib/api';
 import { CalendarButton } from '../components/ui/CalendarButton';
+import { GeocodedLocation } from '../components/ui/GeocodedLocation';
 import type { AppUser } from '../data/mockUser';
 
 function formatDateTime(value: string | null) {
@@ -25,6 +26,23 @@ function eventCrowdLevel(event: ApiEvent) {
   return event.isCertified ? 68 : 44;
 }
 
+function isSameDay(dateStr: string, ref: Date): boolean {
+  const d = new Date(dateStr);
+  return d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth() && d.getDate() === ref.getDate();
+}
+
+function isThisWeekend(dateStr: string | null | undefined): boolean {
+  if (!dateStr) return false;
+  const today = new Date();
+  const dow = today.getDay(); // 0=Sun, 6=Sat
+  const sat = new Date(today);
+  sat.setHours(0, 0, 0, 0);
+  sat.setDate(today.getDate() + (dow === 0 ? -1 : 6 - dow));
+  const sun = new Date(sat);
+  sun.setDate(sat.getDate() + 1);
+  return isSameDay(dateStr, sat) || isSameDay(dateStr, sun);
+}
+
 export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: boolean; user?: AppUser }) {
   const [searchParams] = useSearchParams();
   const openId = searchParams.get('open');
@@ -36,7 +54,7 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
   const [reportMsg, setReportMsg] = useState<{ id: string; ok: boolean; text: string } | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<ApiEvent | null>(null);
   const [search, setSearch] = useState('');
-  const [timeFilter, setTimeFilter] = useState<'all' | 'today' | 'certified'>('all');
+  const [timeFilter, setTimeFilter] = useState<'all' | 'today' | 'weekend'>('all');
   const [partLoading, setPartLoading] = useState<string | null>(null);
   const [partError, setPartError] = useState<{ id: string; text: string } | null>(null);
 
@@ -78,15 +96,11 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
   const visibleEvents = useMemo(
     () => events.filter((event) => {
       if (certifiedOnly && !event.isCertified) return false;
-      if (timeFilter === 'certified' && !event.isCertified) return false;
-      if (timeFilter === 'today' && event.dateTime) {
-        const eventDate = new Date(event.dateTime);
-        const today = new Date();
-        if (
-          eventDate.getFullYear() !== today.getFullYear()
-          || eventDate.getMonth() !== today.getMonth()
-          || eventDate.getDate() !== today.getDate()
-        ) return false;
+      if (timeFilter === 'today') {
+        if (!event.dateTime || !isSameDay(event.dateTime, new Date())) return false;
+      }
+      if (timeFilter === 'weekend') {
+        if (!isThisWeekend(event.dateTime)) return false;
       }
       if (hasInterests && user?.interessi && event.category) {
         return user.interessi.includes(event.category);
@@ -227,7 +241,7 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
         <h2>{event.title}</h2>
         <p>{event.description || 'Nessuna descrizione disponibile.'}</p>
         <dl>
-          <div><dt>Luogo</dt><dd>{event.location || 'Non specificato'}</dd></div>
+          <div><dt>Luogo</dt><dd><GeocodedLocation value={event.location} /></dd></div>
           <div><dt>Quando</dt><dd>{formatDateTime(event.dateTime)}</dd></div>
         </dl>
         {event.dateTime && (
@@ -298,7 +312,7 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
         <p>{selectedEvent.description || 'Nessuna descrizione disponibile.'}</p>
         <dl>
           <div><dt>Categoria</dt><dd>{selectedEvent.category}</dd></div>
-          <div><dt>Luogo</dt><dd>{selectedEvent.location || 'Non specificato'}</dd></div>
+          <div><dt>Luogo</dt><dd><GeocodedLocation value={selectedEvent.location} /></dd></div>
           <div><dt>Quando</dt><dd>{formatDateTime(selectedEvent.dateTime)}</dd></div>
         </dl>
         <div className="activity-popup-actions">
@@ -343,6 +357,7 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
           <div className="time-filter" aria-label="Filtri certificati">
             <button className={timeFilter === 'all' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('all')}>Tutti</button>
             <button className={timeFilter === 'today' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('today')}>Oggi</button>
+            <button className={timeFilter === 'weekend' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('weekend')}>Weekend</button>
           </div>
           <button className="refresh-button" onClick={loadEvents} type="button">Aggiorna</button>
         </header>
@@ -379,6 +394,7 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
         <div className="time-filter" aria-label="Filtri eventi">
           <button className={timeFilter === 'all' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('all')}>Tutti</button>
           <button className={timeFilter === 'today' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('today')}>Oggi</button>
+          <button className={timeFilter === 'weekend' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('weekend')}>Weekend</button>
         </div>
         <button className="refresh-button" onClick={loadEvents} type="button">Aggiorna</button>
       </header>
@@ -398,20 +414,22 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
       {!isLoading && !error && upcomingVisible.length > 0 && (
         <div className="event-editorial-layout">
           {featuredEvent && (
-            <article className="event-feature-story">
-              <div className="event-date-tile">
-                <strong>{formatDay(featuredEvent.dateTime)}</strong>
-                <span>{formatDateTime(featuredEvent.dateTime)}</span>
-              </div>
-              <div>
-                <div className="feature-badges" aria-label="Stato evento">
-                  <span>{featuredEvent.category}</span>
-                  {featuredEvent.isCertified && <span>Certificato</span>}
+            <>
+              <h3 className="section-eyebrow featured-section-title">Prossimo Evento</h3>
+              <article className="event-feature-story">
+                <div className="event-date-tile">
+                  <strong>{formatDay(featuredEvent.dateTime)}</strong>
+                  <span>{formatDateTime(featuredEvent.dateTime)}</span>
                 </div>
-                <h2>{featuredEvent.title}</h2>
-                <p>{featuredEvent.description || 'Nessuna descrizione disponibile.'}</p>
-              </div>
-            </article>
+                <div>
+                  <div className="feature-badges" aria-label="Categoria evento">
+                    <span>{featuredEvent.category}</span>
+                  </div>
+                  <h2>{featuredEvent.title}</h2>
+                  <p>{featuredEvent.description || 'Nessuna descrizione disponibile.'}</p>
+                </div>
+              </article>
+            </>
           )}
 
           <aside className="event-timeline-panel">

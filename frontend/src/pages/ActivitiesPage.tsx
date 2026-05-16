@@ -5,10 +5,29 @@ import { InteractiveMapCard } from '../components/ui/InteractiveMapCard';
 import type { AppUser } from '../data/mockUser';
 import { cancelActivity, getActivities, getActivityCalendarUrl, googleCalendarUrl, joinActivity, leaveActivity, type ApiActivity } from '../lib/api';
 import { CalendarButton } from '../components/ui/CalendarButton';
+import { GeocodedLocation } from '../components/ui/GeocodedLocation';
 
 function formatDateTime(value?: string | null) {
   if (!value) return 'Data da definire';
   return new Intl.DateTimeFormat('it-IT', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+}
+
+function isSameDay(dateStr: string, ref: Date): boolean {
+  const d = new Date(dateStr);
+  return d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth() && d.getDate() === ref.getDate();
+}
+
+function isThisWeekend(dateStr: string | null | undefined): boolean {
+  if (!dateStr) return false;
+  const today = new Date();
+  const dow = today.getDay(); // 0=Sun, 6=Sat
+  // Find this week's Saturday
+  const sat = new Date(today);
+  sat.setHours(0, 0, 0, 0);
+  sat.setDate(today.getDate() + (dow === 0 ? -1 : 6 - dow));
+  const sun = new Date(sat);
+  sun.setDate(sat.getDate() + 1);
+  return isSameDay(dateStr, sat) || isSameDay(dateStr, sun);
 }
 
 export function ActivitiesPage({ user }: { user?: AppUser }) {
@@ -22,7 +41,7 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
   const [selectedActivity, setSelectedActivity] = useState<ApiActivity | null>(null);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<string>('all');
-  const [timeFilter, setTimeFilter] = useState<'all' | 'today' | 'open'>('all');
+  const [timeFilter, setTimeFilter] = useState<'all' | 'today' | 'weekend' | 'open'>('all');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const hasInterests = Array.isArray(userInterests) && userInterests.length > 0;
 
@@ -129,14 +148,11 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
       const q = search.trim().toLowerCase();
       if (category !== 'all' && activity.category !== category) return false;
       if (timeFilter === 'open' && activity.status === 'completa') return false;
-      if (timeFilter === 'today' && activity.dateTime) {
-        const eventDate = new Date(activity.dateTime);
-        const today = new Date();
-        if (
-          eventDate.getFullYear() !== today.getFullYear()
-          || eventDate.getMonth() !== today.getMonth()
-          || eventDate.getDate() !== today.getDate()
-        ) return false;
+      if (timeFilter === 'today') {
+        if (!activity.dateTime || !isSameDay(activity.dateTime, new Date())) return false;
+      }
+      if (timeFilter === 'weekend') {
+        if (!isThisWeekend(activity.dateTime)) return false;
       }
       if (!q) return true;
       return `${activity.title} ${activity.description || ''} ${activity.category} ${activity.location || ''}`.toLowerCase().includes(q);
@@ -166,6 +182,7 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
         <div className="time-filter" aria-label="Filtro attività">
           <button className={timeFilter === 'all' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('all')}>Tutte</button>
           <button className={timeFilter === 'today' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('today')}>Oggi</button>
+          <button className={timeFilter === 'weekend' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('weekend')}>Weekend</button>
           <button className={timeFilter === 'open' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('open')}>Aperte</button>
         </div>
         <div className="activities-hero-stats">
@@ -278,20 +295,22 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
 
           <section className="activity-results">
             {featuredActivity && (
-              <article className="activity-featured">
-                <div>
-                  <div className="feature-badges" aria-label="Stato attività">
-                    <span>{featuredActivity.category}</span>
-                    <span>{featuredActivity.status || 'attiva'}</span>
+              <>
+                <h3 className="section-eyebrow featured-section-title">Prossima Attività</h3>
+                <article className="activity-featured">
+                  <div>
+                    <div className="feature-badges" aria-label="Categoria attività">
+                      <span>{featuredActivity.category}</span>
+                    </div>
+                    <h2>{featuredActivity.title}</h2>
+                    <p>{featuredActivity.description || 'Attività spontanea organizzata dalla community.'}</p>
                   </div>
-                  <h2>{featuredActivity.title}</h2>
-                  <p>{featuredActivity.description || 'Attività spontanea organizzata dalla community.'}</p>
-                </div>
                 <dl className="activity-featured-meta">
                   <div><dt>Quando</dt><dd>{formatDateTime(featuredActivity.dateTime)}</dd></div>
                   <div><dt>Partecipanti</dt><dd>{featuredActivity.participantCount} / {featuredActivity.maxParticipants}</dd></div>
                 </dl>
-              </article>
+                </article>
+              </>
             )}
 
             <div className="activity-card-flow">
@@ -321,7 +340,7 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
                   <dl>
                     <div>
                       <dt>Luogo</dt>
-                      <dd>{activity.location || 'Non specificato'}</dd>
+                      <dd><GeocodedLocation value={activity.location} /></dd>
                     </div>
                     <div>
                       <dt>Quando</dt>
@@ -368,7 +387,7 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
             <h2 id="activity-popup-title">{selectedActivity.title}</h2>
             <p>{selectedActivity.description || 'Attività spontanea organizzata dalla community.'}</p>
             <dl>
-              <div><dt>Luogo</dt><dd>{selectedActivity.location || 'Non specificato'}</dd></div>
+              <div><dt>Luogo</dt><dd><GeocodedLocation value={selectedActivity.location} /></dd></div>
               <div><dt>Quando</dt><dd>{formatDateTime(selectedActivity.dateTime)}</dd></div>
               <div><dt>Partecipanti</dt><dd>{selectedActivity.participantCount} / {selectedActivity.maxParticipants}</dd></div>
             </dl>

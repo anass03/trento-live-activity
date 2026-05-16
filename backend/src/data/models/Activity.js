@@ -1,7 +1,7 @@
 const { DataTypes } = require('sequelize');
 
 // RNF22: predefined types only — no free text
-const ACTIVITY_TYPES = ['sport', 'cultura', 'musica', 'studio'];
+const ACTIVITY_TYPES = ['sport', 'cultura', 'musica', 'studio', 'arte', 'gastronomia'];
 const ACTIVITY_STATUSES = ['attiva', 'cancellata', 'conclusa'];
 
 module.exports = (sequelize) => {
