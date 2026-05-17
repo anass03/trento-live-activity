@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import maplibregl, {
   type GeoJSONSource,
@@ -410,6 +411,11 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
   // React popup state
   const [popup, setPopup] = useState<PopupState | null>(null);
   const [popupPos, setPopupPos] = useState({ x: 0, y: 0 });
+  // Target del portal popup: in fullscreen il body è nascosto dal browser,
+  // quindi dirottiamo il portal dentro l'elemento fullscreen (la <section>).
+  const [portalTarget, setPortalTarget] = useState<HTMLElement>(() =>
+    typeof document !== 'undefined' ? document.body : (null as unknown as HTMLElement)
+  );
   // Refs so map event handlers (stale closures) always see current values
   const popupStateRef = useRef<PopupState | null>(null);
   const singleClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -439,6 +445,18 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
   function closePopup() {
     popupStateRef.current = null;
     setPopup(null);
+  }
+
+  // Converte coordinate geografiche in coordinate viewport (window-fixed) così
+  // il popup può essere renderizzato in un portal su document.body e uscire
+  // dai bordi della .map-area (che ha overflow:hidden + isolation:isolate).
+  function projectToViewport(lngLat: [number, number]) {
+    const map = mapRef.current;
+    const container = containerRef.current;
+    if (!map || !container) return { x: 0, y: 0 };
+    const pt = map.project(lngLat);
+    const rect = container.getBoundingClientRect();
+    return { x: pt.x + rect.left, y: pt.y + rect.top };
   }
 
   function resetView() {
@@ -475,6 +493,7 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
       setForm((f) => ({
         ...f,
         tipo: result.tipo,
+        data: result.data,
         maxPartecipanti: result.maxPartecipanti,
         orarioInizio: result.orarioInizio,
         orarioFine: result.orarioFine,
@@ -550,8 +569,7 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
         const newState: PopupState = { props, lngLat, locked: false };
         popupStateRef.current = newState;
         setPopup(newState);
-        const pt = map.project(lngLat);
-        setPopupPos({ x: pt.x, y: pt.y });
+        setPopupPos(projectToViewport(lngLat));
       };
 
       // ── Mouse leave: hide hover popup ──────────────────────────────────────
@@ -629,10 +647,7 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
       // ── Map move/zoom: keep popup anchored to its marker ──────────────────
       const handleMapMove = () => {
         const state = popupStateRef.current;
-        if (state) {
-          const pt = map.project(state.lngLat);
-          setPopupPos({ x: pt.x, y: pt.y });
-        }
+        if (state) setPopupPos(projectToViewport(state.lngLat));
       };
 
       map.on('click', 'trento-marker-clusters', handleClusterClick);
@@ -670,14 +685,50 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
     fitMapToMarkers(map, markers);
   }, [data, markers]);
 
+  // Riposiziona il popup quando la pagina scrolla o la window viene ridimensionata.
+  // Necessario perché il popup ora vive su document.body (portal) con position:fixed:
+  // l'evento 'move' della mappa scatta solo per pan/zoom del map canvas, non per
+  // scroll del documento o resize del browser che pure spostano il container.
+  useEffect(() => {
+    if (!popup) return;
+    const reposition = () => {
+      const state = popupStateRef.current;
+      if (state) setPopupPos(projectToViewport(state.lngLat));
+    };
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
+    return () => {
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
+    };
+  }, [popup]);
+
+  // Sposta il portal dentro l'elemento fullscreen quando la mappa va a tutto schermo,
+  // e lo riporta su document.body all'uscita. Senza questo, in fullscreen il browser
+  // nasconde tutto fuori dall'elemento fullscreen → popup sparito.
+  useEffect(() => {
+    function syncPortalTarget() {
+      const fs = document.fullscreenElement as HTMLElement | null;
+      setPortalTarget(fs ?? document.body);
+      // Ricalcola posizione: il container può essere a coordinate diverse in fullscreen.
+      const state = popupStateRef.current;
+      if (state) setPopupPos(projectToViewport(state.lngLat));
+    }
+    document.addEventListener('fullscreenchange', syncPortalTarget);
+    return () => document.removeEventListener('fullscreenchange', syncPortalTarget);
+  }, []);
+
   const canNavigate = popup && popup.props.type !== 'poi';
 
   return (
     <section ref={sectionRef} className="map-area map-area-3d" aria-label="Map Zone 3D" data-testid="map-zone">
       <div ref={containerRef} className="maplibre-map" />
 
-      {/* ── React popup overlay ─────────────────────────────────────────── */}
-      {popup && (
+      {/* ── React popup overlay ─────────────────────────────────────────────
+          Reso via portal su document.body così esce dai bordi della .map-area
+          (overflow:hidden + isolation:isolate) e va in primo piano sopra HUD,
+          legenda e qualunque altro contenuto della pagina. */}
+      {popup && createPortal(
         <div
           className="map-react-popup-anchor"
           style={{ left: popupPos.x, top: popupPos.y }}
@@ -757,7 +808,8 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
               </p>
             )}
           </article>
-        </div>
+        </div>,
+        portalTarget,
       )}
 
       {/* ── Create-activity form panel ──────────────────────────────────── */}

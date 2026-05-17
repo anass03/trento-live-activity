@@ -146,6 +146,10 @@ export function RegistrationPage() {
         navigate('/');
         window.location.reload();
       } else {
+        // #M6: anche la registrazione ente richiede consenso esplicito GDPR.
+        if (!consents.privacy_policy || !consents.terms_of_service) {
+          throw new Error('Devi accettare privacy policy e termini di servizio per registrare l\'ente');
+        }
         if (!isValidPec(form.pec)) {
           throw new Error('Indirizzo PEC non valido: deve essere un\'email su un dominio di posta certificata');
         }
@@ -155,6 +159,7 @@ export function RegistrationPage() {
           password: form.password,
           nomeEnte: form.nomeEnte,
           pec: pecNorm,
+          consents,
         });
         setSuccess(result.message);
       }
@@ -251,21 +256,6 @@ export function RegistrationPage() {
               </small>
             </label>
 
-            <fieldset className="consents">
-              <legend>Consensi (GDPR)</legend>
-              <label className="checkbox">
-                <input type="checkbox" checked={consents.privacy_policy} onChange={(e) => setConsents({ ...consents, privacy_policy: e.target.checked })} required />
-                <span>Accetto la <Link to="/privacy" target="_blank" rel="noreferrer">privacy policy</Link> *</span>
-              </label>
-              <label className="checkbox">
-                <input type="checkbox" checked={consents.terms_of_service} onChange={(e) => setConsents({ ...consents, terms_of_service: e.target.checked })} required />
-                <span>Accetto i <Link to="/termini" target="_blank" rel="noreferrer">termini di servizio</Link> *</span>
-              </label>
-              <label className="checkbox">
-                <input type="checkbox" checked={consents.marketing} onChange={(e) => setConsents({ ...consents, marketing: e.target.checked })} />
-                <span>Accetto di ricevere comunicazioni di marketing (facoltativo)</span>
-              </label>
-            </fieldset>
           </>
         ) : (
           <>
@@ -291,6 +281,23 @@ export function RegistrationPage() {
             </label>
           </>
         )}
+
+        {/* Consensi GDPR: obbligatori sia per cittadini che per enti (#M6). */}
+        <fieldset className="consents">
+          <legend>Consensi (GDPR)</legend>
+          <label className="checkbox">
+            <input type="checkbox" checked={consents.privacy_policy} onChange={(e) => setConsents({ ...consents, privacy_policy: e.target.checked })} required />
+            <span>Accetto la <Link to="/privacy" target="_blank" rel="noreferrer">privacy policy</Link> *</span>
+          </label>
+          <label className="checkbox">
+            <input type="checkbox" checked={consents.terms_of_service} onChange={(e) => setConsents({ ...consents, terms_of_service: e.target.checked })} required />
+            <span>Accetto i <Link to="/termini" target="_blank" rel="noreferrer">termini di servizio</Link> *</span>
+          </label>
+          <label className="checkbox">
+            <input type="checkbox" checked={consents.marketing} onChange={(e) => setConsents({ ...consents, marketing: e.target.checked })} />
+            <span>Accetto di ricevere comunicazioni di marketing (facoltativo)</span>
+          </label>
+        </fieldset>
 
         {error && <div className="form-error">{error}</div>}
         {success && <div className="form-success">{success}</div>}
