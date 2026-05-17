@@ -4,35 +4,69 @@ info:
   description: |
     REST API per Trento Live Activity — piattaforma civic-tech per la città di Trento.
     Università di Trento — Software Engineering a.a. 2025-2026, Gruppo 7.
+
+    Tutti gli endpoint sono esposti sotto il prefisso `/api/`. L'autenticazione
+    è basata su JWT (`Authorization: Bearer <token>`), salvo dove indicato.
+
+    Riferimenti: RF = Functional Requirement (D1), RNF = Non-Functional, OCL = Object Constraint Language (D2).
   version: "1.0.0"
   contact:
     name: Group 7 (Soussane, Marcatili, Safi)
 servers:
-  - url: http://localhost:3000
+  - url: http://localhost:3000/api
     description: Local development
+  - url: https://api.trentoliveactivity.it/api
+    description: Production (pianificato per Sprint #2)
+
 tags:
   - name: Auth
+    description: Registrazione, login, OAuth, SPID, 2FA, gestione profilo, consensi GDPR
   - name: Activities
+    description: Attività spontanee (utenti registrati)
   - name: Events
+    description: Eventi certificati (enti approvati)
   - name: Map
+    description: Mappa pubblica + POI
   - name: Moderation
+    description: Segnalazione + risoluzione DSA
   - name: Dashboard
+    description: Statistiche aggregate per il Comune
   - name: Admin
+    description: Operazioni amministrative (sistema)
   - name: Notifications
-  - name: Users
+    description: Push FCM e test notifiche
+  - name: Favorites
+    description: Preferiti utente (POI/attività/eventi)
+  - name: AI
+    description: Suggeritore AI (Gemini) per creazione attività
 
+# ════════════════════════════════════════════════════════════════════════════
+# SECURITY
+# ════════════════════════════════════════════════════════════════════════════
 components:
   securitySchemes:
     BearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+      description: |
+        JWT firmato HS256 contenente `{id, ruolo, jti, [needs2faSetup]}`.
+        TTL: 7 giorni (default). Revoca via /auth/logout (jti aggiunto a tabella revoked_tokens).
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # SCHEMAS
+  # ──────────────────────────────────────────────────────────────────────────
   schemas:
     Error:
       type: object
       properties:
-        error: { type: string }
-        code:  { type: string }
+        error:
+          type: string
+          example: "Email already registered"
+        code:
+          type: string
+          example: "EMAIL_TAKEN"
+
     User:
       type: object
       properties:
@@ -43,25 +77,125 @@ components:
         ruolo:
           type: string
           enum: [UtenteRegistrato, EnteCertificato, AmministratoreComunale, AmministratoreDiSistema]
+        dataNascita: { type: string, format: date }
+        codiceFiscale: { type: string, nullable: true }
         interessi:
           type: array
           items: { type: string }
-        approvato: { type: boolean }
         nomeEnte: { type: string, nullable: true }
+        pec: { type: string, nullable: true }
+        approvato: { type: boolean, nullable: true }
+        emailVerified: { type: boolean }
+        twoFactorEnabled: { type: boolean }
+        twoFactorRecoveryCodesRemaining: { type: integer, description: "Solo per AmministratoreDiSistema" }
+        hasPassword:
+          type: boolean
+          description: |
+            false per account OAuth-only (Google/Apple senza password locale).
+            Il frontend usa questo flag per decidere se mostrare il form "Cambia password"
+            e quale conferma chiedere su DELETE /me.
+        profile:
+          oneOf:
+            - $ref: '#/components/schemas/CittadinoProfile'
+            - $ref: '#/components/schemas/EnteProfile'
+            - $ref: '#/components/schemas/ComunaleProfile'
+            - $ref: '#/components/schemas/SistemaProfile'
+          nullable: true
+
+    CittadinoProfile:
+      type: object
+      properties:
+        kind: { type: string, enum: [cittadino] }
+        nome: { type: string }
+        cognome: { type: string }
+        dataNascita: { type: string, format: date }
+        codiceFiscale: { type: string }
+        interessi: { type: array, items: { type: string } }
+        onboardingComplete: { type: boolean }
+
+    EnteProfile:
+      type: object
+      properties:
+        kind: { type: string, enum: [ente] }
+        nomeEnte: { type: string }
+        pec: { type: string, format: email }
+        approvato: { type: boolean }
+        noteAdmin: { type: string, nullable: true }
+
+    ComunaleProfile:
+      type: object
+      properties:
+        kind: { type: string, enum: [comunale] }
+        nome: { type: string }
+        cognome: { type: string }
+        ufficio: { type: string, nullable: true }
+        spidId: { type: string }
+
+    SistemaProfile:
+      type: object
+      properties:
+        kind: { type: string, enum: [sistema] }
+        nome: { type: string }
+        cognome: { type: string }
+        superAdmin: { type: boolean }
+
     AuthResponse:
       type: object
       properties:
         user: { $ref: '#/components/schemas/User' }
-        token: { type: string }
+        token: { type: string, description: "JWT" }
+        needs2faSetup:
+          type: boolean
+          description: "true al primo login di un AmministratoreDiSistema; il token è limitato a /2fa/setup e /2fa/verify"
+
+    Consent:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        type:
+          type: string
+          enum: [privacy_policy, terms_of_service, marketing, analytics, notif_email, notif_push]
+        version: { type: string, example: "1.0" }
+        granted: { type: boolean }
+        grantedAt: { type: string, format: date-time }
+        revokedAt: { type: string, format: date-time, nullable: true }
+
     RegisterRequest:
       type: object
-      required: [email, password, nome, cognome, dataNascita, consents]
+      required: [email, password, nome, cognome, dataNascita, codiceFiscale, consents]
       properties:
         email: { type: string, format: email }
-        password: { type: string, minLength: 8 }
+        password:
+          type: string
+          minLength: 8
+          description: "Min 8 char con almeno una maiuscola, una minuscola, un numero, un carattere speciale"
         nome: { type: string }
         cognome: { type: string }
-        dataNascita: { type: string, format: date }
+        dataNascita:
+          type: string
+          format: date
+          description: "Utente deve avere ≥13 anni (GDPR art. 8 / OCL C5)"
+        codiceFiscale: { type: string, minLength: 16, maxLength: 16 }
+        consents:
+          type: object
+          required: [privacy_policy, terms_of_service]
+          properties:
+            privacy_policy: { type: boolean, description: "Obbligatorio (RNF19)" }
+            terms_of_service: { type: boolean, description: "Obbligatorio (RNF19)" }
+            marketing: { type: boolean }
+            analytics: { type: boolean }
+
+    RegisterEntityRequest:
+      type: object
+      required: [password, nomeEnte, pec, consents]
+      properties:
+        password: { type: string, minLength: 8 }
+        nomeEnte: { type: string }
+        pec:
+          type: string
+          format: email
+          description: "Posta Elettronica Certificata su dominio PEC (validata server-side)"
         consents:
           type: object
           required: [privacy_policy, terms_of_service]
@@ -70,31 +204,66 @@ components:
             terms_of_service: { type: boolean }
             marketing: { type: boolean }
             analytics: { type: boolean }
+
     Activity:
       type: object
       properties:
         id: { type: string, format: uuid }
-        tipo: { type: string, enum: [sport, cultura, musica, studio] }
+        title: { type: string, description: "Generato: 'Attività di <tipo>'" }
+        tipo:
+          type: string
+          enum: [sport, cultura, musica, studio, arte, gastronomia]
+          description: "RNF22 — solo valori predefiniti, no free text"
         data: { type: string, format: date }
         orarioInizio: { type: string, example: "18:00" }
         orarioFine: { type: string, example: "19:30" }
-        maxPartecipanti: { type: integer, minimum: 2, maximum: 50 }
-        stato: { type: string, enum: [attiva, cancellata, conclusa] }
-        creatorId: { type: string, format: uuid }
-        latitudine: { type: number, nullable: true }
-        longitudine: { type: number, nullable: true }
-        poiId: { type: string, format: uuid, nullable: true }
+        maxPartecipanti:
+          type: integer
+          minimum: 2
+          maximum: 50
+          description: "OCL C8"
+        stato:
+          type: string
+          enum: [attiva, cancellata, conclusa]
+        creator:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+        participantCount: { type: integer }
+        participantIds: { type: array, items: { type: string, format: uuid } }
+        latitude: { type: number, nullable: true }
+        longitude: { type: number, nullable: true }
+        location: { type: string, nullable: true, description: "Nome POI se collegato" }
+        createdAt: { type: string, format: date-time }
+
     Event:
       type: object
       properties:
         id: { type: string, format: uuid }
-        titolo: { type: string, maxLength: 100 }
-        descrizione: { type: string, nullable: true }
-        categoria: { type: string, enum: [sport, cultura, musica, arte, gastronomia, altro] }
-        badgeVerifica: { type: boolean }
-        entityId: { type: string, format: uuid }
-        data: { type: string, format: date, nullable: true }
-        views: { type: integer }
+        title: { type: string, maxLength: 100, description: "OCL C17" }
+        description: { type: string }
+        category:
+          type: string
+          description: "Free text per evento (a differenza dell'attività)"
+        isCertified: { type: boolean, description: "= badgeVerifica (OCL C16)" }
+        dateTime: { type: string, format: date-time, nullable: true }
+        startTime: { type: string, nullable: true }
+        endTime: { type: string, nullable: true }
+        maxPartecipanti: { type: integer, nullable: true }
+        participantCount: { type: integer }
+        participantIds: { type: array, items: { type: string, format: uuid } }
+        latitude: { type: number, nullable: true }
+        longitude: { type: number, nullable: true }
+        location: { type: string, nullable: true }
+        entity:
+          type: object
+          nullable: true
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+        createdAt: { type: string, format: date-time }
+
     POI:
       type: object
       required: [nome, latitudine, longitudine, capacitaMax]
@@ -103,45 +272,176 @@ components:
         nome: { type: string }
         latitudine: { type: number }
         longitudine: { type: number }
-        capacitaMax: { type: integer, minimum: 1 }
-        statoAffollamento: { type: string, enum: [verde, giallo, rosso] }
+        capacitaMax: { type: integer, minimum: 1, description: "OCL C20" }
+        statoAffollamento:
+          type: string
+          enum: [verde, giallo, rosso]
+          description: "OCL C21"
         tipo: { type: string, nullable: true }
         descrizione: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    MapMarker:
+      type: object
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [poi, activity, event] }
+        title: { type: string }
+        latitude: { type: number }
+        longitude: { type: number }
+        crowdLevel: { type: integer, minimum: 0, maximum: 100 }
+        crowdingStatus: { type: string, enum: [green, yellow, orange, red] }
+        isCertified: { type: boolean }
+        sourceId: { type: string, format: uuid }
+        category: { type: string, nullable: true }
+        dateTime: { type: string, nullable: true }
+
     Report:
       type: object
       properties:
         id: { type: string, format: uuid }
         userId: { type: string, format: uuid }
         eventId: { type: string, format: uuid }
-        tipo: { type: string, enum: [contenuto_illegale, spam, informazioni_false, contenuto_offensivo] }
-        stato: { type: string, enum: [aperta, in lavorazione, risolta] }
-        descrizione: { type: string, nullable: true }
+        tipo:
+          type: string
+          enum: [contenuto_inappropriato, spam, disinformazione, contenuto_offensivo, altro]
+        stato:
+          type: string
+          enum: [aperta, "in lavorazione", risolta]
+        descrizione: { type: string, nullable: true, maxLength: 2000 }
+        createdAt: { type: string, format: date-time }
+
+    Favorite:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        markerType: { type: string, enum: [poi, activity, event] }
+        markerId: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+
     DashboardStats:
       type: object
       properties:
-        totalUsers: { type: integer }
         totalActivities: { type: integer }
         totalEvents: { type: integer }
         totalPOIs: { type: integer }
         totalParticipations: { type: integer }
         activitiesByType:
           type: array
-          items: { type: object, properties: { tipo: {type: string}, count: {type: integer} } }
+          items:
+            type: object
+            properties:
+              tipo: { type: string }
+              count: { type: integer }
+        eventsByCategory:
+          type: array
+          items:
+            type: object
+            properties:
+              categoria: { type: string }
+              count: { type: integer }
         poiCrowding:
           type: array
-          items: { type: object, properties: { statoAffollamento: {type: string}, count: {type: integer} } }
+          items:
+            type: object
+            properties:
+              statoAffollamento: { type: string }
+              count: { type: integer }
+        topCrowdedPOIs:
+          type: array
+          items: { $ref: '#/components/schemas/POI' }
+        filters:
+          type: object
+          description: "Filtri applicati (eco)"
 
+    AiSuggestionRequest:
+      type: object
+      required: [description]
+      properties:
+        description:
+          type: string
+          minLength: 3
+          example: "partita di calcetto domani sera"
+        location: { type: string, nullable: true }
+        time: { type: string, nullable: true }
+
+    AiSuggestionResponse:
+      type: object
+      properties:
+        tipo:
+          type: string
+          enum: [sport, cultura, musica, arte, gastronomia, studio]
+        data: { type: string, format: date }
+        maxPartecipanti: { type: integer, minimum: 2, maximum: 50 }
+        orarioInizio: { type: string, example: "19:00" }
+        orarioFine: { type: string, example: "21:00" }
+        reasoning: { type: string, description: "Breve spiegazione in italiano" }
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # RESPONSES riutilizzabili
+  # ──────────────────────────────────────────────────────────────────────────
+  responses:
+    BadRequest:
+      description: Validation error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: Missing, invalid or revoked JWT
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Authenticated but role/ownership doesn't allow the action
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: Uniqueness or business-rule conflict
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    TooManyRequests:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+# ════════════════════════════════════════════════════════════════════════════
+# PATHS
+# ════════════════════════════════════════════════════════════════════════════
 paths:
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # HEALTH
+  # ──────────────────────────────────────────────────────────────────────────
   /health:
     get:
       tags: [Auth]
-      summary: Health check
-      responses: { '200': { description: OK } }
+      summary: Health check (no auth, no rate limit)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
 
+  # ──────────────────────────────────────────────────────────────────────────
+  # AUTH — public
+  # ──────────────────────────────────────────────────────────────────────────
   /auth/register:
     post:
       tags: [Auth]
-      summary: Register a new citizen (RF5, RNF19, OCL C2/C5/C7)
+      summary: Registrazione cittadino (RF5, RNF19, OCL C2/C5/C7)
       requestBody:
         required: true
         content:
@@ -149,32 +449,39 @@ paths:
             schema: { $ref: '#/components/schemas/RegisterRequest' }
       responses:
         '201':
-          description: User created and authenticated
-          content: { application/json: { schema: { $ref: '#/components/schemas/AuthResponse' } } }
-        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-        '409': { description: Email already taken }
+          description: Account creato, email di verifica inviata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  emailVerificationRequired: { type: boolean, example: true }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
   /auth/register/entity:
     post:
       tags: [Auth]
-      summary: Request registration as a certified entity (RF31)
+      summary: Richiesta registrazione ente certificato (RF31)
+      description: |
+        L'ente si registra con la PEC come identificativo di login. Account creato
+        in stato `approvato: false`; un AmministratoreDiSistema deve approvarlo.
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [email, password, nomeEnte]
-              properties:
-                email: { type: string, format: email }
-                password: { type: string, minLength: 8 }
-                nomeEnte: { type: string }
-                nome: { type: string }
-                cognome: { type: string }
-      responses: { '201': { description: Pending approval } }
+            schema: { $ref: '#/components/schemas/RegisterEntityRequest' }
+      responses:
+        '201':
+          description: Richiesta ricevuta, in attesa di approvazione
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
   /auth/login:
     post:
       tags: [Auth]
-      summary: Login (RF6). 2FA required for AmministratoreDiSistema (RNF15)
+      summary: Login (RF6); 2FA obbligatorio per AmministratoreDiSistema (RNF15)
+      description: Rate limit dedicato 10/15min per prevenire brute-force.
       requestBody:
         required: true
         content:
@@ -183,101 +490,493 @@ paths:
               type: object
               required: [email, password]
               properties:
-                email: { type: string }
+                email: { type: string, format: email }
                 password: { type: string }
-                otpToken: { type: string, description: "6-digit TOTP, required for system admins" }
+                otpToken:
+                  type: string
+                  description: |
+                    Codice TOTP a 6 cifre o codice di recupero a 10 caratteri.
+                    Obbligatorio per AmministratoreDiSistema con 2FA attivo.
       responses:
-        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/AuthResponse' } } } }
-        '401': { description: Invalid credentials or 2FA }
-  /auth/logout:
-    post:
-      tags: [Auth]
-      summary: Revoke the current JWT (OCL C6)
-      security: [{ BearerAuth: [] }]
-      responses: { '204': { description: Logged out } }
-  /auth/me:
-    get:
-      tags: [Auth]
-      summary: Current authenticated user
-      security: [{ BearerAuth: [] }]
-      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } } }
-    put:
-      tags: [Auth]
-      summary: Update profile (RF20, RF13)
-      security: [{ BearerAuth: [] }]
-      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { nome: {type: string}, cognome: {type: string}, interessi: { type: array, items: { type: string } } } } } } }
-      responses: { '200': { description: OK } }
-    delete:
-      tags: [Auth]
-      summary: Delete account (GDPR art. 17, RF26, RNF20)
-      security: [{ BearerAuth: [] }]
-      responses: { '204': { description: Account deleted } }
-  /auth/me/location:
-    put:
-      tags: [Auth]
-      summary: Update user's last known location (for RF40 geo push)
-      security: [{ BearerAuth: [] }]
-      requestBody:
-        required: true
-        content: { application/json: { schema: { type: object, required: [lat, lng], properties: { lat: {type: number}, lng: {type: number} } } } }
-      responses: { '200': { description: OK } }
+        '200':
+          description: Login OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Email non verificata
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
   /auth/forgot-password:
     post:
       tags: [Auth]
-      summary: Send password reset link (RF8)
-      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [email], properties: { email: { type: string, format: email } } } } } }
-      responses: { '200': { description: Email sent (always 200 to prevent enumeration) } }
+      summary: Richiesta link reset password (RF8)
+      description: |
+        Ritorna sempre 200 per evitare user enumeration. Internamente:
+        - Account OAuth-only (passwordHash=null) → no email
+        - AmministratoreDiSistema → no email (deve usare recovery 2FA)
+        - AmministratoreComunale → no email (SPID-only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '200': { description: Email inviata (anti-enumeration) }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
   /auth/reset-password/{token}:
     post:
       tags: [Auth]
-      summary: Complete password reset (RF8)
-      parameters: [{ in: path, name: token, required: true, schema: { type: string } }]
-      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [password], properties: { password: { type: string, minLength: 8 } } } } } }
-      responses: { '200': { description: Password updated } }
-  /auth/2fa/setup:
-    post:
-      tags: [Auth]
-      summary: Setup 2FA for AmministratoreDiSistema (RNF15)
-      security: [{ BearerAuth: [] }]
-      responses: { '200': { description: otpauth URL, content: { application/json: { schema: { type: object, properties: { otpauthUrl: { type: string } } } } } } }
-  /auth/2fa/verify:
-    post:
-      tags: [Auth]
-      summary: Verify and activate 2FA
-      security: [{ BearerAuth: [] }]
-      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [token], properties: { token: { type: string } } } } } }
-      responses: { '200': { description: 2FA enabled } }
-  /auth/consents:
+      summary: Completa reset password
+      parameters:
+        - in: path
+          name: token
+          required: true
+          schema: { type: string }
+          description: "Token plain (in DB salvato come SHA-256, scadenza 1h)"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string, minLength: 8 }
+      responses:
+        '200': { description: Password aggiornata }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /auth/verify-email:
     get:
       tags: [Auth]
-      summary: List user consent history (GDPR RNF19)
-      security: [{ BearerAuth: [] }]
-      responses: { '200': { description: Consents } }
+      summary: Verifica indirizzo email tramite token (RF45)
+      description: "Token (plain) inviato via email; il DB contiene SHA-256. Scadenza 24h."
+      parameters:
+        - in: query
+          name: token
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Email verificata, utente autenticato
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # AUTH — OAuth / SPID
+  # ──────────────────────────────────────────────────────────────────────────
+  /auth/oauth/google:
     post:
       tags: [Auth]
-      summary: Grant or revoke a consent
+      summary: Login OAuth Google (RF6)
+      description: |
+        Il frontend usa il flusso "implicit" Google e invia `accessToken`.
+        Il server verifica l'identità via userinfo endpoint e recupera la data
+        di nascita via People API (scope `user.birthday.read` richiesto).
+        Account OAuth-only: `passwordHash = null` lato server.
+        Check sicurezza: rifiuta se l'email appartiene a admin di sistema/comunale/ente.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [accessToken]
+              properties:
+                accessToken: { type: string }
+                idToken:
+                  type: string
+                  deprecated: true
+                  description: "Retro-compat: accettato se accessToken manca"
+      responses:
+        '200':
+          description: Login OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/AuthResponse' } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: "OAuth bloccato per ruolo privilegiato (OAUTH_FORBIDDEN_ADMIN / UNDERAGE)"
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+
+  /auth/oauth/apple:
+    post:
+      tags: [Auth]
+      summary: Login Sign-in with Apple (RF6)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [idToken]
+              properties:
+                idToken: { type: string }
+      responses:
+        '200':
+          description: Login OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/AuthResponse' } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /auth/spid/callback:
+    post:
+      tags: [Auth]
+      summary: Callback SPID per AmministratoreComunale (RF7, OCL C4)
+      description: |
+        Stub in dev. In produzione si integra con un IdP SPID reale.
+        Solo email associate al ruolo `AmministratoreComunale` sono ammesse.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [spidId, email]
+              properties:
+                spidId: { type: string }
+                email: { type: string, format: email }
+                nome: { type: string }
+                cognome: { type: string }
+                ufficio: { type: string }
+      responses:
+        '200':
+          description: Login OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/AuthResponse' } } }
+        '403':
+          description: "SPID_FORBIDDEN_ROLE — account non comunale"
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # AUTH — protected (richiede Bearer JWT)
+  # ──────────────────────────────────────────────────────────────────────────
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Revoca il JWT corrente (OCL C6)
+      description: "Il `jti` viene salvato in revoked_tokens fino alla scadenza."
+      security: [{ BearerAuth: [] }]
+      responses:
+        '204': { description: Logged out }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Dati utente autenticato + profilo role-aware
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/User' } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    put:
+      tags: [Auth]
+      summary: Aggiorna profilo cittadino (RF20, RF13)
       security: [{ BearerAuth: [] }]
       requestBody:
         required: true
         content:
           application/json:
-            schema: { type: object, required: [type, granted], properties: { type: { type: string }, granted: { type: boolean } } }
-      responses: { '200': { description: Consent recorded } }
+            schema:
+              type: object
+              properties:
+                nome: { type: string }
+                cognome: { type: string }
+                interessi: { type: array, items: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/User' } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      tags: [Auth]
+      summary: Cancellazione account (GDPR art. 17, RF26, RNF20)
+      description: |
+        Richiede re-conferma:
+        - utente con password locale → `currentPassword`
+        - utente OAuth-only → `confirmEmail` = "DELETE <email>"
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                currentPassword: { type: string }
+                confirmEmail:
+                  type: string
+                  example: "DELETE mario.rossi@example.com"
+      responses:
+        '204': { description: Account cancellato }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
 
+  /auth/me/password:
+    post:
+      tags: [Auth]
+      summary: Cambio password utente loggato
+      description: |
+        Richiede password attuale. Al successo il JWT viene revocato → re-login forzato.
+        Bloccato per utenti OAuth-only (passwordHash=null).
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string }
+                newPassword: { type: string, minLength: 8 }
+      responses:
+        '204': { description: Password aggiornata, JWT revocato }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/me/location:
+    put:
+      tags: [Auth]
+      summary: Aggiorna ultima posizione conosciuta (RF40 — push geo-aware)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lat, lng]
+              properties:
+                lat: { type: number, minimum: -90, maximum: 90 }
+                lng: { type: number, minimum: -180, maximum: 180 }
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/me/ente:
+    patch:
+      tags: [Auth]
+      summary: Aggiorna note pubbliche dell'ente certificato
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                noteAdmin: { type: string }
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /auth/me/onboarding:
+    post:
+      tags: [Auth]
+      summary: Completa onboarding interessi (+ dataNascita se placeholder)
+      description: |
+        Per cittadini. Se la `dataNascita` è ancora il placeholder (`2000-01-01`,
+        tipico OAuth senza birthday su Google), richiede `dataNascita` reale
+        e verifica età ≥13 (OCL C5).
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                interessi: { type: array, items: { type: string } }
+                dataNascita: { type: string, format: date }
+      responses:
+        '200': { description: OK }
+        '400':
+          description: "BIRTHDATE_REQUIRED se il placeholder è ancora attivo"
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+        '403':
+          description: "UNDERAGE — età <13"
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+
+  /auth/suggested-interests:
+    get:
+      tags: [Auth]
+      summary: Suggerisce interessi co-occorrenti (3 top via query SQL aggregata)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: query
+          name: picked
+          schema: { type: string }
+          description: "Lista CSV degli interessi già scelti (es. sport,musica)"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  suggestions: { type: array, items: { type: string } }
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # AUTH — 2FA
+  # ──────────────────────────────────────────────────────────────────────────
+  /auth/2fa/setup:
+    post:
+      tags: [Auth]
+      summary: Genera secret TOTP per AmministratoreDiSistema (RNF15)
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: otpauth URL per QR code
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  otpauthUrl: { type: string }
+                  base32: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /auth/2fa/verify:
+    post:
+      tags: [Auth]
+      summary: Verifica OTP e attiva 2FA (+ genera 8 recovery codes single-use)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [otpToken]
+              properties:
+                otpToken: { type: string, description: "Codice TOTP 6 cifre" }
+      responses:
+        '200':
+          description: 2FA attivo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+                  user: { $ref: '#/components/schemas/User' }
+                  recoveryCodes:
+                    type: array
+                    items: { type: string }
+                    description: "Mostrati una sola volta — l'utente deve salvarli"
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/2fa/recovery-codes:
+    post:
+      tags: [Auth]
+      summary: Rigenera gli 8 recovery codes (invalida i precedenti)
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Nuovi codici
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recoveryCodes: { type: array, items: { type: string } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # AUTH — Consents (GDPR)
+  # ──────────────────────────────────────────────────────────────────────────
+  /auth/consents:
+    get:
+      tags: [Auth]
+      summary: Storico consensi utente (audit trail, GDPR RNF19)
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Consent' }
+    post:
+      tags: [Auth]
+      summary: Aggiorna un consenso (grant o revoke). Crea una nuova riga (no overwrite).
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, granted]
+              properties:
+                type:
+                  type: string
+                  enum: [privacy_policy, terms_of_service, marketing, analytics, notif_email, notif_push]
+                granted: { type: boolean }
+      responses:
+        '200':
+          description: Consent registrato
+          content: { application/json: { schema: { $ref: '#/components/schemas/Consent' } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # ACTIVITIES
+  # ──────────────────────────────────────────────────────────────────────────
   /activities:
     get:
       tags: [Activities]
-      summary: List active activities (RF14, RF15, RF9)
+      summary: Lista attività attive (RF14, RF15, RF9)
+      description: "Pubblica. Se autenticato e `mine=interests`, filtra per gli interessi dell'utente."
       parameters:
-        - { in: query, name: tipo, schema: { type: string } }
-        - { in: query, name: q, schema: { type: string }, description: "Textual search via POI name (RF15)" }
-        - { in: query, name: mine, schema: { type: string, enum: [interests] }, description: "RF9 — filter by current user interests" }
-        - { in: query, name: page, schema: { type: integer } }
-        - { in: query, name: limit, schema: { type: integer } }
-      responses: { '200': { description: OK } }
+        - in: query
+          name: tipo
+          schema: { type: string, enum: [sport, cultura, musica, studio, arte, gastronomia] }
+        - in: query
+          name: q
+          schema: { type: string }
+          description: "Ricerca testuale via nome POI (RF15)"
+        - in: query
+          name: mine
+          schema: { type: string, enum: [interests] }
+          description: "RF9 — filtra per interessi dell'utente loggato"
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  activities: { type: array, items: { $ref: '#/components/schemas/Activity' } }
+                  total: { type: integer }
+                  page: { type: integer }
+                  limit: { type: integer }
     post:
       tags: [Activities]
-      summary: Create a spontaneous activity (RF10, OCL C8/C9/C10/C11)
+      summary: Crea attività spontanea (RF10, OCL C8/C9/C10/C11)
+      description: "Solo UtenteRegistrato. Il creatore è auto-iscritto."
       security: [{ BearerAuth: [] }]
       requestBody:
         required: true
@@ -287,7 +986,7 @@ paths:
               type: object
               required: [tipo, data, orarioInizio, orarioFine, maxPartecipanti]
               properties:
-                tipo: { type: string, enum: [sport, cultura, musica, studio] }
+                tipo: { type: string, enum: [sport, cultura, musica, studio, arte, gastronomia] }
                 data: { type: string, format: date }
                 orarioInizio: { type: string }
                 orarioFine: { type: string }
@@ -295,56 +994,141 @@ paths:
                 latitudine: { type: number }
                 longitudine: { type: number }
                 poiId: { type: string, format: uuid }
-      responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Activity' } } } } }
+      responses:
+        '201':
+          description: Creata; trigger push+email a utenti interessati
+          content: { application/json: { schema: { $ref: '#/components/schemas/Activity' } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /activities/{id}:
     get:
       tags: [Activities]
-      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
-      responses: { '200': { description: OK } }
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/Activity' } } }
+        '404': { $ref: '#/components/responses/NotFound' }
     put:
       tags: [Activities]
-      summary: Modify activity (creator-only, before start; RF19, OCL C12)
+      summary: Modifica attività (solo creator, prima dell'inizio, RF19/OCL C12)
+      description: "Whitelist mass-assignment: solo `tipo, data, orarioInizio, orarioFine, maxPartecipanti, latitudine, longitudine, poiId`."
       security: [{ BearerAuth: [] }]
-      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Activity' } } } }
-      responses: { '200': { description: Updated } }
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Activity' }
+      responses:
+        '200': { description: Modificata; partecipanti notificati }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
     delete:
       tags: [Activities]
-      summary: Cancel activity (creator-only)
+      summary: Annulla attività (solo creator)
       security: [{ BearerAuth: [] }]
-      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
-      responses: { '204': { description: Cancelled } }
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Annullata; partecipanti notificati via push+email }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /activities/{id}/join:
     post:
       tags: [Activities]
-      summary: Join an activity (RF11, OCL C13/C14/C18)
+      summary: Iscrizione attività (RF11, OCL C13/C14/C18)
       security: [{ BearerAuth: [] }]
-      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
-      responses: { '200': { description: Joined } }
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Iscritto; creator notificato
+          content: { application/json: { schema: { $ref: '#/components/schemas/Activity' } } }
+        '400':
+          description: "FULL (posti esauriti)"
+        '409':
+          description: Già iscritto
     delete:
       tags: [Activities]
-      summary: Cancel own participation (RF17, OCL C19)
+      summary: Annulla propria partecipazione (RF17, OCL C19)
       security: [{ BearerAuth: [] }]
-      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
-      responses: { '204': { description: Left activity } }
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Lasciato; altri partecipanti notificati }
+
   /activities/{id}/calendar:
     get:
       tags: [Activities]
-      summary: Export activity to iCalendar (RF12, RF49)
-      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
-      responses: { '200': { description: text/calendar, content: { text/calendar: {} } } }
+      summary: Export attività in iCalendar (RF12/RF49)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: File .ics
+          content:
+            text/calendar:
+              schema: { type: string }
 
+  # ──────────────────────────────────────────────────────────────────────────
+  # EVENTS
+  # ──────────────────────────────────────────────────────────────────────────
   /events:
     get:
       tags: [Events]
-      summary: List certified events (RF15)
+      summary: Lista eventi certificati (RF15)
       parameters:
-        - { in: query, name: categoria, schema: { type: string } }
-        - { in: query, name: q, schema: { type: string }, description: "Textual search on titolo + descrizione" }
-      responses: { '200': { description: OK } }
+        - in: query
+          name: categoria
+          schema: { type: string }
+        - in: query
+          name: q
+          schema: { type: string }
+          description: "Ricerca testuale su titolo + descrizione"
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events: { type: array, items: { $ref: '#/components/schemas/Event' } }
+                  total: { type: integer }
     post:
       tags: [Events]
-      summary: Publish certified event (RF21, OCL C15/C16/C17/C24)
+      summary: Pubblica evento certificato (RF21, OCL C15/C16/C17/C24)
+      description: "Solo EnteCertificato con `approvato = true`."
       security: [{ BearerAuth: [] }]
       requestBody:
         required: true
@@ -360,80 +1144,243 @@ paths:
                 data: { type: string, format: date }
                 orarioInizio: { type: string }
                 orarioFine: { type: string }
+                maxPartecipanti: { type: integer }
                 latitudine: { type: number }
                 longitudine: { type: number }
-                poiId: { type: string }
-      responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Event' } } } } }
+                poiId: { type: string, format: uuid }
+      responses:
+        '201':
+          description: Pubblicato (badgeVerifica=true); push+email a utenti interessati
+          content: { application/json: { schema: { $ref: '#/components/schemas/Event' } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /events/mine:
     get:
       tags: [Events]
-      summary: Certified entity's own events
+      summary: Lista eventi pubblicati dall'ente corrente
       security: [{ BearerAuth: [] }]
-      responses: { '200': { description: OK } }
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /events/{id}:
     get:
       tags: [Events]
-      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
-      responses: { '200': { description: OK — view counter incremented (RF25) } }
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: OK — contatore views incrementato (RF25)
+          content: { application/json: { schema: { $ref: '#/components/schemas/Event' } } }
+        '404': { $ref: '#/components/responses/NotFound' }
     put:
       tags: [Events]
-      summary: Modify event (RF24)
+      summary: Modifica evento (RF24, solo ente pubblicante)
+      description: "Whitelist mass-assignment: solo `titolo, descrizione, categoria, latitudine, longitudine, poiId, data, orarioInizio, orarioFine, maxPartecipanti`."
       security: [{ BearerAuth: [] }]
-      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
-      responses: { '200': { description: Updated } }
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/Event' } } }
+      responses:
+        '200': { description: Aggiornato }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    delete:
+      tags: [Events]
+      summary: Cancella evento (solo ente pubblicante)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Cancellato (con cascade su Report) }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /events/{id}/stats:
     get:
       tags: [Events]
-      summary: Event statistics — owning entity only (RF25)
+      summary: Statistiche evento — solo ente proprietario (RF25)
       security: [{ BearerAuth: [] }]
-      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
-      responses: { '200': { description: OK } }
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  views: { type: integer }
+                  participantCount: { type: integer }
+                  reportCount: { type: integer }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /events/{id}/calendar:
     get:
       tags: [Events]
-      summary: Export event to iCalendar (RF49)
-      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
-      responses: { '200': { description: text/calendar } }
+      summary: Export evento in iCalendar (RF49)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: File .ics
+          content:
+            text/calendar:
+              schema: { type: string }
 
+  /events/{id}/participate:
+    post:
+      tags: [Events]
+      summary: Iscrizione a un evento certificato
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Iscritto }
+        '400':
+          description: Posti esauriti / vincolo violato
+        '409': { description: Già iscritto }
+    delete:
+      tags: [Events]
+      summary: Annulla iscrizione a un evento
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Annullata }
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # MAP / POI
+  # ──────────────────────────────────────────────────────────────────────────
   /map:
     get:
       tags: [Map]
-      summary: Map data — POIs + activities + events (RF2, RF3)
-      responses: { '200': { description: OK } }
+      summary: Marker mappa unificati — POI + attività + eventi (RF2, RF3)
+      description: "Pubblico. Ritorna array di marker normalizzati per il frontend."
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  markers:
+                    type: array
+                    items: { $ref: '#/components/schemas/MapMarker' }
+
   /map/poi:
     get:
       tags: [Map]
-      responses: { '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/POI' } } } } } }
+      summary: Lista POI
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/POI' }
     post:
       tags: [Map]
-      summary: Add POI (RF36) — AmministratoreDiSistema only
+      summary: Crea POI (RF36) — solo AmministratoreDiSistema
       security: [{ BearerAuth: [] }]
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/POI' } } } }
-      responses: { '201': { description: Created } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/POI' } } }
+      responses:
+        '201':
+          description: Creato
+          content: { application/json: { schema: { $ref: '#/components/schemas/POI' } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /map/poi/{id}:
     get:
       tags: [Map]
-      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
-      responses: { '200': { description: OK } }
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/POI' } } }
+        '404': { $ref: '#/components/responses/NotFound' }
     put:
       tags: [Map]
-      summary: Modify POI (RF36)
+      summary: Modifica POI (RF36)
       security: [{ BearerAuth: [] }]
-      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
-      responses: { '200': { description: Updated } }
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/POI' } } }
+      responses:
+        '200': { description: Aggiornato }
+        '403': { $ref: '#/components/responses/Forbidden' }
     delete:
       tags: [Map]
-      summary: Delete POI (RF36)
+      summary: Elimina POI (RF36)
       security: [{ BearerAuth: [] }]
-      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
-      responses: { '204': { description: Deleted } }
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Eliminato }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
+  # ──────────────────────────────────────────────────────────────────────────
+  # MODERATION (DSA)
+  # ──────────────────────────────────────────────────────────────────────────
   /moderation/events/{eventId}/report:
     post:
       tags: [Moderation]
-      summary: Report an event (RF16, OCL C22/C23)
+      summary: Segnala un evento (RF16, OCL C22/C23)
+      description: "Un utente può segnalare un evento una sola volta (OCL C22)."
       security: [{ BearerAuth: [] }]
-      parameters: [{ in: path, name: eventId, required: true, schema: { type: string } }]
+      parameters:
+        - in: path
+          name: eventId
+          required: true
+          schema: { type: string, format: uuid }
       requestBody:
         required: true
         content:
@@ -442,27 +1389,68 @@ paths:
               type: object
               required: [tipo]
               properties:
-                tipo: { type: string, enum: [contenuto_illegale, spam, informazioni_false, contenuto_offensivo] }
-                descrizione: { type: string }
-      responses: { '201': { description: Report created } }
+                tipo:
+                  type: string
+                  enum: [contenuto_inappropriato, spam, disinformazione, contenuto_offensivo, altro]
+                descrizione:
+                  type: string
+                  maxLength: 2000
+                  description: "Limite 2000 char (security #H3)"
+      responses:
+        '201':
+          description: Segnalazione registrata (stato=aperta)
+          content: { application/json: { schema: { $ref: '#/components/schemas/Report' } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { description: "ALREADY_REPORTED (OCL C22)" }
+
   /moderation/reports:
     get:
       tags: [Moderation]
-      summary: List reports — AmministratoreDiSistema (RF33)
+      summary: Lista segnalazioni — AmministratoreDiSistema (RF33)
       security: [{ BearerAuth: [] }]
-      parameters: [{ in: query, name: stato, schema: { type: string } }]
-      responses: { '200': { description: OK } }
+      parameters:
+        - in: query
+          name: stato
+          schema: { type: string, enum: [aperta, "in lavorazione", risolta] }
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reports: { type: array, items: { $ref: '#/components/schemas/Report' } }
+                  total: { type: integer }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /moderation/reports/{id}:
     get:
       tags: [Moderation]
       security: [{ BearerAuth: [] }]
-      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
-      responses: { '200': { description: OK } }
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: OK }
+        '404': { $ref: '#/components/responses/NotFound' }
     patch:
       tags: [Moderation]
-      summary: Resolve report (DSA flow, RNF23/RNF24)
+      summary: Risolvi segnalazione (DSA flow — RNF23/RNF24)
       security: [{ BearerAuth: [] }]
-      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
       requestBody:
         required: true
         content:
@@ -470,66 +1458,193 @@ paths:
             schema:
               type: object
               required: [azione]
-              properties: { azione: { type: string, enum: [rimuovi, archivia, in_lavorazione] } }
-      responses: { '200': { description: Resolved } }
+              properties:
+                azione:
+                  type: string
+                  enum: [rimuovi, archivia, in_lavorazione]
+      responses:
+        '200': { description: Risolta; reporter ed ente notificati (DSA art. 20) }
+        '400': { $ref: '#/components/responses/BadRequest' }
 
+  # ──────────────────────────────────────────────────────────────────────────
+  # DASHBOARD (Comune)
+  # ──────────────────────────────────────────────────────────────────────────
   /dashboard/stats:
     get:
       tags: [Dashboard]
-      summary: Aggregated stats — AmministratoreComunale (RF27/RF28/RF29, OCL C25)
+      summary: Statistiche aggregate (RF27/RF28/RF29, OCL C25)
+      description: "Solo AmministratoreComunale. Dati aggregati: nessuna identificazione di singoli utenti."
       security: [{ BearerAuth: [] }]
       parameters:
-        - { in: query, name: tipo, schema: { type: string } }
-        - { in: query, name: da, schema: { type: string, format: date } }
-        - { in: query, name: a, schema: { type: string, format: date } }
-        - { in: query, name: centerLat, schema: { type: number } }
-        - { in: query, name: centerLng, schema: { type: number } }
-        - { in: query, name: radiusKm, schema: { type: number } }
-        - { in: query, name: poiId, schema: { type: string } }
-      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/DashboardStats' } } } } }
+        - in: query
+          name: tipo
+          schema: { type: string }
+        - in: query
+          name: da
+          schema: { type: string, format: date }
+        - in: query
+          name: a
+          schema: { type: string, format: date }
+        - in: query
+          name: centerLat
+          schema: { type: number }
+        - in: query
+          name: centerLng
+          schema: { type: number }
+        - in: query
+          name: radiusKm
+          schema: { type: number }
+        - in: query
+          name: poiId
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/DashboardStats' } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /dashboard/stats/export:
     get:
       tags: [Dashboard]
-      summary: Export stats as CSV or PDF (RF30)
+      summary: Esporta statistiche in PDF o CSV (RF30)
       security: [{ BearerAuth: [] }]
       parameters:
-        - { in: query, name: format, schema: { type: string, enum: [csv, pdf] } }
-      responses: { '200': { description: File download } }
+        - in: query
+          name: format
+          required: true
+          schema: { type: string, enum: [csv, pdf] }
+        - in: query
+          name: tipo
+          schema: { type: string }
+        - in: query
+          name: da
+          schema: { type: string, format: date }
+        - in: query
+          name: a
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: File download
+          content:
+            text/csv: { schema: { type: string } }
+            application/pdf: { schema: { type: string, format: binary } }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
+  # ──────────────────────────────────────────────────────────────────────────
+  # ADMIN (sistema)
+  # ──────────────────────────────────────────────────────────────────────────
   /admin/entities/pending:
     get:
       tags: [Admin]
-      summary: Pending entity registration requests (RF31)
+      summary: Richieste enti in attesa di approvazione (RF31)
       security: [{ BearerAuth: [] }]
-      responses: { '200': { description: OK } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/User' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /admin/entities/{id}/approve:
     patch:
       tags: [Admin]
+      summary: Approva ente (`approvato = true`) e invia email
       security: [{ BearerAuth: [] }]
-      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
-      responses: { '200': { description: Approved } }
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Approvato }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /admin/entities/{id}/reject:
     patch:
       tags: [Admin]
+      summary: Rifiuta ente (account distrutto) e invia email
       security: [{ BearerAuth: [] }]
-      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
-      responses: { '200': { description: Rejected — account deleted } }
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Rifiutato }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /admin/users:
     get:
       tags: [Admin]
+      summary: Lista completa utenti (tutti i ruoli)
       security: [{ BearerAuth: [] }]
-      responses: { '200': { description: OK } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/User' }
+
+  /admin/users/cittadini:
+    get:
+      tags: [Admin]
+      summary: Cittadini (con profilo) — tab dashboard admin
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+
+  /admin/users/enti:
+    get:
+      tags: [Admin]
+      summary: Enti certificati (con profilo) — tab dashboard admin
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+
+  /admin/users/comunali:
+    get:
+      tags: [Admin]
+      summary: Amministratori comunali — tab dashboard admin
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+
+  /admin/users/sistema:
+    get:
+      tags: [Admin]
+      summary: Amministratori di sistema — tab dashboard admin
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+
   /admin/users/{id}:
     delete:
       tags: [Admin]
+      summary: Cancella utente (con cascade su entità collegate)
+      description: "Vietato self-delete (SELF_DELETE_FORBIDDEN)."
       security: [{ BearerAuth: [] }]
-      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
-      responses: { '204': { description: Deleted } }
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Eliminato }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
+  # ──────────────────────────────────────────────────────────────────────────
+  # NOTIFICATIONS (push FCM)
+  # ──────────────────────────────────────────────────────────────────────────
   /notifications/device-token:
     post:
       tags: [Notifications]
-      summary: Register FCM device token (RF40)
+      summary: Registra token FCM del dispositivo (RF40)
       security: [{ BearerAuth: [] }]
       requestBody:
         required: true
@@ -540,17 +1655,121 @@ paths:
               required: [token]
               properties:
                 token: { type: string }
-                platform: { type: string, enum: [web, ios, android] }
-      responses: { '201': { description: Registered } }
+                platform: { type: string, enum: [web, ios, android], default: web }
+      responses:
+        '201': { description: Registrato (o re-associato all'utente corrente) }
+        '400': { $ref: '#/components/responses/BadRequest' }
     delete:
       tags: [Notifications]
-      summary: Unregister FCM device token
+      summary: Rimuove un device token (logout/disabilita push)
       security: [{ BearerAuth: [] }]
-      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [token], properties: { token: { type: string } } } } } }
-      responses: { '204': { description: Removed } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        '204': { description: Rimosso }
 
-  /api/users/me:
+  /notifications/test:
+    post:
+      tags: [Notifications]
+      summary: Invia notifica di test all'utente loggato
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tokensTargeted: { type: integer }
+        '400': { description: "NO_DEVICE_TOKEN — nessun device registrato" }
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # FAVORITES
+  # ──────────────────────────────────────────────────────────────────────────
+  /users/me/favorites:
     get:
-      tags: [Users]
-      summary: Mocked "current user" for frontend dev (no auth required)
-      responses: { '200': { description: OK } }
+      tags: [Favorites]
+      summary: Lista preferiti dell'utente corrente
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Favorite' }
+    post:
+      tags: [Favorites]
+      summary: Aggiungi un preferito (POI/attività/evento)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [markerType, markerId]
+              properties:
+                markerType: { type: string, enum: [poi, activity, event] }
+                markerId: { type: string, format: uuid }
+      responses:
+        '201':
+          description: Creato (idempotente — UNIQUE su userId+markerType+markerId)
+          content: { application/json: { schema: { $ref: '#/components/schemas/Favorite' } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+    delete:
+      tags: [Favorites]
+      summary: Rimuovi un preferito
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: query
+          name: markerType
+          required: true
+          schema: { type: string, enum: [poi, activity, event] }
+        - in: query
+          name: markerId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Rimosso }
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # AI suggester
+  # ──────────────────────────────────────────────────────────────────────────
+  /ai/suggest-activity:
+    post:
+      tags: [AI]
+      summary: Suggerimento AI per creazione attività spontanea (Gemini 2.5 Flash)
+      description: |
+        Solo UtenteRegistrato (endpoint costoso). Il modello inferisce categoria,
+        data, orario e maxPartecipanti dalla descrizione testuale, sempre nei
+        limiti dei valori predefiniti (RNF22).
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AiSuggestionRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AiSuggestionResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '502':
+          description: "AI_UPSTREAM_ERROR / AI_INVALID_RESPONSE"
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+        '503':
+          description: "AI_UNAVAILABLE — GEMINI_API_KEY non configurato"
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
