@@ -17,25 +17,55 @@ function formatDay(value?: string | null) {
   return new Intl.DateTimeFormat('it-IT', { weekday: 'short', day: '2-digit', month: 'short' }).format(new Date(value));
 }
 
-function isSameDay(dateStr: string, ref: Date): boolean {
-  const d = new Date(dateStr);
-  return d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth() && d.getDate() === ref.getDate();
+function parseLocalDateTime(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const hasExplicitTimezone = /(?:z|[+-]\d{2}:?\d{2})$/i.test(value);
+  if (!hasExplicitTimezone) {
+    const localDate = value.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+    if (localDate) {
+      return new Date(
+        Number(localDate[1]),
+        Number(localDate[2]) - 1,
+        Number(localDate[3]),
+        Number(localDate[4] ?? 0),
+        Number(localDate[5] ?? 0),
+        Number(localDate[6] ?? 0),
+      );
+    }
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
 }
 
-function isThisWeekend(dateStr: string | null | undefined): boolean {
-  if (!dateStr) return false;
-  const today = new Date();
-  const dow = today.getDay();
-  const sat = new Date(today);
-  sat.setHours(0, 0, 0, 0);
-  sat.setDate(today.getDate() + (dow === 0 ? -1 : 6 - dow));
-  const sun = new Date(sat);
-  sun.setDate(sat.getDate() + 1);
-  return isSameDay(dateStr, sat) || isSameDay(dateStr, sun);
+function endDateFromStartAndTime(start: Date, endTime?: string | null): Date {
+  const end = new Date(start);
+  const time = endTime?.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (!time) return end;
+  end.setHours(Number(time[1]), Number(time[2]), Number(time[3] ?? 0), 0);
+  if (end < start) end.setDate(end.getDate() + 1);
+  return end;
+}
+
+function happensToday(activity: ApiActivity, ref: Date): boolean {
+  const start = parseLocalDateTime(activity.dateTime);
+  if (!start) return false;
+  const end = endDateFromStartAndTime(start, activity.endTime);
+  const dayStart = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
+  const dayEnd = new Date(dayStart);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+  return start < dayEnd && end >= dayStart;
+}
+
+function isUpcomingWeekend(dateStr: string | null | undefined): boolean {
+  const date = parseLocalDateTime(dateStr);
+  if (!date) return false;
+  const day = date.getDay();
+  return date >= new Date() && (day === 0 || day === 6);
 }
 
 export function ActivitiesPage({ user }: { user?: AppUser }) {
-  const userInterests = user?.interessi;
+  const userInterests = user?.interessi ?? [];
   const userId = user?.id;
   const [searchParams] = useSearchParams();
   const openId = searchParams.get('open');
@@ -48,7 +78,7 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
   const [timeFilter, setTimeFilter] = useState<'all' | 'today' | 'weekend' | 'open'>('all');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [showPast, setShowPast] = useState(false);
-  const hasInterests = Array.isArray(userInterests) && userInterests.length > 0;
+  const hasInterests = userInterests.length > 0;
 
   async function loadActivities() {
     setIsLoading(true);
@@ -130,38 +160,52 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
     [activities, userId],
   );
 
-  // Main list: ALL activities (like EventsPage shows all events), filtered only by
-  // search/category/time — participation status does not remove items from the list.
-  const baseVisible = useMemo(
-    () => activities.filter((a) => !hasInterests || userInterests!.includes(a.category)),
-    [activities, hasInterests, userInterests],
-  );
-
   const categoryCounts = useMemo(() => {
+    const q = search.trim().toLowerCase();
     const counts = new Map<string, number>();
-    baseVisible.forEach((a) => counts.set(a.category, (counts.get(a.category) ?? 0) + 1));
+    activities.forEach((activity) => {
+      if (timeFilter === 'open' && activity.status === 'completa') return;
+      if (timeFilter === 'today' && !happensToday(activity, new Date())) return;
+      if (timeFilter === 'weekend' && !isUpcomingWeekend(activity.dateTime)) return;
+      if (q && !`${activity.title} ${activity.description || ''} ${activity.category} ${activity.location || ''}`.toLowerCase().includes(q)) return;
+      counts.set(activity.category, (counts.get(activity.category) ?? 0) + 1);
+    });
     return Array.from(counts.entries()).map(([cat, count]) => ({ category: cat, count }));
-  }, [baseVisible]);
+  }, [activities, search, timeFilter]);
 
-  const visibleActivities = useMemo(
-    () => baseVisible.filter((activity) => {
+  const filteredActivities = useMemo(
+    () => activities.filter((activity) => {
       const q = search.trim().toLowerCase();
       if (category !== 'all' && activity.category !== category) return false;
       if (timeFilter === 'open' && activity.status === 'completa') return false;
       if (timeFilter === 'today') {
-        if (!activity.dateTime || !isSameDay(activity.dateTime, new Date())) return false;
+        if (!happensToday(activity, new Date())) return false;
       }
       if (timeFilter === 'weekend') {
-        if (!isThisWeekend(activity.dateTime)) return false;
+        if (!isUpcomingWeekend(activity.dateTime)) return false;
       }
       if (!q) return true;
       return `${activity.title} ${activity.description || ''} ${activity.category} ${activity.location || ''}`.toLowerCase().includes(q);
     }),
-    [baseVisible, category, search, timeFilter],
+    [activities, category, search, timeFilter],
+  );
+
+  const recommendedActivities = useMemo(
+    () => (hasInterests
+      ? filteredActivities.filter((activity) => userInterests.includes(activity.category))
+      : filteredActivities),
+    [filteredActivities, hasInterests, userInterests],
+  );
+
+  const otherFilteredActivities = useMemo(
+    () => (hasInterests
+      ? filteredActivities.filter((activity) => !userInterests.includes(activity.category))
+      : []),
+    [filteredActivities, hasInterests, userInterests],
   );
 
   const now = new Date();
-  const upcomingAvailable = visibleActivities
+  const upcomingAvailable = recommendedActivities
     .filter((a) => !a.dateTime || new Date(a.dateTime) >= now)
     .slice()
     .sort((a, b) => {
@@ -169,7 +213,7 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
       const tb = b.dateTime ? new Date(b.dateTime).getTime() : Number.MAX_SAFE_INTEGER;
       return ta - tb;
     });
-  const pastAvailable = visibleActivities
+  const pastAvailable = recommendedActivities
     .filter((a) => a.dateTime && new Date(a.dateTime) < now)
     .slice()
     .sort((a, b) => new Date(b.dateTime!).getTime() - new Date(a.dateTime!).getTime());
@@ -187,7 +231,8 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
     return Array.from(groups.entries());
   }, [timelineActivities]);
 
-  const openActivities = visibleActivities.filter((a) => a.status !== 'completa').length;
+  const filteredOpenActivities = filteredActivities.filter((a) => a.status !== 'completa').length;
+  const filteredUpcomingActivities = filteredActivities.filter((a) => !a.dateTime || new Date(a.dateTime) >= now).length;
 
   function renderActivityCard(activity: ApiActivity, className = '') {
     return (
@@ -251,7 +296,7 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
         </div>
         <div className="activities-hero-stats">
           <span>
-            <strong>{timeFilter === 'open' ? openActivities : upcomingAvailable.length}</strong>
+            <strong>{timeFilter === 'open' ? filteredOpenActivities : filteredUpcomingActivities}</strong>
             {' '}
             {timeFilter === 'open' ? 'aperte' : timeFilter === 'today' ? 'oggi' : 'attività'}
           </span>
@@ -268,6 +313,9 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
       )}
       {!isLoading && !error && activities.length === 0 && (
         <div className="state-panel liquid-panel">Nessuna attività trovata nel database.</div>
+      )}
+      {!isLoading && !error && activities.length > 0 && recommendedActivities.length === 0 && otherFilteredActivities.length === 0 && (
+        <div className="state-panel liquid-panel">Nessuna attività corrisponde ai filtri o alla ricerca.</div>
       )}
 
       {/* ── Le mie attività ─────────────────────────────────────────── */}
@@ -325,60 +373,148 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
         </section>
       )}
 
-      {!isLoading && !error && upcomingAvailable.length > 0 && (
-        <div className="event-editorial-layout">
-          {featuredActivity && (
-            <>
-              <h3 className="section-eyebrow featured-section-title">Prossima Attività</h3>
-              <article className="event-feature-story">
-                <div className="event-date-tile">
-                  <strong>{formatDay(featuredActivity.dateTime)}</strong>
-                  <span>{formatDateTime(featuredActivity.dateTime)}</span>
-                </div>
-                <div>
-                  <div className="feature-badges" aria-label="Categoria attività">
-                    <span>{featuredActivity.category}</span>
-                  </div>
-                  <h2>{featuredActivity.title}</h2>
-                  <p>{featuredActivity.description || 'Attività spontanea organizzata dalla community.'}</p>
-                </div>
-              </article>
-            </>
+      {!isLoading && !error && hasInterests && filteredActivities.length > 0 && (
+        <section className="preference-section" aria-label="Attività consigliate per te">
+          <div className="preference-section-header">
+            <div>
+              <span className="section-eyebrow">Consigliati per te</span>
+              <h2>Attività consigliate per te <span className="section-count">{recommendedActivities.length}</span></h2>
+            </div>
+          </div>
+
+          {recommendedActivities.length === 0 && (
+            <div className="preference-empty-state">
+              Nessuna attività consigliata corrisponde ai filtri attuali. Puoi comunque esplorare le altre attività qui sotto.
+            </div>
           )}
 
-          <aside className="event-timeline-panel">
-            <span className="section-eyebrow">Timeline</span>
-            <ol className="event-timeline-grouped">
-              {timelineByDay.map(([day, acts]) => (
-                <li key={day} className="event-timeline-day">
-                  <time>{day !== 'unknown' ? formatDay(day) : 'Data da definire'}</time>
-                  <ul>
-                    {acts.map((a) => (
-                      <li key={a.id}>{a.title}</li>
-                    ))}
-                  </ul>
-                </li>
-              ))}
-            </ol>
-            {categoryCounts.length > 0 && (
-              <div style={{ marginTop: 16 }}>
-                <span className="section-eyebrow">Categoria</span>
-                <div className="category-pill-list" style={{ marginTop: 8 }}>
-                  <button className={category === 'all' ? 'active-filter' : undefined} type="button" onClick={() => setCategory('all')}>Tutte</button>
-                  {categoryCounts.map((item) => (
-                    <button className={category === item.category ? 'active-filter' : undefined} key={item.category} type="button" onClick={() => setCategory(item.category)}>
-                      {item.category} <strong>{item.count}</strong>
-                    </button>
-                  ))}
+          {recommendedActivities.length > 0 && upcomingAvailable.length === 0 && (
+            <div className="preference-empty-state">
+              Nessuna attività consigliata in programma con questi filtri.
+            </div>
+          )}
+
+          {upcomingAvailable.length > 0 && (
+            <div className="event-editorial-layout">
+              {featuredActivity && (
+                <div className="featured-activity-story-stack">
+                  <h3 className="section-eyebrow featured-section-title">Prossima Attività</h3>
+                  <article className="event-feature-story">
+                    <div className="event-date-tile">
+                      <strong>{formatDay(featuredActivity.dateTime)}</strong>
+                      <span>{formatDateTime(featuredActivity.dateTime)}</span>
+                    </div>
+                    <div>
+                      <div className="feature-badges" aria-label="Categoria attività">
+                        <span>{featuredActivity.category}</span>
+                      </div>
+                      <h2>{featuredActivity.title}</h2>
+                      <p>{featuredActivity.description || 'Attività spontanea organizzata dalla community.'}</p>
+                    </div>
+                  </article>
                 </div>
+              )}
+
+              <aside className="event-timeline-panel">
+                <span className="section-eyebrow">Timeline</span>
+                <ol className="event-timeline-grouped">
+                  {timelineByDay.map(([day, acts]) => (
+                    <li key={day} className="event-timeline-day">
+                      <time>{day !== 'unknown' ? formatDay(day) : 'Data da definire'}</time>
+                      <ul>
+                        {acts.map((a) => (
+                          <li key={a.id}>{a.title}</li>
+                        ))}
+                      </ul>
+                    </li>
+                  ))}
+                </ol>
+                {categoryCounts.length > 0 && (
+                  <div style={{ marginTop: 16 }}>
+                    <span className="section-eyebrow">Categoria</span>
+                    <div className="category-pill-list" style={{ marginTop: 8 }}>
+                      <button className={category === 'all' ? 'active-filter' : undefined} type="button" onClick={() => setCategory('all')}>Tutte</button>
+                      {categoryCounts.map((item) => (
+                        <button className={category === item.category ? 'active-filter' : undefined} key={item.category} type="button" onClick={() => setCategory(item.category)}>
+                          {item.category} <strong>{item.count}</strong>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </aside>
+
+              <div className="event-card-strip">
+                {upcomingAvailable.map((activity) => renderActivityCard(activity, 'event-explorer-card'))}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {!isLoading && !error && !hasInterests && upcomingAvailable.length > 0 && (
+        <section className="preference-section" aria-label="Attività in evidenza">
+          <div className="preference-section-header">
+            <div>
+              <span className="section-eyebrow">In evidenza</span>
+              <h2>Attività in evidenza <span className="section-count">{upcomingAvailable.length}</span></h2>
+            </div>
+          </div>
+
+          <div className="event-editorial-layout">
+            {featuredActivity && (
+              <div className="featured-activity-story-stack">
+                <h3 className="section-eyebrow featured-section-title">Prossima Attività</h3>
+                <article className="event-feature-story">
+                  <div className="event-date-tile">
+                    <strong>{formatDay(featuredActivity.dateTime)}</strong>
+                    <span>{formatDateTime(featuredActivity.dateTime)}</span>
+                  </div>
+                  <div>
+                    <div className="feature-badges" aria-label="Categoria attività">
+                      <span>{featuredActivity.category}</span>
+                    </div>
+                    <h2>{featuredActivity.title}</h2>
+                    <p>{featuredActivity.description || 'Attività spontanea organizzata dalla community.'}</p>
+                  </div>
+                </article>
               </div>
             )}
-          </aside>
 
-          <div className="event-card-strip">
-            {upcomingAvailable.map((activity) => renderActivityCard(activity, 'event-explorer-card'))}
+            <aside className="event-timeline-panel">
+              <span className="section-eyebrow">Timeline</span>
+              <ol className="event-timeline-grouped">
+                {timelineByDay.map(([day, acts]) => (
+                  <li key={day} className="event-timeline-day">
+                    <time>{day !== 'unknown' ? formatDay(day) : 'Data da definire'}</time>
+                    <ul>
+                      {acts.map((a) => (
+                        <li key={a.id}>{a.title}</li>
+                      ))}
+                    </ul>
+                  </li>
+                ))}
+              </ol>
+              {categoryCounts.length > 0 && (
+                <div style={{ marginTop: 16 }}>
+                  <span className="section-eyebrow">Categoria</span>
+                  <div className="category-pill-list" style={{ marginTop: 8 }}>
+                    <button className={category === 'all' ? 'active-filter' : undefined} type="button" onClick={() => setCategory('all')}>Tutte</button>
+                    {categoryCounts.map((item) => (
+                      <button className={category === item.category ? 'active-filter' : undefined} key={item.category} type="button" onClick={() => setCategory(item.category)}>
+                        {item.category} <strong>{item.count}</strong>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </aside>
+
+            <div className="event-card-strip">
+              {upcomingAvailable.map((activity) => renderActivityCard(activity, 'event-explorer-card'))}
+            </div>
           </div>
-        </div>
+        </section>
       )}
 
       {/* ── Attività passate ────────────────────────────────────────── */}
@@ -397,6 +533,20 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
               {pastAvailable.map((activity) => renderActivityCard(activity, 'event-explorer-card'))}
             </div>
           )}
+        </section>
+      )}
+
+      {!isLoading && !error && hasInterests && otherFilteredActivities.length > 0 && (
+        <section className="preference-section preference-section-secondary" aria-label="Altre attività">
+          <div className="preference-section-header">
+            <div>
+              <span className="section-eyebrow">Scopri ancora</span>
+              <h2>Altre attività <span className="section-count">{otherFilteredActivities.length}</span></h2>
+            </div>
+          </div>
+          <div className="event-card-strip">
+            {otherFilteredActivities.map((activity) => renderActivityCard(activity, 'event-explorer-card'))}
+          </div>
         </section>
       )}
 
