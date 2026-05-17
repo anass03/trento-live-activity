@@ -4,6 +4,7 @@ const { sendNewEventToInterested: sendNewEventPush } = require('../notifications
 const { sendNewEventToInterested: sendNewEventEmail } = require('../notifications/email.service');
 const { serializeEvent } = require('../data/presenters');
 const { buildIcs } = require('./ics');
+const { reverseGeocode } = require('../lib/geocode');
 
 async function createEvent(entityId, { titolo, descrizione, categoria, latitudine, longitudine, poiId, data, orarioInizio, orarioFine, maxPartecipanti }) {
   const entity = await User.findByPk(entityId);
@@ -34,6 +35,13 @@ async function createEvent(entityId, { titolo, descrizione, categoria, latitudin
     entityId, latitudine, longitudine, poiId, data, orarioInizio, orarioFine,
     maxPartecipanti: maxPartecipanti && maxPartecipanti > 0 ? maxPartecipanti : null,
   });
+
+  // Geocode coordinates and store for instant display on frontend (fire-and-forget).
+  if (latitudine && longitudine) {
+    reverseGeocode(latitudine, longitudine)
+      .then((address) => { if (address) event.update({ indirizzo: address }); })
+      .catch(() => {});
+  }
 
   // RF40: push + email to users with matching interest
   sendNewEventPush(event.id, categoria, titolo).catch(() => {});

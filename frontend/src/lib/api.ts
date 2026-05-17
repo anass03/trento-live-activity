@@ -409,7 +409,7 @@ export function deleteAccount(payload: { currentPassword?: string; confirmEmail?
 export function changePassword(payload: { currentPassword: string; newPassword: string }): Promise<void> {
   return request('/api/auth/me/password', { method: 'POST', body: payload });
 }
-export function updateLocation(lat: number, lng: number): Promise<{ lat: number; lng: number }> {
+export function updateLocation(lat: number, lng: number): Promise<{ lat: number; lng: number; address?: string | null }> {
   return request('/api/auth/me/location', { method: 'PUT', body: { lat, lng } });
 }
 
@@ -578,6 +578,7 @@ export function getAdminSistema(): Promise<AdminSistema[]> {
 export interface POI {
   id: string; nome: string; latitudine: number; longitudine: number;
   capacitaMax: number; statoAffollamento: string; tipo?: string; descrizione?: string;
+  indirizzo?: string | null;
 }
 export function getPOIs(): Promise<POI[]> {
   return request('/api/map/poi', { auth: false });
