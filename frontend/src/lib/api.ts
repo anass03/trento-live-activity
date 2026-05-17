@@ -8,6 +8,8 @@ export interface ApiEvent {
   description: string;
   location: string | null;
   dateTime: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
   isCertified: boolean;
   category: string;
   createdAt: string | null;
@@ -31,6 +33,8 @@ export interface ApiActivity {
   maxParticipants: number;
   createdAt: string | null;
   dateTime?: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
   status?: string;
   latitude?: number | null;
   longitude?: number | null;
@@ -294,17 +298,10 @@ export type MeProfile = MeProfileCittadino | MeProfileEnte | MeProfileComunale |
 export function updateEnteProfile(payload: { noteAdmin?: string }): Promise<{ noteAdmin: string | null }> {
   return request('/api/auth/me/ente', { method: 'PATCH', body: payload });
 }
-export function completeOnboarding(payload: { interessi: string[]; dataNascita?: string }): Promise<{ interessi: string[]; onboardingComplete: true }> {
+export function completeOnboarding(payload: { interessi: string[] }): Promise<{ interessi: string[]; onboardingComplete: true }> {
   return request('/api/auth/me/onboarding', { method: 'POST', body: payload });
 }
 
-// Placeholder usato lato server quando un signup OAuth non riesce a ottenere
-// la data di nascita reale. Lo controlliamo per capire se chiedere all'utente
-// di completare l'age verification.
-export const BIRTHDATE_PLACEHOLDER = '2000-01-01';
-export function isPlaceholderBirthdate(dataNascita: string | undefined | null): boolean {
-  return !!dataNascita && String(dataNascita).startsWith(BIRTHDATE_PLACEHOLDER);
-}
 export function getSuggestedInterests(picked: string[]): Promise<{ suggestions: string[] }> {
   const qs = picked.length ? `?picked=${encodeURIComponent(picked.join(','))}` : '';
   return request(`/api/auth/suggested-interests${qs}`);

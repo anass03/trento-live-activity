@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { getMe, isPlaceholderBirthdate, verifyEmail, setToken } from '../lib/api';
+import { getMe, verifyEmail, setToken } from '../lib/api';
 
 export function VerifyEmailPage() {
   const [searchParams] = useSearchParams();
@@ -29,7 +29,7 @@ export function VerifyEmailPage() {
           const me = await getMe();
           const profile = me.profile;
           const needsOnboarding = profile?.kind === 'cittadino'
-            && (!profile.onboardingComplete || isPlaceholderBirthdate(profile.dataNascita));
+            && !profile.onboardingComplete;
           setTimeout(() => navigate(needsOnboarding ? '/onboarding/interessi' : '/'), 1400);
         } catch {
           setTimeout(() => navigate('/'), 1800);

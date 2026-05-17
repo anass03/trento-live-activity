@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 import AppleSignin from 'react-apple-signin-auth';
 import { useNavigate } from 'react-router-dom';
-import { getMe, isPlaceholderBirthdate, oauthAppleLogin, oauthGoogleLogin } from '../../lib/api';
+import { getMe, oauthAppleLogin, oauthGoogleLogin } from '../../lib/api';
 
 const GOOGLE_CLIENT_ID = (import.meta as ImportMeta & { env: { VITE_GOOGLE_CLIENT_ID?: string } }).env.VITE_GOOGLE_CLIENT_ID || '';
 const APPLE_CLIENT_ID = (import.meta as ImportMeta & { env: { VITE_APPLE_CLIENT_ID?: string } }).env.VITE_APPLE_CLIENT_ID || '';
@@ -53,12 +53,9 @@ export function SocialButtons({ onSpidClick, showSpid = false }: Props) {
   async function redirectAfterLogin() {
     try {
       const me = await getMe();
-      // Manda all'onboarding anche se onboardingComplete è già true ma la birthday
-      // è ancora il placeholder (es. utente OAuth pre-fix età). L'onboarding
-      // ora richiede una data reale per validare il check >=13 anni (GDPR).
       const profile = me.profile;
       const needsOnboarding = profile?.kind === 'cittadino'
-        && (!profile.onboardingComplete || isPlaceholderBirthdate(profile.dataNascita));
+        && !profile.onboardingComplete;
       navigate(needsOnboarding ? '/onboarding/interessi' : '/');
     } catch {
       navigate('/');
