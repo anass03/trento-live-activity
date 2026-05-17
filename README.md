@@ -88,8 +88,7 @@ trento-live-activity/
 │   ├── ARCHITECTURE.md   # Component diagram & descriptions
 │   ├── REQUIREMENTS.md   # Functional & non-functional requirements
 │   └── api/              # OpenAPI 3 spec (Apiary link below)
-├── README.md
-└── CLAUDE.md
+└── README.md
 ```
 
 ---
@@ -101,7 +100,6 @@ The complete OpenAPI 3 specification lives in [`docs/openapi.yaml`](docs/openapi
 To explore it interactively:
 
 - Open `docs/openapi.yaml` in [Swagger Editor](https://editor.swagger.io/) (drag and drop the file)
-- Or upload to Apiary (link TBD when the Apiary project is created)
 
 ---
 
