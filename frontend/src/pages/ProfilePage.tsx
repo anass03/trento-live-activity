@@ -7,7 +7,6 @@ import {
   type ConsentType, type MeProfile,
 } from '../lib/api';
 import { requestFcmToken, revokeFcmToken } from '../lib/firebase';
-import { reverseGeocode } from '../components/ui/GeocodedLocation';
 
 const AVAILABLE_INTERESTS = ['sport', 'cultura', 'musica', 'arte', 'gastronomia', 'studio', 'natura', 'tecnologia', 'volontariato'];
 const FCM_TOKEN_KEY = 'tla_fcm_token';
@@ -230,9 +229,9 @@ export function ProfilePage() {
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         try {
-          await updateLocation(pos.coords.latitude, pos.coords.longitude);
-          const coordStr = `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
-          const placeName = await reverseGeocode(coordStr).catch(() => coordStr);
+          const result = await updateLocation(pos.coords.latitude, pos.coords.longitude);
+          const placeName = result.address
+            || `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
           setLocationMessage(`Posizione aggiornata: ${placeName}`);
           setLocationError(null);
         } catch (e) {

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { createEvent, deleteEvent, getMyEvents, getPOIs, type ApiEvent, type POI } from '../lib/api';
 import { POIMapPicker } from '../components/map/POIMapPicker';
+import { GeocodedLocation } from '../components/ui/GeocodedLocation';
 
 const CATEGORIES = ['sport', 'cultura', 'musica', 'arte', 'gastronomia', 'altro'];
 
@@ -212,9 +213,12 @@ export function EntityPublishPage() {
             </label>
             <div className="poi-location-row">
               <div className="poi-location-info">
-                <span className="poi-location-label">Coordinate selezionate</span>
+                <span className="poi-location-label">Posizione selezionata</span>
                 {form.latitudine && form.longitudine ? (
-                  <code>{Number(form.latitudine).toFixed(6)}, {Number(form.longitudine).toFixed(6)}</code>
+                  <>
+                    <GeocodedLocation value={`${Number(form.latitudine).toFixed(4)}, ${Number(form.longitudine).toFixed(4)}`} />
+                    <code style={{ fontSize: 11, opacity: 0.6 }}>{Number(form.latitudine).toFixed(6)}, {Number(form.longitudine).toFixed(6)}</code>
+                  </>
                 ) : (
                   <em>Nessuna posizione selezionata</em>
                 )}
