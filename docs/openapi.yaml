@@ -15,19 +15,25 @@ info:
     name: Group 7 — Soussane, Marcatili, Safi
 
 servers:
-  - url: http://localhost:3000
+  - url: http://localhost:3000/api
     description: Local development
 
 tags:
   - name: Health
   - name: Auth
+    description: Registrazione, login, OAuth, SPID, 2FA, gestione profilo, consensi GDPR
   - name: Activities
+    description: Attività spontanee (utenti registrati)
   - name: Events
+    description: Eventi certificati (enti approvati)
   - name: Map
   - name: Favorites
   - name: Moderation
+    description: Segnalazione + risoluzione DSA
   - name: Dashboard
+    description: Statistiche aggregate per il Comune
   - name: Admin
+    description: Operazioni amministrative (sistema)
   - name: Notifications
   - name: AI
 
@@ -543,7 +549,7 @@ paths:
   /api/auth/register:
     post:
       tags: [Auth]
-      summary: Register a new citizen (RF5, RNF19, OCL C2/C5/C7)
+      summary: Registrazione cittadino (RF5, RNF19, OCL C2/C5/C7)
       requestBody:
         required: true
         content:
@@ -568,7 +574,62 @@ paths:
   /api/auth/register/entity:
     post:
       tags: [Auth]
-      summary: Request registration as a certified entity (RF31)
+      summary: Richiesta registrazione ente certificato (RF31)
+      description: |
+        L'ente si registra con la PEC come identificativo di login. Account creato
+        in stato `approvato: false`; un AmministratoreDiSistema deve approvarlo.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterEntityRequest' }
+      responses:
+        '201':
+          description: Richiesta ricevuta, in attesa di approvazione
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login (RF6); 2FA obbligatorio per AmministratoreDiSistema (RNF15)
+      description: Rate limit dedicato 10/15min per prevenire brute-force.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+                otpToken:
+                  type: string
+                  description: |
+                    Codice TOTP a 6 cifre o codice di recupero a 10 caratteri.
+                    Obbligatorio per AmministratoreDiSistema con 2FA attivo.
+      responses:
+        '200':
+          description: Login OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Email non verificata
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Richiesta link reset password (RF8)
+      description: |
+        Ritorna sempre 200 per evitare user enumeration. Internamente:
+        - Account OAuth-only (passwordHash=null) → no email
+        - AmministratoreDiSistema → no email (deve usare recovery 2FA)
+        - AmministratoreComunale → no email (SPID-only)
       requestBody:
         required: true
         content:
