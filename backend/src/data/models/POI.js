@@ -19,6 +19,7 @@ module.exports = (sequelize) => {
     },
     tipo: { type: DataTypes.STRING, allowNull: true },
     descrizione: { type: DataTypes.TEXT, allowNull: true },
+    indirizzo: { type: DataTypes.STRING, allowNull: true },
   }, {
     tableName: 'pois',
     timestamps: true,

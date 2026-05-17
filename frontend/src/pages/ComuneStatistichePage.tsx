@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getDashboardStats, type DashboardFilters, type DashboardStats } from '../lib/api';
+import { AreaMapPicker } from '../components/map/AreaMapPicker';
+import { GeocodedLocation } from '../components/ui/GeocodedLocation';
 
 const EMPTY_FILTERS: DashboardFilters = {};
 
@@ -16,6 +18,7 @@ export function ComuneStatistichePage() {
   const [filters, setFilters] = useState<DashboardFilters>(EMPTY_FILTERS);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showAreaPicker, setShowAreaPicker] = useState(false);
 
   function load(nextFilters = filters) {
     setIsLoading(true);
@@ -47,7 +50,7 @@ export function ComuneStatistichePage() {
           <h1>Statistiche Comune</h1>
           <p>Metriche aggregate, filtri territoriali e distribuzioni operative.</p>
         </div>
-        <button type="button" onClick={() => load(filters)}>Aggiorna</button>
+        <button type="button" className="refresh-button" onClick={() => load(filters)}>Aggiorna</button>
       </header>
 
       <div className="liquid-card filter-bar">
@@ -66,10 +69,28 @@ export function ComuneStatistichePage() {
           <label><span>Dal</span><input type="date" value={filters.da || ''} onChange={(event) => update('da', event.target.value)} /></label>
           <label><span>Al</span><input type="date" value={filters.a || ''} onChange={(event) => update('a', event.target.value)} /></label>
         </div>
-        <div className="filter-row">
-          <label><span>Latitudine centro</span><input type="number" step="0.0001" value={filters.centerLat || ''} onChange={(event) => update('centerLat', event.target.value)} placeholder="46.0664" /></label>
-          <label><span>Longitudine centro</span><input type="number" step="0.0001" value={filters.centerLng || ''} onChange={(event) => update('centerLng', event.target.value)} placeholder="11.1216" /></label>
-          <label><span>Raggio (km)</span><input type="number" step="0.5" value={filters.radiusKm || ''} onChange={(event) => update('radiusKm', event.target.value)} placeholder="2" /></label>
+        <div className="filter-row area-picker-row">
+          <div className="area-picker-summary">
+            <span>Area geografica</span>
+            {filters.centerLat && filters.centerLng ? (
+              <span className="area-picker-value">
+                <GeocodedLocation value={`${filters.centerLat}, ${filters.centerLng}`} />
+                {filters.radiusKm && <em> · {filters.radiusKm} km</em>}
+              </span>
+            ) : (
+              <em className="muted-copy">Nessuna area selezionata</em>
+            )}
+          </div>
+          <div className="filter-actions" style={{ marginTop: 0 }}>
+            <button type="button" onClick={() => setShowAreaPicker(true)}>
+              {filters.centerLat ? '📍 Modifica area' : '📍 Scegli area sulla mappa'}
+            </button>
+            {filters.centerLat && (
+              <button type="button" onClick={() => setFilters((prev) => ({ ...prev, centerLat: undefined, centerLng: undefined, radiusKm: undefined }))}>
+                Rimuovi area
+              </button>
+            )}
+          </div>
         </div>
         <div className="filter-actions">
           <button type="button" className="primary-button" onClick={() => load(filters)}>Applica filtri</button>
@@ -126,6 +147,16 @@ export function ComuneStatistichePage() {
             </section>
           </div>
         </>
+      )}
+      {showAreaPicker && (
+        <AreaMapPicker
+          initial={{ centerLat: filters.centerLat, centerLng: filters.centerLng, radiusKm: filters.radiusKm }}
+          onCancel={() => setShowAreaPicker(false)}
+          onConfirm={({ centerLat, centerLng, radiusKm }) => {
+            setFilters((prev) => ({ ...prev, centerLat: String(centerLat), centerLng: String(centerLng), radiusKm: String(radiusKm) }));
+            setShowAreaPicker(false);
+          }}
+        />
       )}
     </section>
   );

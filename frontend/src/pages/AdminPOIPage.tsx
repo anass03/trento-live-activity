@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { POIMapPicker } from '../components/map/POIMapPicker';
+import { GeocodedLocation } from '../components/ui/GeocodedLocation';
 import { createPOI, deletePOI, getPOIs, updatePOI, type POI } from '../lib/api';
 
 const EMPTY: Partial<POI> = { nome: '', latitudine: undefined, longitudine: undefined, capacitaMax: 100, statoAffollamento: 'verde', tipo: '', descrizione: '' };
@@ -55,7 +56,9 @@ export function AdminPOIPage() {
           <div className="poi-location-info">
             <span className="poi-location-label">Posizione sulla mappa</span>
             {typeof editing.latitudine === 'number' && typeof editing.longitudine === 'number' ? (
-              <code>{editing.latitudine.toFixed(6)}, {editing.longitudine.toFixed(6)}</code>
+              <GeocodedLocation
+                value={(editing as POI).indirizzo || `${editing.latitudine.toFixed(4)}, ${editing.longitudine.toFixed(4)}`}
+              />
             ) : (
               <em>Nessuna posizione selezionata</em>
             )}
@@ -90,7 +93,7 @@ export function AdminPOIPage() {
           initial={{ latitudine: editing.latitudine, longitudine: editing.longitudine }}
           onCancel={() => setShowPicker(false)}
           onConfirm={(coords) => {
-            setEditing({ ...editing, ...coords });
+            setEditing({ ...editing, ...coords, indirizzo: undefined });
             setShowPicker(false);
           }}
         />
@@ -99,12 +102,12 @@ export function AdminPOIPage() {
       <div className="liquid-card">
         <h2>POI esistenti ({pois.length})</h2>
         <table className="stats-table">
-          <thead><tr><th>Nome</th><th>Coordinate</th><th>Cap.</th><th>Affollamento</th><th>Azioni</th></tr></thead>
+          <thead><tr><th>Nome</th><th>Posizione</th><th>Cap.</th><th>Affollamento</th><th>Azioni</th></tr></thead>
           <tbody>
             {pois.map((p) => (
               <tr key={p.id}>
                 <td>{p.nome}</td>
-                <td>{p.latitudine.toFixed(4)}, {p.longitudine.toFixed(4)}</td>
+                <td>{p.indirizzo || `${p.latitudine.toFixed(4)}, ${p.longitudine.toFixed(4)}`}</td>
                 <td>{p.capacitaMax}</td>
                 <td><span className={`crowding-dot ${p.statoAffollamento}`} /> {{ verde: 'Basso', giallo: 'Medio', rosso: 'Elevato' }[p.statoAffollamento] ?? p.statoAffollamento}</td>
                 <td>

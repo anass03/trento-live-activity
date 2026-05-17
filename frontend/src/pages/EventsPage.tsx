@@ -61,6 +61,7 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
   const isLoggedIn = !!getToken() && user?.role !== 'anonymous';
   const userId = user?.id;
   const isCitizen = user?.role === 'registered_user';
+  const canReport = isLoggedIn && user?.role !== 'certified_entity';
   const hasInterests = Array.isArray(user?.interessi) && (user!.interessi!.length ?? 0) > 0;
 
   async function loadEvents() {
@@ -259,7 +260,7 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
         <div className="card-actions-row">
           {participateButton(event)}
           {partError?.id === event.id && <small className="error-message">{partError.text}</small>}
-          {isLoggedIn && reportMsg?.id !== event.id && (
+          {canReport && reportMsg?.id !== event.id && (
             reportingId === event.id ? (
               <div className="report-controls">
                 <select value={reportTipo} onChange={(e) => setReportTipo(e.target.value)}>
@@ -324,7 +325,7 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
             />
           )}
           {participateButton(selectedEvent)}
-          {isLoggedIn && reportMsg?.id !== selectedEvent.id && (
+          {canReport && reportMsg?.id !== selectedEvent.id && (
             reportingId === selectedEvent.id ? (
               <div className="report-controls">
                 <select value={reportTipo} onChange={(event) => setReportTipo(event.target.value)}>

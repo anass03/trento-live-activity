@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import maplibregl, { type Map as MapLibreMap, type Marker } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { GeocodedLocation } from '../ui/GeocodedLocation';
 
 const TRENTO_CENTER: [number, number] = [11.1211, 46.0679];
 const CITY_STYLE = 'https://tiles.openfreemap.org/styles/bright';
@@ -69,9 +70,14 @@ export function POIMapPicker({ initial, onConfirm, onCancel }: POIMapPickerProps
         <div ref={containerRef} className="poi-map-picker-canvas" />
         <footer>
           <div className="poi-map-picker-coord">
-            {coord
-              ? <><strong>Coordinate</strong> {coord[1].toFixed(6)}, {coord[0].toFixed(6)}</>
-              : <em>Nessun punto selezionato — clicca sulla mappa</em>}
+            {coord ? (
+              <>
+                <strong><GeocodedLocation value={`${coord[1].toFixed(4)}, ${coord[0].toFixed(4)}`} /></strong>
+                <code style={{ fontSize: 11, opacity: 0.6 }}>{coord[1].toFixed(6)}, {coord[0].toFixed(6)}</code>
+              </>
+            ) : (
+              <em>Nessun punto selezionato — clicca sulla mappa</em>
+            )}
           </div>
           <div className="filter-actions">
             <button type="button" onClick={onCancel}>Annulla</button>

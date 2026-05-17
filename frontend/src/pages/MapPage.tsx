@@ -82,6 +82,7 @@ function crowdBarColor(level: number): string {
 
 export function MapPage({ user }: { user?: AppUser }) {
   const isEnte = user?.role === 'certified_entity';
+  const isAdmin = user?.role === 'municipal_admin' || user?.role === 'system_admin';
   const [markers, setMarkers] = useState<MapMarker[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('now');
@@ -139,11 +140,19 @@ export function MapPage({ user }: { user?: AppUser }) {
     );
   }
 
-  // Enti certificati non vedono attività spontanee: le filtriamo dalla base e
-  // rimuoviamo il filtro "Attività" dalla toolbar.
-  const filterLabels = isEnte
-    ? filterLabelsBase.filter((f) => f.value !== 'activity')
-    : filterLabelsBase;
+  // Enti certificati non vedono attività spontanee; admin/dashboard non hanno preferenze personali.
+  const filterLabels = filterLabelsBase.filter((f) => {
+    if (isEnte && f.value === 'activity') return false;
+    if (isAdmin && (f.value === 'preferred' || f.value === 'favorites')) return false;
+    return true;
+  });
+
+  // If the active filter is no longer in the visible set, reset to 'all'.
+  useEffect(() => {
+    if (isAdmin && (filter === 'preferred' || filter === 'favorites')) {
+      setFilter('all');
+    }
+  }, [isAdmin, filter]);
 
   const baseMarkers = useMemo(
     () => (isEnte ? markers.filter((m) => m.type !== 'activity') : markers),
