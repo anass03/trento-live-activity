@@ -29,6 +29,7 @@ function capitalize(value) {
 function locationFor(item) {
   const poi = item.poi || item.POI;
   if (poi?.nome) return poi.nome;
+  if (item.indirizzo) return item.indirizzo;
   if (item.latitudine != null && item.longitudine != null) {
     return `${item.latitudine}, ${item.longitudine}`;
   }
@@ -136,12 +137,20 @@ function serializePOI(record) {
   const poi = plain(record);
   return {
     id: poi.id,
+    nome: poi.nome,
     title: poi.nome,
     description: poi.descrizione || '',
     category: poi.tipo,
+    tipo: poi.tipo,
+    latitudine: poi.latitudine,
+    longitudine: poi.longitudine,
     latitude: poi.latitudine,
     longitude: poi.longitudine,
+    indirizzo: poi.indirizzo || null,
+    capacitaMax: poi.capacitaMax,
+    statoAffollamento: poi.statoAffollamento,
     crowdingStatus: crowdingStatus(poi.statoAffollamento),
+    descrizione: poi.descrizione || '',
     createdAt: timestamp(poi.createdAt),
   };
 }

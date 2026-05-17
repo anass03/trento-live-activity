@@ -26,6 +26,7 @@ module.exports = (sequelize) => {
     // Capienza massima opzionale. null = evento aperto a tutti senza limite.
     // Quando valorizzato, il backend rifiuta nuove partecipazioni una volta raggiunto.
     maxPartecipanti: { type: DataTypes.INTEGER, allowNull: true, validate: { min: 1 } },
+    indirizzo: { type: DataTypes.STRING, allowNull: true },
   }, {
     tableName: 'events',
     timestamps: true,

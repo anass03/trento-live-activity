@@ -6,6 +6,14 @@ const {
   serializeActivity,
   serializeEvent,
 } = require('../data/presenters');
+const { reverseGeocode } = require('../lib/geocode');
+
+function geocodeAndStore(record) {
+  if (!record.latitudine || !record.longitudine || record.indirizzo) return;
+  reverseGeocode(record.latitudine, record.longitudine)
+    .then((address) => { if (address) record.update({ indirizzo: address }); })
+    .catch(() => {});
+}
 
 async function listPOIs({ tipo } = {}) {
   const where = {};
@@ -24,7 +32,9 @@ async function createPOI(data) {
   if (data.capacitaMax <= 0) {
     throw { status: 400, code: 'INVALID_CAPACITY', error: 'capacitaMax must be greater than 0' };
   }
-  return POI.create(data);
+  const poi = await POI.create(data);
+  geocodeAndStore(poi);
+  return poi;
 }
 
 async function updatePOI(id, updates) {
@@ -33,7 +43,11 @@ async function updatePOI(id, updates) {
   if (updates.statoAffollamento && !['verde', 'giallo', 'rosso'].includes(updates.statoAffollamento)) {
     throw { status: 400, code: 'INVALID_STATUS', error: 'statoAffollamento must be verde, giallo, or rosso' };
   }
+  const coordsChanged = (updates.latitudine && updates.latitudine !== poi.latitudine)
+    || (updates.longitudine && updates.longitudine !== poi.longitudine);
+  if (coordsChanged) updates.indirizzo = null; // will be re-geocoded below
   await poi.update(updates);
+  if (coordsChanged) geocodeAndStore(poi);
   return poi;
 }
 
