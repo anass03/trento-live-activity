@@ -15,7 +15,7 @@
     "db:sync": "node -e \"require('./src/data/db').sync({ force: true }).then(() => { console.log('DB synced'); process.exit(0); })\""
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.96.0",
+    "@google/genai": "^2.3.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

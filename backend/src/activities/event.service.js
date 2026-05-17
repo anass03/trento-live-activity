@@ -96,7 +96,13 @@ async function updateEvent(entityId, eventId, updates) {
   if (updates.titolo !== undefined && (updates.titolo.length === 0 || updates.titolo.length > 100)) {
     throw { status: 400, code: 'INVALID_TITLE', error: 'Title must be between 1 and 100 characters' };
   }
-  await event.update(updates);
+  // Mass-assignment guard: senza whitelist un ente potrebbe passare entityId
+  // (riassegnare l'evento a un altro ente), badgeVerifica:false, id, ecc.
+  const ALLOWED_UPDATE_FIELDS = ['titolo', 'descrizione', 'categoria', 'latitudine', 'longitudine', 'poiId', 'data', 'orarioInizio', 'orarioFine', 'maxPartecipanti'];
+  const safeUpdates = Object.fromEntries(
+    Object.entries(updates).filter(([k]) => ALLOWED_UPDATE_FIELDS.includes(k))
+  );
+  await event.update(safeUpdates);
   return event;
 }
 

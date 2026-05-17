@@ -3,9 +3,14 @@ function errorHandler(err, _req, res, _next) {
   const code = err.code || 'INTERNAL_ERROR';
 
   // Never leak internal error details to the client. Log them server-side instead.
-  if (status >= 500) {
+  // Exception: 503 Service Unavailable is safe to pass through (e.g. "AI not configured").
+  if (status >= 500 && status !== 503) {
     console.error('[errorHandler]', err);
     return res.status(status).json({ error: 'Internal server error', code });
+  }
+
+  if (status >= 500) {
+    console.error('[errorHandler]', err);
   }
 
   const message = err.error || err.message || 'Bad request';
