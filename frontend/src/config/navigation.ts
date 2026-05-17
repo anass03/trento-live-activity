@@ -8,9 +8,12 @@ const ALL_ROLES: UserRole[] = ['anonymous', 'registered_user', 'certified_entity
 // (loro lavorano su dashboard/POI/moderazione, non sull'esplorazione cittadina).
 const CITIZEN_FACING_ROLES: UserRole[] = ['anonymous', 'registered_user', 'certified_entity'];
 
+// Attività spontanee: non visibili agli enti certificati (che pubblicano eventi, non attività).
+const ACTIVITY_ROLES: UserRole[] = ['anonymous', 'registered_user'];
+
 export const primaryNav: NavItem[] = [
   { label: 'Mappa', path: '/', roles: ALL_ROLES },
-  { label: 'Attività', path: '/attivita', roles: CITIZEN_FACING_ROLES },
+  { label: 'Attività', path: '/attivita', roles: ACTIVITY_ROLES },
   { label: 'Eventi', path: '/eventi', roles: CITIZEN_FACING_ROLES },
   { label: 'Profilo', path: '/profilo', roles: ['registered_user', 'certified_entity', 'municipal_admin', 'system_admin'] },
   { label: 'Accedi / Registrati', path: '/login', roles: ['anonymous'] },

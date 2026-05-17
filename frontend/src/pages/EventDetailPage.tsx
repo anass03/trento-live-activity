@@ -26,6 +26,7 @@ export function EventDetailPage({ user }: { user?: AppUser }) {
   const [participating, setParticipating] = useState(false);
   const [partError, setPartError] = useState<string | null>(null);
   const isLoggedIn = !!getToken() && user?.role !== 'anonymous';
+  const canReport = isLoggedIn && user?.role !== 'certified_entity';
   const userId = user?.id;
   const isCitizen = user?.role === 'registered_user';
 
@@ -158,7 +159,7 @@ export function EventDetailPage({ user }: { user?: AppUser }) {
               label="Aggiungi al calendario"
             />
           )}
-          {isLoggedIn && !reportMsg && (
+          {canReport && !reportMsg && (
             reporting ? (
               <div className="inline-form-row">
                 <select value={reportTipo} onChange={(e) => setReportTipo(e.target.value)}>

@@ -582,60 +582,57 @@ export function ProfilePage() {
               )}
             </div>
           )}
+          {/* ── Cambio password (solo per chi ha una password locale) ── */}
+          {user.hasPassword && (
+            <form className="auth-form liquid-card" onSubmit={handleChangePassword}>
+              <h2>Cambia password</h2>
+              <p className="muted-copy" style={{ marginTop: 0 }}>
+                Verrà chiesto un nuovo login al termine.
+              </p>
+              <label>
+                <span>Password attuale</span>
+                <input
+                  type="password"
+                  value={pwdCurrent}
+                  onChange={(e) => setPwdCurrent(e.target.value)}
+                  autoComplete="current-password"
+                  required
+                />
+              </label>
+              <label>
+                <span>Nuova password</span>
+                <input
+                  type="password"
+                  value={pwdNew}
+                  onChange={(e) => setPwdNew(e.target.value)}
+                  autoComplete="new-password"
+                  minLength={8}
+                  required
+                />
+              </label>
+              <label>
+                <span>Conferma nuova password</span>
+                <input
+                  type="password"
+                  value={pwdConfirm}
+                  onChange={(e) => setPwdConfirm(e.target.value)}
+                  autoComplete="new-password"
+                  minLength={8}
+                  required
+                />
+              </label>
+              <p className="muted-copy" style={{ fontSize: 12, margin: '4px 0 0' }}>
+                Min 8 caratteri, una maiuscola, una minuscola, un numero, un carattere speciale.
+              </p>
+              {pwdError && <div className="form-error">{pwdError}</div>}
+              {pwdMessage && <div className="form-success">{pwdMessage}</div>}
+              <button className="primary-button" type="submit" disabled={pwdSaving || !pwdCurrent || !pwdNew}>
+                {pwdSaving ? 'Salvataggio...' : 'Aggiorna password'}
+              </button>
+            </form>
+          )}
         </div>
       </div>
-
-      {/* ── Cambio password (solo per chi ha una password locale) ── */}
-      {user.hasPassword && (
-        <div className="profile-delete-footer">
-          <form className="auth-form liquid-card" onSubmit={handleChangePassword}>
-            <h2>Cambia password</h2>
-            <p className="muted-copy" style={{ marginTop: 0 }}>
-              Verrà chiesto un nuovo login al termine.
-            </p>
-            <label>
-              <span>Password attuale</span>
-              <input
-                type="password"
-                value={pwdCurrent}
-                onChange={(e) => setPwdCurrent(e.target.value)}
-                autoComplete="current-password"
-                required
-              />
-            </label>
-            <label>
-              <span>Nuova password</span>
-              <input
-                type="password"
-                value={pwdNew}
-                onChange={(e) => setPwdNew(e.target.value)}
-                autoComplete="new-password"
-                minLength={8}
-                required
-              />
-            </label>
-            <label>
-              <span>Conferma nuova password</span>
-              <input
-                type="password"
-                value={pwdConfirm}
-                onChange={(e) => setPwdConfirm(e.target.value)}
-                autoComplete="new-password"
-                minLength={8}
-                required
-              />
-            </label>
-            <p className="muted-copy" style={{ fontSize: 12, margin: '4px 0 0' }}>
-              Min 8 caratteri, una maiuscola, una minuscola, un numero, un carattere speciale.
-            </p>
-            {pwdError && <div className="form-error">{pwdError}</div>}
-            {pwdMessage && <div className="form-success">{pwdMessage}</div>}
-            <button className="primary-button" type="submit" disabled={pwdSaving || !pwdCurrent || !pwdNew}>
-              {pwdSaving ? 'Salvataggio...' : 'Aggiorna password'}
-            </button>
-          </form>
-        </div>
-      )}
 
       {/* ── Elimina account: fuori dai card principali, in fondo ── */}
       <div className="profile-delete-footer">
