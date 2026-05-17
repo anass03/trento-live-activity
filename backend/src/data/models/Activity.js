@@ -18,6 +18,7 @@ module.exports = (sequelize) => {
       validate: { min: 2, max: 50 },
     },
     stato: { type: DataTypes.ENUM(...ACTIVITY_STATUSES), defaultValue: 'attiva' },
+    indirizzo: { type: DataTypes.STRING, allowNull: true },
     creatorId: { type: DataTypes.UUID, allowNull: false },
     latitudine: { type: DataTypes.FLOAT, allowNull: true },
     longitudine: { type: DataTypes.FLOAT, allowNull: true },

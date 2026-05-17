@@ -405,7 +405,10 @@ async function updateLocation(userId, { lat, lng }) {
   const user = await User.findByPk(userId);
   if (!user) throw { status: 404, code: 'NOT_FOUND', error: 'User not found' };
   await user.update({ lastLat: lat, lastLng: lng, lastLocationAt: new Date() });
-  return { lat, lng, updatedAt: new Date() };
+  // Resolve address server-side and return it so the frontend can display it directly.
+  const { reverseGeocode } = require('../lib/geocode');
+  const address = await reverseGeocode(lat, lng).catch(() => null);
+  return { lat, lng, updatedAt: new Date(), address };
 }
 
 async function deleteAccount(userId, { currentPassword, confirmEmail } = {}) {

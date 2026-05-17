@@ -1,6 +1,7 @@
 const { Op } = require('sequelize');
 const { Activity, Participation, User, POI } = require('../data/models');
 const { serializeActivity } = require('../data/presenters');
+const { reverseGeocode } = require('../lib/geocode');
 const {
   sendActivityJoinConfirmation,
   sendActivityNewParticipant,
@@ -81,6 +82,11 @@ async function createActivity(creatorId, { tipo, data, orarioInizio, orarioFine,
     stato: 'attiva', creatorId, latitudine, longitudine, poiId,
   });
   await Participation.create({ userId: creatorId, activityId: activity.id });
+  if (latitudine && longitudine) {
+    reverseGeocode(latitudine, longitudine)
+      .then((address) => { if (address) activity.update({ indirizzo: address }); })
+      .catch(() => {});
+  }
 
   // RF40: push to nearby users with matching interest.
   // If the activity has no explicit coords, fall back to the creator's last known location.

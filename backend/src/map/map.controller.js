@@ -1,5 +1,6 @@
 const service = require('./map.service');
 const { assertUuid } = require('../data/presenters');
+const { reverseGeocode } = require('../lib/geocode');
 
 async function getMap(req, res, next) {
   try { res.json(await service.getMapData()); } catch (e) { next(e); }
@@ -35,4 +36,16 @@ async function deletePOI(req, res, next) {
   } catch (e) { next(e); }
 }
 
-module.exports = { getMap, listPOIs, getPOI, createPOI, updatePOI, deletePOI };
+async function geocode(req, res, next) {
+  try {
+    const lat = parseFloat(req.query.lat);
+    const lon = parseFloat(req.query.lon);
+    if (isNaN(lat) || isNaN(lon)) {
+      return res.status(400).json({ error: 'lat and lon are required numbers' });
+    }
+    const address = await reverseGeocode(lat, lon);
+    res.json({ address: address || null });
+  } catch (e) { next(e); }
+}
+
+module.exports = { getMap, listPOIs, getPOI, createPOI, updatePOI, deletePOI, geocode };
