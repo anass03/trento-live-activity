@@ -9,10 +9,6 @@ __pycache__/
 .env.local
 .env.*.local
 
-#Claude Code - personal files (each colaborator has its own local preferences)
-CLAUDE.local.md
-.claude/
-
 #Build
 dist/
 build/
