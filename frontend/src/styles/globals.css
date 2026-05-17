@@ -2913,6 +2913,43 @@ select option {
   margin-right: 8px;
 }
 
+/* Area map picker — radius control (lives inside poi-map-picker-coord) */
+.area-picker-radius-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.area-picker-radius-input input[type="range"] {
+  flex: 1;
+  accent-color: var(--color-primary);
+}
+.area-picker-radius-input input[type="number"] {
+  border: 1px solid var(--color-surface-line);
+  border-radius: 8px;
+  padding: 4px 8px;
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  font-size: 13px;
+}
+
+/* Area summary row in filter bars */
+.area-picker-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13.5px;
+}
+.area-picker-row > span:first-child {
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.area-picker-value {
+  color: var(--color-text-primary);
+}
+
 /* ── Moderation page: stats + cards ── */
 .moderation-stats {
   display: grid;
