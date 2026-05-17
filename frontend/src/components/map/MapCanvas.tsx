@@ -612,8 +612,7 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
             const newState: PopupState = { props, lngLat, locked: true };
             popupStateRef.current = newState;
             setPopup(newState);
-            const pt = map.project(lngLat);
-            setPopupPos({ x: pt.x, y: pt.y });
+            setPopupPos(projectToViewport(lngLat));
           }
         }, 230);
       };
@@ -774,7 +773,7 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
                   compact
                 />
               )}
-              {popup.props.type === 'poi' && isLoggedIn && (
+              {popup.props.type === 'poi' && isLoggedIn && user?.role !== 'certified_entity' && (
                 <button
                   className="primary-button"
                   type="button"

@@ -8,7 +8,7 @@ import type { AppUser } from '../data/mockUser';
 type Filter = 'all' | 'preferred' | 'favorites' | MarkerType;
 type TimeFilter = 'now' | 'today' | 'weekend';
 
-const filterLabels: Array<{ label: string; value: Filter }> = [
+const filterLabelsBase: Array<{ label: string; value: Filter }> = [
   { label: 'Tutti', value: 'all' },
   { label: 'Per te', value: 'preferred' },
   { label: 'Preferiti', value: 'favorites' },
@@ -81,6 +81,7 @@ function crowdBarColor(level: number): string {
 }
 
 export function MapPage({ user }: { user?: AppUser }) {
+  const isEnte = user?.role === 'certified_entity';
   const [markers, setMarkers] = useState<MapMarker[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('now');
@@ -138,9 +139,20 @@ export function MapPage({ user }: { user?: AppUser }) {
     );
   }
 
+  // Enti certificati non vedono attività spontanee: le filtriamo dalla base e
+  // rimuoviamo il filtro "Attività" dalla toolbar.
+  const filterLabels = isEnte
+    ? filterLabelsBase.filter((f) => f.value !== 'activity')
+    : filterLabelsBase;
+
+  const baseMarkers = useMemo(
+    () => (isEnte ? markers.filter((m) => m.type !== 'activity') : markers),
+    [isEnte, markers],
+  );
+
   const visibleMarkers = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return markers.filter((marker) => {
+    return baseMarkers.filter((marker) => {
       // ── filtro categoria/tipo ────────────────────────────────────────
       if (filter === 'preferred') {
         if (marker.type === 'poi') {
@@ -151,7 +163,9 @@ export function MapPage({ user }: { user?: AppUser }) {
           return false;
         }
       } else if (filter === 'favorites') {
-        const fav = favorites.some((f) => f.markerType === marker.type && f.markerId === marker.id);
+        // POI favorites are stored with sourceId; activities/events use id.
+        const favoriteId = marker.type === 'poi' ? marker.sourceId : marker.id;
+        const fav = favorites.some((f) => f.markerType === marker.type && f.markerId === favoriteId);
         if (!fav) return false;
       } else if (filter !== 'all' && marker.type !== filter) {
         return false;
@@ -180,10 +194,10 @@ export function MapPage({ user }: { user?: AppUser }) {
       }
       return true;
     });
-  }, [filter, timeFilter, search, markers, hasInterests, user, favorites, userLocation]);
+  }, [filter, timeFilter, search, baseMarkers, hasInterests, user, favorites, userLocation]);
 
   const highCrowdMarkers = useMemo(
-    () => markers
+    () => baseMarkers
       .filter((marker) =>
         crowdLevel(marker) >= 45
         || marker.crowdingStatus === 'red'
@@ -192,23 +206,23 @@ export function MapPage({ user }: { user?: AppUser }) {
       )
       .sort((a, b) => crowdLevel(b) - crowdLevel(a))
       .slice(0, 5),
-    [markers],
+    [baseMarkers],
   );
 
   const upcomingItems = useMemo(
-    () => markers
+    () => baseMarkers
       .filter((marker) => marker.type !== 'poi' && marker.dateTime)
       .sort((a, b) => new Date(a.dateTime || '').getTime() - new Date(b.dateTime || '').getTime())
       .slice(0, 4),
-    [markers],
+    [baseMarkers],
   );
 
   const featuredHotspots = useMemo(
-    () => markers
+    () => baseMarkers
       .slice()
       .sort((a, b) => crowdLevel(b) - crowdLevel(a))
       .slice(0, 4),
-    [markers],
+    [baseMarkers],
   );
 
   function severityFor(marker: MapMarker): { label: string; tone: MapMarker['crowdingStatus'] } {
@@ -240,7 +254,7 @@ export function MapPage({ user }: { user?: AppUser }) {
   });
 
   const quickStats = [
-    { label: 'Punti live', value: markers.length },
+    { label: 'Punti live', value: baseMarkers.length },
     { label: 'Hotspot', value: highCrowdMarkers.length },
     { label: 'Oggi', value: upcomingItems.length },
   ];
