@@ -26,21 +26,51 @@ function eventCrowdLevel(event: ApiEvent) {
   return event.isCertified ? 68 : 44;
 }
 
-function isSameDay(dateStr: string, ref: Date): boolean {
-  const d = new Date(dateStr);
-  return d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth() && d.getDate() === ref.getDate();
+function parseLocalDateTime(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const hasExplicitTimezone = /(?:z|[+-]\d{2}:?\d{2})$/i.test(value);
+  if (!hasExplicitTimezone) {
+    const localDate = value.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+    if (localDate) {
+      return new Date(
+        Number(localDate[1]),
+        Number(localDate[2]) - 1,
+        Number(localDate[3]),
+        Number(localDate[4] ?? 0),
+        Number(localDate[5] ?? 0),
+        Number(localDate[6] ?? 0),
+      );
+    }
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
 }
 
-function isThisWeekend(dateStr: string | null | undefined): boolean {
-  if (!dateStr) return false;
-  const today = new Date();
-  const dow = today.getDay(); // 0=Sun, 6=Sat
-  const sat = new Date(today);
-  sat.setHours(0, 0, 0, 0);
-  sat.setDate(today.getDate() + (dow === 0 ? -1 : 6 - dow));
-  const sun = new Date(sat);
-  sun.setDate(sat.getDate() + 1);
-  return isSameDay(dateStr, sat) || isSameDay(dateStr, sun);
+function endDateFromStartAndTime(start: Date, endTime?: string | null): Date {
+  const end = new Date(start);
+  const time = endTime?.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (!time) return end;
+  end.setHours(Number(time[1]), Number(time[2]), Number(time[3] ?? 0), 0);
+  if (end < start) end.setDate(end.getDate() + 1);
+  return end;
+}
+
+function happensToday(event: ApiEvent, ref: Date): boolean {
+  const start = parseLocalDateTime(event.dateTime);
+  if (!start) return false;
+  const end = endDateFromStartAndTime(start, event.endTime);
+  const dayStart = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
+  const dayEnd = new Date(dayStart);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+  return start < dayEnd && end >= dayStart;
+}
+
+function isUpcomingWeekend(dateStr: string | null | undefined): boolean {
+  const date = parseLocalDateTime(dateStr);
+  if (!date) return false;
+  const day = date.getDay();
+  return date >= new Date() && (day === 0 || day === 6);
 }
 
 export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: boolean; user?: AppUser }) {
@@ -59,10 +89,11 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
   const [partError, setPartError] = useState<{ id: string; text: string } | null>(null);
 
   const isLoggedIn = !!getToken() && user?.role !== 'anonymous';
+  const userInterests = user?.interessi ?? [];
   const userId = user?.id;
   const isCitizen = user?.role === 'registered_user';
   const canReport = isLoggedIn && user?.role !== 'certified_entity';
-  const hasInterests = Array.isArray(user?.interessi) && (user!.interessi!.length ?? 0) > 0;
+  const hasInterests = userInterests.length > 0;
 
   async function loadEvents() {
     setIsLoading(true);
@@ -94,23 +125,34 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
     return () => window.removeEventListener('keydown', handleEscape);
   }, [selectedEvent]);
 
-  const visibleEvents = useMemo(
+  const filteredEvents = useMemo(
     () => events.filter((event) => {
       if (certifiedOnly && !event.isCertified) return false;
       if (timeFilter === 'today') {
-        if (!event.dateTime || !isSameDay(event.dateTime, new Date())) return false;
+        if (!happensToday(event, new Date())) return false;
       }
       if (timeFilter === 'weekend') {
-        if (!isThisWeekend(event.dateTime)) return false;
-      }
-      if (hasInterests && user?.interessi && event.category) {
-        return user.interessi.includes(event.category);
+        if (!isUpcomingWeekend(event.dateTime)) return false;
       }
       const q = search.trim().toLowerCase();
       if (!q) return true;
       return `${event.title} ${event.description || ''} ${event.category} ${event.location || ''}`.toLowerCase().includes(q);
     }),
-    [certifiedOnly, events, hasInterests, search, timeFilter, user],
+    [certifiedOnly, events, search, timeFilter],
+  );
+
+  const recommendedEvents = useMemo(
+    () => (hasInterests
+      ? filteredEvents.filter((event) => event.category && userInterests.includes(event.category))
+      : filteredEvents),
+    [filteredEvents, hasInterests, userInterests],
+  );
+
+  const otherFilteredEvents = useMemo(
+    () => (hasInterests
+      ? filteredEvents.filter((event) => !event.category || !userInterests.includes(event.category))
+      : []),
+    [filteredEvents, hasInterests, userInterests],
   );
 
   async function handleJoinEvent(eventId: string) {
@@ -183,7 +225,7 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
   const now = new Date();
   // Ordina per data crescente — il backend restituisce per createdAt DESC,
   // quindi senza riordinare la timeline mostrava 30/05 prima di 23/05.
-  const upcomingVisible = visibleEvents
+  const upcomingVisible = recommendedEvents
     .filter((ev) => !ev.dateTime || new Date(ev.dateTime) >= now)
     .slice()
     .sort((a, b) => {
@@ -191,7 +233,7 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
       const tb = b.dateTime ? new Date(b.dateTime).getTime() : Number.MAX_SAFE_INTEGER;
       return ta - tb;
     });
-  const pastVisible = visibleEvents
+  const pastVisible = recommendedEvents
     .filter((ev) => ev.dateTime && new Date(ev.dateTime) < now)
     .slice()
     .sort((a, b) => new Date(b.dateTime!).getTime() - new Date(a.dateTime!).getTime()); // più recente in alto
@@ -290,8 +332,8 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
           <button onClick={loadEvents} type="button">Riprova</button>
         </div>
       )}
-      {!isLoading && !error && visibleEvents.length === 0 && (
-        <div className="state-panel liquid-panel">Nessun evento trovato nel database.</div>
+      {!isLoading && !error && recommendedEvents.length === 0 && otherFilteredEvents.length === 0 && (
+        <div className="state-panel liquid-panel">Nessun evento corrisponde ai filtri o alla ricerca.</div>
       )}
     </>
   );
@@ -365,20 +407,76 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
 
         {stateContent}
 
-        {!isLoading && !error && visibleEvents.length > 0 && (
-          <div className="certified-layout">
-            <aside className="certified-trust-panel">
-              <strong>{visibleEvents.length} eventi verificati</strong>
-              <ul>
-                <li>Identità ente controllata</li>
-                <li>Informazioni calendario pronte</li>
-                <li>Segnalazione sempre disponibile</li>
-              </ul>
-            </aside>
-            <div className="certified-registry">
-              {visibleEvents.map((event) => renderEventCard(event, 'certified-event-card'))}
-            </div>
+        {!isLoading && !error && filteredEvents.length > 0 && hasInterests && (
+          <div className="preference-page-stack">
+            <section className="preference-section" aria-label="Eventi consigliati per te">
+              <div className="preference-section-header">
+                <div>
+                  <span className="section-eyebrow">Consigliati per te</span>
+                  <h2>Eventi consigliati per te <span className="section-count">{recommendedEvents.length}</span></h2>
+                </div>
+              </div>
+
+              {recommendedEvents.length === 0 ? (
+                <div className="preference-empty-state">
+                  Nessun evento certificato consigliato corrisponde ai filtri attuali. Puoi comunque esplorare gli altri eventi verificati qui sotto.
+                </div>
+              ) : (
+                <div className="certified-layout">
+                  <aside className="certified-trust-panel">
+                    <strong>{recommendedEvents.length} eventi verificati</strong>
+                    <ul>
+                      <li>Identità ente controllata</li>
+                      <li>Informazioni calendario pronte</li>
+                      <li>Segnalazione sempre disponibile</li>
+                    </ul>
+                  </aside>
+                  <div className="certified-registry">
+                    {recommendedEvents.map((event) => renderEventCard(event, 'certified-event-card'))}
+                  </div>
+                </div>
+              )}
+            </section>
+
+            {otherFilteredEvents.length > 0 && (
+              <section className="preference-section preference-section-secondary" aria-label="Altri eventi">
+                <div className="preference-section-header">
+                  <div>
+                    <span className="section-eyebrow">Scopri ancora</span>
+                    <h2>Altri eventi <span className="section-count">{otherFilteredEvents.length}</span></h2>
+                  </div>
+                </div>
+                <div className="certified-registry">
+                  {otherFilteredEvents.map((event) => renderEventCard(event, 'certified-event-card'))}
+                </div>
+              </section>
+            )}
           </div>
+        )}
+
+        {!isLoading && !error && filteredEvents.length > 0 && !hasInterests && (
+          <section className="preference-section" aria-label="Tutti gli eventi">
+            <div className="preference-section-header">
+              <div>
+                <span className="section-eyebrow">Registro eventi</span>
+                <h2>Tutti gli eventi <span className="section-count">{recommendedEvents.length}</span></h2>
+              </div>
+            </div>
+
+            <div className="certified-layout">
+              <aside className="certified-trust-panel">
+                <strong>{recommendedEvents.length} eventi verificati</strong>
+                <ul>
+                  <li>Identità ente controllata</li>
+                  <li>Informazioni calendario pronte</li>
+                  <li>Segnalazione sempre disponibile</li>
+                </ul>
+              </aside>
+              <div className="certified-registry">
+                {recommendedEvents.map((event) => renderEventCard(event, 'certified-event-card'))}
+              </div>
+            </div>
+          </section>
         )}
         {eventPopup}
       </section>
@@ -412,47 +510,122 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
         </section>
       )}
 
-      {!isLoading && !error && upcomingVisible.length > 0 && (
-        <div className="event-editorial-layout">
-          {featuredEvent && (
-            <>
-              <h3 className="section-eyebrow featured-section-title">Prossimo Evento</h3>
-              <article className="event-feature-story">
-                <div className="event-date-tile">
-                  <strong>{formatDay(featuredEvent.dateTime)}</strong>
-                  <span>{formatDateTime(featuredEvent.dateTime)}</span>
-                </div>
-                <div>
-                  <div className="feature-badges" aria-label="Categoria evento">
-                    <span>{featuredEvent.category}</span>
-                  </div>
-                  <h2>{featuredEvent.title}</h2>
-                  <p>{featuredEvent.description || 'Nessuna descrizione disponibile.'}</p>
-                </div>
-              </article>
-            </>
+      {!isLoading && !error && hasInterests && filteredEvents.length > 0 && (
+        <section className="preference-section" aria-label="Eventi consigliati per te">
+          <div className="preference-section-header">
+            <div>
+              <span className="section-eyebrow">Consigliati per te</span>
+              <h2>Eventi consigliati per te <span className="section-count">{recommendedEvents.length}</span></h2>
+            </div>
+          </div>
+
+          {recommendedEvents.length === 0 && (
+            <div className="preference-empty-state">
+              Nessun evento consigliato corrisponde ai filtri attuali. Puoi comunque esplorare gli altri eventi qui sotto.
+            </div>
           )}
 
-          <aside className="event-timeline-panel">
-            <span className="section-eyebrow">Timeline</span>
-            <ol className="event-timeline-grouped">
-              {timelineByDay.map(([day, evs]) => (
-                <li key={day} className="event-timeline-day">
-                  <time>{day !== 'unknown' ? formatDay(day) : 'Data da definire'}</time>
-                  <ul>
-                    {evs.map((event) => (
-                      <li key={event.id}>{event.title}</li>
-                    ))}
-                  </ul>
-                </li>
-              ))}
-            </ol>
-          </aside>
+          {recommendedEvents.length > 0 && upcomingVisible.length === 0 && (
+            <div className="preference-empty-state">
+              Nessun evento consigliato in programma con questi filtri.
+            </div>
+          )}
 
-          <div className="event-card-strip">
-            {upcomingVisible.map((event) => renderEventCard(event, 'event-explorer-card'))}
+          {upcomingVisible.length > 0 && (
+            <div className="event-editorial-layout">
+              {featuredEvent && (
+                <>
+                  <h3 className="section-eyebrow featured-section-title">Prossimo Evento</h3>
+                  <article className="event-feature-story">
+                    <div className="event-date-tile">
+                      <strong>{formatDay(featuredEvent.dateTime)}</strong>
+                      <span>{formatDateTime(featuredEvent.dateTime)}</span>
+                    </div>
+                    <div>
+                      <div className="feature-badges" aria-label="Categoria evento">
+                        <span>{featuredEvent.category}</span>
+                      </div>
+                      <h2>{featuredEvent.title}</h2>
+                      <p>{featuredEvent.description || 'Nessuna descrizione disponibile.'}</p>
+                    </div>
+                  </article>
+                </>
+              )}
+
+              <aside className="event-timeline-panel">
+                <span className="section-eyebrow">Timeline</span>
+                <ol className="event-timeline-grouped">
+                  {timelineByDay.map(([day, evs]) => (
+                    <li key={day} className="event-timeline-day">
+                      <time>{day !== 'unknown' ? formatDay(day) : 'Data da definire'}</time>
+                      <ul>
+                        {evs.map((event) => (
+                          <li key={event.id}>{event.title}</li>
+                        ))}
+                      </ul>
+                    </li>
+                  ))}
+                </ol>
+              </aside>
+
+              <div className="event-card-strip">
+                {upcomingVisible.map((event) => renderEventCard(event, 'event-explorer-card'))}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {!isLoading && !error && !hasInterests && upcomingVisible.length > 0 && (
+        <section className="preference-section" aria-label="Eventi in evidenza">
+          <div className="preference-section-header">
+            <div>
+              <span className="section-eyebrow">In evidenza</span>
+              <h2>Eventi in evidenza <span className="section-count">{upcomingVisible.length}</span></h2>
+            </div>
           </div>
-        </div>
+
+          <div className="event-editorial-layout">
+            {featuredEvent && (
+              <>
+                <h3 className="section-eyebrow featured-section-title">Prossimo Evento</h3>
+                <article className="event-feature-story">
+                  <div className="event-date-tile">
+                    <strong>{formatDay(featuredEvent.dateTime)}</strong>
+                    <span>{formatDateTime(featuredEvent.dateTime)}</span>
+                  </div>
+                  <div>
+                    <div className="feature-badges" aria-label="Categoria evento">
+                      <span>{featuredEvent.category}</span>
+                    </div>
+                    <h2>{featuredEvent.title}</h2>
+                    <p>{featuredEvent.description || 'Nessuna descrizione disponibile.'}</p>
+                  </div>
+                </article>
+              </>
+            )}
+
+            <aside className="event-timeline-panel">
+              <span className="section-eyebrow">Timeline</span>
+              <ol className="event-timeline-grouped">
+                {timelineByDay.map(([day, evs]) => (
+                  <li key={day} className="event-timeline-day">
+                    <time>{day !== 'unknown' ? formatDay(day) : 'Data da definire'}</time>
+                    <ul>
+                      {evs.map((event) => (
+                        <li key={event.id}>{event.title}</li>
+                      ))}
+                    </ul>
+                  </li>
+                ))}
+              </ol>
+            </aside>
+
+            <div className="event-card-strip">
+              {upcomingVisible.map((event) => renderEventCard(event, 'event-explorer-card'))}
+            </div>
+          </div>
+        </section>
       )}
 
       {/* Eventi passati - collassabili */}
@@ -471,6 +644,20 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
               {pastVisible.map((event) => renderEventCard(event, 'event-explorer-card'))}
             </div>
           )}
+        </section>
+      )}
+
+      {!isLoading && !error && hasInterests && otherFilteredEvents.length > 0 && (
+        <section className="preference-section preference-section-secondary" aria-label="Altri eventi">
+          <div className="preference-section-header">
+            <div>
+              <span className="section-eyebrow">Scopri ancora</span>
+              <h2>Altri eventi <span className="section-count">{otherFilteredEvents.length}</span></h2>
+            </div>
+          </div>
+          <div className="event-card-strip">
+            {otherFilteredEvents.map((event) => renderEventCard(event, 'event-explorer-card'))}
+          </div>
         </section>
       )}
 

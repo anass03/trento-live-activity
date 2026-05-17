@@ -11,7 +11,7 @@ __pycache__/
 
 #Claude Code - personal files (each colaborator has its own local preferences)
 CLAUDE.local.md
-.claude/settings.local.json
+.claude/
 
 #Build
 dist/

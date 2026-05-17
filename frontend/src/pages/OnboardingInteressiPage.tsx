@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { completeOnboarding, getMe, getSuggestedInterests, isPlaceholderBirthdate } from '../lib/api';
+import { completeOnboarding, getSuggestedInterests } from '../lib/api';
 
 const INTERESSI: Array<{ key: string; label: string; emoji: string; description: string }> = [
   { key: 'sport', label: 'Sport', emoji: '⚽', description: 'Calcetto, running, padel…' },
@@ -17,40 +17,13 @@ const INTERESSI: Array<{ key: string; label: string; emoji: string; description:
 const labelFor = (key: string) =>
   INTERESSI.find((i) => i.key === key)?.label ?? key.charAt(0).toUpperCase() + key.slice(1);
 
-// Calcolo età locale per dare feedback immediato all'utente prima di chiamare
-// il backend. Il check definitivo resta lato server (auth.service:calcAge).
-function ageFromIso(iso: string): number {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return NaN;
-  const t = new Date();
-  let age = t.getFullYear() - d.getFullYear();
-  const m = t.getMonth() - d.getMonth();
-  if (m < 0 || (m === 0 && t.getDate() < d.getDate())) age -= 1;
-  return age;
-}
-
 export function OnboardingInteressiPage() {
   const navigate = useNavigate();
   const [selected, setSelected] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [needsBirthdate, setNeedsBirthdate] = useState(false);
-  const [birthdate, setBirthdate] = useState('');
   const suggestionTimer = useRef<number | null>(null);
-
-  // Determina se mostrare il campo data: se l'utente è arrivato qui con il
-  // placeholder (es. signup Google senza birthday su Google) deve fornirla
-  // ora per superare il check >=13 anni del GDPR.
-  useEffect(() => {
-    getMe()
-      .then((me) => {
-        if (me.profile?.kind === 'cittadino' && isPlaceholderBirthdate(me.profile.dataNascita)) {
-          setNeedsBirthdate(true);
-        }
-      })
-      .catch(() => { /* best effort: se getMe fallisce, l'errore arriverà sul submit */ });
-  }, []);
 
   const toggle = (key: string) =>
     setSelected((prev) => (prev.includes(key) ? prev.filter((p) => p !== key) : [...prev, key]));
@@ -68,27 +41,10 @@ export function OnboardingInteressiPage() {
 
   async function handleSave(skip: boolean) {
     setError(null);
-    // Pre-validation lato client: feedback immediato senza round-trip.
-    if (needsBirthdate) {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(birthdate)) {
-        setError('Inserisci la tua data di nascita per continuare.');
-        return;
-      }
-      const age = ageFromIso(birthdate);
-      if (Number.isNaN(age) || age < 13) {
-        setError('Devi avere almeno 13 anni per usare il servizio (GDPR art. 8).');
-        return;
-      }
-      if (age > 120) {
-        setError('Data di nascita non valida.');
-        return;
-      }
-    }
     setSaving(true);
     try {
       await completeOnboarding({
         interessi: skip ? [] : selected,
-        ...(needsBirthdate ? { dataNascita: birthdate } : {}),
       });
       window.dispatchEvent(new CustomEvent('tla:user-updated'));
       navigate('/');
@@ -101,54 +57,44 @@ export function OnboardingInteressiPage() {
 
   return (
     <section className="auth-page onboarding-page">
-      <div className="auth-form liquid-card onboarding-card">
+      <div className="liquid-card onboarding-card" aria-labelledby="onboarding-title">
         <header className="onboarding-header">
           <span className="section-eyebrow">Benvenutə in Trento Live Activity</span>
-          <h1>I tuoi interessi</h1>
-          <p>Scegline qualcuno per ricevere notifiche e suggerimenti su misura. Potrai modificarli dal profilo in qualsiasi momento.</p>
+          <h1 id="onboarding-title">I tuoi interessi</h1>
+          <p>Scegli qualche tema: useremo queste preferenze per notifiche e suggerimenti su misura. Puoi modificarle dal profilo in qualsiasi momento.</p>
         </header>
 
-        {needsBirthdate && (
-          <div className="auth-form" style={{ padding: 0, marginBottom: 16 }}>
-            <label>
-              <span>Data di nascita <strong style={{ color: '#d33' }}>*</strong></span>
-              <input
-                type="date"
-                value={birthdate}
-                onChange={(e) => setBirthdate(e.target.value)}
-                max={new Date().toISOString().slice(0, 10)}
-                required
-              />
-            </label>
-            <p className="muted-copy" style={{ fontSize: 12, margin: '4px 0 0' }}>
-              Obbligatoria per legge (GDPR art. 8): il servizio è riservato ai maggiori di 13 anni.
-            </p>
+        <section className="onboarding-interest-section" aria-labelledby="interest-selection-title">
+          <div className="onboarding-section-copy">
+            <h2 id="interest-selection-title">Scegli cosa vuoi seguire</h2>
+            <p>Le selezioni aiutano a dare priorità alle attività più rilevanti per te.</p>
           </div>
-        )}
 
-        <div className="onboarding-grid">
-          {INTERESSI.map((item) => {
-            const active = selected.includes(item.key);
-            return (
-              <button
-                key={item.key}
-                type="button"
-                className={`onboarding-tile ${active ? 'active' : ''}`}
-                onClick={() => toggle(item.key)}
-                aria-pressed={active}
-              >
-                <span className="onboarding-emoji" aria-hidden="true">{item.emoji}</span>
-                <strong>{item.label}</strong>
-                <small>{item.description}</small>
-              </button>
-            );
-          })}
-        </div>
+          <div className="onboarding-grid">
+            {INTERESSI.map((item) => {
+              const active = selected.includes(item.key);
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  className={`onboarding-tile ${active ? 'active' : ''}`}
+                  onClick={() => toggle(item.key)}
+                  aria-pressed={active}
+                >
+                  <span className="onboarding-tile-check" aria-hidden="true">✓</span>
+                  <span className="onboarding-emoji" aria-hidden="true">{item.emoji}</span>
+                  <strong>{item.label}</strong>
+                  <small>{item.description}</small>
+                </button>
+              );
+            })}
+          </div>
+        </section>
 
         {suggestions.length > 0 && (
           <div className="onboarding-suggestions">
             <strong>Anche utenti come te seguono:</strong>
-            <div>
+            <div className="onboarding-suggestion-list">
               {suggestions.map((s) => (
                 <button
                   type="button"
@@ -157,20 +103,20 @@ export function OnboardingInteressiPage() {
                   onClick={() => toggle(s)}
                   aria-pressed={selected.includes(s)}
                 >
-                  + {labelFor(s)}
+                  {labelFor(s)}
                 </button>
               ))}
             </div>
           </div>
         )}
 
-        {error && <div className="form-error">{error}</div>}
+        {error && <div className="form-error onboarding-error" role="alert">{error}</div>}
 
         <div className="filter-actions onboarding-actions">
           <button
             type="button"
             className="primary-button"
-            disabled={saving || selected.length === 0 || (needsBirthdate && !birthdate)}
+            disabled={saving || selected.length === 0}
             onClick={() => handleSave(false)}
           >
             {saving ? 'Salvataggio…' : `Continua${selected.length ? ` (${selected.length})` : ''}`}
@@ -178,7 +124,7 @@ export function OnboardingInteressiPage() {
           <button
             type="button"
             className="ghost-button"
-            disabled={saving || (needsBirthdate && !birthdate)}
+            disabled={saving}
             onClick={() => handleSave(true)}
           >
             Salta per ora
