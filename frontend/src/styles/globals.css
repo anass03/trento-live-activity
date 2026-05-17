@@ -333,6 +333,7 @@ textarea:focus-visible {
 .compact-button,
 .filter-actions button,
 .stats-table button,
+.moderation-card-actions button,
 .link-button {
   min-height: 38px;
   border-radius: 999px;
@@ -369,6 +370,7 @@ textarea:focus-visible {
 .ghost-button:hover,
 .filter-actions button:hover,
 .stats-table button:hover,
+.moderation-card-actions button:hover,
 .link-button:hover {
   color: var(--color-text-primary);
   background: var(--color-bg-muted);
