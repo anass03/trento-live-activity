@@ -6,14 +6,15 @@
 importScripts('https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-compat.js');
 
-// These values are public client identifiers (same as the main app config).
+// Configure these values to match your Firebase project.
+// See frontend/.env.example for the corresponding environment variables.
 firebase.initializeApp({
-  apiKey: 'AIzaSyA82T8bcjKHDNL3R18HUX0ZsJXqRIpVkC4',
-  authDomain: 'trento-live-activity.firebaseapp.com',
-  projectId: 'trento-live-activity',
-  storageBucket: 'trento-live-activity.firebasestorage.app',
-  messagingSenderId: '21691364418',
-  appId: '1:21691364418:web:27ad00e05713be19a929db',
+  apiKey:            '<VITE_FIREBASE_API_KEY>',
+  authDomain:        '<VITE_FIREBASE_AUTH_DOMAIN>',
+  projectId:         '<VITE_FIREBASE_PROJECT_ID>',
+  storageBucket:     '<VITE_FIREBASE_STORAGE_BUCKET>',
+  messagingSenderId: '<VITE_FIREBASE_MESSAGING_SENDER_ID>',
+  appId:             '<VITE_FIREBASE_APP_ID>',
 });
 
 const messaging = firebase.messaging();
