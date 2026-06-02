@@ -220,6 +220,41 @@ async function sendNewEventToInterested(eventId, categoria, titolo) {
   });
 }
 
+// ── Admin broadcast (manual push from the admin panel) ──────────────────
+const ROLE_BY_AUDIENCE = {
+  cittadini: 'UtenteRegistrato',
+  enti: 'EnteCertificato',
+  comunali: 'AmministratoreComunale',
+};
+
+// Send a manual notification to a whole audience. audience='all' targets every
+// registered device token; otherwise only tokens belonging to users of that role.
+async function sendBroadcast({ title, body, audience = 'all' }) {
+  const where = {};
+  if (audience !== 'all') {
+    const role = ROLE_BY_AUDIENCE[audience];
+    const users = await User.findAll({ where: { ruolo: role }, attributes: ['id'] });
+    if (users.length === 0) return { tokensTargeted: 0, audience };
+    where.userId = { [Op.in]: users.map((u) => u.id) };
+  }
+  const rows = await DeviceToken.findAll({ where, attributes: ['token'] });
+  const tokens = rows.map((r) => r.token);
+  await sendToTokens(tokens, { title, body, data: { type: 'broadcast' } });
+  return { tokensTargeted: tokens.length, audience };
+}
+
+// Reach stats for the admin dashboard: how many devices/users we can target.
+async function getTokenStats() {
+  const rows = await DeviceToken.findAll({ attributes: ['platform', 'userId'] });
+  const byPlatform = {};
+  const users = new Set();
+  for (const r of rows) {
+    byPlatform[r.platform] = (byPlatform[r.platform] || 0) + 1;
+    users.add(r.userId);
+  }
+  return { totalTokens: rows.length, usersReachable: users.size, byPlatform };
+}
+
 // Eager init at module load so configuration problems surface at startup
 // instead of waiting for the first push trigger.
 init();
@@ -232,6 +267,8 @@ module.exports = {
   sendActivityUpdated,
   sendParticipantLeft,
   sendReportOutcome,
+  sendBroadcast,
+  getTokenStats,
   // exposed for tests / admin debug
   sendToTokens,
   sendToUsers,

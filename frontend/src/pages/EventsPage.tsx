@@ -8,6 +8,7 @@ import {
 } from '../lib/api';
 import { CalendarButton } from '../components/ui/CalendarButton';
 import { GeocodedLocation } from '../components/ui/GeocodedLocation';
+import { useAutoRefresh } from '../lib/useAutoRefresh';
 import type { AppUser } from '../data/mockUser';
 
 function formatDateTime(value: string | null) {
@@ -95,19 +96,20 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
   const canReport = isLoggedIn && user?.role !== 'certified_entity';
   const hasInterests = userInterests.length > 0;
 
-  async function loadEvents() {
-    setIsLoading(true);
-    setError(null);
+  // silent=true: refresh automatico senza spinner (evita il flicker della lista).
+  async function loadEvents(silent = false) {
+    if (!silent) { setIsLoading(true); setError(null); }
     try {
       setEvents(await getEvents());
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Errore nel caricamento degli eventi.');
+      if (!silent) setError(e instanceof Error ? e.message : 'Errore nel caricamento degli eventi.');
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }
 
   useEffect(() => { void loadEvents(); }, []);
+  useAutoRefresh(() => loadEvents(true), 30_000);
 
   // Auto-open popup when navigating from the map with ?open=<id>
   useEffect(() => {
@@ -329,7 +331,7 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
       {error && (
         <div className="state-panel liquid-panel">
           <p>{error}</p>
-          <button onClick={loadEvents} type="button">Riprova</button>
+          <button onClick={() => loadEvents()} type="button">Riprova</button>
         </div>
       )}
       {!isLoading && !error && recommendedEvents.length === 0 && otherFilteredEvents.length === 0 && (
@@ -402,7 +404,7 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
             <button className={timeFilter === 'today' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('today')}>Oggi</button>
             <button className={timeFilter === 'weekend' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('weekend')}>Weekend</button>
           </div>
-          <button className="refresh-button" onClick={loadEvents} type="button">Aggiorna</button>
+          {isLoading && <span className="muted-copy auto-refresh-hint">Aggiornamento…</span>}
         </header>
 
         {stateContent}
@@ -495,7 +497,7 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
           <button className={timeFilter === 'today' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('today')}>Oggi</button>
           <button className={timeFilter === 'weekend' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('weekend')}>Weekend</button>
         </div>
-        <button className="refresh-button" onClick={loadEvents} type="button">Aggiorna</button>
+        {isLoading && <span className="muted-copy auto-refresh-hint">Aggiornamento…</span>}
       </header>
 
       {stateContent}

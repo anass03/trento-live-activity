@@ -6,6 +6,7 @@ const {
 } = require('../data/models');
 const { authenticate, authorize } = require('../middleware/auth');
 const { sendEntityApproved, sendEntityRejected } = require('../notifications/email.service');
+const logger = require('../lib/logger');
 
 //GET all pending entities
 router.get('/entities/pending', authenticate, authorize('AmministratoreDiSistema'), async (req, res, next) => {
@@ -26,6 +27,7 @@ router.patch('/entities/:id/approve', authenticate, authorize('AmministratoreDiS
         const entity = await User.findOne({ where: { id: req.params.id, ruolo: 'EnteCertificato' } });
         if (!entity) return res.status(404).json({ error: 'Entity not found', code: 'NOT FOUND' });
         await entity.update({ approvato: true });
+        logger.audit('entity.approve', { actorId: req.user?.id, entityId: entity.id, nomeEnte: entity.nomeEnte });
         sendEntityApproved(entity.email, entity.nomeEnte).catch(() => {});
         res.json({ message: 'Entity approved' });
     } catch (error) {
@@ -40,6 +42,7 @@ router.patch('/entities/:id/reject', authenticate, authorize('AmministratoreDiSi
         if (!entity) return res.status(404).json({ error: 'Entity not found', code: 'NOT_FOUND' });
         const { email, nomeEnte } = entity;
         await entity.destroy();
+        logger.audit('entity.reject', { actorId: req.user?.id, entityId: req.params.id, nomeEnte });
         sendEntityRejected(email, nomeEnte).catch(() => {});
         res.json({ message: 'Entity rejected and deleted' });
     } catch (error) {
@@ -177,7 +180,9 @@ router.delete('/users/:id', authenticate, authorize('AmministratoreDiSistema'), 
         await Participation.destroy({ where: { userId: user.id } });
 
         // DeviceToken, Consent e i profili 1:1 sono CASCADE: user.destroy() li elimina.
+        const { email: deletedEmail, ruolo: deletedRuolo } = user;
         await user.destroy();
+        logger.audit('user.delete', { actorId: req.user?.id, targetId: req.params.id, targetEmail: deletedEmail, targetRuolo: deletedRuolo });
         res.status(204).send();
     } catch (error) { next(error); }
 });

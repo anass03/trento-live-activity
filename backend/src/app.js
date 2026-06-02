@@ -12,7 +12,9 @@ const dashboardRoutes = require('./dashboard/dashboard.routes');
 const adminRoutes = require('./admin/admin.routes');
 const notificationsRoutes = require('./notifications/notifications.routes');
 const aiRoutes = require('./ai/ai.routes');
+const parkingRoutes = require('./parking/parking.routes');
 const errorHandler = require('./middleware/errorHandler');
+const requestLogger = require('./middleware/requestLogger');
 
 const app = express();
 
@@ -39,6 +41,9 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json());
+
+// Structured access log (one JSON line per request, with latency + user id).
+app.use(requestLogger);
 
 // Rate limit globale (RNF / API Gateway): protegge da brute force, DoS, scraping
 // e abuso di endpoint costosi (es. AI suggester che consuma quota Gemini).
@@ -68,6 +73,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/parking', parkingRoutes);
 app.use(errorHandler);
 
 module.exports = app;

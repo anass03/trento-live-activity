@@ -1,5 +1,5 @@
 export type CrowdingStatus = 'green' | 'yellow' | 'orange' | 'red';
-export type MarkerType = 'poi' | 'activity' | 'event';
+export type MarkerType = 'poi' | 'activity' | 'event' | 'parking';
 export type UserRole = 'anonymous' | 'registered_user' | 'certified_entity' | 'municipal_admin' | 'system_admin';
 
 export interface ApiEvent {
@@ -54,6 +54,9 @@ export interface MapMarker {
   category?: string | null;
   description?: string | null;
   dateTime?: string | null;
+  // Solo per i marker di tipo 'parking': posti liberi / totali.
+  free?: number | null;
+  total?: number | null;
 }
 
 export interface CurrentUser {
@@ -624,4 +627,44 @@ export function googleCalendarUrl(title: string, startIso: string, location?: st
   const start = toGoogleDate(startIso);
   const params = new URLSearchParams({ action: 'TEMPLATE', text: title, dates: `${start}/${start}`, location: location || '' });
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+// ============================== Parking (proxy Comune di Trento) ==============================
+
+export type CrowdingLevel = 'verde' | 'giallo' | 'rosso';
+export interface ParkingSpot {
+  id: string;
+  name: string;
+  type: 'car' | 'bike';
+  capacity: number;
+  free: number | null;
+  occupied: number | null;
+  occupancyPct: number | null;
+  status: CrowdingLevel;
+  latitude: number | null;
+  longitude: number | null;
+  address: string | null;
+  description: string | null;
+  link: string | null;
+  updatedAt: string | null;
+}
+export interface ParkingResponse { parkings: ParkingSpot[]; fetchedAt: string; }
+// Public — the backend proxies the Comune di Trento registry (avoids CORS).
+export function getParking(): Promise<ParkingResponse> {
+  return request('/api/parking', { auth: false });
+}
+
+// ============================== Admin: push notifications ==============================
+
+export type PushAudience = 'all' | 'cittadini' | 'enti' | 'comunali';
+export interface PushStats {
+  totalTokens: number;
+  usersReachable: number;
+  byPlatform: Record<string, number>;
+}
+export function getPushStats(): Promise<PushStats> {
+  return request('/api/notifications/admin/stats');
+}
+export function sendAdminBroadcast(payload: { title: string; body: string; audience: PushAudience }): Promise<{ tokensTargeted: number; audience: PushAudience }> {
+  return request('/api/notifications/admin/broadcast', { method: 'POST', body: payload });
 }

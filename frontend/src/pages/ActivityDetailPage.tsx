@@ -18,7 +18,9 @@ export function ActivityDetailPage({ user }: { user?: AppUser }) {
   const [joinMsg, setJoinMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [joining, setJoining] = useState(false);
   const [cancelling, setCancelling] = useState(false);
-  const isLoggedIn = !!getToken() && user?.role !== 'anonymous';
+  // Solo i cittadini registrati possono partecipare: gli amministratori no
+  // (il backend già blocca le API, qui nascondiamo i controlli).
+  const canParticipate = !!getToken() && user?.role === 'registered_user';
 
   async function loadActivity() {
     if (!id) return;
@@ -109,7 +111,7 @@ export function ActivityDetailPage({ user }: { user?: AppUser }) {
               label="Aggiungi al calendario"
             />
           )}
-          {isLoggedIn && activity.status === 'attiva' && (
+          {canParticipate && activity.status === 'attiva' && (
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               {isCreator ? (
                 <button className="danger-button" onClick={handleCancelActivity} disabled={cancelling}>
