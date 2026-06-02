@@ -34,4 +34,5 @@ export const adminNav: NavItem[] = [
   { label: 'Utenti', path: '/admin/utenti', roles: ['system_admin'] },
   { label: 'Richieste enti', path: '/admin/enti/richieste', roles: ['system_admin'] },
   { label: 'Moderazione', path: '/admin/moderazione', roles: ['system_admin'] },
+  { label: 'Notifiche push', path: '/admin/notifiche', roles: ['system_admin'] },
 ];

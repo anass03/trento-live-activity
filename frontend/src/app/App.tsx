@@ -7,6 +7,7 @@ import { ActivitiesPage } from '../pages/ActivitiesPage';
 import { ActivityDetailPage } from '../pages/ActivityDetailPage';
 import { AdminEntitiesPage } from '../pages/AdminEntitiesPage';
 import { AdminModerationPage } from '../pages/AdminModerationPage';
+import { AdminNotificationsPage } from '../pages/AdminNotificationsPage';
 import { AdminPOIPage } from '../pages/AdminPOIPage';
 import { AdminUsersPage } from '../pages/AdminUsersPage';
 import { ComuneDashboardPage } from '../pages/ComuneDashboardPage';
@@ -101,6 +102,7 @@ export function App() {
         <Route path="/admin/utenti" element={<AdminUsersPage />} />
         <Route path="/admin/enti/richieste" element={<AdminEntitiesPage />} />
         <Route path="/admin/moderazione" element={<AdminModerationPage />} />
+        <Route path="/admin/notifiche" element={<AdminNotificationsPage />} />
 
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/termini" element={<TermsPage />} />

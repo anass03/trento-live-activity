@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MapCanvas } from '../components/map/MapCanvas';
-import { getMapMarkers, type MapMarker, type MarkerType } from '../lib/api';
+import { getMapMarkers, getParking, type MapMarker, type MarkerType, type ParkingSpot } from '../lib/api';
 import { listFavorites } from '../lib/favorites';
 import { fetchWeather, type WeatherMood, type WeatherSnapshot } from '../lib/weather';
+import { useAutoRefresh } from '../lib/useAutoRefresh';
 import type { AppUser } from '../data/mockUser';
 
 type Filter = 'all' | 'preferred' | 'favorites' | MarkerType;
@@ -15,6 +16,7 @@ const filterLabelsBase: Array<{ label: string; value: Filter }> = [
   { label: 'Attività', value: 'activity' },
   { label: 'Eventi', value: 'event' },
   { label: 'POI', value: 'poi' },
+  { label: 'Parcheggi', value: 'parking' },
 ];
 
 const weatherMoodLabel: Record<WeatherMood, string> = {
@@ -26,6 +28,12 @@ const weatherMoodLabel: Record<WeatherMood, string> = {
 };
 
 const TRENTO: [number, number] = [46.0679, 11.1211];
+
+const PARKING_STATUS: Record<string, { label: string; color: string }> = {
+  verde: { label: 'Libero', color: 'var(--color-success)' },
+  giallo: { label: 'Quasi pieno', color: 'var(--color-warning)' },
+  rosso: { label: 'Pieno', color: 'var(--color-danger)' },
+};
 
 function haversineKm(a: [number, number], b: [number, number]): number {
   const toRad = (d: number) => (d * Math.PI) / 180;
@@ -65,8 +73,16 @@ function formatTime(value?: string | null) {
 function markerTypeLabel(type: MarkerType) {
   if (type === 'activity') return 'Attività';
   if (type === 'event') return 'Evento';
+  if (type === 'parking') return 'Parcheggio';
   return 'POI';
 }
+
+// Stato affollamento (verde/giallo/rosso) → colore/livello dei marker mappa,
+// così il colore sulla mappa combacia col pallino del widget.
+const PARKING_CROWD_STATUS: Record<string, MapMarker['crowdingStatus']> = {
+  verde: 'green', giallo: 'yellow', rosso: 'red',
+};
+const PARKING_CROWD_LEVEL: Record<string, number> = { verde: 18, giallo: 45, rosso: 92 };
 
 function crowdLevel(marker: MapMarker) {
   if (Number.isFinite(marker.crowdLevel)) return marker.crowdLevel;
@@ -94,29 +110,46 @@ export function MapPage({ user }: { user?: AppUser }) {
   const [geoError, setGeoError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
+  const [parking, setParking] = useState<ParkingSpot[]>([]);
   const hasInterests = Array.isArray(user?.interessi) && (user!.interessi!.length ?? 0) > 0;
 
-  async function loadMarkers() {
-    setIsLoading(true);
-    setNotice(null);
+  // silent=true (refresh automatico): non rimonta la mappa né mostra lo spinner.
+  async function loadMarkers(silent = false) {
+    if (!silent) { setIsLoading(true); setNotice(null); }
     try {
       setMarkers(await getMapMarkers());
     } catch (e) {
-      setMarkers([]);
-      setNotice(e instanceof Error ? e.message : 'Errore nel caricamento dati mappa.');
+      if (!silent) {
+        setMarkers([]);
+        setNotice(e instanceof Error ? e.message : 'Errore nel caricamento dati mappa.');
+      }
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
+  }
+
+  function loadParking() {
+    return getParking()
+      .then((res) => setParking(res.parkings))
+      .catch(() => { /* dati parcheggi opzionali: in errore mantieni i precedenti */ });
   }
 
   useEffect(() => {
     void loadMarkers();
+    void loadParking();
     void listFavorites().then(setFavorites);
     void fetchWeather().then(setWeather).catch(() => setWeather(null));
     const onFavChanged = () => { void listFavorites().then(setFavorites); };
     window.addEventListener('tla:favorites-changed', onFavChanged);
     return () => window.removeEventListener('tla:favorites-changed', onFavChanged);
   }, []);
+
+  // Aggiornamento automatico di mappa, parcheggi e meteo (niente pulsante manuale).
+  useAutoRefresh(() => {
+    void loadMarkers(true);
+    void loadParking();
+    void fetchWeather().then(setWeather).catch(() => { /* keep last */ });
+  }, 30_000);
 
   function handleNearMe() {
     if (!navigator.geolocation) { setGeoError('Geolocalizzazione non supportata dal browser'); return; }
@@ -154,9 +187,35 @@ export function MapPage({ user }: { user?: AppUser }) {
     }
   }, [isAdmin, filter]);
 
+  // Parcheggi → marker mappa: colore in base all'affollamento (occupancyPct),
+  // posti liberi/totali nel popup.
+  const parkingMarkers = useMemo<MapMarker[]>(
+    () => parking
+      .filter((p) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude))
+      .map((p) => ({
+        id: `parking-${p.id}`,
+        type: 'parking' as MarkerType,
+        title: p.name,
+        latitude: p.latitude as number,
+        longitude: p.longitude as number,
+        crowdLevel: PARKING_CROWD_LEVEL[p.status] ?? (p.occupancyPct ?? 0),
+        crowdingStatus: PARKING_CROWD_STATUS[p.status] ?? 'green',
+        isCertified: false,
+        sourceId: p.id,
+        category: p.type === 'bike' ? 'parcheggio bici' : 'parcheggio auto',
+        description: p.description || (p.type === 'bike' ? 'Posteggio bici' : 'Parcheggio auto'),
+        free: p.free,
+        total: p.capacity,
+      })),
+    [parking],
+  );
+
   const baseMarkers = useMemo(
-    () => (isEnte ? markers.filter((m) => m.type !== 'activity') : markers),
-    [isEnte, markers],
+    () => {
+      const base = isEnte ? markers.filter((m) => m.type !== 'activity') : markers;
+      return [...base, ...parkingMarkers];
+    },
+    [isEnte, markers, parkingMarkers],
   );
 
   const visibleMarkers = useMemo(() => {
@@ -269,6 +328,38 @@ export function MapPage({ user }: { user?: AppUser }) {
   ];
   const currentMood: WeatherMood = weather?.mood ?? 'cloudy';
 
+  // Parcheggi auto/bici (RF affollamento parcheggi) — proxy backend del Comune.
+  const parkingByType = useMemo(() => {
+    const byCrowd = (a: ParkingSpot, b: ParkingSpot) => (b.occupancyPct ?? 0) - (a.occupancyPct ?? 0);
+    return {
+      cars: parking.filter((p) => p.type === 'car').sort(byCrowd),
+      bikes: parking.filter((p) => p.type === 'bike').sort(byCrowd),
+    };
+  }, [parking]);
+
+  function renderParkingGroup(items: ParkingSpot[], title: string) {
+    if (items.length === 0) return null;
+    return (
+      <div className="parking-group">
+        <h3 className="parking-group-title">{title} <span className="section-count">{items.length}</span></h3>
+        <ul className="parking-list">
+          {items.map((p) => {
+            const st = PARKING_STATUS[p.status] ?? PARKING_STATUS.verde;
+            return (
+              <li key={p.id} className="parking-item" title={`${st.label} · ${p.occupancyPct ?? 0}% occupato`}>
+                <span className="parking-dot" style={{ background: st.color }} aria-hidden="true" />
+                <span className="parking-name">{p.name}</span>
+                <span className="parking-free" style={{ color: st.color }}>
+                  {p.free != null ? `${p.free} / ${p.capacity}` : `– / ${p.capacity}`}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    );
+  }
+
   return (
     <div className="page-frame home-page">
       <header className="home-control-row" aria-label="Controlli città">
@@ -332,7 +423,7 @@ export function MapPage({ user }: { user?: AppUser }) {
           {notice && (
             <aside className="map-notice" aria-live="polite">
               <span>{notice}</span>
-              <button onClick={loadMarkers} type="button">Riprova</button>
+              <button onClick={() => loadMarkers()} type="button">Riprova</button>
             </aside>
           )}
           {isLoading && <section className="state-panel liquid-panel">La città si sta aggiornando...</section>}
@@ -381,6 +472,22 @@ export function MapPage({ user }: { user?: AppUser }) {
                 </li>
               ))}
             </ol>
+          </section>
+
+          <section className="home-widget parking-widget">
+            <div className="widget-heading">
+              <span className="section-eyebrow">Parcheggi</span>
+              <strong>Disponibilità live</strong>
+              <small className="muted-copy">posti liberi / totali</small>
+            </div>
+            {parking.length === 0 ? (
+              <p className="muted-copy">Dati parcheggi non disponibili al momento.</p>
+            ) : (
+              <div className="parking-groups">
+                {renderParkingGroup(parkingByType.cars, '🚗 Auto')}
+                {renderParkingGroup(parkingByType.bikes, '🚲 Bici')}
+              </div>
+            )}
           </section>
         </aside>
       </section>

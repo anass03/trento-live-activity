@@ -1,7 +1,10 @@
 const { DeviceToken } = require('../data/models');
-const { sendToTokens } = require('./push.service');
+const push = require('./push.service');
+const { sendToTokens } = push;
+const logger = require('../lib/logger');
 
 const VALID_PLATFORMS = ['web', 'ios', 'android'];
+const VALID_AUDIENCES = ['all', 'cittadini', 'enti', 'comunali'];
 
 async function sendTestPush(userId) {
   const tokens = (await DeviceToken.findAll({ where: { userId }, attributes: ['token'] }))
@@ -44,4 +47,30 @@ async function unregisterDeviceToken(userId, token) {
   await DeviceToken.destroy({ where: { userId, token } });
 }
 
-module.exports = { registerDeviceToken, unregisterDeviceToken, sendTestPush };
+// ── Admin: manual broadcast + reach stats ───────────────────────────────
+async function broadcast(actorId, { title, body, audience }) {
+  if (!title || !String(title).trim()) {
+    throw { status: 400, code: 'MISSING_TITLE', error: 'Il titolo è obbligatorio.' };
+  }
+  if (!body || !String(body).trim()) {
+    throw { status: 400, code: 'MISSING_BODY', error: 'Il messaggio è obbligatorio.' };
+  }
+  const aud = audience || 'all';
+  if (!VALID_AUDIENCES.includes(aud)) {
+    throw { status: 400, code: 'INVALID_AUDIENCE', error: `audience deve essere uno di: ${VALID_AUDIENCES.join(', ')}` };
+  }
+  const result = await push.sendBroadcast({ title: String(title).trim(), body: String(body).trim(), audience: aud });
+  logger.audit('notification.broadcast', {
+    actorId,
+    audience: aud,
+    tokensTargeted: result.tokensTargeted,
+    title: String(title).trim(),
+  });
+  return result;
+}
+
+async function getStats() {
+  return push.getTokenStats();
+}
+
+module.exports = { registerDeviceToken, unregisterDeviceToken, sendTestPush, broadcast, getStats };

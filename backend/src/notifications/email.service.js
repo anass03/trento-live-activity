@@ -25,6 +25,10 @@ function getTransporter() {
     host,
     port: Number(process.env.SMTP_PORT) || 587,
     auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    // Render free tier non supporta IPv6 outbound: Node sceglierebbe IPv6
+    // dal DNS Google (smtp.gmail.com risolve sia AAAA che A) e fallirebbe
+    // con `connect ENETUNREACH 2a00:1450:...`. family:4 forza socket IPv4.
+    family: 4,
   });
   return transporter;
 }
