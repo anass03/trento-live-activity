@@ -1,6 +1,7 @@
 const service = require('./map.service');
 const { assertUuid } = require('../data/presenters');
 const { reverseGeocode } = require('../lib/geocode');
+const logger = require('../lib/logger');
 
 async function getMap(req, res, next) {
   try { res.json(await service.getMapData()); } catch (e) { next(e); }
@@ -18,13 +19,19 @@ async function getPOI(req, res, next) {
 }
 
 async function createPOI(req, res, next) {
-  try { res.status(201).json(await service.createPOI(req.body)); } catch (e) { next(e); }
+  try {
+    const poi = await service.createPOI(req.body);
+    logger.audit('poi.create', { actorId: req.user?.id, poiId: poi.id, nome: poi.nome });
+    res.status(201).json(poi);
+  } catch (e) { next(e); }
 }
 
 async function updatePOI(req, res, next) {
   try {
     assertUuid(req.params.id, 'POI id');
-    res.json(await service.updatePOI(req.params.id, req.body));
+    const poi = await service.updatePOI(req.params.id, req.body);
+    logger.audit('poi.update', { actorId: req.user?.id, poiId: req.params.id });
+    res.json(poi);
   } catch (e) { next(e); }
 }
 
@@ -32,6 +39,7 @@ async function deletePOI(req, res, next) {
   try {
     assertUuid(req.params.id, 'POI id');
     await service.deletePOI(req.params.id);
+    logger.audit('poi.delete', { actorId: req.user?.id, poiId: req.params.id });
     res.status(204).send();
   } catch (e) { next(e); }
 }
