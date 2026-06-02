@@ -1,5 +1,5 @@
 export type CrowdingStatus = 'green' | 'yellow' | 'orange' | 'red';
-export type MarkerType = 'poi' | 'activity' | 'event';
+export type MarkerType = 'poi' | 'activity' | 'event' | 'parking';
 export type UserRole = 'anonymous' | 'registered_user' | 'certified_entity' | 'municipal_admin' | 'system_admin';
 
 export interface ApiEvent {
@@ -54,6 +54,9 @@ export interface MapMarker {
   category?: string | null;
   description?: string | null;
   dateTime?: string | null;
+  // Solo per i marker di tipo 'parking': posti liberi / totali.
+  free?: number | null;
+  total?: number | null;
 }
 
 export interface CurrentUser {

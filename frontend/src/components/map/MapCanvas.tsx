@@ -27,6 +27,7 @@ const typeLabel: Record<MarkerType, string> = {
   poi: 'POI',
   activity: 'Attività',
   event: 'Evento',
+  parking: 'Parcheggio',
 };
 
 const crowdLabel: Record<CrowdingStatus, string> = {
@@ -54,6 +55,9 @@ type MarkerProperties = {
   category: string;
   description: string;
   dateTime: string;
+  // Parcheggi: posti liberi/totali (-1 = non applicabile).
+  free: number;
+  total: number;
 };
 
 type MarkerFeatureCollection = {
@@ -127,6 +131,8 @@ function markerCollection(markers: MapMarker[]): MarkerFeatureCollection {
             category: marker.category || typeLabel[marker.type],
             description: marker.description || 'Informazione disponibile sulla mappa cittadina.',
             dateTime: marker.dateTime || '',
+            free: marker.free ?? -1,
+            total: marker.total ?? -1,
           },
           geometry: {
             type: 'Point',
@@ -602,7 +608,7 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
 
           if (current?.locked && current.props.id === props.id) {
             // Already locked on this marker → navigate on single click
-            if (props.type !== 'poi') {
+            if (props.type === 'activity' || props.type === 'event') {
               navigateRef.current(
                 `/${props.type === 'event' ? 'eventi' : 'attivita'}?open=${encodeURIComponent(props.id)}`,
               );
@@ -627,7 +633,7 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
         const feature = event.features?.[0];
         if (!feature) return;
         const props = feature.properties as MarkerProperties;
-        if (props.type !== 'poi') {
+        if (props.type === 'activity' || props.type === 'event') {
           navigateRef.current(
             `/${props.type === 'event' ? 'eventi' : 'attivita'}?open=${encodeURIComponent(props.id)}`,
           );
@@ -717,7 +723,7 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
     return () => document.removeEventListener('fullscreenchange', syncPortalTarget);
   }, []);
 
-  const canNavigate = popup && popup.props.type !== 'poi';
+  const canNavigate = !!popup && (popup.props.type === 'activity' || popup.props.type === 'event');
 
   return (
     <section ref={sectionRef} className="map-area map-area-3d" aria-label="Map Zone 3D" data-testid="map-zone">
@@ -756,6 +762,15 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
 
             <dl>
               <div><dt>Categoria</dt><dd>{popup.props.category}</dd></div>
+              {popup.props.type === 'parking' && popup.props.total >= 0 && (
+                <div>
+                  <dt>Posti liberi</dt>
+                  <dd>
+                    <strong className={`crowd-${popup.props.crowdingStatus}`}>{popup.props.free}</strong>
+                    {' / '}{popup.props.total}
+                  </dd>
+                </div>
+              )}
               {popup.props.dateTime && (
                 <div><dt>Quando</dt><dd>{formatDateTime(popup.props.dateTime)}</dd></div>
               )}
@@ -766,7 +781,7 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
             )}
 
             <div className="map-popup-actions">
-              {isLoggedIn && (
+              {isLoggedIn && popup.props.type !== 'parking' && (
                 <FavoriteButton
                   markerType={popup.props.type}
                   markerId={popup.props.type === 'poi' ? popup.props.sourceId : popup.props.id}
