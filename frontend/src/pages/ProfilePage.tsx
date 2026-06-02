@@ -486,7 +486,7 @@ export function ProfilePage() {
 
         <div className="profile-col">
           {/* ── Notifiche: una sola stato chiaro ── */}
-          {(isCittadino || isEnte) && (() => {
+          {(isCittadino || isEnte || isComunale || isSistema) && (() => {
             // Stato unificato: l'utente vede UNA situazione, non 3 righe contraddittorie.
             const browserBlocked = 'Notification' in window && Notification.permission === 'denied';
             const consentDenied = notifSummary.notif_push === false;
@@ -537,6 +537,13 @@ export function ProfilePage() {
                   Gestisci tutte le preferenze in{' '}
                   <a href="/impostazioni">Impostazioni</a>.
                 </p>
+
+                {isSistema && (
+                  <p className="muted-copy" style={{ fontSize: 12, margin: '8px 0 0' }}>
+                    📣 Invio notifiche a tutti gli utenti:{' '}
+                    <a href="/admin/notifiche">Gestione e invio notifiche push</a>.
+                  </p>
+                )}
               </div>
             );
           })()}
