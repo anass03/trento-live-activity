@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { approveEntity, getPendingEntities, rejectEntity, type PendingEntity } from '../lib/api';
+import { useAutoRefresh } from '../lib/useAutoRefresh';
 
 export function AdminEntitiesPage() {
   const [entities, setEntities] = useState<PendingEntity[]>([]);
@@ -7,14 +8,15 @@ export function AdminEntitiesPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  function load() {
-    setIsLoading(true);
+  function load(silent = false) {
+    if (!silent) setIsLoading(true);
     getPendingEntities()
       .then(setEntities)
-      .catch((e) => setError(e.message))
-      .finally(() => setIsLoading(false));
+      .catch((e) => { if (!silent) setError(e.message); })
+      .finally(() => { if (!silent) setIsLoading(false); });
   }
-  useEffect(load, []);
+  useEffect(() => { load(); }, []);
+  useAutoRefresh(() => load(true), 30_000);
 
   async function handleApprove(id: string) {
     try { await approveEntity(id); setMessage('Ente approvato'); load(); }
@@ -33,9 +35,7 @@ export function AdminEntitiesPage() {
           <h1>Richieste di registrazione enti certificati</h1>
           <p>Approva o rifiuta i nuovi enti che richiedono la verifica</p>
         </div>
-        <button type="button" className="refresh-button" onClick={load} disabled={isLoading}>
-          {isLoading ? 'Aggiornamento…' : 'Aggiorna'}
-        </button>
+        {isLoading && <span className="muted-copy auto-refresh-hint">Aggiornamento…</span>}
       </header>
 
       {error && <div className="state-panel liquid-panel"><p>{error}</p></div>}
