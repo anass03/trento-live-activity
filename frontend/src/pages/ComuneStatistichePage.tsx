@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { getDashboardStats, type DashboardFilters, type DashboardStats } from '../lib/api';
 import { AreaMapPicker } from '../components/map/AreaMapPicker';
 import { GeocodedLocation } from '../components/ui/GeocodedLocation';
+import { useAutoRefresh } from '../lib/useAutoRefresh';
 
 const EMPTY_FILTERS: DashboardFilters = {};
 
@@ -20,16 +21,18 @@ export function ComuneStatistichePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
 
-  function load(nextFilters = filters) {
-    setIsLoading(true);
-    setError(null);
+  function load(nextFilters = filters, silent = false) {
+    if (!silent) { setIsLoading(true); setError(null); }
     getDashboardStats(cleanFilters(nextFilters))
       .then(setStats)
-      .catch((e) => setError(e instanceof Error ? e.message : 'Errore nel caricamento statistiche.'))
-      .finally(() => setIsLoading(false));
+      .catch((e) => { if (!silent) setError(e instanceof Error ? e.message : 'Errore nel caricamento statistiche.'); })
+      .finally(() => { if (!silent) setIsLoading(false); });
   }
 
-  useEffect(() => { load(EMPTY_FILTERS); }, []);
+  // I filtri si applicano automaticamente al cambio (niente pulsante "Aggiorna").
+  useEffect(() => { load(filters); }, [filters]);
+  // Auto-aggiornamento periodico silenzioso con i filtri correnti.
+  useAutoRefresh(() => load(filters, true), 60_000);
 
   function update(key: keyof DashboardFilters, value: string) {
     setFilters((prev) => ({ ...prev, [key]: value || undefined }));
@@ -37,7 +40,6 @@ export function ComuneStatistichePage() {
 
   function resetFilters() {
     setFilters(EMPTY_FILTERS);
-    load(EMPTY_FILTERS);
   }
 
   const activityMax = useMemo(() => maxCount(stats?.activitiesByType || []), [stats]);
@@ -50,7 +52,7 @@ export function ComuneStatistichePage() {
           <h1>Statistiche Comune</h1>
           <p>Metriche aggregate, filtri territoriali e distribuzioni operative.</p>
         </div>
-        <button type="button" className="refresh-button" onClick={() => load(filters)}>Aggiorna</button>
+        {isLoading && <span className="muted-copy auto-refresh-hint">Aggiornamento…</span>}
       </header>
 
       <div className="liquid-card filter-bar">

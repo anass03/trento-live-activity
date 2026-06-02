@@ -4,6 +4,7 @@ import {
   getAdminCittadini, getAdminComunali, getAdminEnti, getAdminSistema,
   type AdminCittadino, type AdminComunale, type AdminEnte, type AdminSistema,
 } from '../lib/api';
+import { useAutoRefresh } from '../lib/useAutoRefresh';
 
 type Tab = 'cittadini' | 'enti' | 'comunali' | 'sistema';
 
@@ -31,9 +32,8 @@ export function AdminUsersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const load = useCallback(() => {
-    setIsLoading(true);
-    setError(null);
+  const load = useCallback((silent = false) => {
+    if (!silent) { setIsLoading(true); setError(null); }
     Promise.all([
       getAdminCittadini().catch(() => [] as AdminCittadino[]),
       getAdminEnti().catch(() => [] as AdminEnte[]),
@@ -41,11 +41,12 @@ export function AdminUsersPage() {
       getAdminSistema().catch(() => [] as AdminSistema[]),
     ])
       .then(([c, e, m, s]) => { setCittadini(c); setEnti(e); setComunali(m); setSistema(s); })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Errore'))
-      .finally(() => setIsLoading(false));
+      .catch((e) => { if (!silent) setError(e instanceof Error ? e.message : 'Errore'); })
+      .finally(() => { if (!silent) setIsLoading(false); });
   }, []);
 
-  useEffect(load, [load]);
+  useEffect(() => { load(); }, [load]);
+  useAutoRefresh(() => load(true), 30_000);
 
   async function handleDelete(id: string, label: string) {
     if (!window.confirm(
@@ -106,9 +107,7 @@ export function AdminUsersPage() {
           <h1>Gestione utenti</h1>
           <p>Account suddivisi per ruolo — schema con tabelle profilo separate</p>
         </div>
-        <button type="button" className="refresh-button" onClick={load} disabled={isLoading}>
-          {isLoading ? 'Aggiornamento…' : 'Aggiorna'}
-        </button>
+        {isLoading && <span className="muted-copy auto-refresh-hint">Aggiornamento…</span>}
       </header>
 
       <nav className="admin-users-tabs" aria-label="Categorie utenti">

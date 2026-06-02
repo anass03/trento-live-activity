@@ -7,6 +7,7 @@ import {
 } from '../lib/api';
 import { AreaMapPicker } from '../components/map/AreaMapPicker';
 import { GeocodedLocation } from '../components/ui/GeocodedLocation';
+import { useAutoRefresh } from '../lib/useAutoRefresh';
 
 type ExportFormat = 'csv' | 'pdf';
 type ExportType = 'stats';
@@ -39,16 +40,17 @@ export function ComuneExportPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
 
-  function loadPreview(nextFilters = filters) {
-    setIsLoading(true);
-    setError(null);
+  function loadPreview(nextFilters = filters, silent = false) {
+    if (!silent) { setIsLoading(true); setError(null); }
     getDashboardStats(cleanFilters(nextFilters))
       .then(setStats)
-      .catch((e) => setError(e instanceof Error ? e.message : 'Errore nel caricamento anteprima export.'))
-      .finally(() => setIsLoading(false));
+      .catch((e) => { if (!silent) setError(e instanceof Error ? e.message : 'Errore nel caricamento anteprima export.'); })
+      .finally(() => { if (!silent) setIsLoading(false); });
   }
 
-  useEffect(() => { loadPreview(EMPTY_FILTERS); }, []);
+  // L'anteprima si aggiorna automaticamente al cambio dei filtri.
+  useEffect(() => { loadPreview(filters); }, [filters]);
+  useAutoRefresh(() => loadPreview(filters, true), 60_000);
 
   function update(key: keyof DashboardFilters, value: string) {
     setFilters((prev) => ({ ...prev, [key]: value || undefined }));
@@ -76,7 +78,7 @@ export function ComuneExportPage() {
           <h1>Export Comune</h1>
           <p>Generazione file autenticata dai dati statistici comunali.</p>
         </div>
-        <button type="button" className="refresh-button" onClick={() => loadPreview(filters)}>Aggiorna anteprima</button>
+        {isLoading && <span className="muted-copy auto-refresh-hint">Aggiornamento…</span>}
       </header>
 
       <div className="comune-export-grid">
@@ -129,7 +131,6 @@ export function ComuneExportPage() {
             <button className="primary-button" type="submit" disabled={isExporting}>
               {isExporting ? 'Generazione...' : `Scarica ${format.toUpperCase()}`}
             </button>
-            <button type="button" className="ghost-button" onClick={() => loadPreview(filters)}>Aggiorna anteprima</button>
           </div>
         </form>
 

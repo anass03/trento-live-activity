@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getReports, resolveReport, type Report } from '../lib/api';
+import { useAutoRefresh } from '../lib/useAutoRefresh';
 
 const STATI = ['aperta', 'in lavorazione', 'risolta'] as const;
 type Stato = (typeof STATI)[number];
@@ -24,15 +25,16 @@ export function AdminModerationPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  function load(stato: '' | Stato = filter) {
-    setIsLoading(true);
-    setError(null);
+  function load(stato: '' | Stato = filter, silent = false) {
+    if (!silent) { setIsLoading(true); setError(null); }
     getReports(stato || undefined)
       .then((r) => setReports(r.reports || []))
-      .catch((e) => setError(e.message))
-      .finally(() => setIsLoading(false));
+      .catch((e) => { if (!silent) setError(e.message); })
+      .finally(() => { if (!silent) setIsLoading(false); });
   }
   useEffect(() => { load(filter); }, [filter]);
+  // Auto-aggiornamento silenzioso: niente pulsante manuale, nessun flicker.
+  useAutoRefresh(() => load(filter, true), 30_000);
 
   async function resolve(id: string, azione: 'rimuovi' | 'archivia' | 'in_lavorazione') {
     setActionLoading(id + azione);
@@ -74,9 +76,7 @@ export function AdminModerationPage() {
           <h1>Moderazione segnalazioni</h1>
           <p>Flow conforme al Digital Services Act (Regolamento UE 2022/2065)</p>
         </div>
-        <button type="button" className="refresh-button" onClick={() => load()} disabled={isLoading}>
-          {isLoading ? 'Aggiornamento…' : 'Aggiorna'}
-        </button>
+        {isLoading && <span className="muted-copy auto-refresh-hint">Aggiornamento…</span>}
       </header>
 
       <div className="moderation-stats">

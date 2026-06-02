@@ -773,7 +773,7 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
                   compact
                 />
               )}
-              {popup.props.type === 'poi' && isLoggedIn && user?.role !== 'certified_entity' && (
+              {popup.props.type === 'poi' && user?.role === 'registered_user' && (
                 <button
                   className="primary-button"
                   type="button"

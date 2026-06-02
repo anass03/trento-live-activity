@@ -6,6 +6,7 @@ import type { AppUser } from '../data/mockUser';
 import { cancelActivity, getActivities, getActivityCalendarUrl, googleCalendarUrl, joinActivity, leaveActivity, type ApiActivity } from '../lib/api';
 import { CalendarButton } from '../components/ui/CalendarButton';
 import { GeocodedLocation } from '../components/ui/GeocodedLocation';
+import { useAutoRefresh } from '../lib/useAutoRefresh';
 
 function formatDateTime(value?: string | null) {
   if (!value) return 'Data da definire';
@@ -67,6 +68,9 @@ function isUpcomingWeekend(dateStr: string | null | undefined): boolean {
 export function ActivitiesPage({ user }: { user?: AppUser }) {
   const userInterests = user?.interessi ?? [];
   const userId = user?.id;
+  // RF: gli amministratori (sistema/comune) non partecipano alle attività cittadine.
+  // Il backend già blocca le API; qui nascondiamo i controlli per coerenza UX.
+  const canParticipate = user?.role === 'registered_user';
   const [searchParams] = useSearchParams();
   const openId = searchParams.get('open');
   const [activities, setActivities] = useState<ApiActivity[]>([]);
@@ -80,19 +84,21 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
   const [showPast, setShowPast] = useState(false);
   const hasInterests = userInterests.length > 0;
 
-  async function loadActivities() {
-    setIsLoading(true);
-    setError(null);
+  // silent=true (refresh automatico): aggiorna i dati senza far comparire lo
+  // stato di caricamento, così la lista non lampeggia ogni 30s.
+  async function loadActivities(silent = false) {
+    if (!silent) { setIsLoading(true); setError(null); }
     try {
       setActivities(await getActivities());
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Errore nel caricamento delle attività.');
+      if (!silent) setError(e instanceof Error ? e.message : 'Errore nel caricamento delle attività.');
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }
 
   useEffect(() => { void loadActivities(); }, []);
+  useAutoRefresh(() => loadActivities(true), 30_000);
 
   // Auto-open popup when navigating from the map with ?open=<id>
   useEffect(() => {
@@ -270,7 +276,7 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
             googleUrl={googleCalendarUrl(activity.title, activity.dateTime, activity.location)}
           />
         )}
-        {userId && (
+        {canParticipate && userId && (
           activity.participantIds?.includes(userId)
             ? <button className="ghost-button compact-button" type="button" disabled={actionLoading === activity.id} onClick={(e) => { e.stopPropagation(); handleLeave(activity.id); }}>{actionLoading === activity.id ? '...' : 'Abbandona'}</button>
             : activity.status !== 'completa'
@@ -300,7 +306,7 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
             {' '}
             {timeFilter === 'open' ? 'aperte' : timeFilter === 'today' ? 'oggi' : 'attività'}
           </span>
-          <button className="refresh-button" onClick={loadActivities} type="button">Aggiorna</button>
+          {isLoading && <span className="muted-copy auto-refresh-hint">Aggiornamento…</span>}
         </div>
       </header>
 
@@ -308,7 +314,7 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
       {error && (
         <div className="state-panel liquid-panel">
           <p>{error}</p>
-          <button onClick={loadActivities} type="button">Riprova</button>
+          <button onClick={() => loadActivities()} type="button">Riprova</button>
         </div>
       )}
       {!isLoading && !error && activities.length === 0 && (
@@ -579,7 +585,7 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
                   googleUrl={googleCalendarUrl(selectedActivity.title, selectedActivity.dateTime, selectedActivity.location)}
                 />
               )}
-              {userId && (
+              {canParticipate && userId && (
                 selectedActivity.creator?.id === userId
                   ? <button className="danger-button" type="button" disabled={actionLoading === selectedActivity.id} onClick={() => handleCancel(selectedActivity.id)}>{actionLoading === selectedActivity.id ? '...' : 'Cancella attività'}</button>
                   : selectedActivity.participantIds?.includes(userId)

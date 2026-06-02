@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getDashboardStats, type DashboardStats } from '../lib/api';
+import { useAutoRefresh } from '../lib/useAutoRefresh';
 
 const CROWD_LABEL: Record<string, { label: string; tone: 'green' | 'yellow' | 'red' }> = {
   verde: { label: 'Basso', tone: 'green' },
@@ -23,15 +24,15 @@ export function ComuneDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  function load() {
-    setIsLoading(true);
-    setError(null);
+  function load(silent = false) {
+    if (!silent) { setIsLoading(true); setError(null); }
     getDashboardStats()
       .then((next) => setStats(next as DashboardStats))
-      .catch((e) => setError(e instanceof Error ? e.message : 'Errore'))
-      .finally(() => setIsLoading(false));
+      .catch((e) => { if (!silent) setError(e instanceof Error ? e.message : 'Errore'); })
+      .finally(() => { if (!silent) setIsLoading(false); });
   }
-  useEffect(load, []);
+  useEffect(() => { load(); }, []);
+  useAutoRefresh(() => load(true), 60_000);
 
   return (
     <section className="data-page comune-page comune-dashboard-page">
@@ -43,16 +44,14 @@ export function ComuneDashboardPage() {
             non vengono mai mostrate informazioni sui singoli cittadini o conteggi totali di utenti.
           </p>
         </div>
-        <button type="button" className="refresh-button" onClick={load} disabled={isLoading}>
-          {isLoading ? 'Aggiornamento…' : 'Aggiorna'}
-        </button>
+        {isLoading && <span className="muted-copy auto-refresh-hint">Aggiornamento…</span>}
       </header>
 
       {isLoading && <div className="state-panel liquid-panel">Caricamento dati aggregati…</div>}
       {error && (
         <div className="state-panel liquid-panel">
           <p>{error}</p>
-          <button type="button" onClick={load}>Riprova</button>
+          <button type="button" onClick={() => load()}>Riprova</button>
         </div>
       )}
 
