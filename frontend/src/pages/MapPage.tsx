@@ -16,6 +16,7 @@ const filterLabelsBase: Array<{ label: string; value: Filter }> = [
   { label: 'Attività', value: 'activity' },
   { label: 'Eventi', value: 'event' },
   { label: 'POI', value: 'poi' },
+  { label: 'Parcheggi', value: 'parking' },
 ];
 
 const weatherMoodLabel: Record<WeatherMood, string> = {
@@ -72,8 +73,16 @@ function formatTime(value?: string | null) {
 function markerTypeLabel(type: MarkerType) {
   if (type === 'activity') return 'Attività';
   if (type === 'event') return 'Evento';
+  if (type === 'parking') return 'Parcheggio';
   return 'POI';
 }
+
+// Stato affollamento (verde/giallo/rosso) → colore/livello dei marker mappa,
+// così il colore sulla mappa combacia col pallino del widget.
+const PARKING_CROWD_STATUS: Record<string, MapMarker['crowdingStatus']> = {
+  verde: 'green', giallo: 'yellow', rosso: 'red',
+};
+const PARKING_CROWD_LEVEL: Record<string, number> = { verde: 18, giallo: 45, rosso: 92 };
 
 function crowdLevel(marker: MapMarker) {
   if (Number.isFinite(marker.crowdLevel)) return marker.crowdLevel;
@@ -178,9 +187,35 @@ export function MapPage({ user }: { user?: AppUser }) {
     }
   }, [isAdmin, filter]);
 
+  // Parcheggi → marker mappa: colore in base all'affollamento (occupancyPct),
+  // posti liberi/totali nel popup.
+  const parkingMarkers = useMemo<MapMarker[]>(
+    () => parking
+      .filter((p) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude))
+      .map((p) => ({
+        id: `parking-${p.id}`,
+        type: 'parking' as MarkerType,
+        title: p.name,
+        latitude: p.latitude as number,
+        longitude: p.longitude as number,
+        crowdLevel: PARKING_CROWD_LEVEL[p.status] ?? (p.occupancyPct ?? 0),
+        crowdingStatus: PARKING_CROWD_STATUS[p.status] ?? 'green',
+        isCertified: false,
+        sourceId: p.id,
+        category: p.type === 'bike' ? 'parcheggio bici' : 'parcheggio auto',
+        description: p.description || (p.type === 'bike' ? 'Posteggio bici' : 'Parcheggio auto'),
+        free: p.free,
+        total: p.capacity,
+      })),
+    [parking],
+  );
+
   const baseMarkers = useMemo(
-    () => (isEnte ? markers.filter((m) => m.type !== 'activity') : markers),
-    [isEnte, markers],
+    () => {
+      const base = isEnte ? markers.filter((m) => m.type !== 'activity') : markers;
+      return [...base, ...parkingMarkers];
+    },
+    [isEnte, markers, parkingMarkers],
   );
 
   const visibleMarkers = useMemo(() => {
@@ -306,16 +341,16 @@ export function MapPage({ user }: { user?: AppUser }) {
     if (items.length === 0) return null;
     return (
       <div className="parking-group">
-        <h3 className="parking-group-title">{title}</h3>
+        <h3 className="parking-group-title">{title} <span className="section-count">{items.length}</span></h3>
         <ul className="parking-list">
-          {items.slice(0, 5).map((p) => {
+          {items.map((p) => {
             const st = PARKING_STATUS[p.status] ?? PARKING_STATUS.verde;
             return (
-              <li key={p.id} className="parking-item">
+              <li key={p.id} className="parking-item" title={`${st.label} · ${p.occupancyPct ?? 0}% occupato`}>
                 <span className="parking-dot" style={{ background: st.color }} aria-hidden="true" />
                 <span className="parking-name">{p.name}</span>
                 <span className="parking-free" style={{ color: st.color }}>
-                  {p.free != null ? `${p.free} liberi` : st.label}
+                  {p.free != null ? `${p.free} / ${p.capacity}` : `– / ${p.capacity}`}
                 </span>
               </li>
             );
@@ -443,6 +478,7 @@ export function MapPage({ user }: { user?: AppUser }) {
             <div className="widget-heading">
               <span className="section-eyebrow">Parcheggi</span>
               <strong>Disponibilità live</strong>
+              <small className="muted-copy">posti liberi / totali</small>
             </div>
             {parking.length === 0 ? (
               <p className="muted-copy">Dati parcheggi non disponibili al momento.</p>
