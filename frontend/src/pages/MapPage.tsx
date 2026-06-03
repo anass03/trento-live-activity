@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MapCanvas } from '../components/map/MapCanvas';
 import { getMapMarkers, getParking, type MapMarker, type MarkerType, type ParkingSpot } from '../lib/api';
 import { listFavorites } from '../lib/favorites';
@@ -9,31 +10,12 @@ import type { AppUser } from '../data/mockUser';
 type Filter = 'all' | 'preferred' | 'favorites' | MarkerType;
 type TimeFilter = 'now' | 'today' | 'weekend';
 
-const filterLabelsBase: Array<{ label: string; value: Filter }> = [
-  { label: 'Tutti', value: 'all' },
-  { label: 'Per te', value: 'preferred' },
-  { label: 'Preferiti', value: 'favorites' },
-  { label: 'Attività', value: 'activity' },
-  { label: 'Eventi', value: 'event' },
-  { label: 'POI', value: 'poi' },
-  { label: 'Parcheggi', value: 'parking' },
-];
-
-const weatherMoodLabel: Record<WeatherMood, string> = {
-  sunny: 'Sereno',
-  cloudy: 'Nuvoloso',
-  rainy: 'Pioggia',
-  stormy: 'Temporale',
-  snowy: 'Neve',
-};
-
 const TRENTO: [number, number] = [46.0679, 11.1211];
 
-const PARKING_STATUS: Record<string, { label: string; color: string }> = {
-  verde: { label: 'Libero', color: 'var(--color-success)' },
-  giallo: { label: 'Quasi pieno', color: 'var(--color-warning)' },
-  rosso: { label: 'Pieno', color: 'var(--color-danger)' },
+const PARKING_CROWD_STATUS: Record<string, MapMarker['crowdingStatus']> = {
+  verde: 'green', giallo: 'yellow', rosso: 'red',
 };
+const PARKING_CROWD_LEVEL: Record<string, number> = { verde: 18, giallo: 45, rosso: 92 };
 
 function haversineKm(a: [number, number], b: [number, number]): number {
   const toRad = (d: number) => (d * Math.PI) / 180;
@@ -47,15 +29,12 @@ function haversineKm(a: [number, number], b: [number, number]): number {
 }
 
 function isToday(d: Date, today = new Date()): boolean {
-  return d.getFullYear() === today.getFullYear()
-    && d.getMonth() === today.getMonth()
-    && d.getDate() === today.getDate();
+  return d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
 }
 function isInWeekend(d: Date, today = new Date()): boolean {
-  // Calcola sabato e domenica della settimana corrente (lun=1, dom=0 in JS).
   const start = new Date(today);
-  const dow = start.getDay(); // 0..6
-  const daysUntilSaturday = (6 - dow + 7) % 7; // dom→6, lun→5, sab→0
+  const dow = start.getDay();
+  const daysUntilSaturday = (6 - dow + 7) % 7;
   const sat = new Date(start);
   sat.setDate(start.getDate() + daysUntilSaturday);
   sat.setHours(0, 0, 0, 0);
@@ -64,25 +43,6 @@ function isInWeekend(d: Date, today = new Date()): boolean {
   sun.setHours(23, 59, 59, 999);
   return d >= sat && d <= sun;
 }
-
-function formatTime(value?: string | null) {
-  if (!value) return 'Oggi';
-  return new Intl.DateTimeFormat('it-IT', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }).format(new Date(value));
-}
-
-function markerTypeLabel(type: MarkerType) {
-  if (type === 'activity') return 'Attività';
-  if (type === 'event') return 'Evento';
-  if (type === 'parking') return 'Parcheggio';
-  return 'POI';
-}
-
-// Stato affollamento (verde/giallo/rosso) → colore/livello dei marker mappa,
-// così il colore sulla mappa combacia col pallino del widget.
-const PARKING_CROWD_STATUS: Record<string, MapMarker['crowdingStatus']> = {
-  verde: 'green', giallo: 'yellow', rosso: 'red',
-};
-const PARKING_CROWD_LEVEL: Record<string, number> = { verde: 18, giallo: 45, rosso: 92 };
 
 function crowdLevel(marker: MapMarker) {
   if (Number.isFinite(marker.crowdLevel)) return marker.crowdLevel;
@@ -97,6 +57,7 @@ function crowdBarColor(level: number): string {
 }
 
 export function MapPage({ user }: { user?: AppUser }) {
+  const { t } = useTranslation();
   const isEnte = user?.role === 'certified_entity';
   const isAdmin = user?.role === 'municipal_admin' || user?.role === 'system_admin';
   const [markers, setMarkers] = useState<MapMarker[]>([]);
@@ -113,25 +74,32 @@ export function MapPage({ user }: { user?: AppUser }) {
   const [parking, setParking] = useState<ParkingSpot[]>([]);
   const hasInterests = Array.isArray(user?.interessi) && (user!.interessi!.length ?? 0) > 0;
 
-  // silent=true (refresh automatico): non rimonta la mappa né mostra lo spinner.
+  const filterLabelsBase: Array<{ label: string; value: Filter }> = [
+    { label: t('filters.all'),        value: 'all' },
+    { label: t('filters.forYou'),     value: 'preferred' },
+    { label: t('filters.favorites'),  value: 'favorites' },
+    { label: t('filters.activities'), value: 'activity' },
+    { label: t('filters.events'),     value: 'event' },
+    { label: t('filters.poi'),        value: 'poi' },
+    { label: t('filters.parking'),    value: 'parking' },
+  ];
+
+  const PARKING_STATUS: Record<string, { label: string; color: string }> = {
+    verde:  { label: t('map.parkingFree'),      color: 'var(--color-success)' },
+    giallo: { label: t('map.parkingAlmostFull'), color: 'var(--color-warning)' },
+    rosso:  { label: t('map.parkingFull'),       color: 'var(--color-danger)' },
+  };
+
   async function loadMarkers(silent = false) {
     if (!silent) { setIsLoading(true); setNotice(null); }
-    try {
-      setMarkers(await getMapMarkers());
-    } catch (e) {
-      if (!silent) {
-        setMarkers([]);
-        setNotice(e instanceof Error ? e.message : 'Errore nel caricamento dati mappa.');
-      }
-    } finally {
-      if (!silent) setIsLoading(false);
-    }
+    try { setMarkers(await getMapMarkers()); }
+    catch (e) {
+      if (!silent) { setMarkers([]); setNotice(e instanceof Error ? e.message : t('map.loadError')); }
+    } finally { if (!silent) setIsLoading(false); }
   }
 
   function loadParking() {
-    return getParking()
-      .then((res) => setParking(res.parkings))
-      .catch(() => { /* dati parcheggi opzionali: in errore mantieni i precedenti */ });
+    return getParking().then((res) => setParking(res.parkings)).catch(() => { /* optional */ });
   }
 
   useEffect(() => {
@@ -144,7 +112,6 @@ export function MapPage({ user }: { user?: AppUser }) {
     return () => window.removeEventListener('tla:favorites-changed', onFavChanged);
   }, []);
 
-  // Aggiornamento automatico di mappa, parcheggi e meteo (niente pulsante manuale).
   useAutoRefresh(() => {
     void loadMarkers(true);
     void loadParking();
@@ -152,43 +119,33 @@ export function MapPage({ user }: { user?: AppUser }) {
   }, 30_000);
 
   function handleNearMe() {
-    if (!navigator.geolocation) { setGeoError('Geolocalizzazione non supportata dal browser'); return; }
-    setGeoLoading(true);
-    setGeoError(null);
+    if (!navigator.geolocation) { setGeoError(t('profile.locationUnsupported')); return; }
+    setGeoLoading(true); setGeoError(null);
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setUserLocation([pos.coords.latitude, pos.coords.longitude]);
-        setGeoLoading(false);
-      },
+      (pos) => { setUserLocation([pos.coords.latitude, pos.coords.longitude]); setGeoLoading(false); },
       (err) => {
         const reasons: Record<number, string> = {
-          1: 'Permesso negato. Controlla le impostazioni del browser.',
-          2: 'Posizione non disponibile.',
-          3: 'Timeout.',
+          1: t('map.geoDenied'),
+          2: t('map.geoUnavailable'),
+          3: t('map.geoTimeout'),
         };
-        setGeoError(reasons[err.code] ?? `Errore (codice ${err.code})`);
+        setGeoError(reasons[err.code] ?? `Error (${err.code})`);
         setGeoLoading(false);
       },
       { timeout: 10000 },
     );
   }
 
-  // Enti certificati non vedono attività spontanee; admin/dashboard non hanno preferenze personali.
   const filterLabels = filterLabelsBase.filter((f) => {
     if (isEnte && f.value === 'activity') return false;
     if (isAdmin && (f.value === 'preferred' || f.value === 'favorites')) return false;
     return true;
   });
 
-  // If the active filter is no longer in the visible set, reset to 'all'.
   useEffect(() => {
-    if (isAdmin && (filter === 'preferred' || filter === 'favorites')) {
-      setFilter('all');
-    }
+    if (isAdmin && (filter === 'preferred' || filter === 'favorites')) setFilter('all');
   }, [isAdmin, filter]);
 
-  // Parcheggi → marker mappa: colore in base all'affollamento (occupancyPct),
-  // posti liberi/totali nel popup.
   const parkingMarkers = useMemo<MapMarker[]>(
     () => parking
       .filter((p) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude))
@@ -202,45 +159,32 @@ export function MapPage({ user }: { user?: AppUser }) {
         crowdingStatus: PARKING_CROWD_STATUS[p.status] ?? 'green',
         isCertified: false,
         sourceId: p.id,
-        category: p.type === 'bike' ? 'parcheggio bici' : 'parcheggio auto',
-        description: p.description || (p.type === 'bike' ? 'Posteggio bici' : 'Parcheggio auto'),
+        category: p.type === 'bike' ? t('map.parkingBikes') : t('map.parkingCars'),
+        description: p.description || (p.type === 'bike' ? t('map.parkingBikes') : t('map.parkingCars')),
         free: p.free,
         total: p.capacity,
       })),
-    [parking],
+    [parking, t],
   );
 
   const baseMarkers = useMemo(
-    () => {
-      const base = isEnte ? markers.filter((m) => m.type !== 'activity') : markers;
-      return [...base, ...parkingMarkers];
-    },
+    () => { const base = isEnte ? markers.filter((m) => m.type !== 'activity') : markers; return [...base, ...parkingMarkers]; },
     [isEnte, markers, parkingMarkers],
   );
 
   const visibleMarkers = useMemo(() => {
     const q = search.trim().toLowerCase();
     return baseMarkers.filter((marker) => {
-      // ── filtro categoria/tipo ────────────────────────────────────────
       if (filter === 'preferred') {
-        if (marker.type === 'poi') {
-          /* keep POIs */
-        } else if (!hasInterests || !marker.category) {
-          return false;
-        } else if (!user!.interessi!.includes(marker.category)) {
-          return false;
-        }
+        if (marker.type === 'poi') { /* keep */ }
+        else if (!hasInterests || !marker.category) return false;
+        else if (!user!.interessi!.includes(marker.category)) return false;
       } else if (filter === 'favorites') {
-        // POI favorites are stored with sourceId; activities/events use id.
         const favoriteId = marker.type === 'poi' ? marker.sourceId : marker.id;
-        const fav = favorites.some((f) => f.markerType === marker.type && f.markerId === favoriteId);
-        if (!fav) return false;
+        if (!favorites.some((f) => f.markerType === marker.type && f.markerId === favoriteId)) return false;
       } else if (filter !== 'all' && marker.type !== filter) {
         return false;
       }
-
-      // ── filtro temporale ──────────────────────────────────────────────
-      // 'now' = tutto visibile; 'today' / 'weekend' = solo attività/eventi nella finestra
       if (timeFilter !== 'now') {
         if (marker.type === 'poi') return false;
         if (!marker.dateTime) return false;
@@ -248,68 +192,62 @@ export function MapPage({ user }: { user?: AppUser }) {
         if (timeFilter === 'today' && !isToday(d)) return false;
         if (timeFilter === 'weekend' && !isInWeekend(d)) return false;
       }
-
-      // ── "Vicino a me" ────────────────────────────────────────────────
       if (userLocation && Number.isFinite(marker.latitude) && Number.isFinite(marker.longitude)) {
-        const dist = haversineKm(userLocation, [marker.latitude!, marker.longitude!]);
-        if (dist > 2) return false; // 2 km
+        if (haversineKm(userLocation, [marker.latitude!, marker.longitude!]) > 2) return false;
       }
-
-      // ── ricerca testuale: matcha titolo, categoria, descrizione ──────
       if (q) {
-        const hay = `${marker.title} ${marker.category || ''} ${marker.description || ''}`.toLowerCase();
-        if (!hay.includes(q)) return false;
+        if (!`${marker.title} ${marker.category || ''} ${marker.description || ''}`.toLowerCase().includes(q)) return false;
       }
       return true;
     });
   }, [filter, timeFilter, search, baseMarkers, hasInterests, user, favorites, userLocation]);
 
   const highCrowdMarkers = useMemo(
-    () => baseMarkers
-      .filter((marker) =>
-        crowdLevel(marker) >= 45
-        || marker.crowdingStatus === 'red'
-        || marker.crowdingStatus === 'orange'
-        || marker.crowdingStatus === 'yellow',
-      )
-      .sort((a, b) => crowdLevel(b) - crowdLevel(a))
-      .slice(0, 5),
+    () => baseMarkers.filter((m) => crowdLevel(m) >= 45 || m.crowdingStatus === 'red' || m.crowdingStatus === 'orange' || m.crowdingStatus === 'yellow').sort((a, b) => crowdLevel(b) - crowdLevel(a)).slice(0, 5),
     [baseMarkers],
   );
-
   const upcomingItems = useMemo(
-    () => baseMarkers
-      .filter((marker) => marker.type !== 'poi' && marker.dateTime)
-      .sort((a, b) => new Date(a.dateTime || '').getTime() - new Date(b.dateTime || '').getTime())
-      .slice(0, 4),
+    () => baseMarkers.filter((m) => m.type !== 'poi' && m.dateTime).sort((a, b) => new Date(a.dateTime || '').getTime() - new Date(b.dateTime || '').getTime()).slice(0, 4),
     [baseMarkers],
   );
+  const featuredHotspots = useMemo(() => baseMarkers.slice().sort((a, b) => crowdLevel(b) - crowdLevel(a)).slice(0, 4), [baseMarkers]);
 
-  const featuredHotspots = useMemo(
-    () => baseMarkers
-      .slice()
-      .sort((a, b) => crowdLevel(b) - crowdLevel(a))
-      .slice(0, 4),
-    [baseMarkers],
-  );
-
-  function severityFor(marker: MapMarker): { label: string; tone: MapMarker['crowdingStatus'] } {
-    const level = crowdLevel(marker);
-    if (marker.crowdingStatus === 'red' || level >= 82) return { label: 'affollamento critico', tone: 'red' };
-    if (marker.crowdingStatus === 'orange' || level >= 62) return { label: 'affollamento intenso', tone: 'orange' };
-    if (marker.crowdingStatus === 'yellow' || level >= 34) return { label: 'affollamento moderato', tone: 'yellow' };
-    return { label: 'affollamento basso', tone: 'green' };
+  function markerTypeLabel(type: MarkerType): string {
+    if (type === 'activity') return t('map.markerActivity');
+    if (type === 'event')    return t('map.markerEvent');
+    if (type === 'parking')  return t('map.markerParking');
+    return t('map.markerPOI');
   }
 
   function categoryLabel(marker: MapMarker): string {
     const cat = (marker.category || '').toLowerCase();
-    if (cat.includes('parcheg')) return 'Parcheggio';
-    if (cat.includes('univ') || cat.includes('biblio') || cat.includes('aula')) return 'Università';
-    if (cat.includes('piazza')) return 'Piazza';
-    if (cat.includes('parco')) return 'Parco';
-    if (cat.includes('museo')) return 'Museo';
-    if (cat.includes('stazione') || cat.includes('trasport')) return 'Trasporti';
+    if (cat.includes('parcheg')) return t('categories.parcheggio');
+    if (cat.includes('univ') || cat.includes('biblio') || cat.includes('aula')) return t('categories.universita');
+    if (cat.includes('piazza')) return t('categories.piazza');
+    if (cat.includes('parco'))  return t('categories.parco');
+    if (cat.includes('museo'))  return t('categories.museo');
+    if (cat.includes('stazione') || cat.includes('trasport')) return t('categories.stazione');
     return markerTypeLabel(marker.type);
+  }
+
+  function translateCategory(cat: string | undefined): string {
+    if (!cat) return t('map.city');
+    const key = cat.toLowerCase().replace(/\s+/g, '');
+    return t(`categories.${key}`, { defaultValue: cat });
+  }
+
+  function severityFor(marker: MapMarker): { label: string; tone: MapMarker['crowdingStatus'] } {
+    const level = crowdLevel(marker);
+    if (marker.crowdingStatus === 'red'    || level >= 82) return { label: t('map.severityCritical'), tone: 'red' };
+    if (marker.crowdingStatus === 'orange' || level >= 62) return { label: t('map.severityIntense'),  tone: 'orange' };
+    if (marker.crowdingStatus === 'yellow' || level >= 34) return { label: t('map.severityModerate'), tone: 'yellow' };
+    return { label: t('map.severityLow'), tone: 'green' };
+  }
+
+  function formatTime(value?: string | null) {
+    if (!value) return t('filters.now');
+    const locale = t('common.dateTBD') === 'Date TBD' ? 'en-GB' : 'it-IT';
+    return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }).format(new Date(value));
   }
 
   const cityAlerts = highCrowdMarkers.map((marker) => {
@@ -322,19 +260,16 @@ export function MapPage({ user }: { user?: AppUser }) {
   });
 
   const quickStats = [
-    { label: 'Punti live', value: baseMarkers.length },
-    { label: 'Hotspot', value: highCrowdMarkers.length },
-    { label: 'Oggi', value: upcomingItems.length },
+    { label: t('map.liveDots'), value: baseMarkers.length },
+    { label: t('map.hotspot'),  value: highCrowdMarkers.length },
+    { label: t('map.today'),    value: upcomingItems.length },
   ];
+
   const currentMood: WeatherMood = weather?.mood ?? 'cloudy';
 
-  // Parcheggi auto/bici (RF affollamento parcheggi) — proxy backend del Comune.
   const parkingByType = useMemo(() => {
     const byCrowd = (a: ParkingSpot, b: ParkingSpot) => (b.occupancyPct ?? 0) - (a.occupancyPct ?? 0);
-    return {
-      cars: parking.filter((p) => p.type === 'car').sort(byCrowd),
-      bikes: parking.filter((p) => p.type === 'bike').sort(byCrowd),
-    };
+    return { cars: parking.filter((p) => p.type === 'car').sort(byCrowd), bikes: parking.filter((p) => p.type === 'bike').sort(byCrowd) };
   }, [parking]);
 
   function renderParkingGroup(items: ParkingSpot[], title: string) {
@@ -346,7 +281,7 @@ export function MapPage({ user }: { user?: AppUser }) {
           {items.map((p) => {
             const st = PARKING_STATUS[p.status] ?? PARKING_STATUS.verde;
             return (
-              <li key={p.id} className="parking-item" title={`${st.label} · ${p.occupancyPct ?? 0}% occupato`}>
+              <li key={p.id} className="parking-item" title={`${st.label} · ${p.occupancyPct ?? 0}% ${t('map.occupied')}`}>
                 <span className="parking-dot" style={{ background: st.color }} aria-hidden="true" />
                 <span className="parking-name">{p.name}</span>
                 <span className="parking-free" style={{ color: st.color }}>
@@ -362,34 +297,29 @@ export function MapPage({ user }: { user?: AppUser }) {
 
   return (
     <div className="page-frame home-page">
-      <header className="home-control-row" aria-label="Controlli città">
+      <header className="home-control-row" aria-label={t('map.filterLabel')}>
         <div className="city-status-strip">
           <span className="live-dot" aria-hidden="true" />
           <strong>{visibleMarkers.length}</strong>
-          <span>punti visibili</span>
-          {userLocation && <small className="muted-copy"> · raggio 2 km</small>}
+          <span>{t('map.visiblePoints')}</span>
+          {userLocation && <small className="muted-copy"> {t('map.radiusHint')}</small>}
         </div>
         <label className="city-search">
-          <span className="visually-hidden">Cerca</span>
-          <input
-            type="search"
-            placeholder="Cerca zona, evento, attività…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <span className="visually-hidden">{t('common.search')}</span>
+          <input type="search" placeholder={t('map.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
         </label>
-        <div className="time-filter" aria-label="Filtro orario">
-          <button type="button" className={timeFilter === 'now' ? 'active-filter' : undefined} onClick={() => setTimeFilter('now')}>Ora</button>
-          <button type="button" className={timeFilter === 'today' ? 'active-filter' : undefined} onClick={() => setTimeFilter('today')}>Oggi</button>
-          <button type="button" className={timeFilter === 'weekend' ? 'active-filter' : undefined} onClick={() => setTimeFilter('weekend')}>Weekend</button>
+        <div className="time-filter" aria-label={t('map.timeFilterLabel')}>
+          <button type="button" className={timeFilter === 'now'     ? 'active-filter' : undefined} onClick={() => setTimeFilter('now')}>{t('filters.now')}</button>
+          <button type="button" className={timeFilter === 'today'   ? 'active-filter' : undefined} onClick={() => setTimeFilter('today')}>{t('filters.today')}</button>
+          <button type="button" className={timeFilter === 'weekend' ? 'active-filter' : undefined} onClick={() => setTimeFilter('weekend')}>{t('filters.weekend')}</button>
         </div>
         {userLocation ? (
           <button className="nearby-button active-filter" type="button" onClick={() => { setUserLocation(null); setGeoError(null); }}>
-            Rimuovi posizione
+            {t('map.removeLocation')}
           </button>
         ) : (
           <button className="nearby-button" type="button" onClick={handleNearMe} disabled={geoLoading}>
-            {geoLoading ? 'Localizzazione…' : 'Vicino a me'}
+            {geoLoading ? t('map.locating') : t('map.nearMe')}
           </button>
         )}
         {geoError && <span className="form-error" style={{ margin: 0 }}>{geoError}</span>}
@@ -398,9 +328,9 @@ export function MapPage({ user }: { user?: AppUser }) {
       <section className="home-dashboard-grid">
         <aside className={`weather-summary weather-${currentMood}`} aria-label="Meteo Trento">
           <div className="weather-main">
-            <span>{weatherMoodLabel[currentMood]}</span>
+            <span>{t(`weather.${currentMood}`)}</span>
             <strong>{weather ? `${weather.temperature}°C` : '—'}</strong>
-            <small>{weather ? `Vento ${Math.round(weather.windKmh)} km/h` : 'Caricamento meteo…'}</small>
+            <small>{weather ? `${t('map.windLabel')} ${Math.round(weather.windKmh)} km/h` : t('map.weatherLoading')}</small>
           </div>
         </aside>
 
@@ -408,12 +338,7 @@ export function MapPage({ user }: { user?: AppUser }) {
           <div className="home-map-toolbar">
             <div className="filters">
               {filterLabels.map((item) => (
-                <button
-                  key={item.value}
-                  className={filter === item.value ? 'active-filter' : undefined}
-                  onClick={() => setFilter(item.value)}
-                  type="button"
-                >
+                <button key={item.value} className={filter === item.value ? 'active-filter' : undefined} onClick={() => setFilter(item.value)} type="button">
                   {item.label}
                 </button>
               ))}
@@ -423,13 +348,13 @@ export function MapPage({ user }: { user?: AppUser }) {
           {notice && (
             <aside className="map-notice" aria-live="polite">
               <span>{notice}</span>
-              <button onClick={() => loadMarkers()} type="button">Riprova</button>
+              <button onClick={() => loadMarkers()} type="button">{t('map.retry')}</button>
             </aside>
           )}
-          {isLoading && <section className="state-panel liquid-panel">La città si sta aggiornando...</section>}
+          {isLoading && <section className="state-panel liquid-panel">{t('map.loading')}</section>}
           {!isLoading && visibleMarkers.length === 0 && (
             <aside className="map-notice map-notice--empty" aria-live="polite">
-              <span>Nessun punto visibile per questo filtro.</span>
+              <span>{t('map.noPoints')}</span>
             </aside>
           )}
           {!isLoading && <MapCanvas markers={visibleMarkers} user={user} />}
@@ -438,18 +363,15 @@ export function MapPage({ user }: { user?: AppUser }) {
         <aside className="home-live-column">
           <section className="home-widget city-alerts">
             <div className="widget-heading">
-              <span className="section-eyebrow">Avvisi città</span>
-              <strong>Da guardare ora</strong>
+              <span className="section-eyebrow">{t('map.cityAlerts')}</span>
+              <strong>{t('map.watchNow')}</strong>
             </div>
             <div className="alert-list">
-              {cityAlerts.length === 0 && <p className="muted-copy">Nessun avviso critico dai dati live.</p>}
+              {cityAlerts.length === 0 && <p className="muted-copy">{t('map.noAlerts')}</p>}
               {cityAlerts.map((alert) => (
                 <article className={`alert-item alert-${alert.tone}`} key={`${alert.title}-${alert.meta}`}>
                   <i aria-hidden="true" />
-                  <div>
-                    <h3>{alert.title}</h3>
-                    <p>{alert.meta}</p>
-                  </div>
+                  <div><h3>{alert.title}</h3><p>{alert.meta}</p></div>
                 </article>
               ))}
             </div>
@@ -457,17 +379,19 @@ export function MapPage({ user }: { user?: AppUser }) {
 
           <section className="home-widget upcoming-widget">
             <div className="widget-heading">
-              <span className="section-eyebrow">Prossime ore</span>
-              <strong>Vicino a te</strong>
+              <span className="section-eyebrow">{t('map.upcoming')}</span>
+              <strong>{t('map.nearYou')}</strong>
             </div>
             <ol className="timeline-list">
-              {upcomingItems.length === 0 && <li><time>Ora</time><div><strong>Nessun evento imminente</strong><span>Dati backend aggiornati</span></div></li>}
+              {upcomingItems.length === 0 && (
+                <li><time>{t('filters.now')}</time><div><strong>{t('map.noUpcoming')}</strong><span>{t('map.upcomingMeta')}</span></div></li>
+              )}
               {upcomingItems.map((item) => (
                 <li key={item.id}>
                   <time>{formatTime(item.dateTime)}</time>
                   <div>
                     <strong>{item.title}</strong>
-                    <span>{markerTypeLabel(item.type)} · {item.category || 'città'}</span>
+                    <span>{markerTypeLabel(item.type)} · {translateCategory(item.category)}</span>
                   </div>
                 </li>
               ))}
@@ -476,35 +400,32 @@ export function MapPage({ user }: { user?: AppUser }) {
 
           <section className="home-widget parking-widget">
             <div className="widget-heading">
-              <span className="section-eyebrow">Parcheggi</span>
-              <strong>Disponibilità live</strong>
-              <small className="muted-copy">posti liberi / totali</small>
+              <span className="section-eyebrow">{t('map.parking')}</span>
+              <strong>{t('map.parkingAvailability')}</strong>
+              <small className="muted-copy">{t('map.parkingHint')}</small>
             </div>
             {parking.length === 0 ? (
-              <p className="muted-copy">Dati parcheggi non disponibili al momento.</p>
+              <p className="muted-copy">{t('map.parkingNoData')}</p>
             ) : (
               <div className="parking-groups">
-                {renderParkingGroup(parkingByType.cars, '🚗 Auto')}
-                {renderParkingGroup(parkingByType.bikes, '🚲 Bici')}
+                {renderParkingGroup(parkingByType.cars, t('map.parkingCars'))}
+                {renderParkingGroup(parkingByType.bikes, t('map.parkingBikes'))}
               </div>
             )}
           </section>
         </aside>
       </section>
 
-      <section className="home-support-grid" aria-label="Sintesi live">
+      <section className="home-support-grid" aria-label={t('map.liveDots')}>
         <div className="quick-stat-strip">
           {quickStats.map((stat) => (
-            <article key={stat.label}>
-              <strong>{stat.value}</strong>
-              <span>{stat.label}</span>
-            </article>
+            <article key={stat.label}><strong>{stat.value}</strong><span>{stat.label}</span></article>
           ))}
         </div>
         <section className="home-widget hotspot-widget">
           <div className="widget-heading">
-            <span className="section-eyebrow">Hotspot</span>
-            <strong>Aree più attive</strong>
+            <span className="section-eyebrow">{t('map.hotspot')}</span>
+            <strong>{t('map.mostActive')}</strong>
           </div>
           <div className="hotspot-list">
             {featuredHotspots.map((marker) => {

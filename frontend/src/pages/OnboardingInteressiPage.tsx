@@ -1,24 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { completeOnboarding, getSuggestedInterests } from '../lib/api';
 
-const INTERESSI: Array<{ key: string; label: string; emoji: string; description: string }> = [
-  { key: 'sport', label: 'Sport', emoji: '⚽', description: 'Calcetto, running, padel…' },
-  { key: 'cultura', label: 'Cultura', emoji: '📚', description: 'Mostre, libri, conferenze' },
-  { key: 'musica', label: 'Musica', emoji: '🎶', description: 'Concerti, jam session' },
-  { key: 'arte', label: 'Arte', emoji: '🎨', description: 'Mostre, atelier, performance' },
-  { key: 'gastronomia', label: 'Gastronomia', emoji: '🍝', description: 'Aperitivi, food tour' },
-  { key: 'studio', label: 'Studio', emoji: '🧠', description: 'Aule, gruppi di studio' },
-  { key: 'natura', label: 'Natura', emoji: '🌲', description: 'Trekking, parchi, escursioni' },
-  { key: 'tecnologia', label: 'Tecnologia', emoji: '💻', description: 'Hackathon, meetup tech' },
-  { key: 'volontariato', label: 'Volontariato', emoji: '🤝', description: 'Iniziative civiche' },
-];
-
-const labelFor = (key: string) =>
-  INTERESSI.find((i) => i.key === key)?.label ?? key.charAt(0).toUpperCase() + key.slice(1);
+const INTEREST_KEYS = ['sport', 'cultura', 'musica', 'arte', 'gastronomia', 'studio', 'natura', 'tecnologia', 'volontariato'];
+const EMOJIS: Record<string, string> = {
+  sport: '⚽', cultura: '📚', musica: '🎶', arte: '🎨',
+  gastronomia: '🍝', studio: '🧠', natura: '🌲', tecnologia: '💻', volontariato: '🤝',
+};
 
 export function OnboardingInteressiPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [selected, setSelected] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -28,7 +21,6 @@ export function OnboardingInteressiPage() {
   const toggle = (key: string) =>
     setSelected((prev) => (prev.includes(key) ? prev.filter((p) => p !== key) : [...prev, key]));
 
-  // Debounced fetch dei suggerimenti man mano che l'utente seleziona
   const fetchSuggestions = useCallback((picked: string[]) => {
     if (suggestionTimer.current) window.clearTimeout(suggestionTimer.current);
     if (picked.length === 0) { setSuggestions([]); return; }
@@ -43,13 +35,11 @@ export function OnboardingInteressiPage() {
     setError(null);
     setSaving(true);
     try {
-      await completeOnboarding({
-        interessi: skip ? [] : selected,
-      });
+      await completeOnboarding({ interessi: skip ? [] : selected });
       window.dispatchEvent(new CustomEvent('tla:user-updated'));
       navigate('/');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Errore');
+      setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
       setSaving(false);
     }
@@ -59,32 +49,32 @@ export function OnboardingInteressiPage() {
     <section className="auth-page onboarding-page">
       <div className="liquid-card onboarding-card" aria-labelledby="onboarding-title">
         <header className="onboarding-header">
-          <span className="section-eyebrow">Benvenutə in Trento Live Activity</span>
-          <h1 id="onboarding-title">I tuoi interessi</h1>
-          <p>Scegli qualche tema: useremo queste preferenze per notifiche e suggerimenti su misura. Puoi modificarle dal profilo in qualsiasi momento.</p>
+          <span className="section-eyebrow">{t('onboarding.welcome')}</span>
+          <h1 id="onboarding-title">{t('onboarding.title')}</h1>
+          <p>{t('onboarding.subtitle')}</p>
         </header>
 
         <section className="onboarding-interest-section" aria-labelledby="interest-selection-title">
           <div className="onboarding-section-copy">
-            <h2 id="interest-selection-title">Scegli cosa vuoi seguire</h2>
-            <p>Le selezioni aiutano a dare priorità alle attività più rilevanti per te.</p>
+            <h2 id="interest-selection-title">{t('onboarding.selectTitle')}</h2>
+            <p>{t('onboarding.selectSubtitle')}</p>
           </div>
 
           <div className="onboarding-grid">
-            {INTERESSI.map((item) => {
-              const active = selected.includes(item.key);
+            {INTEREST_KEYS.map((key) => {
+              const active = selected.includes(key);
               return (
                 <button
-                  key={item.key}
+                  key={key}
                   type="button"
                   className={`onboarding-tile ${active ? 'active' : ''}`}
-                  onClick={() => toggle(item.key)}
+                  onClick={() => toggle(key)}
                   aria-pressed={active}
                 >
                   <span className="onboarding-tile-check" aria-hidden="true">✓</span>
-                  <span className="onboarding-emoji" aria-hidden="true">{item.emoji}</span>
-                  <strong>{item.label}</strong>
-                  <small>{item.description}</small>
+                  <span className="onboarding-emoji" aria-hidden="true">{EMOJIS[key]}</span>
+                  <strong>{t(`onboarding.interests.${key}.label`)}</strong>
+                  <small>{t(`onboarding.interests.${key}.description`)}</small>
                 </button>
               );
             })}
@@ -93,7 +83,7 @@ export function OnboardingInteressiPage() {
 
         {suggestions.length > 0 && (
           <div className="onboarding-suggestions">
-            <strong>Anche utenti come te seguono:</strong>
+            <strong>{t('onboarding.suggestions')}</strong>
             <div className="onboarding-suggestion-list">
               {suggestions.map((s) => (
                 <button
@@ -103,7 +93,7 @@ export function OnboardingInteressiPage() {
                   onClick={() => toggle(s)}
                   aria-pressed={selected.includes(s)}
                 >
-                  {labelFor(s)}
+                  {t(`onboarding.interests.${s}.label`, { defaultValue: s.charAt(0).toUpperCase() + s.slice(1) })}
                 </button>
               ))}
             </div>
@@ -119,7 +109,7 @@ export function OnboardingInteressiPage() {
             disabled={saving || selected.length === 0}
             onClick={() => handleSave(false)}
           >
-            {saving ? 'Salvataggio…' : `Continua${selected.length ? ` (${selected.length})` : ''}`}
+            {saving ? t('onboarding.saving') : selected.length > 0 ? t('onboarding.continueCount', { count: selected.length }) : t('onboarding.continue')}
           </button>
           <button
             type="button"
@@ -127,7 +117,7 @@ export function OnboardingInteressiPage() {
             disabled={saving}
             onClick={() => handleSave(true)}
           >
-            Salta per ora
+            {t('onboarding.skip')}
           </button>
         </div>
       </div>

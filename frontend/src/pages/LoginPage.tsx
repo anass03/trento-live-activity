@@ -33,22 +33,18 @@ export function LoginPage() {
       }
       if (result.recoveryUsed) {
         const remaining = result.recoveryCodesRemaining ?? 0;
-        window.alert(
-          `Hai effettuato l'accesso con un codice di recupero. Te ne restano ${remaining}.\n\n` +
-          `Se non hai più accesso al tuo authenticator, vai sul profilo e usa ` +
-          `"Cambia authenticator / Reimposta 2FA" per riconfigurare la 2FA con un nuovo dispositivo.`,
-        );
+        window.alert(t('auth.usedRecoveryCode', { remaining }));
       }
       navigate('/');
       window.location.reload();
     } catch (e) {
       if (e instanceof ApiError && e.code === '2FA_REQUIRED') {
         setNeeds2fa(true);
-        setError('Inserisci il codice 2FA dal tuo authenticator');
+        setError(t('auth.need2fa'));
       } else if (e instanceof ApiError && e.code === 'EMAIL_NOT_VERIFIED') {
-        setError('Devi verificare la tua email prima di accedere. Controlla la tua casella di posta (anche lo spam).');
+        setError(t('auth.emailNotVerified'));
       } else {
-        setError(e instanceof Error ? e.message : 'Errore durante il login');
+        setError(e instanceof Error ? e.message : t('auth.loginError'));
       }
     } finally {
       setIsLoading(false);
@@ -82,7 +78,7 @@ export function LoginPage() {
 
         {needs2fa && codeMode === 'totp' && (
           <label>
-            <span>Codice 2FA (6 cifre)</span>
+            <span>{t('auth.code2fa')}</span>
             <input
               type="text"
               inputMode="numeric"
@@ -99,7 +95,7 @@ export function LoginPage() {
 
         {needs2fa && codeMode === 'recovery' && (
           <label>
-            <span>Codice di recupero</span>
+            <span>{t('auth.recoveryCode')}</span>
             <input
               type="text"
               value={otpToken}
@@ -109,13 +105,13 @@ export function LoginPage() {
               required
               autoFocus
             />
-            <small>Userai uno dei codici salvati al setup 2FA. Il codice verrà consumato e dovrai riconfigurare la 2FA.</small>
+            <small>{t('auth.recoveryCodeHint')}</small>
           </label>
         )}
 
         {needs2fa && (
           <button type="button" className="link-button" onClick={toggleMode}>
-            {codeMode === 'totp' ? 'Ho perso l\'accesso all\'authenticator — usa codice di recupero' : 'Torna al codice authenticator'}
+            {codeMode === 'totp' ? t('auth.lostAuthenticator') : t('auth.backToAuthenticator')}
           </button>
         )}
 
