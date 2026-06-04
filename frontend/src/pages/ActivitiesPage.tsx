@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { activityCrowdLevel } from '../components/map/CardMapPreview';
 import { InteractiveMapCard } from '../components/ui/InteractiveMapCard';
 import type { AppUser } from '../data/mockUser';
@@ -7,16 +8,7 @@ import { cancelActivity, getActivities, getActivityCalendarUrl, googleCalendarUr
 import { CalendarButton } from '../components/ui/CalendarButton';
 import { GeocodedLocation } from '../components/ui/GeocodedLocation';
 import { useAutoRefresh } from '../lib/useAutoRefresh';
-
-function formatDateTime(value?: string | null) {
-  if (!value) return 'Data da definire';
-  return new Intl.DateTimeFormat('it-IT', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
-}
-
-function formatDay(value?: string | null) {
-  if (!value) return 'Da definire';
-  return new Intl.DateTimeFormat('it-IT', { weekday: 'short', day: '2-digit', month: 'short' }).format(new Date(value));
-}
+import { formatDateTime, formatDay } from '../lib/formatters';
 
 function parseLocalDateTime(value: string | null | undefined): Date | null {
   if (!value) return null;
@@ -24,19 +16,11 @@ function parseLocalDateTime(value: string | null | undefined): Date | null {
   if (!hasExplicitTimezone) {
     const localDate = value.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/);
     if (localDate) {
-      return new Date(
-        Number(localDate[1]),
-        Number(localDate[2]) - 1,
-        Number(localDate[3]),
-        Number(localDate[4] ?? 0),
-        Number(localDate[5] ?? 0),
-        Number(localDate[6] ?? 0),
-      );
+      return new Date(Number(localDate[1]), Number(localDate[2]) - 1, Number(localDate[3]), Number(localDate[4] ?? 0), Number(localDate[5] ?? 0), Number(localDate[6] ?? 0));
     }
   }
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date;
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function endDateFromStartAndTime(start: Date, endTime?: string | null): Date {
@@ -66,10 +50,9 @@ function isUpcomingWeekend(dateStr: string | null | undefined): boolean {
 }
 
 export function ActivitiesPage({ user }: { user?: AppUser }) {
+  const { t } = useTranslation();
   const userInterests = user?.interessi ?? [];
   const userId = user?.id;
-  // RF: gli amministratori (sistema/comune) non partecipano alle attività cittadine.
-  // Il backend già blocca le API; qui nascondiamo i controlli per coerenza UX.
   const canParticipate = user?.role === 'registered_user';
   const [searchParams] = useSearchParams();
   const openId = searchParams.get('open');
@@ -84,23 +67,16 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
   const [showPast, setShowPast] = useState(false);
   const hasInterests = userInterests.length > 0;
 
-  // silent=true (refresh automatico): aggiorna i dati senza far comparire lo
-  // stato di caricamento, così la lista non lampeggia ogni 30s.
   async function loadActivities(silent = false) {
     if (!silent) { setIsLoading(true); setError(null); }
-    try {
-      setActivities(await getActivities());
-    } catch (e) {
-      if (!silent) setError(e instanceof Error ? e.message : 'Errore nel caricamento delle attività.');
-    } finally {
-      if (!silent) setIsLoading(false);
-    }
+    try { setActivities(await getActivities()); }
+    catch (e) { if (!silent) setError(e instanceof Error ? e.message : t('activities.loading')); }
+    finally { if (!silent) setIsLoading(false); }
   }
 
   useEffect(() => { void loadActivities(); }, []);
   useAutoRefresh(() => loadActivities(true), 30_000);
 
-  // Auto-open popup when navigating from the map with ?open=<id>
   useEffect(() => {
     if (!openId || activities.length === 0) return;
     const target = activities.find((a) => String(a.id) === openId);
@@ -109,9 +85,7 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
 
   useEffect(() => {
     if (!selectedActivity) return undefined;
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setSelectedActivity(null);
-    };
+    const handleEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setSelectedActivity(null); };
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
   }, [selectedActivity]);
@@ -122,49 +96,27 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
       const updated = await joinActivity(activityId);
       setActivities((prev) => prev.map((a) => (a.id === activityId ? { ...a, ...updated } : a)));
       setSelectedActivity((prev) => (prev?.id === activityId ? { ...prev, ...updated } : prev));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Errore');
-    } finally {
-      setActionLoading(null);
-    }
+    } catch (e) { setError(e instanceof Error ? e.message : t('common.error')); }
+    finally { setActionLoading(null); }
   }
 
   async function handleLeave(activityId: string) {
     setActionLoading(activityId);
-    try {
-      await leaveActivity(activityId);
-      await loadActivities();
-      setSelectedActivity(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Errore');
-    } finally {
-      setActionLoading(null);
-    }
+    try { await leaveActivity(activityId); await loadActivities(); setSelectedActivity(null); }
+    catch (e) { setError(e instanceof Error ? e.message : t('common.error')); }
+    finally { setActionLoading(null); }
   }
 
   async function handleCancel(activityId: string) {
-    if (!window.confirm('Vuoi cancellare questa attività? L\'operazione è irreversibile.')) return;
+    if (!window.confirm(t('activities.cancelConfirm'))) return;
     setActionLoading(activityId);
-    try {
-      await cancelActivity(activityId);
-      await loadActivities();
-      setSelectedActivity(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Errore');
-    } finally {
-      setActionLoading(null);
-    }
+    try { await cancelActivity(activityId); await loadActivities(); setSelectedActivity(null); }
+    catch (e) { setError(e instanceof Error ? e.message : t('common.error')); }
+    finally { setActionLoading(null); }
   }
 
-  // Top-strip summaries (unchanged — just for the cards shown above the main layout)
-  const createdByMe = useMemo(
-    () => activities.filter((a) => userId && a.creator?.id === userId),
-    [activities, userId],
-  );
-  const participatingIn = useMemo(
-    () => activities.filter((a) => userId && a.creator?.id !== userId && a.participantIds?.includes(userId)),
-    [activities, userId],
-  );
+  const createdByMe = useMemo(() => activities.filter((a) => userId && a.creator?.id === userId), [activities, userId]);
+  const participatingIn = useMemo(() => activities.filter((a) => userId && a.creator?.id !== userId && a.participantIds?.includes(userId)), [activities, userId]);
 
   const categoryCounts = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -184,12 +136,8 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
       const q = search.trim().toLowerCase();
       if (category !== 'all' && activity.category !== category) return false;
       if (timeFilter === 'open' && activity.status === 'completa') return false;
-      if (timeFilter === 'today') {
-        if (!happensToday(activity, new Date())) return false;
-      }
-      if (timeFilter === 'weekend') {
-        if (!isUpcomingWeekend(activity.dateTime)) return false;
-      }
+      if (timeFilter === 'today' && !happensToday(activity, new Date())) return false;
+      if (timeFilter === 'weekend' && !isUpcomingWeekend(activity.dateTime)) return false;
       if (!q) return true;
       return `${activity.title} ${activity.description || ''} ${activity.category} ${activity.location || ''}`.toLowerCase().includes(q);
     }),
@@ -197,33 +145,21 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
   );
 
   const recommendedActivities = useMemo(
-    () => (hasInterests
-      ? filteredActivities.filter((activity) => userInterests.includes(activity.category))
-      : filteredActivities),
+    () => (hasInterests ? filteredActivities.filter((a) => userInterests.includes(a.category)) : filteredActivities),
     [filteredActivities, hasInterests, userInterests],
   );
-
   const otherFilteredActivities = useMemo(
-    () => (hasInterests
-      ? filteredActivities.filter((activity) => !userInterests.includes(activity.category))
-      : []),
+    () => (hasInterests ? filteredActivities.filter((a) => !userInterests.includes(a.category)) : []),
     [filteredActivities, hasInterests, userInterests],
   );
 
   const now = new Date();
-  const upcomingAvailable = recommendedActivities
-    .filter((a) => !a.dateTime || new Date(a.dateTime) >= now)
-    .slice()
-    .sort((a, b) => {
-      const ta = a.dateTime ? new Date(a.dateTime).getTime() : Number.MAX_SAFE_INTEGER;
-      const tb = b.dateTime ? new Date(b.dateTime).getTime() : Number.MAX_SAFE_INTEGER;
-      return ta - tb;
-    });
-  const pastAvailable = recommendedActivities
-    .filter((a) => a.dateTime && new Date(a.dateTime) < now)
-    .slice()
-    .sort((a, b) => new Date(b.dateTime!).getTime() - new Date(a.dateTime!).getTime());
-
+  const upcomingAvailable = recommendedActivities.filter((a) => !a.dateTime || new Date(a.dateTime) >= now).slice().sort((a, b) => {
+    const ta = a.dateTime ? new Date(a.dateTime).getTime() : Number.MAX_SAFE_INTEGER;
+    const tb = b.dateTime ? new Date(b.dateTime).getTime() : Number.MAX_SAFE_INTEGER;
+    return ta - tb;
+  });
+  const pastAvailable = recommendedActivities.filter((a) => a.dateTime && new Date(a.dateTime) < now).slice().sort((a, b) => new Date(b.dateTime!).getTime() - new Date(a.dateTime!).getTime());
   const featuredActivity = upcomingAvailable[0];
   const timelineActivities = upcomingAvailable.slice(0, 5);
   const timelineByDay = useMemo(() => {
@@ -243,45 +179,31 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
   function renderActivityCard(activity: ApiActivity, className = '') {
     return (
       <InteractiveMapCard
-        key={activity.id}
-        id={activity.id}
+        key={activity.id} id={activity.id}
         className={`activity-card ${className}`}
         onSelect={() => setSelectedActivity(activity)}
-        map={{
-          latitude: activity.latitude,
-          longitude: activity.longitude,
-          title: activity.title,
-          category: activity.category,
-          description: activity.description || 'Attività spontanea organizzata dalla community.',
-          dateTime: activity.dateTime,
-          type: 'activity',
-          crowdLevel: activityCrowdLevel(activity.participantCount, activity.maxParticipants),
-        }}
+        map={{ latitude: activity.latitude, longitude: activity.longitude, title: activity.title, category: activity.category, description: activity.description || t('activities.defaultDescription'), dateTime: activity.dateTime, type: 'activity', crowdLevel: activityCrowdLevel(activity.participantCount, activity.maxParticipants) }}
       >
         <div className="interactive-map-card-header">
           <span>{activity.category}</span>
-          <small>{activity.status || 'attiva'}</small>
+          <small>{activity.status || t('activities.active')}</small>
         </div>
         <h2>{activity.title}</h2>
-        <p>{activity.description || 'Attività spontanea organizzata dalla community.'}</p>
+        <p>{activity.description || t('activities.defaultDescription')}</p>
         <dl>
-          <div><dt>Luogo</dt><dd><GeocodedLocation value={activity.location} /></dd></div>
-          <div><dt>Quando</dt><dd>{formatDateTime(activity.dateTime)}</dd></div>
-          <div><dt>Partecipanti</dt><dd>{activity.participantCount} / {activity.maxParticipants}</dd></div>
+          <div><dt>{t('common.where')}</dt><dd><GeocodedLocation value={activity.location} /></dd></div>
+          <div><dt>{t('common.when')}</dt><dd>{formatDateTime(activity.dateTime)}</dd></div>
+          <div><dt>{t('common.participants')}</dt><dd>{activity.participantCount} / {activity.maxParticipants}</dd></div>
         </dl>
         {activity.dateTime && (
-          <CalendarButton
-            icsUrl={getActivityCalendarUrl(activity.id)}
-            icsFilename={`attivita-${activity.id}.ics`}
-            googleUrl={googleCalendarUrl(activity.title, activity.dateTime, activity.location)}
-          />
+          <CalendarButton icsUrl={getActivityCalendarUrl(activity.id)} icsFilename={`attivita-${activity.id}.ics`} googleUrl={googleCalendarUrl(activity.title, activity.dateTime, activity.location)} />
         )}
         {canParticipate && userId && (
           activity.participantIds?.includes(userId)
-            ? <button className="ghost-button compact-button" type="button" disabled={actionLoading === activity.id} onClick={(e) => { e.stopPropagation(); handleLeave(activity.id); }}>{actionLoading === activity.id ? '...' : 'Abbandona'}</button>
+            ? <button className="ghost-button compact-button" type="button" disabled={actionLoading === activity.id} onClick={(e) => { e.stopPropagation(); handleLeave(activity.id); }}>{actionLoading === activity.id ? '...' : t('activities.leave')}</button>
             : activity.status !== 'completa'
-              ? <button className="primary-button compact-button" type="button" disabled={actionLoading === activity.id} onClick={(e) => { e.stopPropagation(); handleJoin(activity.id); }}>{actionLoading === activity.id ? '...' : 'Partecipa'}</button>
-              : <span className="muted-copy">Al completo</span>
+              ? <button className="primary-button compact-button" type="button" disabled={actionLoading === activity.id} onClick={(e) => { e.stopPropagation(); handleJoin(activity.id); }}>{actionLoading === activity.id ? '...' : t('activities.join')}</button>
+              : <span className="muted-copy">{t('activities.full')}</span>
         )}
       </InteractiveMapCard>
     );
@@ -291,59 +213,58 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
     <section className="activities-page">
       <header className="activities-hero">
         <label className="city-search activity-search">
-          <span>Cerca</span>
-          <input value={search} onChange={(e) => setSearch(e.target.value)} type="search" placeholder="Cerca attività, zona, categoria" />
+          <span>{t('common.search')}</span>
+          <input value={search} onChange={(e) => setSearch(e.target.value)} type="search" placeholder={t('activities.searchPlaceholder')} />
         </label>
-        <div className="time-filter" aria-label="Filtro attività">
-          <button className={timeFilter === 'all' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('all')}>Tutte</button>
-          <button className={timeFilter === 'today' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('today')}>Oggi</button>
-          <button className={timeFilter === 'weekend' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('weekend')}>Weekend</button>
-          <button className={timeFilter === 'open' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('open')}>Aperte</button>
+        <div className="time-filter" aria-label={t('activities.loading')}>
+          <button className={timeFilter === 'all' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('all')}>{t('filters.all')}</button>
+          <button className={timeFilter === 'today' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('today')}>{t('filters.today')}</button>
+          <button className={timeFilter === 'weekend' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('weekend')}>{t('filters.weekend')}</button>
+          <button className={timeFilter === 'open' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('open')}>{t('filters.open')}</button>
         </div>
         <div className="activities-hero-stats">
           <span>
             <strong>{timeFilter === 'open' ? filteredOpenActivities : filteredUpcomingActivities}</strong>
             {' '}
-            {timeFilter === 'open' ? 'aperte' : timeFilter === 'today' ? 'oggi' : 'attività'}
+            {timeFilter === 'open' ? t('activities.openStat') : timeFilter === 'today' ? t('activities.todayStat') : t('activities.activitiesStat')}
           </span>
-          {isLoading && <span className="muted-copy auto-refresh-hint">Aggiornamento…</span>}
+          {isLoading && <span className="muted-copy auto-refresh-hint">{t('common.updating')}</span>}
         </div>
       </header>
 
-      {isLoading && <div className="state-panel liquid-panel">Caricamento attività...</div>}
+      {isLoading && <div className="state-panel liquid-panel">{t('activities.loading')}</div>}
       {error && (
         <div className="state-panel liquid-panel">
           <p>{error}</p>
-          <button onClick={() => loadActivities()} type="button">Riprova</button>
+          <button onClick={() => loadActivities()} type="button">{t('common.retry')}</button>
         </div>
       )}
       {!isLoading && !error && activities.length === 0 && (
-        <div className="state-panel liquid-panel">Nessuna attività trovata nel database.</div>
+        <div className="state-panel liquid-panel">{t('activities.noActivities')}</div>
       )}
       {!isLoading && !error && activities.length > 0 && recommendedActivities.length === 0 && otherFilteredActivities.length === 0 && (
-        <div className="state-panel liquid-panel">Nessuna attività corrisponde ai filtri o alla ricerca.</div>
+        <div className="state-panel liquid-panel">{t('activities.noResults')}</div>
       )}
 
-      {/* ── Le mie attività ─────────────────────────────────────────── */}
       {userId && !isLoading && createdByMe.length > 0 && (
-        <section className="my-activities-section" aria-label="Attività create da me">
-          <h2>Le mie attività <span className="section-count">{createdByMe.length}</span></h2>
+        <section className="my-activities-section" aria-label={t('activities.createdByMe')}>
+          <h2>{t('activities.createdByMe')} <span className="section-count">{createdByMe.length}</span></h2>
           <div className="event-card-strip">
             {createdByMe.map((activity) => (
               <article key={activity.id} className="activity-card event-explorer-card" onClick={() => setSelectedActivity(activity)}>
                 <div className="interactive-map-card-header">
                   <span>{activity.category}</span>
-                  <small className="badge">Creata da te</small>
+                  <small className="badge">{t('activities.createdByMeBadge')}</small>
                 </div>
                 <h2>{activity.title}</h2>
                 <dl>
-                  <div><dt>Quando</dt><dd>{formatDateTime(activity.dateTime)}</dd></div>
-                  <div><dt>Partecipanti</dt><dd>{activity.participantCount} / {activity.maxParticipants}</dd></div>
-                  <div><dt>Stato</dt><dd>{activity.status || 'attiva'}</dd></div>
+                  <div><dt>{t('common.when')}</dt><dd>{formatDateTime(activity.dateTime)}</dd></div>
+                  <div><dt>{t('common.participants')}</dt><dd>{activity.participantCount} / {activity.maxParticipants}</dd></div>
+                  <div><dt>{t('common.status')}</dt><dd>{activity.status || t('activities.active')}</dd></div>
                 </dl>
                 <div className="card-actions-row">
                   <button className="danger-button compact-button" type="button" disabled={actionLoading === activity.id} onClick={(e) => { e.stopPropagation(); handleCancel(activity.id); }}>
-                    {actionLoading === activity.id ? '...' : 'Cancella attività'}
+                    {actionLoading === activity.id ? '...' : t('activities.cancel')}
                   </button>
                 </div>
               </article>
@@ -352,25 +273,24 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
         </section>
       )}
 
-      {/* ── Sto partecipando ────────────────────────────────────────── */}
       {userId && !isLoading && participatingIn.length > 0 && (
-        <section className="my-activities-section" aria-label="Attività a cui partecipo">
-          <h2>Sto partecipando <span className="section-count">{participatingIn.length}</span></h2>
+        <section className="my-activities-section" aria-label={t('activities.participating')}>
+          <h2>{t('activities.participating')} <span className="section-count">{participatingIn.length}</span></h2>
           <div className="event-card-strip">
             {participatingIn.map((activity) => (
               <article key={activity.id} className="activity-card event-explorer-card" onClick={() => setSelectedActivity(activity)}>
                 <div className="interactive-map-card-header">
                   <span>{activity.category}</span>
-                  <small>Partecipante</small>
+                  <small>{t('activities.participantBadge')}</small>
                 </div>
                 <h2>{activity.title}</h2>
                 <dl>
-                  <div><dt>Quando</dt><dd>{formatDateTime(activity.dateTime)}</dd></div>
-                  <div><dt>Partecipanti</dt><dd>{activity.participantCount} / {activity.maxParticipants}</dd></div>
+                  <div><dt>{t('common.when')}</dt><dd>{formatDateTime(activity.dateTime)}</dd></div>
+                  <div><dt>{t('common.participants')}</dt><dd>{activity.participantCount} / {activity.maxParticipants}</dd></div>
                 </dl>
                 <div className="card-actions-row">
                   <button className="ghost-button compact-button" type="button" disabled={actionLoading === activity.id} onClick={(e) => { e.stopPropagation(); handleLeave(activity.id); }}>
-                    {actionLoading === activity.id ? '...' : 'Abbandona'}
+                    {actionLoading === activity.id ? '...' : t('activities.leave')}
                   </button>
                 </div>
               </article>
@@ -380,66 +300,48 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
       )}
 
       {!isLoading && !error && hasInterests && filteredActivities.length > 0 && (
-        <section className="preference-section" aria-label="Attività consigliate per te">
+        <section className="preference-section" aria-label={t('activities.recommendedTitle')}>
           <div className="preference-section-header">
             <div>
-              <span className="section-eyebrow">Consigliati per te</span>
-              <h2>Attività consigliate per te <span className="section-count">{recommendedActivities.length}</span></h2>
+              <span className="section-eyebrow">{t('activities.recommended')}</span>
+              <h2>{t('activities.recommendedTitle')} <span className="section-count">{recommendedActivities.length}</span></h2>
             </div>
           </div>
-
-          {recommendedActivities.length === 0 && (
-            <div className="preference-empty-state">
-              Nessuna attività consigliata corrisponde ai filtri attuali. Puoi comunque esplorare le altre attività qui sotto.
-            </div>
-          )}
-
-          {recommendedActivities.length > 0 && upcomingAvailable.length === 0 && (
-            <div className="preference-empty-state">
-              Nessuna attività consigliata in programma con questi filtri.
-            </div>
-          )}
-
+          {recommendedActivities.length === 0 && <div className="preference-empty-state">{t('activities.noRecommended')}</div>}
+          {recommendedActivities.length > 0 && upcomingAvailable.length === 0 && <div className="preference-empty-state">{t('activities.noRecommendedScheduled')}</div>}
           {upcomingAvailable.length > 0 && (
             <div className="event-editorial-layout">
               {featuredActivity && (
                 <div className="featured-activity-story-stack">
-                  <h3 className="section-eyebrow featured-section-title">Prossima Attività</h3>
+                  <h3 className="section-eyebrow featured-section-title">{t('activities.next')}</h3>
                   <article className="event-feature-story">
                     <div className="event-date-tile">
                       <strong>{formatDay(featuredActivity.dateTime)}</strong>
                       <span>{formatDateTime(featuredActivity.dateTime)}</span>
                     </div>
                     <div>
-                      <div className="feature-badges" aria-label="Categoria attività">
-                        <span>{featuredActivity.category}</span>
-                      </div>
+                      <div className="feature-badges" aria-label={t('common.category')}><span>{featuredActivity.category}</span></div>
                       <h2>{featuredActivity.title}</h2>
-                      <p>{featuredActivity.description || 'Attività spontanea organizzata dalla community.'}</p>
+                      <p>{featuredActivity.description || t('activities.defaultDescription')}</p>
                     </div>
                   </article>
                 </div>
               )}
-
               <aside className="event-timeline-panel">
-                <span className="section-eyebrow">Timeline</span>
+                <span className="section-eyebrow">{t('activities.timeline')}</span>
                 <ol className="event-timeline-grouped">
                   {timelineByDay.map(([day, acts]) => (
                     <li key={day} className="event-timeline-day">
-                      <time>{day !== 'unknown' ? formatDay(day) : 'Data da definire'}</time>
-                      <ul>
-                        {acts.map((a) => (
-                          <li key={a.id}>{a.title}</li>
-                        ))}
-                      </ul>
+                      <time>{day !== 'unknown' ? formatDay(day) : t('common.dateTBD')}</time>
+                      <ul>{acts.map((a) => <li key={a.id}>{a.title}</li>)}</ul>
                     </li>
                   ))}
                 </ol>
                 {categoryCounts.length > 0 && (
                   <div style={{ marginTop: 16 }}>
-                    <span className="section-eyebrow">Categoria</span>
+                    <span className="section-eyebrow">{t('common.category')}</span>
                     <div className="category-pill-list" style={{ marginTop: 8 }}>
-                      <button className={category === 'all' ? 'active-filter' : undefined} type="button" onClick={() => setCategory('all')}>Tutte</button>
+                      <button className={category === 'all' ? 'active-filter' : undefined} type="button" onClick={() => setCategory('all')}>{t('activities.allCategories')}</button>
                       {categoryCounts.map((item) => (
                         <button className={category === item.category ? 'active-filter' : undefined} key={item.category} type="button" onClick={() => setCategory(item.category)}>
                           {item.category} <strong>{item.count}</strong>
@@ -449,63 +351,52 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
                   </div>
                 )}
               </aside>
-
-              <div className="event-card-strip">
-                {upcomingAvailable.map((activity) => renderActivityCard(activity, 'event-explorer-card'))}
-              </div>
+              <div className="event-card-strip">{upcomingAvailable.map((activity) => renderActivityCard(activity, 'event-explorer-card'))}</div>
             </div>
           )}
         </section>
       )}
 
       {!isLoading && !error && !hasInterests && upcomingAvailable.length > 0 && (
-        <section className="preference-section" aria-label="Attività in evidenza">
+        <section className="preference-section" aria-label={t('activities.featuredTitle')}>
           <div className="preference-section-header">
             <div>
-              <span className="section-eyebrow">In evidenza</span>
-              <h2>Attività in evidenza <span className="section-count">{upcomingAvailable.length}</span></h2>
+              <span className="section-eyebrow">{t('activities.featured')}</span>
+              <h2>{t('activities.featuredTitle')} <span className="section-count">{upcomingAvailable.length}</span></h2>
             </div>
           </div>
-
           <div className="event-editorial-layout">
             {featuredActivity && (
               <div className="featured-activity-story-stack">
-                <h3 className="section-eyebrow featured-section-title">Prossima Attività</h3>
+                <h3 className="section-eyebrow featured-section-title">{t('activities.next')}</h3>
                 <article className="event-feature-story">
                   <div className="event-date-tile">
                     <strong>{formatDay(featuredActivity.dateTime)}</strong>
                     <span>{formatDateTime(featuredActivity.dateTime)}</span>
                   </div>
                   <div>
-                    <div className="feature-badges" aria-label="Categoria attività">
-                      <span>{featuredActivity.category}</span>
-                    </div>
+                    <div className="feature-badges" aria-label={t('common.category')}><span>{featuredActivity.category}</span></div>
                     <h2>{featuredActivity.title}</h2>
-                    <p>{featuredActivity.description || 'Attività spontanea organizzata dalla community.'}</p>
+                    <p>{featuredActivity.description || t('activities.defaultDescription')}</p>
                   </div>
                 </article>
               </div>
             )}
-
             <aside className="event-timeline-panel">
-              <span className="section-eyebrow">Timeline</span>
+              <span className="section-eyebrow">{t('activities.timeline')}</span>
               <ol className="event-timeline-grouped">
                 {timelineByDay.map(([day, acts]) => (
                   <li key={day} className="event-timeline-day">
-                    <time>{day !== 'unknown' ? formatDay(day) : 'Data da definire'}</time>
-                    <ul>
-                      {acts.map((a) => (
-                        <li key={a.id}>{a.title}</li>
-                      ))}
-                    </ul>
+                    <time>{day !== 'unknown' ? formatDay(day) : t('common.dateTBD')}</time>
+                    <ul>{acts.map((a) => <li key={a.id}>{a.title}</li>)}</ul>
                   </li>
                 ))}
               </ol>
               {categoryCounts.length > 0 && (
                 <div style={{ marginTop: 16 }}>
-                  <span className="section-eyebrow">Categoria</span>
+                  <span className="section-eyebrow">{t('common.category')}</span>
                   <div className="category-pill-list" style={{ marginTop: 8 }}>
-                    <button className={category === 'all' ? 'active-filter' : undefined} type="button" onClick={() => setCategory('all')}>Tutte</button>
+                    <button className={category === 'all' ? 'active-filter' : undefined} type="button" onClick={() => setCategory('all')}>{t('activities.allCategories')}</button>
                     {categoryCounts.map((item) => (
                       <button className={category === item.category ? 'active-filter' : undefined} key={item.category} type="button" onClick={() => setCategory(item.category)}>
                         {item.category} <strong>{item.count}</strong>
@@ -515,86 +406,58 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
                 </div>
               )}
             </aside>
-
-            <div className="event-card-strip">
-              {upcomingAvailable.map((activity) => renderActivityCard(activity, 'event-explorer-card'))}
-            </div>
+            <div className="event-card-strip">{upcomingAvailable.map((activity) => renderActivityCard(activity, 'event-explorer-card'))}</div>
           </div>
         </section>
       )}
 
-      {/* ── Attività passate ────────────────────────────────────────── */}
       {!isLoading && pastAvailable.length > 0 && (
-        <section className="my-activities-section" aria-label="Attività passate">
-          <button
-            type="button"
-            className="ghost-button compact-button"
-            onClick={() => setShowPast((v) => !v)}
-            aria-expanded={showPast}
-          >
-            {showPast ? '▾' : '▸'} Attività passate <span className="section-count">{pastAvailable.length}</span>
+        <section className="my-activities-section" aria-label={t('activities.past')}>
+          <button type="button" className="ghost-button compact-button" onClick={() => setShowPast((v) => !v)} aria-expanded={showPast}>
+            {showPast ? '▾' : '▸'} {t('activities.past')} <span className="section-count">{pastAvailable.length}</span>
           </button>
-          {showPast && (
-            <div className="event-card-strip" style={{ marginTop: 14, opacity: 0.85 }}>
-              {pastAvailable.map((activity) => renderActivityCard(activity, 'event-explorer-card'))}
-            </div>
-          )}
+          {showPast && <div className="event-card-strip" style={{ marginTop: 14, opacity: 0.85 }}>{pastAvailable.map((activity) => renderActivityCard(activity, 'event-explorer-card'))}</div>}
         </section>
       )}
 
       {!isLoading && !error && hasInterests && otherFilteredActivities.length > 0 && (
-        <section className="preference-section preference-section-secondary" aria-label="Altre attività">
+        <section className="preference-section preference-section-secondary" aria-label={t('activities.others')}>
           <div className="preference-section-header">
             <div>
-              <span className="section-eyebrow">Scopri ancora</span>
-              <h2>Altre attività <span className="section-count">{otherFilteredActivities.length}</span></h2>
+              <span className="section-eyebrow">{t('activities.discover')}</span>
+              <h2>{t('activities.others')} <span className="section-count">{otherFilteredActivities.length}</span></h2>
             </div>
           </div>
-          <div className="event-card-strip">
-            {otherFilteredActivities.map((activity) => renderActivityCard(activity, 'event-explorer-card'))}
-          </div>
+          <div className="event-card-strip">{otherFilteredActivities.map((activity) => renderActivityCard(activity, 'event-explorer-card'))}</div>
         </section>
       )}
 
-      {/* ── Popup dettaglio ─────────────────────────────────────────── */}
       {selectedActivity && (
         <div className="activity-popup-backdrop" role="presentation" onClick={() => setSelectedActivity(null)}>
-          <article
-            className="activity-popup"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="activity-popup-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button className="activity-popup-close" type="button" onClick={() => setSelectedActivity(null)} aria-label="Chiudi">
-              ×
-            </button>
+          <article className="activity-popup" role="dialog" aria-modal="true" aria-labelledby="activity-popup-title" onClick={(e) => e.stopPropagation()}>
+            <button className="activity-popup-close" type="button" onClick={() => setSelectedActivity(null)} aria-label={t('common.close')}>×</button>
             <span className="section-eyebrow">{selectedActivity.category}</span>
             <h2 id="activity-popup-title">{selectedActivity.title}</h2>
-            <p>{selectedActivity.description || 'Attività spontanea organizzata dalla community.'}</p>
+            <p>{selectedActivity.description || t('activities.defaultDescription')}</p>
             <dl>
-              <div><dt>Luogo</dt><dd><GeocodedLocation value={selectedActivity.location} /></dd></div>
-              <div><dt>Quando</dt><dd>{formatDateTime(selectedActivity.dateTime)}</dd></div>
-              <div><dt>Partecipanti</dt><dd>{selectedActivity.participantCount} / {selectedActivity.maxParticipants}</dd></div>
+              <div><dt>{t('common.where')}</dt><dd><GeocodedLocation value={selectedActivity.location} /></dd></div>
+              <div><dt>{t('common.when')}</dt><dd>{formatDateTime(selectedActivity.dateTime)}</dd></div>
+              <div><dt>{t('common.participants')}</dt><dd>{selectedActivity.participantCount} / {selectedActivity.maxParticipants}</dd></div>
             </dl>
             <div className="activity-popup-actions">
               {selectedActivity.dateTime && (
-                <CalendarButton
-                  icsUrl={getActivityCalendarUrl(selectedActivity.id)}
-                  icsFilename={`attivita-${selectedActivity.id}.ics`}
-                  googleUrl={googleCalendarUrl(selectedActivity.title, selectedActivity.dateTime, selectedActivity.location)}
-                />
+                <CalendarButton icsUrl={getActivityCalendarUrl(selectedActivity.id)} icsFilename={`attivita-${selectedActivity.id}.ics`} googleUrl={googleCalendarUrl(selectedActivity.title, selectedActivity.dateTime, selectedActivity.location)} />
               )}
               {canParticipate && userId && (
                 selectedActivity.creator?.id === userId
-                  ? <button className="danger-button" type="button" disabled={actionLoading === selectedActivity.id} onClick={() => handleCancel(selectedActivity.id)}>{actionLoading === selectedActivity.id ? '...' : 'Cancella attività'}</button>
+                  ? <button className="danger-button" type="button" disabled={actionLoading === selectedActivity.id} onClick={() => handleCancel(selectedActivity.id)}>{actionLoading === selectedActivity.id ? '...' : t('activities.cancel')}</button>
                   : selectedActivity.participantIds?.includes(userId)
-                    ? <button className="ghost-button" type="button" disabled={actionLoading === selectedActivity.id} onClick={() => handleLeave(selectedActivity.id)}>{actionLoading === selectedActivity.id ? '...' : 'Abbandona'}</button>
+                    ? <button className="ghost-button" type="button" disabled={actionLoading === selectedActivity.id} onClick={() => handleLeave(selectedActivity.id)}>{actionLoading === selectedActivity.id ? '...' : t('activities.leave')}</button>
                     : selectedActivity.status !== 'completa'
-                      ? <button className="primary-button" type="button" disabled={actionLoading === selectedActivity.id} onClick={() => handleJoin(selectedActivity.id)}>{actionLoading === selectedActivity.id ? '...' : 'Partecipa'}</button>
-                      : <span className="muted-copy">Al completo</span>
+                      ? <button className="primary-button" type="button" disabled={actionLoading === selectedActivity.id} onClick={() => handleJoin(selectedActivity.id)}>{actionLoading === selectedActivity.id ? '...' : t('activities.join')}</button>
+                      : <span className="muted-copy">{t('activities.full')}</span>
               )}
-              <button className="ghost-button" type="button" onClick={() => setSelectedActivity(null)}>Chiudi</button>
+              <button className="ghost-button" type="button" onClick={() => setSelectedActivity(null)}>{t('common.close')}</button>
             </div>
           </article>
         </div>

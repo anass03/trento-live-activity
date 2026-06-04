@@ -1,22 +1,17 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { createEvent, deleteEvent, getMyEvents, getPOIs, type ApiEvent, type POI } from '../lib/api';
 import { POIMapPicker } from '../components/map/POIMapPicker';
 import { GeocodedLocation } from '../components/ui/GeocodedLocation';
+import { formatDate } from '../lib/formatters';
 
 const CATEGORIES = ['sport', 'cultura', 'musica', 'arte', 'gastronomia', 'altro'];
 
 interface FormState {
-  titolo: string;
-  descrizione: string;
-  categoria: string;
-  data: string;
-  orarioInizio: string;
-  orarioFine: string;
-  latitudine: string;
-  longitudine: string;
-  poiId: string;
-  maxPartecipanti: string;
+  titolo: string; descrizione: string; categoria: string;
+  data: string; orarioInizio: string; orarioFine: string;
+  latitudine: string; longitudine: string; poiId: string; maxPartecipanti: string;
 }
 
 const EMPTY_FORM: FormState = {
@@ -30,6 +25,7 @@ function todayISO(): string {
 }
 
 export function EntityPublishPage() {
+  const { t } = useTranslation();
   const [myEvents, setMyEvents] = useState<ApiEvent[]>([]);
   const [pois, setPois] = useState<POI[]>([]);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
@@ -40,87 +36,54 @@ export function EntityPublishPage() {
   const [showPreview, setShowPreview] = useState(false);
 
   function load() {
-    getMyEvents()
-      .then((r) => setMyEvents(r.events || []))
-      .catch((e) => setError(e instanceof Error ? e.message : 'Errore'));
+    getMyEvents().then((r) => setMyEvents(r.events || [])).catch((e) => setError(e instanceof Error ? e.message : t('common.error')));
     getPOIs().then(setPois).catch(() => { /* ignore */ });
   }
   useEffect(load, []);
 
-  // Sync coordinate quando si seleziona un POI esistente
   function selectPoi(poiId: string) {
-    if (!poiId) {
-      setForm((f) => ({ ...f, poiId: '' }));
-      return;
-    }
+    if (!poiId) { setForm((f) => ({ ...f, poiId: '' })); return; }
     const poi = pois.find((p) => p.id === poiId);
-    if (poi) {
-      setForm((f) => ({
-        ...f,
-        poiId,
-        latitudine: String(poi.latitudine),
-        longitudine: String(poi.longitudine),
-      }));
-    }
+    if (poi) setForm((f) => ({ ...f, poiId, latitudine: String(poi.latitudine), longitudine: String(poi.longitudine) }));
   }
 
-  // ── Validazioni client (anche il backend ricontrolla) ──
   const validationErrors = useMemo(() => {
     const errs: string[] = [];
-    if (form.titolo.length === 0) errs.push('Titolo obbligatorio');
-    if (form.titolo.length > 100) errs.push('Titolo: max 100 caratteri (OCL C17)');
-    if (form.data && form.data < todayISO()) errs.push('Data nel passato non ammessa');
-    if (form.orarioInizio && form.orarioFine && form.orarioInizio >= form.orarioFine) {
-      errs.push('Ora fine deve essere dopo Ora inizio');
-    }
-    if (!form.latitudine || !form.longitudine) {
-      errs.push('Posizione obbligatoria (scegli un POI esistente o clicca sulla mappa)');
-    }
-    if (form.maxPartecipanti && (Number(form.maxPartecipanti) < 1)) {
-      errs.push('maxPartecipanti deve essere ≥ 1');
-    }
+    if (form.titolo.length === 0) errs.push(t('entity.validation.titleRequired'));
+    if (form.titolo.length > 100) errs.push(t('entity.validation.titleTooLong'));
+    if (form.data && form.data < todayISO()) errs.push(t('entity.validation.datePast'));
+    if (form.orarioInizio && form.orarioFine && form.orarioInizio >= form.orarioFine) errs.push(t('entity.validation.endBeforeStart'));
+    if (!form.latitudine || !form.longitudine) errs.push(t('entity.validation.positionRequired'));
+    if (form.maxPartecipanti && Number(form.maxPartecipanti) < 1) errs.push(t('entity.validation.maxParticipants'));
     return errs;
-  }, [form]);
+  }, [form, t]);
 
   async function handleDelete(eventId: string, titolo: string) {
-    if (!window.confirm(`Eliminare definitivamente l'evento "${titolo}"? L'azione non è reversibile.`)) return;
+    if (!window.confirm(t('entity.deleteConfirm', { title: titolo }))) return;
     setError(null); setMessage(null);
-    try {
-      await deleteEvent(eventId);
-      setMessage('Evento eliminato.');
-      load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Errore eliminazione');
-    }
+    try { await deleteEvent(eventId); setMessage(t('entity.deleted')); load(); }
+    catch (e) { setError(e instanceof Error ? e.message : t('common.error')); }
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null); setMessage(null);
-    if (validationErrors.length > 0) {
-      setError(validationErrors[0]);
-      return;
-    }
+    if (validationErrors.length > 0) { setError(validationErrors[0]); return; }
     setIsLoading(true);
     try {
       await createEvent({
-        titolo: form.titolo,
-        descrizione: form.descrizione,
-        categoria: form.categoria,
-        data: form.data || undefined,
-        orarioInizio: form.orarioInizio || undefined,
+        titolo: form.titolo, descrizione: form.descrizione, categoria: form.categoria,
+        data: form.data || undefined, orarioInizio: form.orarioInizio || undefined,
         orarioFine: form.orarioFine || undefined,
         latitudine: form.latitudine ? Number(form.latitudine) : undefined,
         longitudine: form.longitudine ? Number(form.longitudine) : undefined,
         poiId: form.poiId || undefined,
         maxPartecipanti: form.maxPartecipanti ? Number(form.maxPartecipanti) : undefined,
       });
-      setMessage('Evento pubblicato — gli utenti interessati riceveranno una notifica.');
-      setForm(EMPTY_FORM);
-      setShowPreview(false);
-      load();
+      setMessage(t('entity.published'));
+      setForm(EMPTY_FORM); setShowPreview(false); load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Errore');
+      setError(e instanceof Error ? e.message : t('common.error'));
     } finally { setIsLoading(false); }
   }
 
@@ -131,101 +94,66 @@ export function EntityPublishPage() {
     <section className="data-page entity-publish-page">
       <header className="utility-strip liquid-card">
         <div>
-          <h1>Pubblica evento</h1>
-          <p>Riservato agli enti certificati approvati. L'evento sarà visibile a tutti con badge verifica.</p>
+          <h1>{t('entity.publishTitle')}</h1>
+          <p>{t('entity.publishSubtitle')}</p>
         </div>
       </header>
 
       <div className="publish-layout">
         <form className="auth-form liquid-card publish-form" onSubmit={handleSubmit}>
-          <h2>Nuovo evento</h2>
+          <h2>{t('entity.newEvent')}</h2>
 
           <label>
-            <span>Titolo <small className="muted-copy">({form.titolo.length}/100)</small></span>
-            <input
-              type="text"
-              maxLength={100}
-              value={form.titolo}
-              onChange={(ev) => setForm({ ...form, titolo: ev.target.value })}
-              required
-              placeholder="Es: Mostra fotografica al Castello"
-            />
+            <span>{t('entity.titleField')} <small className="muted-copy">({form.titolo.length}/100)</small></span>
+            <input type="text" maxLength={100} value={form.titolo} onChange={(ev) => setForm({ ...form, titolo: ev.target.value })} required placeholder="Es: Mostra fotografica al Castello" />
           </label>
 
           <label>
-            <span>Descrizione</span>
-            <textarea
-              rows={4}
-              value={form.descrizione}
-              onChange={(ev) => setForm({ ...form, descrizione: ev.target.value })}
-              placeholder="Descrivi l'evento in dettaglio. Sarà visibile ai cittadini."
-            />
+            <span>{t('entity.descriptionField')}</span>
+            <textarea rows={4} value={form.descrizione} onChange={(ev) => setForm({ ...form, descrizione: ev.target.value })} placeholder={t('entity.descriptionPlaceholder')} />
           </label>
 
           <div className="filter-row">
             <label>
-              <span>Categoria</span>
+              <span>{t('entity.category')}</span>
               <select value={form.categoria} onChange={(ev) => setForm({ ...form, categoria: ev.target.value })}>
                 {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </label>
             <label>
-              <span>Max partecipanti (opz.)</span>
-              <input
-                type="number"
-                min={1}
-                value={form.maxPartecipanti}
-                onChange={(ev) => setForm({ ...form, maxPartecipanti: ev.target.value })}
-                placeholder="Vuoto = senza limite"
-              />
+              <span>{t('entity.maxParticipants')}</span>
+              <input type="number" min={1} value={form.maxPartecipanti} onChange={(ev) => setForm({ ...form, maxPartecipanti: ev.target.value })} placeholder={t('entity.noLimit')} />
             </label>
           </div>
 
           <div className="filter-row">
-            <label>
-              <span>Data</span>
-              <input
-                type="date"
-                min={todayISO()}
-                value={form.data}
-                onChange={(ev) => setForm({ ...form, data: ev.target.value })}
-              />
-            </label>
-            <label>
-              <span>Ora inizio</span>
-              <input type="time" value={form.orarioInizio} onChange={(ev) => setForm({ ...form, orarioInizio: ev.target.value })} />
-            </label>
-            <label>
-              <span>Ora fine</span>
-              <input type="time" value={form.orarioFine} onChange={(ev) => setForm({ ...form, orarioFine: ev.target.value })} />
-            </label>
+            <label><span>{t('entity.date')}</span><input type="date" min={todayISO()} value={form.data} onChange={(ev) => setForm({ ...form, data: ev.target.value })} /></label>
+            <label><span>{t('entity.startTime')}</span><input type="time" value={form.orarioInizio} onChange={(ev) => setForm({ ...form, orarioInizio: ev.target.value })} /></label>
+            <label><span>{t('entity.endTime')}</span><input type="time" value={form.orarioFine} onChange={(ev) => setForm({ ...form, orarioFine: ev.target.value })} /></label>
           </div>
 
-          {/* ── Posizione: scegli POI esistente OPPURE clicca sulla mappa ── */}
           <fieldset className="publish-location">
-            <legend>Posizione</legend>
+            <legend>{t('entity.position')}</legend>
             <label>
-              <span>POI esistente (consigliato)</span>
+              <span>{t('entity.existingPOI')}</span>
               <select value={form.poiId} onChange={(ev) => selectPoi(ev.target.value)}>
-                <option value="">— Scegli un POI o clicca sulla mappa —</option>
+                <option value="">{t('entity.choosePOI')}</option>
                 {pois.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
               </select>
             </label>
             <div className="poi-location-row">
               <div className="poi-location-info">
-                <span className="poi-location-label">Posizione selezionata</span>
+                <span className="poi-location-label">{t('entity.selectedPosition')}</span>
                 {form.latitudine && form.longitudine ? (
                   <>
                     <GeocodedLocation value={`${Number(form.latitudine).toFixed(4)}, ${Number(form.longitudine).toFixed(4)}`} />
                     <code style={{ fontSize: 11, opacity: 0.6 }}>{Number(form.latitudine).toFixed(6)}, {Number(form.longitudine).toFixed(6)}</code>
                   </>
                 ) : (
-                  <em>Nessuna posizione selezionata</em>
+                  <em>{t('entity.noPosition')}</em>
                 )}
               </div>
-              <button type="button" className="ghost-button" onClick={() => setShowPicker(true)}>
-                📍 Scegli sulla mappa
-              </button>
+              <button type="button" className="ghost-button" onClick={() => setShowPicker(true)}>{t('entity.chooseOnMap')}</button>
             </div>
           </fieldset>
 
@@ -238,54 +166,42 @@ export function EntityPublishPage() {
           {message && <div className="form-success">{message}</div>}
 
           <div className="filter-actions">
-            <button type="button" className="ghost-button" onClick={() => setShowPreview(true)} disabled={validationErrors.length > 0}>
-              👁 Anteprima
-            </button>
-            <button type="submit" className="primary-button" disabled={!canSubmit}>
-              {isLoading ? 'Pubblicazione…' : 'Pubblica evento'}
-            </button>
+            <button type="button" className="ghost-button" onClick={() => setShowPreview(true)} disabled={validationErrors.length > 0}>{t('entity.preview')}</button>
+            <button type="submit" className="primary-button" disabled={!canSubmit}>{isLoading ? t('entity.publishing') : t('entity.publish')}</button>
           </div>
         </form>
 
         <aside className="publish-summary liquid-card">
-          <h3>Riepilogo</h3>
+          <h3>{t('entity.summary')}</h3>
           <dl>
-            <div><dt>Titolo</dt><dd>{form.titolo || <em className="muted-copy">—</em>}</dd></div>
-            <div><dt>Categoria</dt><dd>{form.categoria}</dd></div>
-            <div><dt>Data</dt><dd>{form.data || <em className="muted-copy">—</em>}</dd></div>
-            <div><dt>Orario</dt><dd>{form.orarioInizio || '—'} → {form.orarioFine || '—'}</dd></div>
-            <div><dt>Luogo</dt><dd>{selectedPoi ? selectedPoi.nome : (form.latitudine ? 'Punto su mappa' : <em className="muted-copy">—</em>)}</dd></div>
-            <div><dt>Capienza</dt><dd>{form.maxPartecipanti || <em className="muted-copy">illimitata</em>}</dd></div>
+            <div><dt>{t('entity.titleField')}</dt><dd>{form.titolo || <em className="muted-copy">—</em>}</dd></div>
+            <div><dt>{t('entity.category')}</dt><dd>{form.categoria}</dd></div>
+            <div><dt>{t('entity.date')}</dt><dd>{form.data || <em className="muted-copy">—</em>}</dd></div>
+            <div><dt>{t('entity.summaryTime')}</dt><dd>{form.orarioInizio || '—'} → {form.orarioFine || '—'}</dd></div>
+            <div><dt>{t('entity.summaryPlace')}</dt><dd>{selectedPoi ? selectedPoi.nome : (form.latitudine ? t('entity.pointOnMap') : <em className="muted-copy">—</em>)}</dd></div>
+            <div><dt>{t('entity.summaryCapacity')}</dt><dd>{form.maxPartecipanti || <em className="muted-copy">{t('entity.unlimited')}</em>}</dd></div>
           </dl>
-          <small className="muted-copy">
-            L'evento ottiene il badge verifica e viene mostrato ai cittadini con gli interessi corrispondenti.
-          </small>
+          <small className="muted-copy">{t('entity.badgeHint')}</small>
         </aside>
       </div>
 
       <div className="liquid-card">
-        <h2>I miei eventi pubblicati ({myEvents.length})</h2>
+        <h2>{t('entity.myEvents', { count: myEvents.length })}</h2>
         {myEvents.length === 0 ? (
-          <p>Non hai ancora pubblicato eventi.</p>
+          <p>{t('entity.noEvents')}</p>
         ) : (
           <table className="stats-table">
-            <thead><tr><th>Titolo</th><th>Categoria</th><th>Data</th><th>Partecipanti</th><th>Azioni</th></tr></thead>
+            <thead><tr><th>{t('entity.colTitle')}</th><th>{t('common.category')}</th><th>{t('entity.colDate')}</th><th>{t('entity.colParticipants')}</th><th>{t('common.actions')}</th></tr></thead>
             <tbody>
               {myEvents.map((e) => (
                 <tr key={e.id}>
                   <td>{e.title}</td>
                   <td>{e.category}</td>
-                  <td>{e.dateTime ? new Date(e.dateTime).toLocaleDateString('it-IT') : '—'}</td>
+                  <td>{e.dateTime ? formatDate(e.dateTime) : '—'}</td>
                   <td>{e.participantCount ?? 0}{e.maxPartecipanti ? ` / ${e.maxPartecipanti}` : ''}</td>
                   <td style={{ display: 'flex', gap: 8 }}>
-                    <Link to={`/eventi/${e.id}`}>Apri</Link>
-                    <button
-                      type="button"
-                      className="danger-button compact-button"
-                      onClick={() => handleDelete(e.id, e.title)}
-                    >
-                      Elimina
-                    </button>
+                    <Link to={`/eventi/${e.id}`}>{t('common.open')}</Link>
+                    <button type="button" className="danger-button compact-button" onClick={() => handleDelete(e.id, e.title)}>{t('common.delete')}</button>
                   </td>
                 </tr>
               ))}
@@ -296,18 +212,10 @@ export function EntityPublishPage() {
 
       {showPicker && (
         <POIMapPicker
-          initial={{
-            latitudine: form.latitudine ? Number(form.latitudine) : undefined,
-            longitudine: form.longitudine ? Number(form.longitudine) : undefined,
-          }}
+          initial={{ latitudine: form.latitudine ? Number(form.latitudine) : undefined, longitudine: form.longitudine ? Number(form.longitudine) : undefined }}
           onCancel={() => setShowPicker(false)}
           onConfirm={(coords) => {
-            setForm((f) => ({
-              ...f,
-              poiId: '', // se l'utente clicca manualmente, scollegalo dal POI
-              latitudine: String(coords.latitudine),
-              longitudine: String(coords.longitudine),
-            }));
+            setForm((f) => ({ ...f, poiId: '', latitudine: String(coords.latitudine), longitudine: String(coords.longitudine) }));
             setShowPicker(false);
           }}
         />
@@ -316,20 +224,20 @@ export function EntityPublishPage() {
       {showPreview && (
         <div className="activity-popup-backdrop" role="presentation" onClick={() => setShowPreview(false)}>
           <article className="activity-popup" role="dialog" aria-modal="true" onClick={(ev) => ev.stopPropagation()}>
-            <button className="activity-popup-close" type="button" onClick={() => setShowPreview(false)} aria-label="Chiudi">×</button>
-            <span className="section-eyebrow">Anteprima evento</span>
+            <button className="activity-popup-close" type="button" onClick={() => setShowPreview(false)} aria-label={t('common.close')}>×</button>
+            <span className="section-eyebrow">{t('entity.previewTitle')}</span>
             <h2>{form.titolo}</h2>
-            <p>{form.descrizione || 'Nessuna descrizione disponibile.'}</p>
+            <p>{form.descrizione || t('events.noDescription')}</p>
             <dl>
-              <div><dt>Categoria</dt><dd>{form.categoria}</dd></div>
-              <div><dt>Data</dt><dd>{form.data ? new Date(form.data).toLocaleDateString('it-IT') : '—'}</dd></div>
-              <div><dt>Orario</dt><dd>{form.orarioInizio || '—'} → {form.orarioFine || '—'}</dd></div>
-              <div><dt>Luogo</dt><dd>{selectedPoi ? selectedPoi.nome : 'Punto sulla mappa'}</dd></div>
-              {form.maxPartecipanti && <div><dt>Capienza</dt><dd>{form.maxPartecipanti}</dd></div>}
+              <div><dt>{t('common.category')}</dt><dd>{form.categoria}</dd></div>
+              <div><dt>{t('entity.date')}</dt><dd>{form.data ? formatDate(form.data) : '—'}</dd></div>
+              <div><dt>{t('entity.summaryTime')}</dt><dd>{form.orarioInizio || '—'} → {form.orarioFine || '—'}</dd></div>
+              <div><dt>{t('entity.summaryPlace')}</dt><dd>{selectedPoi ? selectedPoi.nome : t('entity.pointOnMap')}</dd></div>
+              {form.maxPartecipanti && <div><dt>{t('entity.summaryCapacity')}</dt><dd>{form.maxPartecipanti}</dd></div>}
             </dl>
             <div className="filter-actions">
-              <button type="button" className="ghost-button" onClick={() => setShowPreview(false)}>Modifica</button>
-              <button type="button" className="primary-button" onClick={handleSubmit}>Pubblica ora</button>
+              <button type="button" className="ghost-button" onClick={() => setShowPreview(false)}>{t('entity.editAction')}</button>
+              <button type="button" className="primary-button" onClick={handleSubmit}>{t('entity.publishNow')}</button>
             </div>
           </article>
         </div>
