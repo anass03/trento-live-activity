@@ -1,5 +1,5 @@
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
-import { getMessaging, getToken, deleteToken, onMessage, type Messaging } from 'firebase/messaging';
+import { getMessaging, getToken, deleteToken, onMessage, isSupported, type Messaging } from 'firebase/messaging';
 
 // These values are intentionally public — they identify the web client to
 // Firebase. Sono hardcoded come fallback così le notifiche funzionano per tutti
@@ -28,11 +28,17 @@ export function getFirebaseApp(): FirebaseApp {
 }
 
 export function getFirebaseMessaging(): Messaging | null {
-  if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('Notification' in window)) {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('Notification' in window) || !('PushManager' in window)) {
     return null;
   }
   if (messaging) return messaging;
-  messaging = getMessaging(getFirebaseApp());
+  // Su Safari (e altri browser senza supporto FCM) getMessaging può lanciare
+  // 'messaging/unsupported-browser': lo trattiamo come "non disponibile".
+  try {
+    messaging = getMessaging(getFirebaseApp());
+  } catch {
+    return null;
+  }
   return messaging;
 }
 
@@ -65,6 +71,12 @@ export async function revokeFcmToken(): Promise<void> {
 // one first) so stale tokens are replaced on every "enable" click.
 // Throws if the user denies notification permission or the browser isn't supported.
 export async function requestFcmToken(): Promise<string> {
+  // isSupported() è il check autoritativo di Firebase: copre Safari datati e
+  // contesti senza Push API. Su iOS le push web funzionano solo da iOS 16.4+ e
+  // solo se l'app è stata aggiunta alla schermata Home (PWA).
+  if (!(await isSupported())) {
+    throw new Error('Notifiche push non supportate da questo browser. Su iPhone/iPad aggiungi prima l\'app alla schermata Home (richiede iOS/Safari 16.4 o superiore).');
+  }
   const m = getFirebaseMessaging();
   if (!m) throw new Error('Notifiche push non supportate da questo browser');
 
