@@ -26,16 +26,15 @@ export function SettingsPage() {
     listConsents()
       .then((records) => {
         const summary = summarizeConsents(records);
-        // Default true: se non c'è un record esplicito di revoca, notifiche attive.
         setNotifEmail(summary.notif_email !== false);
       })
-      .catch(() => { /* offline → mantieni default */ });
+      .catch(() => { /* offline → keep default */ });
   }, [isLoggedIn]);
 
   useEffect(() => {
     if (!saved) return;
-    const t = setTimeout(() => setSaved(false), 2200);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setSaved(false), 2200);
+    return () => clearTimeout(timer);
   }, [saved]);
 
   function changeTheme(next: Theme) {
@@ -63,8 +62,8 @@ export function SettingsPage() {
       window.dispatchEvent(new CustomEvent('tla:consents-changed'));
       setSaved(true);
     } catch (e) {
-      setNotifError(e instanceof Error ? e.message : 'Errore salvataggio preferenza');
-      setNotifEmail(!value); // rollback
+      setNotifError(e instanceof Error ? e.message : t('common.error'));
+      setNotifEmail(!value);
     }
   }
 
@@ -118,26 +117,26 @@ export function SettingsPage() {
       <div className="liquid-card settings-card">
         <h2>{t('settings.notifications')}</h2>
         <p>
-          {!isLoggedIn && <em>Accedi per salvare le preferenze sul tuo account. </em>}
-          Le notifiche push si gestiscono dal <a href="/profilo">profilo</a> (dipendono dal browser specifico).
+          {!isLoggedIn && <em>{t('settings.loginHint')} </em>}
+          {t('settings.notifHint', { interpolation: { escapeValue: false } })}
         </p>
         {notifError && <div className="form-error">{notifError}</div>}
         <label className="settings-row settings-row-toggle">
           <div>
-            <strong>Email</strong>
-            <small>Conferme partecipazione, modifiche eventi, segnalazioni</small>
+            <strong>{t('settings.notifEmail')}</strong>
+            <small>{t('settings.notifEmailHint')}</small>
           </div>
           <input type="checkbox" checked={notifEmail} onChange={(e) => toggleNotifEmail(e.target.checked)} />
         </label>
       </div>
 
       <div className="liquid-card settings-card">
-        <h2>Account</h2>
-        <p>Gestisci i tuoi dati personali e i consensi.</p>
+        <h2>{t('settings.account')}</h2>
+        <p>{t('settings.accountHint')}</p>
         <div className="filter-actions">
-          <a className="primary-button" href="/profilo">Vai al profilo</a>
-          <a href="/privacy">Informativa privacy</a>
-          <a href="/termini">Termini di servizio</a>
+          <a className="primary-button" href="/profilo">{t('settings.goToProfile')}</a>
+          <a href="/privacy">{t('settings.privacyLink')}</a>
+          <a href="/termini">{t('settings.termsLink')}</a>
         </div>
       </div>
     </section>

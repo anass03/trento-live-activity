@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c ' *)",
+      "Bash(python -c ' *)",
+      "Read(//usr/**)",
+      "Read(//c/Users/filip/.nvm/**)",
+      "Bash(find \"/mnt/f/UNI/UNITN/SOFTWARE ENGINEERING/repo/trento-live-activity/frontend/src\" -name \"*.tsx\" -o -name \"*.ts\" | sort)",
+      "Bash(npx tsc *)",
+      "Bash(cmd /c \"where node 2>&1\")",
+      "Bash(cmd /c \"where npx 2>&1\")",
+      "Bash(xargs grep -l \"admin\\\\|DELETE\")",
+      "PowerShell($path = \"F:\\\\UNI\\\\UNITN\\\\SOFTWARE ENGINEERING\\\\repo\\\\trento-live-activity\\\\backend\\\\src\"; Get-ChildItem $path -Recurse | Where-Object { -not $_.PSIsContainer } | Select-Object FullName)",
+      "Bash(Get-ChildItem -Path \"F:\\\\UNI\\\\UNITN\\\\SOFTWARE ENGINEERING\\\\repo\\\\trento-live-activity\\\\backend\" -Recurse -File)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Get-ChildItem -Path \"F:\\\\UNI\\\\UNITN\\\\SOFTWARE ENGINEERING\\\\repo\\\\trento-live-activity\\\\docs\" -Recurse)",
+      "Bash(Select-Object Name, FullName)",
+      "Bash(npm test *)",
+      "Bash(git -C \"F:\\\\UNI\\\\UNITN\\\\SOFTWARE ENGINEERING\\\\repo\\\\trento-live-activity\" log --oneline)",
+      "Bash(git -C \"F:\\\\UNI\\\\UNITN\\\\SOFTWARE ENGINEERING\\\\repo\\\\trento-live-activity\" log --oneline --merges main)",
+      "Bash(git -C \"F:\\\\UNI\\\\UNITN\\\\SOFTWARE ENGINEERING\\\\repo\\\\trento-live-activity\" branch -a)",
+      "Bash(ls \"F:\\\\UNI\\\\UNITN\\\\SOFTWARE ENGINEERING\\\\repo\\\\trento-live-activity\\\\\")",
+      "Bash(find \"/mnt/f/UNI/UNITN/SOFTWARE ENGINEERING/repo/trento-live-activity\" -maxdepth 2 -type d 2>/dev/null)"
+    ]
+  }
+}

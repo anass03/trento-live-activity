@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { getDashboardStats, type DashboardFilters, type DashboardStats } from '../lib/api';
 import { AreaMapPicker } from '../components/map/AreaMapPicker';
 import { GeocodedLocation } from '../components/ui/GeocodedLocation';
-import { useAutoRefresh } from '../lib/useAutoRefresh';
 
 const EMPTY_FILTERS: DashboardFilters = {};
 
@@ -15,24 +15,23 @@ function maxCount(rows: Array<{ count: number | string }>) {
 }
 
 export function ComuneStatistichePage() {
+  const { t } = useTranslation();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [filters, setFilters] = useState<DashboardFilters>(EMPTY_FILTERS);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
 
-  function load(nextFilters = filters, silent = false) {
-    if (!silent) { setIsLoading(true); setError(null); }
+  function load(nextFilters = filters) {
+    setIsLoading(true);
+    setError(null);
     getDashboardStats(cleanFilters(nextFilters))
       .then(setStats)
-      .catch((e) => { if (!silent) setError(e instanceof Error ? e.message : 'Errore nel caricamento statistiche.'); })
-      .finally(() => { if (!silent) setIsLoading(false); });
+      .catch((e) => setError(e instanceof Error ? e.message : t('comune.stats.loading')))
+      .finally(() => setIsLoading(false));
   }
 
-  // I filtri si applicano automaticamente al cambio (niente pulsante "Aggiorna").
-  useEffect(() => { load(filters); }, [filters]);
-  // Auto-aggiornamento periodico silenzioso con i filtri correnti.
-  useAutoRefresh(() => load(filters, true), 60_000);
+  useEffect(() => { load(EMPTY_FILTERS); }, []);
 
   function update(key: keyof DashboardFilters, value: string) {
     setFilters((prev) => ({ ...prev, [key]: value || undefined }));
@@ -40,6 +39,7 @@ export function ComuneStatistichePage() {
 
   function resetFilters() {
     setFilters(EMPTY_FILTERS);
+    load(EMPTY_FILTERS);
   }
 
   const activityMax = useMemo(() => maxCount(stats?.activitiesByType || []), [stats]);
@@ -49,75 +49,74 @@ export function ComuneStatistichePage() {
     <section className="data-page comune-page">
       <header className="utility-strip liquid-card">
         <div>
-          <h1>Statistiche Comune</h1>
-          <p>Metriche aggregate, filtri territoriali e distribuzioni operative.</p>
+          <h1>{t('comune.stats.title')}</h1>
+          <p>{t('comune.stats.subtitle')}</p>
         </div>
-        {isLoading && <span className="muted-copy auto-refresh-hint">Aggiornamento…</span>}
+        <button type="button" className="refresh-button" onClick={() => load(filters)}>{t('comune.stats.refresh')}</button>
       </header>
 
       <div className="liquid-card filter-bar">
-        <h2>Filtri analisi</h2>
+        <h2>{t('comune.stats.filtersTitle')}</h2>
         <div className="filter-row">
           <label>
-            <span>Tipo attività</span>
+            <span>{t('comune.stats.activityType')}</span>
             <select value={filters.tipo || ''} onChange={(event) => update('tipo', event.target.value)}>
-              <option value="">Tutti</option>
+              <option value="">{t('comune.stats.all')}</option>
               <option value="sport">Sport</option>
               <option value="cultura">Cultura</option>
               <option value="musica">Musica</option>
               <option value="studio">Studio</option>
             </select>
           </label>
-          <label><span>Dal</span><input type="date" value={filters.da || ''} onChange={(event) => update('da', event.target.value)} /></label>
-          <label><span>Al</span><input type="date" value={filters.a || ''} onChange={(event) => update('a', event.target.value)} /></label>
+          <label><span>{t('comune.stats.from')}</span><input type="date" value={filters.da || ''} onChange={(event) => update('da', event.target.value)} /></label>
+          <label><span>{t('comune.stats.to')}</span><input type="date" value={filters.a || ''} onChange={(event) => update('a', event.target.value)} /></label>
         </div>
         <div className="filter-row area-picker-row">
           <div className="area-picker-summary">
-            <span>Area geografica</span>
+            <span>{t('comune.stats.geoArea')}</span>
             {filters.centerLat && filters.centerLng ? (
               <span className="area-picker-value">
                 <GeocodedLocation value={`${filters.centerLat}, ${filters.centerLng}`} />
                 {filters.radiusKm && <em> · {filters.radiusKm} km</em>}
               </span>
             ) : (
-              <em className="muted-copy">Nessuna area selezionata</em>
+              <em className="muted-copy">{t('comune.stats.noArea')}</em>
             )}
           </div>
           <div className="filter-actions" style={{ marginTop: 0 }}>
             <button type="button" onClick={() => setShowAreaPicker(true)}>
-              {filters.centerLat ? '📍 Modifica area' : '📍 Scegli area sulla mappa'}
+              {filters.centerLat ? t('comune.stats.editArea') : t('comune.stats.chooseArea')}
             </button>
             {filters.centerLat && (
               <button type="button" onClick={() => setFilters((prev) => ({ ...prev, centerLat: undefined, centerLng: undefined, radiusKm: undefined }))}>
-                Rimuovi area
+                {t('comune.stats.removeArea')}
               </button>
             )}
           </div>
         </div>
         <div className="filter-actions">
-          <button type="button" className="primary-button" onClick={() => load(filters)}>Applica filtri</button>
-          <button type="button" onClick={resetFilters}>Reset</button>
+          <button type="button" className="primary-button" onClick={() => load(filters)}>{t('comune.stats.applyFilters')}</button>
+          <button type="button" onClick={resetFilters}>{t('comune.stats.reset')}</button>
         </div>
       </div>
 
-      {isLoading && <div className="state-panel liquid-panel">Caricamento statistiche...</div>}
-      {error && <div className="state-panel liquid-panel"><p>{error}</p><button type="button" onClick={() => load(filters)}>Riprova</button></div>}
+      {isLoading && <div className="state-panel liquid-panel">{t('comune.stats.loading')}</div>}
+      {error && <div className="state-panel liquid-panel"><p>{error}</p><button type="button" onClick={() => load(filters)}>{t('comune.stats.retry')}</button></div>}
 
       {stats && !isLoading && !error && (
         <>
           <div className="kpi-grid">
-            <article className="kpi liquid-card"><span className="kpi-label">Utenti</span><strong className="kpi-value">{stats.totalUsers}</strong></article>
-            <article className="kpi liquid-card"><span className="kpi-label">Attività</span><strong className="kpi-value">{stats.totalActivities}</strong></article>
-            <article className="kpi liquid-card"><span className="kpi-label">Eventi</span><strong className="kpi-value">{stats.totalEvents}</strong></article>
-            <article className="kpi liquid-card"><span className="kpi-label">POI</span><strong className="kpi-value">{stats.totalPOIs}</strong></article>
-            <article className="kpi liquid-card"><span className="kpi-label">Partecipazioni</span><strong className="kpi-value">{stats.totalParticipations}</strong></article>
+            <article className="kpi liquid-card"><span className="kpi-label">{t('comune.dashboard.activeActivities')}</span><strong className="kpi-value">{stats.totalActivities}</strong></article>
+            <article className="kpi liquid-card"><span className="kpi-label">{t('comune.dashboard.certifiedEvents')}</span><strong className="kpi-value">{stats.totalEvents}</strong></article>
+            <article className="kpi liquid-card"><span className="kpi-label">{t('comune.dashboard.pointsOfInterest')}</span><strong className="kpi-value">{stats.totalPOIs}</strong></article>
+            <article className="kpi liquid-card"><span className="kpi-label">{t('comune.dashboard.participations')}</span><strong className="kpi-value">{stats.totalParticipations}</strong></article>
           </div>
 
           <div className="comune-analytics-grid">
             <section className="dashboard-section liquid-card">
-              <h2>Attività per tipo</h2>
+              <h2>{t('comune.stats.byType')}</h2>
               {stats.activitiesByType.length === 0 ? (
-                <p className="muted-copy">Nessun dato per i filtri applicati.</p>
+                <p className="muted-copy">{t('comune.stats.noData')}</p>
               ) : (
                 <div className="metric-bar-list">
                   {stats.activitiesByType.map((row) => (
@@ -132,9 +131,9 @@ export function ComuneStatistichePage() {
             </section>
 
             <section className="dashboard-section liquid-card">
-              <h2>POI per affollamento</h2>
+              <h2>{t('comune.stats.byCrowding')}</h2>
               {stats.poiCrowding.length === 0 ? (
-                <p className="muted-copy">Nessun dato per i filtri applicati.</p>
+                <p className="muted-copy">{t('comune.stats.noData')}</p>
               ) : (
                 <div className="metric-bar-list">
                   {stats.poiCrowding.map((row) => (
@@ -150,6 +149,7 @@ export function ComuneStatistichePage() {
           </div>
         </>
       )}
+
       {showAreaPicker && (
         <AreaMapPicker
           initial={{ centerLat: filters.centerLat, centerLng: filters.centerLng, radiusKm: filters.radiusKm }}

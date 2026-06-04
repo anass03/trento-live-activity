@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import QRCode from 'qrcode';
 import { setup2fa, verify2fa } from '../lib/api';
 
@@ -7,6 +8,7 @@ type Phase = 'scan' | 'codes';
 
 export function Setup2FAPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [phase, setPhase] = useState<Phase>('scan');
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [secret, setSecret] = useState<string | null>(null);
@@ -24,9 +26,9 @@ export function Setup2FAPage() {
         const dataUrl = await QRCode.toDataURL(otpauthUrl, { width: 256, margin: 2 });
         setQrDataUrl(dataUrl);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Errore inizializzazione 2FA'))
+      .catch((e) => setError(e instanceof Error ? e.message : t('twofa.initError')))
       .finally(() => setIsLoading(false));
-  }, []);
+  }, [t]);
 
   async function handleVerify(event: FormEvent) {
     event.preventDefault();
@@ -37,7 +39,7 @@ export function Setup2FAPage() {
       setRecoveryCodes(result.recoveryCodes);
       setPhase('codes');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Codice non valido');
+      setError(e instanceof Error ? e.message : t('twofa.invalidCode'));
     } finally {
       setIsVerifying(false);
     }
@@ -49,10 +51,10 @@ export function Setup2FAPage() {
 
   function handleDownloadCodes() {
     const blob = new Blob([
-      `Trento Live Activity — Codici di recupero 2FA\n` +
+      `Trento Live Activity — Recovery codes 2FA\n` +
       `Account: admin@trento-live.it\n` +
-      `Generati il: ${new Date().toLocaleString('it-IT')}\n\n` +
-      `Conservali in un luogo sicuro. Ogni codice è monouso.\n\n` +
+      `Generated: ${new Date().toLocaleString()}\n\n` +
+      `Keep these in a safe place. Each code is single-use.\n\n` +
       recoveryCodes.join('\n') + '\n',
     ], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -73,22 +75,22 @@ export function Setup2FAPage() {
       <div className="auth-form liquid-card two-factor-card">
         {phase === 'scan' && (
           <>
-            <h1>Configurazione 2FA</h1>
-            <p>Configura la 2FA con il tuo authenticator. Un eventuale setup precedente verrà sostituito.</p>
+            <h1>{t('twofa.setupTitle')}</h1>
+            <p>{t('twofa.setupSubtitle')}</p>
 
-            {isLoading && <div className="state-panel liquid-panel">Generazione QR code...</div>}
+            {isLoading && <div className="state-panel liquid-panel">{t('twofa.loadingQR')}</div>}
             {error && <div className="form-error">{error}</div>}
 
             {!isLoading && qrDataUrl && (
               <>
                 <div className="qr-section">
-                  <p><strong>Passo 1.</strong> Inquadra questo QR code con la tua app di autenticazione (Google Authenticator, Aegis, Authy, 1Password, ecc.).</p>
+                  <p><strong>{t('twofa.step1')}</strong></p>
                   <div className="qr-frame">
-                    <img src={qrDataUrl} alt="QR code per 2FA" />
+                    <img src={qrDataUrl} alt="QR code 2FA" />
                   </div>
                   {secret && (
                     <details>
-                      <summary>Non riesci a scannerizzare? Inserisci la chiave manualmente</summary>
+                      <summary>{t('twofa.cannotScan')}</summary>
                       <code className="secret-fallback">{secret}</code>
                     </details>
                   )}
@@ -96,7 +98,7 @@ export function Setup2FAPage() {
 
                 <form onSubmit={handleVerify}>
                   <label>
-                    <span><strong>Passo 2.</strong> Inserisci il codice a 6 cifre generato dall'app</span>
+                    <span><strong>{t('twofa.step2')}</strong></span>
                     <input
                       type="text"
                       inputMode="numeric"
@@ -110,7 +112,7 @@ export function Setup2FAPage() {
                     />
                   </label>
                   <button className="primary-button" type="submit" disabled={isVerifying || code.length !== 6}>
-                    {isVerifying ? 'Verifica in corso...' : 'Conferma e attiva 2FA'}
+                    {isVerifying ? t('twofa.verifying') : t('twofa.confirm')}
                   </button>
                 </form>
               </>
@@ -120,11 +122,9 @@ export function Setup2FAPage() {
 
         {phase === 'codes' && (
           <>
-            <h1>Salva i tuoi codici di recupero</h1>
+            <h1>{t('twofa.codesTitle')}</h1>
             <div className="warning-box">
-              <strong>⚠ Importante:</strong> questi 8 codici servono ad accedere al tuo account
-              se perdi l'authenticator. Sono <strong>monouso</strong> e verranno mostrati
-              <strong> solo questa volta</strong>. Stampali o salvali in un password manager.
+              <strong>{t('twofa.codesWarning')}</strong>
             </div>
 
             <div className="recovery-codes-grid">
@@ -134,17 +134,17 @@ export function Setup2FAPage() {
             </div>
 
             <div className="filter-actions">
-              <button type="button" onClick={handleCopyCodes}>Copia negli appunti</button>
-              <button type="button" onClick={handleDownloadCodes}>Scarica come .txt</button>
+              <button type="button" onClick={handleCopyCodes}>{t('twofa.copyToClipboard')}</button>
+              <button type="button" onClick={handleDownloadCodes}>{t('twofa.downloadTxt')}</button>
             </div>
 
             <label className="checkbox">
               <input type="checkbox" checked={acknowledged} onChange={(e) => setAcknowledged(e.target.checked)} />
-              <span>Ho salvato i codici in un luogo sicuro</span>
+              <span>{t('twofa.acknowledgeLabel')}</span>
             </label>
 
             <button className="primary-button" type="button" disabled={!acknowledged} onClick={handleContinue}>
-              Continua
+              {t('twofa.continue')}
             </button>
           </>
         )}

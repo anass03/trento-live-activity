@@ -1,38 +1,29 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { cancelActivity, getActivityById, getActivityCalendarUrl, googleCalendarUrl, getToken, joinActivity, leaveActivity, type ApiActivity } from '../lib/api';
 import { CalendarButton } from '../components/ui/CalendarButton';
+import { formatDateTimeFull } from '../lib/formatters';
 import type { AppUser } from '../data/mockUser';
-
-function formatDateTime(value?: string | null) {
-  if (!value) return 'Data da definire';
-  return new Intl.DateTimeFormat('it-IT', { dateStyle: 'full', timeStyle: 'short' }).format(new Date(value));
-}
 
 export function ActivityDetailPage({ user }: { user?: AppUser }) {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { t } = useTranslation();
   const [activity, setActivity] = useState<ApiActivity | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [joinMsg, setJoinMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [joining, setJoining] = useState(false);
   const [cancelling, setCancelling] = useState(false);
-  // Solo i cittadini registrati possono partecipare: gli amministratori no
-  // (il backend già blocca le API, qui nascondiamo i controlli).
   const canParticipate = !!getToken() && user?.role === 'registered_user';
 
   async function loadActivity() {
     if (!id) return;
-    setIsLoading(true);
-    setError(null);
-    try {
-      setActivity(await getActivityById(id));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Errore nel caricamento del dettaglio attività.');
-    } finally {
-      setIsLoading(false);
-    }
+    setIsLoading(true); setError(null);
+    try { setActivity(await getActivityById(id)); }
+    catch (e) { setError(e instanceof Error ? e.message : t('common.error')); }
+    finally { setIsLoading(false); }
   }
 
   useEffect(() => { void loadActivity(); }, [id]);
@@ -43,9 +34,9 @@ export function ActivityDetailPage({ user }: { user?: AppUser }) {
     try {
       const updated = await joinActivity(id);
       setActivity(updated);
-      setJoinMsg({ ok: true, text: 'Iscrizione confermata!' });
+      setJoinMsg({ ok: true, text: t('activities.joined') });
     } catch (e) {
-      setJoinMsg({ ok: false, text: e instanceof Error ? e.message : 'Errore' });
+      setJoinMsg({ ok: false, text: e instanceof Error ? e.message : t('common.error') });
     } finally { setJoining(false); }
   }
 
@@ -55,22 +46,22 @@ export function ActivityDetailPage({ user }: { user?: AppUser }) {
     try {
       await leaveActivity(id);
       await loadActivity();
-      setJoinMsg({ ok: true, text: 'Hai abbandonato l\'attività.' });
+      setJoinMsg({ ok: true, text: t('activities.left') });
     } catch (e) {
-      setJoinMsg({ ok: false, text: e instanceof Error ? e.message : 'Errore' });
+      setJoinMsg({ ok: false, text: e instanceof Error ? e.message : t('common.error') });
     } finally { setJoining(false); }
   }
 
   async function handleCancelActivity() {
     if (!id) return;
-    if (!window.confirm('Annullare definitivamente questa attività? I partecipanti riceveranno una notifica.')) return;
+    if (!window.confirm(t('activities.cancelConfirmDetail'))) return;
     setCancelling(true); setJoinMsg(null);
     try {
       await cancelActivity(id);
-      setJoinMsg({ ok: true, text: 'Attività annullata. Reindirizzamento...' });
+      setJoinMsg({ ok: true, text: t('activities.cancelled') });
       setTimeout(() => navigate('/attivita'), 1200);
     } catch (e) {
-      setJoinMsg({ ok: false, text: e instanceof Error ? e.message : 'Errore annullamento' });
+      setJoinMsg({ ok: false, text: e instanceof Error ? e.message : t('common.error') });
       setCancelling(false);
     }
   }
@@ -82,47 +73,51 @@ export function ActivityDetailPage({ user }: { user?: AppUser }) {
 
   return (
     <section className="detail-page liquid-panel">
-      <Link className="back-link" to="/attivita">Torna alle attività</Link>
-      {isLoading && <p>Caricamento attività...</p>}
+      <Link className="back-link" to="/attivita">{t('activities.backToList')}</Link>
+      {isLoading && <p>{t('activities.loading')}</p>}
       {error && (
         <div className="state-inline">
           <p>{error}</p>
-          <button onClick={loadActivity} type="button">Riprova</button>
+          <button onClick={loadActivity} type="button">{t('common.retry')}</button>
         </div>
       )}
       {!isLoading && !error && activity && (
         <>
           <div className="data-card-header">
             <span>{activity.category}</span>
-            <small>{activity.status || 'attiva'}</small>
+            <small>{activity.status || t('activities.active')}</small>
           </div>
           <h1>{activity.title}</h1>
-          <p>{activity.description || 'Attività spontanea organizzata dalla community.'}</p>
+          <p>{activity.description || t('activities.defaultDescription')}</p>
           <dl className="detail-list">
-            <div><dt>Luogo</dt><dd>{activity.location || 'Non specificato'}</dd></div>
-            <div><dt>Quando</dt><dd>{formatDateTime(activity.dateTime)}</dd></div>
-            <div><dt>Partecipanti</dt><dd>{activity.participantCount} / {activity.maxParticipants}</dd></div>
+            <div><dt>{t('common.where')}</dt><dd>{activity.location || t('common.notSpecified')}</dd></div>
+            <div><dt>{t('common.when')}</dt><dd>{formatDateTimeFull(activity.dateTime)}</dd></div>
+            <div><dt>{t('common.participants')}</dt><dd>{activity.participantCount} / {activity.maxParticipants}</dd></div>
           </dl>
           {activity.dateTime && (
             <CalendarButton
               icsUrl={getActivityCalendarUrl(activity.id)}
               icsFilename={`attivita-${activity.id}.ics`}
               googleUrl={googleCalendarUrl(activity.title, activity.dateTime, activity.location)}
-              label="Aggiungi al calendario"
+              label={t('common.addToCalendar')}
             />
           )}
           {canParticipate && activity.status === 'attiva' && (
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               {isCreator ? (
                 <button className="danger-button" onClick={handleCancelActivity} disabled={cancelling}>
-                  {cancelling ? 'Annullamento...' : 'Annulla attività'}
+                  {cancelling ? t('activities.cancelling') : t('activities.cancel')}
                 </button>
               ) : isParticipating ? (
-                <button onClick={handleLeave} disabled={joining} style={{ background: 'transparent', border: '1px solid var(--color-glass-border)', borderRadius: 999, padding: '10px 14px', cursor: 'pointer' }}>{joining ? '...' : 'Abbandona'}</button>
+                <button onClick={handleLeave} disabled={joining} style={{ background: 'transparent', border: '1px solid var(--color-glass-border)', borderRadius: 999, padding: '10px 14px', cursor: 'pointer' }}>
+                  {joining ? '...' : t('activities.leave')}
+                </button>
               ) : isFull ? (
-                <span style={{ color: 'var(--color-text-secondary)', fontSize: 13 }}>Attività al completo</span>
+                <span style={{ color: 'var(--color-text-secondary)', fontSize: 13 }}>{t('activities.atCapacity')}</span>
               ) : (
-                <button className="primary-button" onClick={handleJoin} disabled={joining}>{joining ? '...' : 'Partecipa'}</button>
+                <button className="primary-button" onClick={handleJoin} disabled={joining}>
+                  {joining ? '...' : t('activities.join')}
+                </button>
               )}
             </div>
           )}

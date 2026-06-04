@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { register, registerEntity } from '../lib/api';
 import { PasswordInput } from '../components/ui/PasswordInput';
 import { SocialButtons } from '../components/auth/SocialButtons';
@@ -52,58 +53,9 @@ function isValidPec(value: string): boolean {
   return KNOWN_PEC_DOMAINS.some((d) => domain === d || domain.endsWith('.' + d));
 }
 
-function getPasswordStrength(password: string): PasswordStrength | null {
-  if (!password) return null;
-
-  const hasLower = /[a-z]/.test(password);
-  const hasUpper = /[A-Z]/.test(password);
-  const hasDigit = /[0-9]/.test(password);
-  const hasSymbol = /[^A-Za-z0-9]/.test(password);
-  const hasRepeat = /(.)\1{2,}/.test(password);
-  const hasSequence = /(?:abc|bcd|cde|def|123|234|345|456|qwerty|password)/i.test(password);
-
-  let score = 0;
-  if (password.length >= 8) score++;
-  if (password.length >= 12) score++;
-  if (password.length >= 16) score++;
-  if (hasUpper && hasLower) score++;
-  if (hasDigit) score++;
-  if (hasSymbol) score++;
-  if (hasRepeat) score--;
-  if (hasSequence) score--;
-
-  const hints: string[] = [];
-  if (password.length < 8) hints.push('almeno 8 caratteri');
-  else if (password.length < 12) hints.push('meglio se 12+ caratteri');
-  if (!hasUpper) hints.push('una maiuscola');
-  if (!hasLower) hints.push('una minuscola');
-  if (!hasDigit) hints.push('un numero');
-  if (!hasSymbol) hints.push('un simbolo (!@#$…)');
-  if (hasRepeat) hints.push('evita 3 caratteri ripetuti');
-  if (hasSequence) hints.push('evita sequenze comuni');
-
-  const clamped = Math.max(1, Math.min(5, score)) as PasswordStrength['score'];
-  const meta: Record<PasswordStrength['score'], { label: string; color: string }> = {
-    1: { label: 'Molto debole', color: '#d63a3a' },
-    2: { label: 'Debole', color: '#e8784a' },
-    3: { label: 'Discreta', color: '#d1be58' },
-    4: { label: 'Buona', color: '#7dc962' },
-    5: { label: 'Eccellente', color: '#3dbb6e' },
-  };
-  return { score: clamped, label: meta[clamped].label, color: meta[clamped].color, hints };
-}
-
-function validatePassword(password: string): string | null {
-  if (password.length < 8) return 'La password deve avere almeno 8 caratteri';
-  if (!/[A-Z]/.test(password)) return 'La password deve contenere almeno una lettera maiuscola';
-  if (!/[a-z]/.test(password)) return 'La password deve contenere almeno una lettera minuscola';
-  if (!/[0-9]/.test(password)) return 'La password deve contenere almeno un numero';
-  if (!/[^A-Za-z0-9]/.test(password)) return 'La password deve contenere almeno un carattere speciale (!@#$%...)';
-  return null;
-}
-
 export function RegistrationPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [mode, setMode] = useState<Mode>('user');
   const [form, setForm] = useState({
     email: '', password: '', nome: '', cognome: '', dataNascita: '',
@@ -113,11 +65,61 @@ export function RegistrationPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const passwordStrength = getPasswordStrength(form.password);
+
+  function getPasswordStrength(password: string): PasswordStrength | null {
+    if (!password) return null;
+    const hasLower = /[a-z]/.test(password);
+    const hasUpper = /[A-Z]/.test(password);
+    const hasDigit = /[0-9]/.test(password);
+    const hasSymbol = /[^A-Za-z0-9]/.test(password);
+    const hasRepeat = /(.)\1{2,}/.test(password);
+    const hasSequence = /(?:abc|bcd|cde|def|123|234|345|456|qwerty|password)/i.test(password);
+
+    let score = 0;
+    if (password.length >= 8) score++;
+    if (password.length >= 12) score++;
+    if (password.length >= 16) score++;
+    if (hasUpper && hasLower) score++;
+    if (hasDigit) score++;
+    if (hasSymbol) score++;
+    if (hasRepeat) score--;
+    if (hasSequence) score--;
+
+    const hints: string[] = [];
+    if (password.length < 8) hints.push(t('registration.strength.minChars'));
+    else if (password.length < 12) hints.push(t('registration.strength.moreChars'));
+    if (!hasUpper) hints.push(t('registration.strength.uppercase'));
+    if (!hasLower) hints.push(t('registration.strength.lowercase'));
+    if (!hasDigit) hints.push(t('registration.strength.number'));
+    if (!hasSymbol) hints.push(t('registration.strength.symbol'));
+    if (hasRepeat) hints.push(t('registration.strength.noRepeat'));
+    if (hasSequence) hints.push(t('registration.strength.noSequence'));
+
+    const clamped = Math.max(1, Math.min(5, score)) as PasswordStrength['score'];
+    const meta: Record<PasswordStrength['score'], { label: string; color: string }> = {
+      1: { label: t('registration.strength.veryWeak'), color: '#d63a3a' },
+      2: { label: t('registration.strength.weak'),     color: '#e8784a' },
+      3: { label: t('registration.strength.fair'),     color: '#d1be58' },
+      4: { label: t('registration.strength.good'),     color: '#7dc962' },
+      5: { label: t('registration.strength.excellent'),color: '#3dbb6e' },
+    };
+    return { score: clamped, label: meta[clamped].label, color: meta[clamped].color, hints };
+  }
+
+  function validatePassword(password: string): string | null {
+    if (password.length < 8) return t('registration.strength.minChars');
+    if (!/[A-Z]/.test(password)) return t('registration.strength.uppercase');
+    if (!/[a-z]/.test(password)) return t('registration.strength.lowercase');
+    if (!/[0-9]/.test(password)) return t('registration.strength.number');
+    if (!/[^A-Za-z0-9]/.test(password)) return t('registration.strength.symbol');
+    return null;
+  }
 
   function update<K extends keyof typeof form>(key: K, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
+
+  const passwordStrength = getPasswordStrength(form.password);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -128,10 +130,10 @@ export function RegistrationPage() {
     try {
       if (mode === 'user') {
         if (!consents.privacy_policy || !consents.terms_of_service) {
-          throw new Error('Devi accettare privacy policy e termini di servizio per registrarti');
+          throw new Error(t('registration.error'));
         }
         if (!isValidCodiceFiscale(form.codiceFiscale)) {
-          throw new Error('Codice fiscale non valido: controlla i 16 caratteri');
+          throw new Error(t('registration.fiscalCodeInvalid'));
         }
         const result = await register({
           email: form.email, password: form.password, nome: form.nome,
@@ -140,18 +142,17 @@ export function RegistrationPage() {
           consents,
         });
         if ('emailVerificationRequired' in result && result.emailVerificationRequired) {
-          setSuccess('Registrazione completata. Controlla la tua email per verificare l\'account prima di accedere.');
+          setSuccess(t('registration.checkEmail'));
           return;
         }
         navigate('/');
         window.location.reload();
       } else {
-        // #M6: anche la registrazione ente richiede consenso esplicito GDPR.
         if (!consents.privacy_policy || !consents.terms_of_service) {
-          throw new Error('Devi accettare privacy policy e termini di servizio per registrare l\'ente');
+          throw new Error(t('registration.error'));
         }
         if (!isValidPec(form.pec)) {
-          throw new Error('Indirizzo PEC non valido: deve essere un\'email su un dominio di posta certificata');
+          throw new Error(t('registration.pecInvalid'));
         }
         const pecNorm = form.pec.trim().toLowerCase();
         const result = await registerEntity({
@@ -164,7 +165,7 @@ export function RegistrationPage() {
         setSuccess(result.message);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Errore durante la registrazione');
+      setError(e instanceof Error ? e.message : t('registration.error'));
     } finally {
       setIsLoading(false);
     }
@@ -173,32 +174,32 @@ export function RegistrationPage() {
   return (
     <section className="auth-page">
       <form className="auth-form liquid-card" onSubmit={handleSubmit}>
-        <h1>Registrazione</h1>
+        <h1>{t('registration.title')}</h1>
 
         {mode === 'user' && (
           <>
             <SocialButtons />
-            <div className="social-divider">oppure crea con email</div>
+            <div className="social-divider">{t('registration.createWithEmail')}</div>
           </>
         )}
 
         <div className="mode-switch">
-          <button type="button" className={mode === 'user' ? 'active' : ''} onClick={() => setMode('user')}>Cittadino</button>
-          <button type="button" className={mode === 'entity' ? 'active' : ''} onClick={() => setMode('entity')}>Ente certificato</button>
+          <button type="button" className={mode === 'user' ? 'active' : ''} onClick={() => setMode('user')}>{t('auth.citizen')}</button>
+          <button type="button" className={mode === 'entity' ? 'active' : ''} onClick={() => setMode('entity')}>{t('auth.entity')}</button>
         </div>
 
         {mode === 'entity' && (
-          <p className="hint">La richiesta sarà sottoposta all'approvazione di un amministratore di sistema.</p>
+          <p className="hint">{t('registration.entityHint')}</p>
         )}
 
         {mode === 'user' && (
           <label>
-            <span>Email</span>
+            <span>{t('auth.email')}</span>
             <input type="email" value={form.email} onChange={(e) => update('email', e.target.value)} required />
           </label>
         )}
         <label>
-          <span>Password</span>
+          <span>{t('auth.password')}</span>
           <PasswordInput value={form.password} onChange={(e) => update('password', e.target.value)} required autoComplete="new-password" />
         </label>
         {passwordStrength && (
@@ -215,7 +216,7 @@ export function RegistrationPage() {
             <div className="password-strength-meta">
               <strong style={{ color: passwordStrength.color }}>{passwordStrength.label}</strong>
               {passwordStrength.hints.length > 0 && (
-                <small>Aggiungi: {passwordStrength.hints.slice(0, 3).join(', ')}</small>
+                <small>{t('registration.strength.addHint')} {passwordStrength.hints.slice(0, 3).join(', ')}</small>
               )}
             </div>
           </div>
@@ -224,47 +225,44 @@ export function RegistrationPage() {
         {mode === 'user' ? (
           <>
             <label>
-              <span>Nome</span>
+              <span>{t('common.name')}</span>
               <input type="text" value={form.nome} onChange={(e) => update('nome', e.target.value)} required />
             </label>
             <label>
-              <span>Cognome</span>
+              <span>{t('common.lastName')}</span>
               <input type="text" value={form.cognome} onChange={(e) => update('cognome', e.target.value)} required />
             </label>
             <label>
-              <span>Data di nascita</span>
+              <span>{t('registration.birthDate')}</span>
               <input type="date" value={form.dataNascita} onChange={(e) => update('dataNascita', e.target.value)} required />
-              <small>Devi avere almeno 13 anni (GDPR art. 8)</small>
+              <small>{t('registration.ageGate')}</small>
             </label>
             <label>
-              <span>Codice fiscale</span>
+              <span>{t('auth.fiscalCode')}</span>
               <input
                 type="text"
                 value={form.codiceFiscale}
                 onChange={(e) => update('codiceFiscale', e.target.value.toUpperCase().replace(/\s/g, ''))}
-                required
-                minLength={16}
-                maxLength={16}
+                required minLength={16} maxLength={16}
                 pattern="[A-Z0-9]{16}"
                 placeholder="RSSMRA85T10A562S"
                 autoComplete="off"
               />
               <small>
                 {form.codiceFiscale && !isValidCodiceFiscale(form.codiceFiscale)
-                  ? 'Codice fiscale non valido (controllo carattere di controllo)'
-                  : '16 caratteri — verifica algoritmica del carattere di controllo'}
+                  ? t('registration.fiscalCodeInvalid')
+                  : t('registration.fiscalCodeHint')}
               </small>
             </label>
-
           </>
         ) : (
           <>
             <label>
-              <span>Nome dell'ente</span>
+              <span>{t('registration.entityName')}</span>
               <input type="text" value={form.nomeEnte} onChange={(e) => update('nomeEnte', e.target.value)} required />
             </label>
             <label>
-              <span>PEC (Posta Elettronica Certificata)</span>
+              <span>{t('auth.pec')}</span>
               <input
                 type="email"
                 value={form.pec}
@@ -275,27 +273,26 @@ export function RegistrationPage() {
               />
               <small>
                 {form.pec && !isValidPec(form.pec)
-                  ? 'PEC non valida: deve essere un\'email su dominio di posta certificata (es. pec.it, legalmail.it, pec.aruba.it)'
-                  : 'L\'indirizzo PEC verrà verificato e usato per le comunicazioni ufficiali'}
+                  ? t('registration.pecInvalid')
+                  : t('registration.pecHint')}
               </small>
             </label>
           </>
         )}
 
-        {/* Consensi GDPR: obbligatori sia per cittadini che per enti (#M6). */}
         <fieldset className="consents">
-          <legend>Consensi (GDPR)</legend>
+          <legend>{t('registration.consents')}</legend>
           <label className="checkbox">
             <input type="checkbox" checked={consents.privacy_policy} onChange={(e) => setConsents({ ...consents, privacy_policy: e.target.checked })} required />
-            <span>Accetto la <Link to="/privacy" target="_blank" rel="noreferrer">privacy policy</Link> *</span>
+            <span>{t('registration.acceptPrivacy')} <Link to="/privacy" target="_blank" rel="noreferrer">*</Link></span>
           </label>
           <label className="checkbox">
             <input type="checkbox" checked={consents.terms_of_service} onChange={(e) => setConsents({ ...consents, terms_of_service: e.target.checked })} required />
-            <span>Accetto i <Link to="/termini" target="_blank" rel="noreferrer">termini di servizio</Link> *</span>
+            <span>{t('registration.acceptTerms')} <Link to="/termini" target="_blank" rel="noreferrer">*</Link></span>
           </label>
           <label className="checkbox">
             <input type="checkbox" checked={consents.marketing} onChange={(e) => setConsents({ ...consents, marketing: e.target.checked })} />
-            <span>Accetto di ricevere comunicazioni di marketing (facoltativo)</span>
+            <span>{t('registration.acceptMarketing')}</span>
           </label>
         </fieldset>
 
@@ -303,11 +300,11 @@ export function RegistrationPage() {
         {success && <div className="form-success">{success}</div>}
 
         <button className="primary-button" type="submit" disabled={isLoading}>
-          {isLoading ? 'Registrazione in corso...' : 'Registrati'}
+          {isLoading ? t('registration.submitting') : t('registration.submit')}
         </button>
 
         <div className="auth-links">
-          <Link to="/login">Hai già un account? Accedi</Link>
+          <Link to="/login">{t('registration.hasAccount')}</Link>
         </div>
       </form>
     </section>

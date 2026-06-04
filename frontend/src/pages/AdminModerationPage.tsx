@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { getReports, resolveReport, type Report } from '../lib/api';
 import { useAutoRefresh } from '../lib/useAutoRefresh';
+import { formatDateTime } from '../lib/formatters';
 
 const STATI = ['aperta', 'in lavorazione', 'risolta'] as const;
 type Stato = (typeof STATI)[number];
@@ -11,11 +13,8 @@ const statoBadgeClass: Record<string, string> = {
   'risolta': 'report-stato report-stato-done',
 };
 
-function formatTime(value: string) {
-  return new Intl.DateTimeFormat('it-IT', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
-}
-
 export function AdminModerationPage() {
+  const { t } = useTranslation();
   const [reports, setReports] = useState<Report[]>([]);
   const [filter, setFilter] = useState<'' | Stato>('aperta');
   const [tipoFilter, setTipoFilter] = useState<string>('all');
@@ -33,7 +32,6 @@ export function AdminModerationPage() {
       .finally(() => { if (!silent) setIsLoading(false); });
   }
   useEffect(() => { load(filter); }, [filter]);
-  // Auto-aggiornamento silenzioso: niente pulsante manuale, nessun flicker.
   useAutoRefresh(() => load(filter, true), 30_000);
 
   async function resolve(id: string, azione: 'rimuovi' | 'archivia' | 'in_lavorazione') {
@@ -43,10 +41,8 @@ export function AdminModerationPage() {
       setMessage(r.message);
       load(filter);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Errore');
-    } finally {
-      setActionLoading(null);
-    }
+      setError(e instanceof Error ? e.message : t('common.error'));
+    } finally { setActionLoading(null); }
   }
 
   const tipi = useMemo(() => Array.from(new Set(reports.map((r) => r.tipo))).sort(), [reports]);
@@ -73,63 +69,37 @@ export function AdminModerationPage() {
     <section className="data-page">
       <header className="utility-strip liquid-card">
         <div>
-          <h1>Moderazione segnalazioni</h1>
-          <p>Flow conforme al Digital Services Act (Regolamento UE 2022/2065)</p>
+          <h1>{t('admin.moderation.title')}</h1>
+          <p>{t('admin.moderation.subtitle')}</p>
         </div>
-        {isLoading && <span className="muted-copy auto-refresh-hint">Aggiornamento…</span>}
+        {isLoading && <span className="muted-copy auto-refresh-hint">{t('common.updating')}</span>}
       </header>
 
       <div className="moderation-stats">
-        <button
-          type="button"
-          className={`moderation-stat ${filter === 'aperta' ? 'active' : ''}`}
-          onClick={() => setFilter('aperta')}
-        >
-          <strong>{counts['aperta'] || 0}</strong>
-          <span>Aperte</span>
-        </button>
-        <button
-          type="button"
-          className={`moderation-stat ${filter === 'in lavorazione' ? 'active' : ''}`}
-          onClick={() => setFilter('in lavorazione')}
-        >
-          <strong>{counts['in lavorazione'] || 0}</strong>
-          <span>In lavorazione</span>
-        </button>
-        <button
-          type="button"
-          className={`moderation-stat ${filter === 'risolta' ? 'active' : ''}`}
-          onClick={() => setFilter('risolta')}
-        >
-          <strong>{counts['risolta'] || 0}</strong>
-          <span>Risolte</span>
-        </button>
-        <button
-          type="button"
-          className={`moderation-stat ${filter === '' ? 'active' : ''}`}
-          onClick={() => setFilter('')}
-        >
-          <strong>{reports.length}</strong>
-          <span>Tutte</span>
-        </button>
+        {(['aperta', 'in lavorazione', 'risolta', ''] as const).map((stato) => (
+          <button
+            key={stato || 'all'}
+            type="button"
+            className={`moderation-stat ${filter === stato ? 'active' : ''}`}
+            onClick={() => setFilter(stato)}
+          >
+            <strong>{stato === '' ? reports.length : (counts[stato] || 0)}</strong>
+            <span>{stato === 'aperta' ? t('admin.moderation.open') : stato === 'in lavorazione' ? t('admin.moderation.inProgress') : stato === 'risolta' ? t('admin.moderation.resolved') : t('admin.moderation.all')}</span>
+          </button>
+        ))}
       </div>
 
       <div className="liquid-card filter-bar">
         <div className="filter-row">
           <label>
-            <span>Cerca</span>
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Titolo evento, motivo, descrizione…"
-            />
+            <span>{t('common.search')}</span>
+            <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('admin.moderation.searchPlaceholder')} />
           </label>
           <label>
-            <span>Tipo segnalazione</span>
+            <span>{t('admin.moderation.reportType')}</span>
             <select value={tipoFilter} onChange={(e) => setTipoFilter(e.target.value)}>
-              <option value="all">Tutti i tipi</option>
-              {tipi.map((t) => <option key={t} value={t}>{t}</option>)}
+              <option value="all">{t('admin.moderation.allTypes')}</option>
+              {tipi.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
             </select>
           </label>
         </div>
@@ -137,11 +107,9 @@ export function AdminModerationPage() {
 
       {error && <div className="state-panel liquid-panel"><p>{error}</p></div>}
       {message && <div className="state-panel liquid-panel"><p>{message}</p></div>}
-      {isLoading && <div className="state-panel liquid-panel">Caricamento…</div>}
+      {isLoading && <div className="state-panel liquid-panel">{t('admin.loading')}</div>}
       {!isLoading && visible.length === 0 && (
-        <div className="state-panel liquid-panel">
-          Nessuna segnalazione {filter ? `con stato "${filter}"` : ''}{search ? ` corrispondente a "${search}"` : ''}.
-        </div>
+        <div className="state-panel liquid-panel">{t('admin.moderation.none')}</div>
       )}
 
       {visible.length > 0 && (
@@ -157,23 +125,23 @@ export function AdminModerationPage() {
                     <span className="report-tipo">{r.tipo}</span>
                     <span className={statoBadgeClass[r.stato] || 'report-stato'}>{r.stato}</span>
                   </div>
-                  <time>{formatTime(r.createdAt)}</time>
+                  <time>{formatDateTime(r.createdAt)}</time>
                 </header>
 
                 <h2>
                   {r.event?.id ? (
                     <a href={`/eventi/${r.event.id}`} target="_blank" rel="noreferrer">{r.event.titolo}</a>
                   ) : (
-                    'Evento sconosciuto'
+                    t('events.unknownEvent')
                   )}
                 </h2>
                 <p className="moderation-card-description">
-                  {r.descrizione || <em>Nessuna descrizione aggiuntiva fornita dall'utente.</em>}
+                  {r.descrizione || <em>{t('events.noExtraDescription')}</em>}
                 </p>
 
                 <dl className="moderation-card-meta">
-                  <div><dt>ID segnalazione</dt><dd><code>{r.id.slice(0, 8)}</code></dd></div>
-                  <div><dt>Segnalante</dt><dd><code>{r.userId.slice(0, 8)}</code></dd></div>
+                  <div><dt>{t('admin.moderation.reportId')}</dt><dd><code>{r.id.slice(0, 8)}</code></dd></div>
+                  <div><dt>{t('admin.moderation.reporter')}</dt><dd><code>{r.userId.slice(0, 8)}</code></dd></div>
                 </dl>
 
                 {!isDone && (
@@ -184,28 +152,24 @@ export function AdminModerationPage() {
                         onClick={() => resolve(r.id, 'in_lavorazione')}
                         disabled={actionLoading === r.id + 'in_lavorazione'}
                       >
-                        Prendi in carico
+                        {t('admin.moderation.takeCharge')}
                       </button>
                     )}
-                    {isProgress && <span className="moderation-card-tag">In carico al moderatore</span>}
-                    <button
-                      type="button"
-                      onClick={() => resolve(r.id, 'archivia')}
-                      disabled={actionLoading === r.id + 'archivia'}
-                    >
-                      Archivia
+                    {isProgress && <span className="moderation-card-tag">{t('admin.moderation.inCharge')}</span>}
+                    <button type="button" onClick={() => resolve(r.id, 'archivia')} disabled={actionLoading === r.id + 'archivia'}>
+                      {t('admin.moderation.archive')}
                     </button>
                     <button
                       type="button"
                       className="danger-button"
                       onClick={() => {
-                        if (window.confirm(`Rimuovere l'evento "${r.event?.titolo || ''}"? L'azione è irreversibile.`)) {
+                        if (window.confirm(t('admin.moderation.removeConfirm', { title: r.event?.titolo || '' }))) {
                           resolve(r.id, 'rimuovi');
                         }
                       }}
                       disabled={actionLoading === r.id + 'rimuovi'}
                     >
-                      Rimuovi evento
+                      {t('admin.moderation.remove')}
                     </button>
                   </div>
                 )}
