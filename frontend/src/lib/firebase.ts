@@ -1,18 +1,21 @@
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { getMessaging, getToken, deleteToken, onMessage, type Messaging } from 'firebase/messaging';
 
-// Configure via environment variables — copy frontend/.env.example to frontend/.env
-// and fill in your Firebase project values before running.
+// These values are intentionally public — they identify the web client to
+// Firebase. Sono hardcoded come fallback così le notifiche funzionano per tutti
+// senza dover creare un .env (che è gitignorato). Si possono comunque
+// sovrascrivere via env Vite (VITE_FIREBASE_*) per puntare a un altro progetto.
 const firebaseConfig = {
-  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY            ?? '<VITE_FIREBASE_API_KEY>',
-  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN        ?? '<VITE_FIREBASE_AUTH_DOMAIN>',
-  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID         ?? '<VITE_FIREBASE_PROJECT_ID>',
-  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET     ?? '<VITE_FIREBASE_STORAGE_BUCKET>',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ?? '<VITE_FIREBASE_MESSAGING_SENDER_ID>',
-  appId:             import.meta.env.VITE_FIREBASE_APP_ID             ?? '<VITE_FIREBASE_APP_ID>',
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY ?? 'AIzaSyA82T8bcjKHDNL3R18HUX0ZsJXqRIpVkC4',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ?? 'trento-live-activity.firebaseapp.com',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID ?? 'trento-live-activity',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ?? 'trento-live-activity.firebasestorage.app',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ?? '21691364418',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID ?? '1:21691364418:web:27ad00e05713be19a929db',
 };
 
-export const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY ?? '<VITE_FIREBASE_VAPID_KEY>';
+export const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY
+  ?? 'BGcYOvwuuQksBU2fIbriZ2wWzHiwFdM1-QT3Fpzjl7Bh0ppcqJVm_iEitp0-wFiuwIbDXJCyzKhoRrYusQyoOyc';
 
 let app: FirebaseApp | null = null;
 let messaging: Messaging | null = null;

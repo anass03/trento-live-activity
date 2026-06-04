@@ -6,7 +6,7 @@
  *  - 2 enti certificati già approvati (Castello del Buonconsiglio, Sport Club Trento)
  *  - 1 amministratore comunale (Comune di Trento, ufficio statistica)
  *  - 16 POI reali di Trento
- *  - Nessun UtenteRegistrato: chi prova l'app si registra come cittadino
+ *  - 2 UtenteRegistrato (cittadini) di test, già verificati e pronti al login
  *
  * Password unica per tutti gli account: "password123".
  *
@@ -148,6 +148,47 @@ async function seed() {
     spidId: 'SPID-TN-0001',
   });
 
+  // ── UTENTI REGISTRATI (CITTADINI) DI TEST ─────────────────────────────
+  // 2 cittadini pronti all'uso per i test: email già verificata e onboarding
+  // completato, così si può fare login subito con "password123" senza passare
+  // dal flusso di verifica email / scelta interessi.
+  console.log('Creating utenti registrati di test (2)...');
+  const CITTADINI = [
+    {
+      email: 'mario.rossi@test.it', nome: 'Mario', cognome: 'Rossi',
+      dataNascita: '1995-06-15', codiceFiscale: 'RSSMRA95H15L378X',
+      interessi: ['cultura', 'sport'],
+    },
+    {
+      email: 'giulia.bianchi@test.it', nome: 'Giulia', cognome: 'Bianchi',
+      dataNascita: '1998-09-23', codiceFiscale: 'BNCGLI98P63L378K',
+      interessi: ['musica', 'enogastronomia'],
+    },
+  ];
+
+  await Promise.all(CITTADINI.map(async (c) => {
+    const u = await User.create({
+      email: c.email,
+      passwordHash,
+      nome: c.nome,
+      cognome: c.cognome,
+      dataNascita: c.dataNascita,
+      codiceFiscale: c.codiceFiscale,
+      ruolo: 'UtenteRegistrato',
+      interessi: c.interessi,
+      emailVerified: true,
+    });
+    await CittadinoProfile.create({
+      userId: u.id,
+      nome: c.nome,
+      cognome: c.cognome,
+      dataNascita: c.dataNascita,
+      codiceFiscale: c.codiceFiscale,
+      interessi: c.interessi,
+      onboardingComplete: true,
+    });
+  }));
+
   // ── POI di Trento (dati pubblici della città) ─────────────────────────
   console.log('Creating POIs (Trento)...');
   await Promise.all([
@@ -211,8 +252,11 @@ async function seed() {
   console.log('    eventi@sportclubtrento.it              Sport Club Trento');
   console.log('\n  Amministratore comunale (dashboard analitica):');
   console.log('    dashboard@comune.trento.it             Comune di Trento');
+  console.log('\n  Utenti registrati (cittadini di test, login immediato):');
+  CITTADINI.forEach((c) => {
+    console.log(`    ${c.email.padEnd(38)}  ${c.nome} ${c.cognome}`);
+  });
   console.log('\n  POI: 31 punti di interesse (16 città + 6 strutture sportive + 9 biblioteche/sale studio).');
-  console.log('  Cittadini (UtenteRegistrato): 0 — si registrano durante la demo.');
   console.log('══════════════════════════════════════════════════════════\n');
   console.log('  Al primo login degli AmministratoreDiSistema verrà richiesto');
   console.log('  di configurare il 2FA (RNF15). Procedura:');
