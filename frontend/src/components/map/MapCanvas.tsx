@@ -17,6 +17,7 @@ import {
   type CrowdingStatus, type MapMarker, type MarkerType,
 } from '../../lib/api';
 import { FavoriteButton } from '../ui/FavoriteButton';
+import { resolveActivityTitle } from '../../lib/activityTitle';
 
 const TRENTO_CENTER: [number, number] = [11.1211, 46.0679];
 const CITY_STYLE = 'https://tiles.openfreemap.org/styles/bright';
@@ -779,7 +780,11 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
               </button>
             </div>
 
-            <h3>{popup.props.title}</h3>
+            <h3>
+              {popup.props.type === 'activity'
+                ? resolveActivityTitle(popup.props.category, t)
+                : popup.props.title}
+            </h3>
             <p>{popup.props.description}</p>
 
             <dl>

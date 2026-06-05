@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { cancelActivity, getActivityById, getActivityCalendarUrl, googleCalendarUrl, getToken, joinActivity, leaveActivity, type ApiActivity } from '../lib/api';
 import { CalendarButton } from '../components/ui/CalendarButton';
 import { formatDateTimeFull } from '../lib/formatters';
+import { resolveActivityTitle } from '../lib/activityTitle';
 import type { AppUser } from '../data/mockUser';
 
 export function ActivityDetailPage({ user }: { user?: AppUser }) {
@@ -17,6 +18,12 @@ export function ActivityDetailPage({ user }: { user?: AppUser }) {
   const [joining, setJoining] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const canParticipate = !!getToken() && user?.role === 'registered_user';
+  const translateStatus = (s?: string | null) => {
+    if (!s || s === 'attiva') return t('activities.statusActive');
+    if (s === 'cancellata') return t('activities.statusCancelled');
+    if (s === 'conclusa') return t('activities.statusCompleted');
+    return s;
+  };
 
   async function loadActivity() {
     if (!id) return;
@@ -84,10 +91,10 @@ export function ActivityDetailPage({ user }: { user?: AppUser }) {
       {!isLoading && !error && activity && (
         <>
           <div className="data-card-header">
-            <span>{activity.category}</span>
-            <small>{activity.status || t('activities.active')}</small>
+            <span>{t(`categories.${activity.category?.toLowerCase()}`, { defaultValue: activity.category })}</span>
+            <small>{translateStatus(activity.status)}</small>
           </div>
-          <h1>{activity.title}</h1>
+          <h1>{resolveActivityTitle(activity.category, t)}</h1>
           <p>{activity.description || t('activities.defaultDescription')}</p>
           <dl className="detail-list">
             <div><dt>{t('common.where')}</dt><dd>{activity.location || t('common.notSpecified')}</dd></div>
