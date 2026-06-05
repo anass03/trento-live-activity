@@ -28,7 +28,9 @@
     "name": "Nome",
     "lastName": "Cognome",
     "open": "Apri",
-    "addToCalendar": "Aggiungi al calendario"
+    "addToCalendar": "Aggiungi al calendario",
+    "addToFavorites": "Aggiungi ai preferiti",
+    "removeFromFavorites": "Rimuovi dai preferiti"
   },
   "nav": {
     "map": "Mappa",
@@ -39,7 +41,27 @@
     "settings": "Impostazioni",
     "logout": "Logout",
     "login": "Accedi",
-    "register": "Registrati"
+    "register": "Registrati",
+    "guestRole": "Ospite",
+    "citizenRole": "Cittadino",
+    "entityRole": "Ente",
+    "municipalRole": "Comune",
+    "adminRole": "Admin",
+    "loginOrRegister": "Accedi o registrati",
+    "userProfile": "Profilo di {{name}}",
+    "activateLightTheme": "Attiva tema chiaro",
+    "activateDarkTheme": "Attiva tema scuro",
+    "lightTheme": "Tema chiaro",
+    "darkTheme": "Tema scuro",
+    "publishEvent": "Pubblica evento",
+    "municipalDashboard": "Dashboard Comune",
+    "statistics": "Statistiche",
+    "export": "Export",
+    "managePOI": "Gestione POI",
+    "users": "Utenti",
+    "entityRequests": "Richieste enti",
+    "moderation": "Moderazione",
+    "pushNotifications": "Notifiche push"
   },
   "auth": {
     "login": "Accedi",
@@ -91,7 +113,13 @@
       "orLogin": "accedi",
       "ifVerified": "se hai già verificato l'email.",
       "invalidToken": "Link non valido: token mancante."
-    }
+    },
+    "spidTitle": "Accesso SPID",
+    "spidDemo": "Demo: in produzione qui ci sono i provider SPID. Compila i campi per simulare il callback.",
+    "institutionalEmail": "Email istituzionale",
+    "spidLoading": "Accesso…",
+    "spidConfirm": "Conferma e accedi",
+    "spidError": "Errore SPID"
   },
   "settings": {
     "title": "Impostazioni",
@@ -202,7 +230,26 @@
     "occupied": "occupato",
     "parkingFree": "Libero",
     "parkingAlmostFull": "Quasi pieno",
-    "parkingFull": "Pieno"
+    "parkingFull": "Pieno",
+    "crowdLow": "Basso",
+    "crowdMedium": "Medio",
+    "crowdHigh": "Intenso",
+    "crowdVeryHigh": "Molto alto",
+    "crowdScale": "Scala affollamento",
+    "defaultMarkerDesc": "Informazione disponibile sulla mappa cittadina.",
+    "popupCategory": "Categoria",
+    "popupFreeSpots": "Posti liberi",
+    "popupWhen": "Quando",
+    "popupCertified": "Evento certificato",
+    "popupOpenDetail": "Apri dettaglio →",
+    "popupCreateHere": "➕ Crea attività qui",
+    "popupHintLocked": "Clic sul marker per aprire · Clic altrove per chiudere",
+    "popupHintUnlocked": "Clic per bloccare · Doppio clic per aprire",
+    "resetView": "Reimposta vista",
+    "hud3dTitle": "Vista 3D Trento",
+    "hud3dHint": "Trascina per muovere, ruota con bussola o tasto destro",
+    "mapUnavailable": "Mappa non disponibile",
+    "coordsUnavailable": "Coordinate non disponibili"
   },
   "activities": {
     "loading": "Caricamento attività...",
@@ -241,7 +288,20 @@
     "activitiesStat": "attività",
     "backToList": "Torna alle attività",
     "active": "attiva",
-    "atCapacity": "Attività al completo"
+    "atCapacity": "Attività al completo",
+    "createFormTitle": "Crea attività",
+    "aiLabel": "💡 Descrivi cosa vuoi fare (l'AI suggerisce categoria e orario)",
+    "aiPlaceholder": "es. partita di calcetto domani sera",
+    "aiSuggest": "Suggerisci con AI",
+    "aiLoading": "Sto suggerendo…",
+    "aiError": "Errore AI",
+    "typeField": "Tipo",
+    "dateField": "Data",
+    "startField": "Inizio",
+    "endField": "Fine",
+    "maxParticipantsField": "Max partecipanti (2–50)",
+    "createButton": "Crea",
+    "createdSuccess": "Attività creata!"
   },
   "events": {
     "loading": "Caricamento eventi...",
@@ -692,5 +752,21 @@
       "errorPreview": "Errore nel caricamento anteprima export.",
       "errorExport": "Errore durante export."
     }
+  },
+  "footer": {
+    "copyright": "© {{year}} Trento Live Activity — Comune di Trento. Tutti i diritti riservati.",
+    "privacy": "Privacy",
+    "terms": "Termini di servizio",
+    "contact": "Contatti",
+    "ariaLabel": "Piè di pagina"
+  },
+  "mapPicker": {
+    "positionTitle": "Scegli la posizione sulla mappa",
+    "positionHint": "Clicca sulla mappa per posizionare il pin. Puoi trascinarlo per affinare.",
+    "areaTitle": "Scegli l'area di analisi",
+    "areaHint": "Clicca sulla mappa per impostare il centro, poi definisci il raggio.",
+    "noPoint": "Nessun punto selezionato — clicca sulla mappa",
+    "confirmPosition": "Conferma posizione",
+    "confirmArea": "Conferma area"
   }
 }

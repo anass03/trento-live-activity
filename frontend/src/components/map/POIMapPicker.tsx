@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import maplibregl, { type Map as MapLibreMap, type Marker } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { useTranslation } from 'react-i18next';
 import { GeocodedLocation } from '../ui/GeocodedLocation';
 
 const TRENTO_CENTER: [number, number] = [11.1211, 46.0679];
@@ -13,6 +14,7 @@ export interface POIMapPickerProps {
 }
 
 export function POIMapPicker({ initial, onConfirm, onCancel }: POIMapPickerProps) {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markerRef = useRef<Marker | null>(null);
@@ -64,8 +66,8 @@ export function POIMapPicker({ initial, onConfirm, onCancel }: POIMapPickerProps
     <div className="poi-map-picker-backdrop" role="presentation" onClick={onCancel}>
       <div className="poi-map-picker liquid-card" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <header>
-          <h2>Scegli la posizione sulla mappa</h2>
-          <p>Clicca sulla mappa per posizionare il pin. Puoi trascinarlo per affinare.</p>
+          <h2>{t('mapPicker.positionTitle')}</h2>
+          <p>{t('mapPicker.positionHint')}</p>
         </header>
         <div ref={containerRef} className="poi-map-picker-canvas" />
         <footer>
@@ -76,18 +78,18 @@ export function POIMapPicker({ initial, onConfirm, onCancel }: POIMapPickerProps
                 <code style={{ fontSize: 11, opacity: 0.6 }}>{coord[1].toFixed(6)}, {coord[0].toFixed(6)}</code>
               </>
             ) : (
-              <em>Nessun punto selezionato — clicca sulla mappa</em>
+              <em>{t('mapPicker.noPoint')}</em>
             )}
           </div>
           <div className="filter-actions">
-            <button type="button" onClick={onCancel}>Annulla</button>
+            <button type="button" onClick={onCancel}>{t('common.cancel')}</button>
             <button
               type="button"
               className="primary-button"
               disabled={!coord}
               onClick={() => coord && onConfirm({ longitudine: coord[0], latitudine: coord[1] })}
             >
-              Conferma posizione
+              {t('mapPicker.confirmPosition')}
             </button>
           </div>
         </footer>
