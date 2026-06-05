@@ -28,7 +28,9 @@
     "name": "Name",
     "lastName": "Last name",
     "open": "Open",
-    "addToCalendar": "Add to calendar"
+    "addToCalendar": "Add to calendar",
+    "addToFavorites": "Add to favourites",
+    "removeFromFavorites": "Remove from favourites"
   },
   "nav": {
     "map": "Map",
@@ -39,7 +41,27 @@
     "settings": "Settings",
     "logout": "Logout",
     "login": "Log in",
-    "register": "Sign up"
+    "register": "Sign up",
+    "guestRole": "Guest",
+    "citizenRole": "Citizen",
+    "entityRole": "Entity",
+    "municipalRole": "Municipal",
+    "adminRole": "Admin",
+    "loginOrRegister": "Sign in or register",
+    "userProfile": "Profile of {{name}}",
+    "activateLightTheme": "Switch to light theme",
+    "activateDarkTheme": "Switch to dark theme",
+    "lightTheme": "Light theme",
+    "darkTheme": "Dark theme",
+    "publishEvent": "Publish event",
+    "municipalDashboard": "Municipal dashboard",
+    "statistics": "Statistics",
+    "export": "Export",
+    "managePOI": "Manage POIs",
+    "users": "Users",
+    "entityRequests": "Entity requests",
+    "moderation": "Moderation",
+    "pushNotifications": "Push notifications"
   },
   "auth": {
     "login": "Log in",
@@ -91,7 +113,13 @@
       "orLogin": "sign in",
       "ifVerified": "if you have already verified your email.",
       "invalidToken": "Invalid link: token missing."
-    }
+    },
+    "spidTitle": "SPID login",
+    "spidDemo": "Demo: in production this shows the SPID provider list. Fill in the fields to simulate the callback.",
+    "institutionalEmail": "Institutional email",
+    "spidLoading": "Signing in…",
+    "spidConfirm": "Confirm and sign in",
+    "spidError": "SPID error"
   },
   "settings": {
     "title": "Settings",
@@ -202,7 +230,26 @@
     "occupied": "occupied",
     "parkingFree": "Free",
     "parkingAlmostFull": "Almost full",
-    "parkingFull": "Full"
+    "parkingFull": "Full",
+    "crowdLow": "Low",
+    "crowdMedium": "Medium",
+    "crowdHigh": "Busy",
+    "crowdVeryHigh": "Very busy",
+    "crowdScale": "Crowding scale",
+    "defaultMarkerDesc": "Information available on the city map.",
+    "popupCategory": "Category",
+    "popupFreeSpots": "Free spots",
+    "popupWhen": "When",
+    "popupCertified": "Certified event",
+    "popupOpenDetail": "Open detail →",
+    "popupCreateHere": "➕ Create activity here",
+    "popupHintLocked": "Click marker to open · Click elsewhere to close",
+    "popupHintUnlocked": "Click to lock · Double-click to open",
+    "resetView": "Reset view",
+    "hud3dTitle": "3D view of Trento",
+    "hud3dHint": "Drag to pan, rotate with compass or right-click",
+    "mapUnavailable": "Map not available",
+    "coordsUnavailable": "Coordinates unavailable"
   },
   "activities": {
     "loading": "Loading activities...",
@@ -241,7 +288,20 @@
     "activitiesStat": "activities",
     "backToList": "Back to activities",
     "active": "active",
-    "atCapacity": "Activity full"
+    "atCapacity": "Activity full",
+    "createFormTitle": "Create activity",
+    "aiLabel": "💡 Describe what you want to do (AI suggests category and time)",
+    "aiPlaceholder": "e.g. football match tomorrow evening",
+    "aiSuggest": "Suggest with AI",
+    "aiLoading": "Thinking…",
+    "aiError": "AI error",
+    "typeField": "Type",
+    "dateField": "Date",
+    "startField": "Start",
+    "endField": "End",
+    "maxParticipantsField": "Max participants (2–50)",
+    "createButton": "Create",
+    "createdSuccess": "Activity created!"
   },
   "events": {
     "loading": "Loading events...",
@@ -692,5 +752,21 @@
       "errorPreview": "Error loading export preview.",
       "errorExport": "Error during export."
     }
+  },
+  "footer": {
+    "copyright": "© {{year}} Trento Live Activity — Comune di Trento. All rights reserved.",
+    "privacy": "Privacy",
+    "terms": "Terms of service",
+    "contact": "Contact",
+    "ariaLabel": "Page footer"
+  },
+  "mapPicker": {
+    "positionTitle": "Choose position on map",
+    "positionHint": "Click the map to place the pin. You can drag it to refine.",
+    "areaTitle": "Choose analysis area",
+    "areaHint": "Click the map to set the centre, then define the radius.",
+    "noPoint": "No point selected — click on the map",
+    "confirmPosition": "Confirm position",
+    "confirmArea": "Confirm area"
   }
 }

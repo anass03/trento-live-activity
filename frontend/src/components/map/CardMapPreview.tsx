@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import maplibregl, { type Map as MapLibreMap, type Marker } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { useTranslation } from 'react-i18next';
 import type { CrowdingStatus, MarkerType } from '../../lib/api';
 
 const CARD_MAP_STYLE = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
@@ -94,6 +95,7 @@ export function CardMapPreview({
   title,
   crowdLevel = 42,
 }: CardMapPreviewProps) {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markerRef = useRef<Marker | null>(null);
@@ -170,11 +172,11 @@ export function CardMapPreview({
       {coordinates ? (
         <>
           <div ref={containerRef} className="card-map-canvas" />
-          {hasMapError && <div className="card-map-empty">Mappa non disponibile</div>}
+          {hasMapError && <div className="card-map-empty">{t('map.mapUnavailable')}</div>}
           <div className="card-map-vignette" />
         </>
       ) : (
-        <div className="card-map-empty">Coordinate non disponibili</div>
+        <div className="card-map-empty">{t('map.coordsUnavailable')}</div>
       )}
     </div>
   );
