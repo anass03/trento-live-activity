@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { resolveActivityTitle } from '../lib/activityTitle';
+import { ServiceRequestModal } from '../components/ui/ServiceRequestModal';
 import { MapCanvas } from '../components/map/MapCanvas';
 import { getMapMarkers, getParking, type MapMarker, type MarkerType, type ParkingSpot } from '../lib/api';
 import { listFavorites } from '../lib/favorites';
@@ -73,6 +74,7 @@ export function MapPage({ user }: { user?: AppUser }) {
   const [isLoading, setIsLoading] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
   const [parking, setParking] = useState<ParkingSpot[]>([]);
+  const [showServiceRequest, setShowServiceRequest] = useState(false);
   const hasInterests = Array.isArray(user?.interessi) && (user!.interessi!.length ?? 0) > 0;
 
   const filterLabelsBase: Array<{ label: string; value: Filter }> = [
@@ -428,8 +430,24 @@ export function MapPage({ user }: { user?: AppUser }) {
               </div>
             )}
           </section>
+
+          {/* Citizen needs CTA — only for registered citizens */}
+          {user?.role === 'registered_user' && (
+            <section className="liquid-card comune-panel" style={{ gap: 10 }}>
+              <div className="widget-heading">
+                <span className="section-eyebrow">{t('serviceRequest.ctaEyebrow')}</span>
+                <strong>{t('serviceRequest.ctaTitle')}</strong>
+              </div>
+              <p className="muted-copy" style={{ margin: 0, fontSize: 13 }}>{t('serviceRequest.ctaDesc')}</p>
+              <button type="button" className="primary-button" style={{ width: 'fit-content' }} onClick={() => setShowServiceRequest(true)}>
+                📍 {t('serviceRequest.ctaButton')}
+              </button>
+            </section>
+          )}
         </aside>
       </section>
+
+      {showServiceRequest && <ServiceRequestModal onClose={() => setShowServiceRequest(false)} />}
 
       <section className="home-support-grid" aria-label={t('map.liveDots')}>
         <div className="quick-stat-strip">

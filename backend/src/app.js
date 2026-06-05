@@ -13,6 +13,7 @@ const adminRoutes = require('./admin/admin.routes');
 const notificationsRoutes = require('./notifications/notifications.routes');
 const aiRoutes = require('./ai/ai.routes');
 const parkingRoutes = require('./parking/parking.routes');
+const serviceRequestRoutes = require('./service-requests/service-request.routes');
 const errorHandler = require('./middleware/errorHandler');
 const requestLogger = require('./middleware/requestLogger');
 
@@ -74,6 +75,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/parking', parkingRoutes);
+app.use('/api/service-requests', serviceRequestRoutes);
 app.use(errorHandler);
 
 module.exports = app;

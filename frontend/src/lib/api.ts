@@ -114,6 +114,19 @@ export interface DashboardStats {
   eventsByCategory?: Array<{ categoria: string; count: number }>;
   poiCrowding: Array<{ statoAffollamento: string; count: number }>;
   topCrowdedPOIs?: Array<{ id: string; nome: string; tipo: string | null; statoAffollamento: string; capacitaMax: number }>;
+  // New: demand/supply, time-series
+  poiByType?: Array<{ tipo: string | null; count: number }>;
+  activitiesByDay?: Array<{ date: string; count: number }>;
+  activitiesByHour?: Array<{ hour: string; count: number }>;
+}
+
+export type ServiceRequestCategory =
+  | 'parcheggio_auto' | 'parcheggio_bici' | 'sport' | 'studio'
+  | 'verde' | 'cultura' | 'ciclismo' | 'altro';
+
+export interface ServiceRequestStats {
+  byCategory: Array<{ categoria: string; count: number }>;
+  total: number;
 }
 
 interface EventsResponse { events: ApiEvent[]; total?: number; }
@@ -502,7 +515,24 @@ export interface DashboardFilters {
   radiusKm?: string | number;
   poiId?: string;
 }
-export async function downloadDashboardExport(format: 'csv' | 'pdf', params?: DashboardFilters): Promise<Blob> {
+export function getDashboardServiceRequests(
+  params?: Pick<DashboardFilters, 'centerLat' | 'centerLng' | 'radiusKm'>,
+): Promise<ServiceRequestStats> {
+  const qs = params
+    ? `?${new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])).toString()}`
+    : '';
+  return request(`/api/dashboard/service-requests${qs}`);
+}
+
+export function submitServiceRequest(payload: {
+  categoria: ServiceRequestCategory;
+  latitudine: number;
+  longitudine: number;
+}): Promise<{ id: string; categoria: string; createdAt: string }> {
+  return request('/api/service-requests', { method: 'POST', body: payload });
+}
+
+export async function downloadDashboardExport(format: 'csv' | 'pdf', params?: DashboardFilters & { dataset?: string }): Promise<Blob> {
   const allParams: Record<string, string> = { format };
   if (params) {
     for (const [k, v] of Object.entries(params)) {
