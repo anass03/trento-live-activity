@@ -4139,6 +4139,131 @@ select option {
 }
 .comune-bar-list strong { text-align: right; }
 
+/* ── Comune dashboard: alert strip ── */
+.alert-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-left: 3px solid var(--color-danger);
+  flex-wrap: wrap;
+}
+.alert-strip-label {
+  font-weight: 780;
+  color: var(--color-danger);
+  font-size: 14px;
+  white-space: nowrap;
+}
+.alert-strip-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.alert-chip {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklch, var(--color-danger) 30%, var(--color-surface-line));
+  background: color-mix(in oklch, var(--color-danger) 8%, var(--color-bg-elevated));
+  font-size: 12px;
+  font-weight: 720;
+  color: var(--color-text-primary);
+}
+
+/* ── Demand list (dashboard) ── */
+.demand-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.demand-row-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.demand-tipo {
+  font-weight: 760;
+  font-size: 13.5px;
+}
+.demand-ratio {
+  font-size: 11px;
+  font-weight: 780;
+}
+.demand-bar-wrap {
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in oklch, var(--palette-sage) 28%, transparent);
+  margin-bottom: 4px;
+}
+.demand-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+.demand-counts {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+/* ── Tab strip (statistics) ── */
+.tab-strip {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+  width: fit-content;
+}
+.tab-btn {
+  min-height: 36px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-weight: 720;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.tab-btn:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-muted);
+}
+.tab-btn.active {
+  color: var(--color-bg-elevated);
+  background: var(--color-primary);
+  box-shadow: 0 4px 14px oklch(0.45 0.08 145 / 0.2);
+}
+
+/* ── Needs list (dashboard) ── */
+.needs-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 7px;
+}
+.needs-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--color-surface-line);
+  background: var(--color-bg-elevated);
+  font-size: 13px;
+}
+.needs-list strong {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-primary);
+}
+
 /* ── Entity publish page: 2-column layout con riepilogo ── */
 .publish-layout {
   display: grid;
