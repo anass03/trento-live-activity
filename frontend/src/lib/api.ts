@@ -554,7 +554,7 @@ export function submitServiceRequest(payload: {
   return request('/api/service-requests', { method: 'POST', body: payload });
 }
 
-export async function downloadDashboardExport(format: 'csv' | 'pdf', params?: DashboardFilters & { dataset?: string }): Promise<Blob> {
+export async function downloadDashboardExport(format: 'csv' | 'pdf', params?: DashboardFilters & { dataset?: string; datasets?: string }): Promise<Blob> {
   const allParams: Record<string, string> = { format };
   if (params) {
     for (const [k, v] of Object.entries(params)) {
