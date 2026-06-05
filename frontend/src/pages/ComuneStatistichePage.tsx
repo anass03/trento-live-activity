@@ -52,25 +52,26 @@ function maxCount(rows: Array<{ count: number | string }>) {
 
 /** Full SVG sparkline with date labels */
 function Sparkline({ days }: { days: Array<{ date: string; count: number }> }) {
-  if (days.length < 2) return <p className="muted-copy">{''}</p>;
   const values = days.map((d) => Number(d.count));
-  const max = Math.max(...values, 1);
+  const max = Math.max(...values);
+  if (max === 0 || days.length < 2) return null;
+  const normMax = Math.max(max, 1);
   const W = 640; const H = 80; const PAD = 6;
   const pts = values.map((v, i) => {
     const x = PAD + (i / (values.length - 1)) * (W - PAD * 2);
-    const y = H - PAD - (v / max) * (H - PAD * 2);
+    const y = H - PAD - (v / normMax) * (H - PAD * 2);
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(' ');
-  const peakIdx = values.indexOf(Math.max(...values));
+  const peakIdx = values.indexOf(max);
   const peakX = PAD + (peakIdx / (values.length - 1)) * (W - PAD * 2);
-  const peakY = H - PAD - (values[peakIdx] / max) * (H - PAD * 2);
+  const peakY = H - PAD - (values[peakIdx] / normMax) * (H - PAD * 2);
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: H }} aria-hidden="true">
       <polyline points={pts} fill="none" stroke="var(--color-primary)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
       {values.map((v, i) => {
         const x = PAD + (i / (values.length - 1)) * (W - PAD * 2);
-        const y = H - PAD - (v / max) * (H - PAD * 2);
-        return <circle key={i} cx={x} cy={y} r="3" fill="var(--color-primary)" opacity={i === peakIdx ? 1 : 0.5} />;
+        const y = H - PAD - (v / normMax) * (H - PAD * 2);
+        return <circle key={i} cx={x} cy={y} r={v > 0 ? 3 : 2} fill={v > 0 ? 'var(--color-primary)' : 'var(--color-border)'} opacity={v > 0 && i !== peakIdx ? 0.5 : 1} />;
       })}
       {/* Peak label */}
       <circle cx={peakX} cy={peakY} r="5" fill="var(--color-primary)" />
@@ -135,6 +136,19 @@ export function ComuneStatistichePage() {
     const map = Object.fromEntries((stats?.activitiesByHour ?? []).map((r) => [r.hour, Number(r.count)]));
     return Array.from({ length: 24 }, (_, i) => ({ hour: String(i).padStart(2, '0'), count: map[String(i).padStart(2, '0')] ?? 0 }));
   }, [stats]);
+
+  // Fill all 14 days — show a continuous line even with sparse data
+  const filledDays = useMemo(() => {
+    const map = Object.fromEntries((stats?.activitiesByDay ?? []).map((r) => [r.date, Number(r.count)]));
+    return Array.from({ length: 14 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (13 - i));
+      const date = d.toISOString().slice(0, 10);
+      return { date, count: map[date] ?? 0 };
+    });
+  }, [stats]);
+
+  const nonZeroDays = useMemo(() => filledDays.filter((d) => d.count > 0).length, [filledDays]);
 
   // Supply/demand table
   const supplyRows = useMemo(() => {
@@ -326,14 +340,19 @@ export function ComuneStatistichePage() {
             <div className="comune-analytics-grid">
               <section className="dashboard-section liquid-card" style={{ gridColumn: '1 / -1' }}>
                 <h2>{t('comune.stats.trendTitle')}</h2>
-                {(stats.activitiesByDay ?? []).length < 2 ? (
+                {nonZeroDays === 0 ? (
                   <p className="muted-copy">{t('comune.stats.noTrend')}</p>
                 ) : (
                   <>
-                    <Sparkline days={stats.activitiesByDay ?? []} />
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
-                      <span>{(stats.activitiesByDay ?? [])[0]?.date}</span>
-                      <span>{(stats.activitiesByDay ?? []).at(-1)?.date}</span>
+                    <Sparkline days={filledDays} />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
+                      <div style={{ display: 'flex', gap: 16 }}>
+                        <span>{filledDays[0]?.date}</span>
+                        <span>{filledDays[filledDays.length - 1]?.date}</span>
+                      </div>
+                      {nonZeroDays < 4 && (
+                        <span className="sparse-badge">{t('comune.stats.trendSparse', { n: nonZeroDays })}</span>
+                      )}
                     </div>
                   </>
                 )}
