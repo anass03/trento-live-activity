@@ -9,6 +9,7 @@ import { CalendarButton } from '../components/ui/CalendarButton';
 import { GeocodedLocation } from '../components/ui/GeocodedLocation';
 import { useAutoRefresh } from '../lib/useAutoRefresh';
 import { formatDateTime, formatDay } from '../lib/formatters';
+import { resolveActivityTitle } from '../lib/activityTitle';
 
 function parseLocalDateTime(value: string | null | undefined): Date | null {
   if (!value) return null;
@@ -51,6 +52,13 @@ function isUpcomingWeekend(dateStr: string | null | undefined): boolean {
 
 export function ActivitiesPage({ user }: { user?: AppUser }) {
   const { t } = useTranslation();
+  const translateStatus = (s?: string | null) => {
+    if (!s || s === 'attiva') return t('activities.statusActive');
+    if (s === 'cancellata') return t('activities.statusCancelled');
+    if (s === 'conclusa') return t('activities.statusCompleted');
+    return s;
+  };
+  const activityTitle = (a: { category?: string | null }) => resolveActivityTitle(a.category, t);
   const userInterests = user?.interessi ?? [];
   const userId = user?.id;
   const canParticipate = user?.role === 'registered_user';
@@ -185,10 +193,10 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
         map={{ latitude: activity.latitude, longitude: activity.longitude, title: activity.title, category: activity.category, description: activity.description || t('activities.defaultDescription'), dateTime: activity.dateTime, type: 'activity', crowdLevel: activityCrowdLevel(activity.participantCount, activity.maxParticipants) }}
       >
         <div className="interactive-map-card-header">
-          <span>{activity.category}</span>
-          <small>{activity.status || t('activities.active')}</small>
+          <span>{t(`categories.${activity.category?.toLowerCase()}`, { defaultValue: activity.category })}</span>
+          <small>{translateStatus(activity.status)}</small>
         </div>
-        <h2>{activity.title}</h2>
+        <h2>{activityTitle(activity)}</h2>
         <p>{activity.description || t('activities.defaultDescription')}</p>
         <dl>
           <div><dt>{t('common.where')}</dt><dd><GeocodedLocation value={activity.location} /></dd></div>
@@ -253,14 +261,14 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
             {createdByMe.map((activity) => (
               <article key={activity.id} className="activity-card event-explorer-card" onClick={() => setSelectedActivity(activity)}>
                 <div className="interactive-map-card-header">
-                  <span>{activity.category}</span>
+                  <span>{t(`categories.${activity.category?.toLowerCase()}`, { defaultValue: activity.category })}</span>
                   <small className="badge">{t('activities.createdByMeBadge')}</small>
                 </div>
-                <h2>{activity.title}</h2>
+                <h2>{activityTitle(activity)}</h2>
                 <dl>
                   <div><dt>{t('common.when')}</dt><dd>{formatDateTime(activity.dateTime)}</dd></div>
                   <div><dt>{t('common.participants')}</dt><dd>{activity.participantCount} / {activity.maxParticipants}</dd></div>
-                  <div><dt>{t('common.status')}</dt><dd>{activity.status || t('activities.active')}</dd></div>
+                  <div><dt>{t('common.status')}</dt><dd>{translateStatus(activity.status)}</dd></div>
                 </dl>
                 <div className="card-actions-row">
                   <button className="danger-button compact-button" type="button" disabled={actionLoading === activity.id} onClick={(e) => { e.stopPropagation(); handleCancel(activity.id); }}>
@@ -280,10 +288,10 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
             {participatingIn.map((activity) => (
               <article key={activity.id} className="activity-card event-explorer-card" onClick={() => setSelectedActivity(activity)}>
                 <div className="interactive-map-card-header">
-                  <span>{activity.category}</span>
+                  <span>{t(`categories.${activity.category?.toLowerCase()}`, { defaultValue: activity.category })}</span>
                   <small>{t('activities.participantBadge')}</small>
                 </div>
-                <h2>{activity.title}</h2>
+                <h2>{activityTitle(activity)}</h2>
                 <dl>
                   <div><dt>{t('common.when')}</dt><dd>{formatDateTime(activity.dateTime)}</dd></div>
                   <div><dt>{t('common.participants')}</dt><dd>{activity.participantCount} / {activity.maxParticipants}</dd></div>
@@ -320,8 +328,8 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
                       <span>{formatDateTime(featuredActivity.dateTime)}</span>
                     </div>
                     <div>
-                      <div className="feature-badges" aria-label={t('common.category')}><span>{featuredActivity.category}</span></div>
-                      <h2>{featuredActivity.title}</h2>
+                      <div className="feature-badges" aria-label={t('common.category')}><span>{t(`categories.${featuredActivity.category?.toLowerCase()}`, { defaultValue: featuredActivity.category })}</span></div>
+                      <h2>{activityTitle(featuredActivity)}</h2>
                       <p>{featuredActivity.description || t('activities.defaultDescription')}</p>
                     </div>
                   </article>
@@ -333,7 +341,7 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
                   {timelineByDay.map(([day, acts]) => (
                     <li key={day} className="event-timeline-day">
                       <time>{day !== 'unknown' ? formatDay(day) : t('common.dateTBD')}</time>
-                      <ul>{acts.map((a) => <li key={a.id}>{a.title}</li>)}</ul>
+                      <ul>{acts.map((a) => <li key={a.id}>{activityTitle(a)}</li>)}</ul>
                     </li>
                   ))}
                 </ol>
@@ -344,7 +352,7 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
                       <button className={category === 'all' ? 'active-filter' : undefined} type="button" onClick={() => setCategory('all')}>{t('activities.allCategories')}</button>
                       {categoryCounts.map((item) => (
                         <button className={category === item.category ? 'active-filter' : undefined} key={item.category} type="button" onClick={() => setCategory(item.category)}>
-                          {item.category} <strong>{item.count}</strong>
+                          {t(`categories.${item.category?.toLowerCase()}`, { defaultValue: item.category })} <strong>{item.count}</strong>
                         </button>
                       ))}
                     </div>
@@ -375,8 +383,8 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
                     <span>{formatDateTime(featuredActivity.dateTime)}</span>
                   </div>
                   <div>
-                    <div className="feature-badges" aria-label={t('common.category')}><span>{featuredActivity.category}</span></div>
-                    <h2>{featuredActivity.title}</h2>
+                    <div className="feature-badges" aria-label={t('common.category')}><span>{t(`categories.${featuredActivity.category?.toLowerCase()}`, { defaultValue: featuredActivity.category })}</span></div>
+                    <h2>{activityTitle(featuredActivity)}</h2>
                     <p>{featuredActivity.description || t('activities.defaultDescription')}</p>
                   </div>
                 </article>
@@ -388,7 +396,7 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
                 {timelineByDay.map(([day, acts]) => (
                   <li key={day} className="event-timeline-day">
                     <time>{day !== 'unknown' ? formatDay(day) : t('common.dateTBD')}</time>
-                    <ul>{acts.map((a) => <li key={a.id}>{a.title}</li>)}</ul>
+                    <ul>{acts.map((a) => <li key={a.id}>{activityTitle(a)}</li>)}</ul>
                   </li>
                 ))}
               </ol>
@@ -399,7 +407,7 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
                     <button className={category === 'all' ? 'active-filter' : undefined} type="button" onClick={() => setCategory('all')}>{t('activities.allCategories')}</button>
                     {categoryCounts.map((item) => (
                       <button className={category === item.category ? 'active-filter' : undefined} key={item.category} type="button" onClick={() => setCategory(item.category)}>
-                        {item.category} <strong>{item.count}</strong>
+                        {t(`categories.${item.category?.toLowerCase()}`, { defaultValue: item.category })} <strong>{item.count}</strong>
                       </button>
                     ))}
                   </div>
@@ -436,8 +444,8 @@ export function ActivitiesPage({ user }: { user?: AppUser }) {
         <div className="activity-popup-backdrop" role="presentation" onClick={() => setSelectedActivity(null)}>
           <article className="activity-popup" role="dialog" aria-modal="true" aria-labelledby="activity-popup-title" onClick={(e) => e.stopPropagation()}>
             <button className="activity-popup-close" type="button" onClick={() => setSelectedActivity(null)} aria-label={t('common.close')}>×</button>
-            <span className="section-eyebrow">{selectedActivity.category}</span>
-            <h2 id="activity-popup-title">{selectedActivity.title}</h2>
+            <span className="section-eyebrow">{t(`categories.${selectedActivity.category?.toLowerCase()}`, { defaultValue: selectedActivity.category })}</span>
+            <h2 id="activity-popup-title">{activityTitle(selectedActivity)}</h2>
             <p>{selectedActivity.description || t('activities.defaultDescription')}</p>
             <dl>
               <div><dt>{t('common.where')}</dt><dd><GeocodedLocation value={selectedActivity.location} /></dd></div>

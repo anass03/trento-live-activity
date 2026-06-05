@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { resolveActivityTitle } from '../lib/activityTitle';
 import { MapCanvas } from '../components/map/MapCanvas';
 import { getMapMarkers, getParking, type MapMarker, type MarkerType, type ParkingSpot } from '../lib/api';
 import { listFavorites } from '../lib/favorites';
@@ -147,29 +148,43 @@ export function MapPage({ user }: { user?: AppUser }) {
   }, [isAdmin, filter]);
 
   const parkingMarkers = useMemo<MapMarker[]>(
-    () => parking
-      .filter((p) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude))
-      .map((p) => ({
-        id: `parking-${p.id}`,
-        type: 'parking' as MarkerType,
-        title: p.name,
-        latitude: p.latitude as number,
-        longitude: p.longitude as number,
-        crowdLevel: PARKING_CROWD_LEVEL[p.status] ?? (p.occupancyPct ?? 0),
-        crowdingStatus: PARKING_CROWD_STATUS[p.status] ?? 'green',
-        isCertified: false,
-        sourceId: p.id,
-        category: p.type === 'bike' ? t('map.parkingBikes') : t('map.parkingCars'),
-        description: p.description || (p.type === 'bike' ? t('map.parkingBikes') : t('map.parkingCars')),
-        free: p.free,
-        total: p.capacity,
-      })),
+    () => {
+      const bikePrefix = t('map.bikeStoragePrefix');
+      const bikeNorm = (s: string) => {
+        const stripped = s.replace(/^(Servizio\s+)?Rimessaggio\s+Bici\s*[-–]?\s*/i, '').trim();
+        return stripped ? `${bikePrefix} – ${stripped}` : bikePrefix;
+      };
+      return parking
+        .filter((p) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude))
+        .map((p) => ({
+          id: `parking-${p.id}`,
+          type: 'parking' as MarkerType,
+          title: p.type === 'bike' ? bikeNorm(p.name) : p.name,
+          latitude: p.latitude as number,
+          longitude: p.longitude as number,
+          crowdLevel: PARKING_CROWD_LEVEL[p.status] ?? (p.occupancyPct ?? 0),
+          crowdingStatus: PARKING_CROWD_STATUS[p.status] ?? 'green',
+          isCertified: false,
+          sourceId: p.id,
+          category: p.type === 'bike' ? t('map.parkingBikes') : t('map.parkingCars'),
+          description: p.type === 'bike' && p.description
+            ? bikeNorm(p.description)
+            : p.description || (p.type === 'bike' ? t('map.parkingBikes') : t('map.parkingCars')),
+          free: p.free,
+          total: p.capacity,
+        }));
+    },
     [parking, t],
   );
 
   const baseMarkers = useMemo(
-    () => { const base = isEnte ? markers.filter((m) => m.type !== 'activity') : markers; return [...base, ...parkingMarkers]; },
-    [isEnte, markers, parkingMarkers],
+    () => {
+      const base = isEnte ? markers.filter((m) => m.type !== 'activity') : markers;
+      return [...base, ...parkingMarkers].map((m) =>
+        m.type === 'activity' ? { ...m, title: resolveActivityTitle(m.category, t) } : m,
+      );
+    },
+    [isEnte, markers, parkingMarkers, t],
   );
 
   const visibleMarkers = useMemo(() => {
