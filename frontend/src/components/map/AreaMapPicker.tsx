@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import maplibregl, { type Map as MapLibreMap, type Marker } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { useTranslation } from 'react-i18next';
 import { GeocodedLocation } from '../ui/GeocodedLocation';
 
 const TRENTO_CENTER: [number, number] = [11.1211, 46.0679];
@@ -30,6 +31,7 @@ export interface AreaMapPickerProps {
 }
 
 export function AreaMapPicker({ initial, onConfirm, onCancel }: AreaMapPickerProps) {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markerRef = useRef<Marker | null>(null);
@@ -123,8 +125,8 @@ export function AreaMapPicker({ initial, onConfirm, onCancel }: AreaMapPickerPro
     <div className="poi-map-picker-backdrop" role="presentation" onClick={onCancel}>
       <div className="poi-map-picker liquid-card" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <header>
-          <h2>Scegli l'area di analisi</h2>
-          <p>Clicca sulla mappa per impostare il centro, poi definisci il raggio.</p>
+          <h2>{t('mapPicker.areaTitle')}</h2>
+          <p>{t('mapPicker.areaHint')}</p>
         </header>
         <div ref={containerRef} className="poi-map-picker-canvas" />
         <footer>
@@ -135,7 +137,7 @@ export function AreaMapPicker({ initial, onConfirm, onCancel }: AreaMapPickerPro
                 <code style={{ fontSize: 11, opacity: 0.6 }}>{coord[1].toFixed(6)}, {coord[0].toFixed(6)}</code>
               </>
             ) : (
-              <em>Nessun punto selezionato — clicca sulla mappa</em>
+              <em>{t('mapPicker.noPoint')}</em>
             )}
             <div className="area-picker-radius-input" style={{ marginTop: 8 }}>
               <input
@@ -159,14 +161,14 @@ export function AreaMapPicker({ initial, onConfirm, onCancel }: AreaMapPickerPro
             </div>
           </div>
           <div className="filter-actions">
-            <button type="button" onClick={onCancel}>Annulla</button>
+            <button type="button" onClick={onCancel}>{t('common.cancel')}</button>
             <button
               type="button"
               className="primary-button"
               disabled={!coord}
               onClick={() => coord && onConfirm({ centerLng: coord[0], centerLat: coord[1], radiusKm })}
             >
-              Conferma area
+              {t('mapPicker.confirmArea')}
             </button>
           </div>
         </footer>
