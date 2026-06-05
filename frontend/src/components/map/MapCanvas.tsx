@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import i18n from 'i18next';
 import maplibregl, {
   type GeoJSONSource,
   type LayerSpecification,
@@ -23,18 +25,13 @@ const HEAT_SOURCE_ID = 'trento-crowd-heat';
 const POINT_SOURCE_ID = 'trento-crowd-points';
 const BUILDING_SOURCE_ID = 'trento-3d-buildings';
 
+// Neutral type keys used as category fallback in GeoJSON properties.
+// Translated at render time via translateCategory() inside the component.
 const typeLabel: Record<MarkerType, string> = {
-  poi: 'POI',
-  activity: 'Attività',
-  event: 'Evento',
-  parking: 'Parcheggio',
-};
-
-const crowdLabel: Record<CrowdingStatus, string> = {
-  green: 'Basso',
-  yellow: 'Medio',
-  orange: 'Intenso',
-  red: 'Molto alto',
+  poi: 'poi',
+  activity: 'activity',
+  event: 'event',
+  parking: 'parking',
 };
 
 const crowdColor: Record<CrowdingStatus, string> = {
@@ -108,7 +105,8 @@ function normalizedCrowd(marker: MapMarker) {
 
 function formatDateTime(value?: string | null) {
   if (!value) return '';
-  return new Intl.DateTimeFormat('it-IT', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+  const locale = i18n.language?.startsWith('en') ? 'en-GB' : 'it-IT';
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
 }
 
 function markerCollection(markers: MapMarker[]): MarkerFeatureCollection {
@@ -129,7 +127,7 @@ function markerCollection(markers: MapMarker[]): MarkerFeatureCollection {
             isCertified: marker.isCertified,
             sourceId: marker.sourceId,
             category: marker.category || typeLabel[marker.type],
-            description: marker.description || 'Informazione disponibile sulla mappa cittadina.',
+            description: marker.description || i18n.t('map.defaultMarkerDesc'),
             dateTime: marker.dateTime || '',
             free: marker.free ?? -1,
             total: marker.total ?? -1,
@@ -406,7 +404,31 @@ const defaultForm = (): PoiForm => ({ tipo: 'sport', data: '', orarioInizio: '',
 const ACTIVITY_TYPES = ['sport', 'cultura', 'musica', 'studio', 'arte', 'gastronomia'];
 
 export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppUser }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
+
+  // Helpers that depend on t() — defined early so they can be used throughout.
+  const crowdStatusLabel = (status: CrowdingStatus) => ({
+    green: t('map.crowdLow'),
+    yellow: t('map.crowdMedium'),
+    orange: t('map.crowdHigh'),
+    red: t('map.crowdVeryHigh'),
+  })[status] ?? status;
+
+  const markerTypeLabel = (type: MarkerType) => {
+    if (type === 'poi')      return t('map.markerPOI');
+    if (type === 'activity') return t('map.markerActivity');
+    if (type === 'event')    return t('map.markerEvent');
+    return t('map.markerParking');
+  };
+
+  const translateCategory = (cat: string) => {
+    if (cat === 'activity') return t('map.markerActivity');
+    if (cat === 'event')    return t('map.markerEvent');
+    if (cat === 'parking')  return t('map.markerParking');
+    if (cat === 'poi')      return t('map.markerPOI');
+    return t(`categories.${cat.toLowerCase()}`, { defaultValue: cat });
+  };
   const sectionRef = useRef<HTMLElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -476,11 +498,11 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
     setFormLoading(true);
     try {
       await createActivity({ ...form, poiId: activePoi.id });
-      setFormSuccess('Attività creata!');
+      setFormSuccess(t('activities.createdSuccess'));
       setForm(defaultForm());
       setTimeout(() => { setShowForm(false); setActivePoi(null); setFormSuccess(null); }, 1800);
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Errore');
+      setFormError(err instanceof Error ? err.message : t('common.error'));
     } finally {
       setFormLoading(false);
     }
@@ -506,7 +528,7 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
       }));
       setAiHint(result.reasoning);
     } catch (err) {
-      setAiError(err instanceof Error ? err.message : 'Errore AI');
+      setAiError(err instanceof Error ? err.message : t('activities.aiError'));
     } finally {
       setAiLoading(false);
     }
@@ -743,14 +765,14 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
             onClick={(e) => e.stopPropagation()}
           >
             <div className="maplibre-popup-kicker">
-              <span>{typeLabel[popup.props.type]}</span>
+              <span>{markerTypeLabel(popup.props.type)}</span>
               <span className={`crowd-${popup.props.crowdingStatus}`}>
-                {crowdLabel[popup.props.crowdingStatus]} · {Math.round(popup.props.crowdLevel)}/100
+                {crowdStatusLabel(popup.props.crowdingStatus)} · {Math.round(popup.props.crowdLevel)}/100
               </span>
               <button
                 className="maplibregl-popup-close-button map-popup-close-btn"
                 type="button"
-                aria-label="Chiudi"
+                aria-label={t('common.close')}
                 onClick={closePopup}
               >
                 ×
@@ -761,10 +783,10 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
             <p>{popup.props.description}</p>
 
             <dl>
-              <div><dt>Categoria</dt><dd>{popup.props.category}</dd></div>
+              <div><dt>{t('map.popupCategory')}</dt><dd>{translateCategory(popup.props.category)}</dd></div>
               {popup.props.type === 'parking' && popup.props.total >= 0 && (
                 <div>
-                  <dt>Posti liberi</dt>
+                  <dt>{t('map.popupFreeSpots')}</dt>
                   <dd>
                     <strong className={`crowd-${popup.props.crowdingStatus}`}>{popup.props.free}</strong>
                     {' / '}{popup.props.total}
@@ -772,12 +794,12 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
                 </div>
               )}
               {popup.props.dateTime && (
-                <div><dt>Quando</dt><dd>{formatDateTime(popup.props.dateTime)}</dd></div>
+                <div><dt>{t('map.popupWhen')}</dt><dd>{formatDateTime(popup.props.dateTime)}</dd></div>
               )}
             </dl>
 
             {popup.props.isCertified && (
-              <span className="maplibre-certified-badge">Evento certificato</span>
+              <span className="maplibre-certified-badge">{t('map.popupCertified')}</span>
             )}
 
             <div className="map-popup-actions">
@@ -798,7 +820,7 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
                     closePopup();
                   }}
                 >
-                  ➕ Crea attività qui
+                  {t('map.popupCreateHere')}
                 </button>
               )}
               {canNavigate && (
@@ -809,16 +831,14 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
                     `/${popup!.props.type === 'event' ? 'eventi' : 'attivita'}?open=${encodeURIComponent(popup!.props.id)}`,
                   )}
                 >
-                  Apri dettaglio →
+                  {t('map.popupOpenDetail')}
                 </button>
               )}
             </div>
 
             {canNavigate && (
               <p className="map-popup-hint">
-                {popup.locked
-                  ? 'Clic sul marker per aprire · Clic altrove per chiudere'
-                  : 'Clic per bloccare · Doppio clic per aprire'}
+                {popup.locked ? t('map.popupHintLocked') : t('map.popupHintUnlocked')}
               </p>
             )}
           </article>
@@ -829,17 +849,17 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
       {/* ── Create-activity form panel ──────────────────────────────────── */}
       {activePoi && showForm && (
         <div className="map-create-activity-panel glass-card">
-          <h3>Crea attività — {activePoi.title}</h3>
+          <h3>{t('activities.createFormTitle')} — {activePoi.title}</h3>
 
-          {/* ── AI suggester: descrizione libera → categoria/orario auto ── */}
+          {/* ── AI suggester: free-text description → auto category/time ── */}
           <div className="ai-suggester-box">
             <label>
-              <span>💡 Descrivi cosa vuoi fare (l'AI suggerisce categoria e orario)</span>
+              <span>{t('activities.aiLabel')}</span>
               <textarea
                 rows={2}
                 value={aiDescription}
                 onChange={(e) => setAiDescription(e.target.value)}
-                placeholder="es. partita di calcetto domani sera"
+                placeholder={t('activities.aiPlaceholder')}
               />
             </label>
             <div className="ai-suggester-actions">
@@ -849,7 +869,7 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
                 disabled={aiLoading || !aiDescription.trim()}
                 onClick={handleAiSuggest}
               >
-                {aiLoading ? 'Sto suggerendo…' : 'Suggerisci con AI'}
+                {aiLoading ? t('activities.aiLoading') : t('activities.aiSuggest')}
               </button>
               {aiHint && <small className="success-message">{aiHint}</small>}
               {aiError && <small className="error-message">{aiError}</small>}
@@ -858,25 +878,27 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
 
           <form onSubmit={handleCreateActivity}>
             <label>
-              <span>Tipo</span>
+              <span>{t('activities.typeField')}</span>
               <select value={form.tipo} onChange={(e) => setForm((f) => ({ ...f, tipo: e.target.value }))}>
-                {ACTIVITY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                {ACTIVITY_TYPES.map((tipo) => (
+                  <option key={tipo} value={tipo}>{t(`categories.${tipo}`, { defaultValue: tipo })}</option>
+                ))}
               </select>
             </label>
             <label>
-              <span>Data</span>
+              <span>{t('activities.dateField')}</span>
               <input type="date" required value={form.data} onChange={(e) => setForm((f) => ({ ...f, data: e.target.value }))} />
             </label>
             <label>
-              <span>Inizio</span>
+              <span>{t('activities.startField')}</span>
               <input type="time" required value={form.orarioInizio} onChange={(e) => setForm((f) => ({ ...f, orarioInizio: e.target.value }))} />
             </label>
             <label>
-              <span>Fine</span>
+              <span>{t('activities.endField')}</span>
               <input type="time" required value={form.orarioFine} onChange={(e) => setForm((f) => ({ ...f, orarioFine: e.target.value }))} />
             </label>
             <label>
-              <span>Max partecipanti (2–50)</span>
+              <span>{t('activities.maxParticipantsField')}</span>
               <input
                 type="number"
                 min={2}
@@ -890,10 +912,10 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
             {formSuccess && <p className="form-success">{formSuccess}</p>}
             <div className="filter-actions">
               <button className="primary-button" type="submit" disabled={formLoading}>
-                {formLoading ? '...' : 'Crea'}
+                {formLoading ? '…' : t('activities.createButton')}
               </button>
               <button type="button" onClick={() => { setShowForm(false); setActivePoi(null); }}>
-                Annulla
+                {t('common.cancel')}
               </button>
             </div>
           </form>
@@ -901,17 +923,17 @@ export function MapCanvas({ markers, user }: { markers: MapMarker[]; user?: AppU
       )}
 
       <div className="map-3d-hud" aria-hidden="true">
-        <strong>Vista 3D Trento</strong>
-        <span>Trascina per muovere, ruota con bussola o tasto destro</span>
+        <strong>{t('map.hud3dTitle')}</strong>
+        <span>{t('map.hud3dHint')}</span>
       </div>
       <button className="map-reset-view" type="button" onClick={resetView}>
-        Reimposta vista
+        {t('map.resetView')}
       </button>
-      <div className="map-density-legend" aria-label="Scala affollamento">
-        <span><i className="legend-green" />Basso</span>
-        <span><i className="legend-yellow" />Medio</span>
-        <span><i className="legend-orange" />Intenso</span>
-        <span><i className="legend-red" />Molto alto</span>
+      <div className="map-density-legend" aria-label={t('map.crowdScale')}>
+        <span><i className="legend-green" />{t('map.crowdLow')}</span>
+        <span><i className="legend-yellow" />{t('map.crowdMedium')}</span>
+        <span><i className="legend-orange" />{t('map.crowdHigh')}</span>
+        <span><i className="legend-red" />{t('map.crowdVeryHigh')}</span>
       </div>
     </section>
   );

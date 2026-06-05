@@ -44,7 +44,7 @@ const iconMap: Record<string, LucideIcon> = {
   Moderazione: MessageSquareWarning,
 };
 
-// Mappa label-IT → chiave i18n (per i tooltip nella topbar).
+// Maps Italian nav labels to i18n keys (tooltips in the topbar).
 const labelToKey: Record<string, string> = {
   Mappa: 'nav.map',
   'Attività': 'nav.activities',
@@ -52,14 +52,23 @@ const labelToKey: Record<string, string> = {
   'Eventi certificati': 'nav.certifiedEvents',
   Profilo: 'nav.profile',
   'Accedi / Registrati': 'nav.login',
+  'Pubblica evento': 'nav.publishEvent',
+  'Dashboard Comune': 'nav.municipalDashboard',
+  Statistiche: 'nav.statistics',
+  Export: 'nav.export',
+  'Gestione POI': 'nav.managePOI',
+  Utenti: 'nav.users',
+  'Richieste enti': 'nav.entityRequests',
+  Moderazione: 'nav.moderation',
+  'Notifiche push': 'nav.pushNotifications',
 };
 
-const roleBadge: Record<AppUser['role'], { label: string; icon: LucideIcon }> = {
-  anonymous: { label: 'Ospite', icon: LogIn },
-  registered_user: { label: 'Cittadino', icon: User },
-  certified_entity: { label: 'Ente', icon: ShieldCheck },
-  municipal_admin: { label: 'Comune', icon: BarChart3 },
-  system_admin: { label: 'Admin', icon: ShieldCheck },
+const roleKey: Record<AppUser['role'], { i18nKey: string; icon: LucideIcon }> = {
+  anonymous: { i18nKey: 'nav.guestRole', icon: LogIn },
+  registered_user: { i18nKey: 'nav.citizenRole', icon: User },
+  certified_entity: { i18nKey: 'nav.entityRole', icon: ShieldCheck },
+  municipal_admin: { i18nKey: 'nav.municipalRole', icon: BarChart3 },
+  system_admin: { i18nKey: 'nav.adminRole', icon: ShieldCheck },
 };
 
 function TopbarLink({ item, compact = false }: { item: { label: string; path: string }; compact?: boolean }) {
@@ -82,10 +91,12 @@ function TopbarLink({ item, compact = false }: { item: { label: string; path: st
 }
 
 export function Topbar({ user }: { user: AppUser }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const canSee = (roles: AppUser['role'][]) => roles.includes(user.role);
-  const role = roleBadge[user.role];
+  const role = roleKey[user.role];
   const RoleIcon = role.icon;
+  const roleLabel = t(role.i18nKey);
   const [theme, setThemeStateLocal] = useState<Theme>(() => getStoredTheme());
 
   useEffect(() => {
@@ -112,8 +123,8 @@ export function Topbar({ user }: { user: AppUser }) {
           className="topbar-user"
           type="button"
           onClick={() => navigate(user.role === 'anonymous' ? '/login' : '/profilo')}
-          aria-label={user.role === 'anonymous' ? 'Accedi o registrati' : `Profilo di ${user.name}`}
-          title={user.role === 'anonymous' ? 'Accedi o registrati' : `${user.name} (${role.label})`}
+          aria-label={user.role === 'anonymous' ? t('nav.loginOrRegister') : t('nav.userProfile', { name: user.name })}
+          title={user.role === 'anonymous' ? t('nav.loginOrRegister') : `${user.name} (${roleLabel})`}
         >
           <span className="topbar-avatar">
             {user.role === 'anonymous' ? <RoleIcon size={17} aria-hidden="true" /> : user.avatar}
@@ -134,8 +145,8 @@ export function Topbar({ user }: { user: AppUser }) {
         <button
           className="topbar-icon-button"
           type="button"
-          aria-label={theme === 'dark' ? 'Attiva tema chiaro' : 'Attiva tema scuro'}
-          title={theme === 'dark' ? 'Tema chiaro' : 'Tema scuro'}
+          aria-label={theme === 'dark' ? t('nav.activateLightTheme') : t('nav.activateDarkTheme')}
+          title={theme === 'dark' ? t('nav.lightTheme') : t('nav.darkTheme')}
           onClick={() => setThemeStateLocal(toggleTheme())}
         >
           {theme === 'dark' ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}
@@ -143,8 +154,8 @@ export function Topbar({ user }: { user: AppUser }) {
         <button
           className="topbar-icon-button"
           type="button"
-          aria-label="Impostazioni"
-          title="Impostazioni"
+          aria-label={t('nav.settings')}
+          title={t('nav.settings')}
           onClick={() => navigate('/impostazioni')}
         >
           <Settings size={18} aria-hidden="true" />

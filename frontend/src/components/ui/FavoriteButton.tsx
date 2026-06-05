@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Heart } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { listFavorites, toggleFavorite } from '../../lib/favorites';
 import type { FavoriteType } from '../../lib/api';
 
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export function FavoriteButton({ markerType, markerId, compact = false, onLight = false }: Props) {
+  const { t } = useTranslation();
   const [favorited, setFavorited] = useState<boolean>(false);
   const [loading, setLoading] = useState(false);
 
@@ -49,8 +51,8 @@ export function FavoriteButton({ markerType, markerId, compact = false, onLight 
       className={`favorite-btn ${favorited ? 'is-favorited' : ''} ${compact ? 'compact' : ''} ${onLight ? 'on-light' : ''}`}
       onClick={handleClick}
       disabled={loading}
-      aria-label={favorited ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}
-      title={favorited ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}
+      aria-label={favorited ? t('common.removeFromFavorites') : t('common.addToFavorites')}
+      title={favorited ? t('common.removeFromFavorites') : t('common.addToFavorites')}
     >
       <Heart
         size={compact ? 16 : 18}
