@@ -142,16 +142,30 @@ async function getServiceRequestStats({ centerLat, centerLng, radiusKm } = {}) {
     });
   }
 
-  const byCategory = await ServiceRequest.findAll({
-    attributes: ['categoria', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
-    where: geoFilter,
-    group: ['categoria'],
-    order: [[sequelize.fn('COUNT', sequelize.col('id')), 'DESC']],
-    raw: true,
-  });
+  const [byCategory, bySubcategory] = await Promise.all([
+    ServiceRequest.findAll({
+      attributes: ['categoria', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
+      where: geoFilter,
+      group: ['categoria'],
+      order: [[sequelize.fn('COUNT', sequelize.col('id')), 'DESC']],
+      raw: true,
+    }),
+    // Subcategory breakdown — only rows where sottocategoria is set (scope ridotto: no personal data)
+    ServiceRequest.findAll({
+      attributes: [
+        'categoria',
+        'sottocategoria',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
+      ],
+      where: { ...geoFilter, sottocategoria: { [Op.ne]: null } },
+      group: ['categoria', 'sottocategoria'],
+      order: [[sequelize.fn('COUNT', sequelize.col('id')), 'DESC']],
+      raw: true,
+    }),
+  ]);
 
   const total = byCategory.reduce((sum, r) => sum + Number(r.count), 0);
-  return { byCategory, total };
+  return { byCategory, bySubcategory, total };
 }
 
 module.exports = { getStats, getServiceRequestStats };

@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { POIMapPicker } from '../map/POIMapPicker';
-import { submitServiceRequest, type ServiceRequestCategory } from '../../lib/api';
+import {
+  submitServiceRequest,
+  SUBCATEGORIES_BY_CATEGORY,
+  type ServiceRequestCategory,
+  type ServiceRequestSubcategory,
+} from '../../lib/api';
 import { GeocodedLocation } from './GeocodedLocation';
 
 const CATEGORIES: ServiceRequestCategory[] = [
@@ -14,18 +19,33 @@ interface Props { onClose: () => void }
 export function ServiceRequestModal({ onClose }: Props) {
   const { t } = useTranslation();
   const [categoria, setCategoria] = useState<ServiceRequestCategory | null>(null);
+  const [sottocategoria, setSottocategoria] = useState<ServiceRequestSubcategory | null>(null);
   const [coords, setCoords] = useState<{ latitudine: number; longitudine: number } | null>(null);
   const [showMap, setShowMap] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // When macro category changes, reset subcategory
+  function handleCategorySelect(cat: ServiceRequestCategory) {
+    setCategoria(cat);
+    setSottocategoria(null);
+  }
+
+  const availableSubcats = categoria ? SUBCATEGORIES_BY_CATEGORY[categoria] : [];
+  const hasSubcats = availableSubcats.length > 0;
+
   async function handleSubmit() {
     if (!categoria || !coords) return;
     setSubmitting(true);
     setError(null);
     try {
-      await submitServiceRequest({ categoria, latitudine: coords.latitudine, longitudine: coords.longitudine });
+      await submitServiceRequest({
+        categoria,
+        sottocategoria: sottocategoria ?? null,
+        latitudine: coords.latitudine,
+        longitudine: coords.longitudine,
+      });
       setSuccess(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : t('serviceRequest.error'));
@@ -34,7 +54,7 @@ export function ServiceRequestModal({ onClose }: Props) {
     }
   }
 
-  // Defer to the same POIMapPicker modal already used in the whole app
+  // Delegate to the existing POIMapPicker modal already used in the whole app
   if (showMap) {
     return (
       <POIMapPicker
@@ -49,7 +69,7 @@ export function ServiceRequestModal({ onClose }: Props) {
     <div className="poi-map-picker-backdrop" role="presentation" onClick={onClose}>
       <div
         className="poi-map-picker liquid-card"
-        style={{ maxWidth: 460 }}
+        style={{ maxWidth: 480 }}
         role="dialog"
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
@@ -70,7 +90,8 @@ export function ServiceRequestModal({ onClose }: Props) {
           </div>
         ) : (
           <div style={{ display: 'grid', gap: 20 }}>
-            {/* Category picker — same pill pattern as activity filters */}
+
+            {/* Step 1: Macro category */}
             <div style={{ display: 'grid', gap: 10 }}>
               <span style={{ fontSize: 13, fontWeight: 780, color: 'var(--color-text-secondary)' }}>
                 {t('serviceRequest.categoryLabel')}
@@ -82,7 +103,7 @@ export function ServiceRequestModal({ onClose }: Props) {
                     type="button"
                     className={categoria === cat ? 'primary-button' : 'ghost-button'}
                     style={{ minHeight: 34, padding: '0 12px', fontSize: 13 }}
-                    onClick={() => setCategoria(cat)}
+                    onClick={() => handleCategorySelect(cat)}
                   >
                     {t(`serviceRequest.categories.${cat}`)}
                   </button>
@@ -90,24 +111,51 @@ export function ServiceRequestModal({ onClose }: Props) {
               </div>
             </div>
 
-            {/* Location picker — delegates to existing POIMapPicker */}
-            <div style={{ display: 'grid', gap: 8 }}>
-              <span style={{ fontSize: 13, fontWeight: 780, color: 'var(--color-text-secondary)' }}>
-                {t('serviceRequest.locationLabel')}
-              </span>
-              {coords ? (
-                <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
-                  <GeocodedLocation value={`${coords.latitudine.toFixed(4)}, ${coords.longitudine.toFixed(4)}`} />
+            {/* Step 2: Subcategory — progressive reveal, only when category has options */}
+            {categoria && hasSubcats && (
+              <div style={{ display: 'grid', gap: 10 }}>
+                <span style={{ fontSize: 13, fontWeight: 780, color: 'var(--color-text-secondary)' }}>
+                  {t('serviceRequest.subcategoryLabel')}
+                  <span className="muted-copy" style={{ fontWeight: 400, marginLeft: 6 }}>
+                    {t('serviceRequest.subcategoryOptional')}
+                  </span>
                 </span>
-              ) : (
-                <em className="muted-copy" style={{ fontSize: 13 }}>{t('serviceRequest.noLocation')}</em>
-              )}
-              <div>
-                <button type="button" className="ghost-button" onClick={() => setShowMap(true)}>
-                  {coords ? t('serviceRequest.changeLocation') : t('serviceRequest.chooseLocation')}
-                </button>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {availableSubcats.map((sub) => (
+                    <button
+                      key={sub}
+                      type="button"
+                      className={sottocategoria === sub ? 'primary-button' : 'ghost-button'}
+                      style={{ minHeight: 32, padding: '0 10px', fontSize: 12 }}
+                      onClick={() => setSottocategoria(sottocategoria === sub ? null : sub)}
+                    >
+                      {t(`serviceRequest.subcategories.${sub}`)}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Step 3: Location — shown after category is chosen */}
+            {categoria && (
+              <div style={{ display: 'grid', gap: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 780, color: 'var(--color-text-secondary)' }}>
+                  {t('serviceRequest.locationLabel')}
+                </span>
+                {coords ? (
+                  <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
+                    <GeocodedLocation value={`${coords.latitudine.toFixed(4)}, ${coords.longitudine.toFixed(4)}`} />
+                  </span>
+                ) : (
+                  <em className="muted-copy" style={{ fontSize: 13 }}>{t('serviceRequest.noLocation')}</em>
+                )}
+                <div>
+                  <button type="button" className="ghost-button" onClick={() => setShowMap(true)}>
+                    {coords ? t('serviceRequest.changeLocation') : t('serviceRequest.chooseLocation')}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {error && <div className="form-error">{error}</div>}
 
