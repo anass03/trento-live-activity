@@ -343,14 +343,49 @@ export function MapPage({ user }: { user?: AppUser }) {
       </header>
 
       <section className="home-dashboard-grid">
-        <aside className={`weather-summary weather-${currentMood}`} aria-label="Meteo Trento">
-          <div className="weather-main">
-            <span>{t(`weather.${currentMood}`)}</span>
-            <strong>{weather ? `${weather.temperature}°C` : '—'}</strong>
-            <small>{weather ? `${t('map.windLabel')} ${Math.round(weather.windKmh)} km/h` : t('map.weatherLoading')}</small>
-          </div>
-        </aside>
 
+        {/* Left column: compact weather + parking + CTA */}
+        <div className="home-left-column">
+          <aside className={`weather-summary weather-${currentMood}`} aria-label="Meteo Trento">
+            <div className="weather-main">
+              <span>{t(`weather.${currentMood}`)}</span>
+              <strong>{weather ? `${weather.temperature}°C` : '—'}</strong>
+              <small>{weather ? `${t('map.windLabel')} ${Math.round(weather.windKmh)} km/h` : t('map.weatherLoading')}</small>
+            </div>
+          </aside>
+
+          <section className="home-widget parking-widget">
+            <div className="widget-heading">
+              <span className="section-eyebrow">{t('map.parking')}</span>
+              <strong>{t('map.parkingAvailability')}</strong>
+              <small className="muted-copy">{t('map.parkingHint')}</small>
+            </div>
+            {parking.length === 0 ? (
+              <p className="muted-copy">{t('map.parkingNoData')}</p>
+            ) : (
+              <div className="parking-groups">
+                {renderParkingGroup(parkingByType.cars, t('map.parkingCars'))}
+                {renderParkingGroup(parkingByType.bikes, t('map.parkingBikes'))}
+              </div>
+            )}
+          </section>
+
+          {/* Citizen needs CTA — only for registered citizens */}
+          {user?.role === 'registered_user' && (
+            <section className="home-widget liquid-card" style={{ gap: 10, display: 'grid' }}>
+              <div className="widget-heading">
+                <span className="section-eyebrow">{t('serviceRequest.ctaEyebrow')}</span>
+                <strong>{t('serviceRequest.ctaTitle')}</strong>
+              </div>
+              <p className="muted-copy" style={{ margin: 0, fontSize: 13 }}>{t('serviceRequest.ctaDesc')}</p>
+              <button type="button" className="primary-button" style={{ width: 'fit-content' }} onClick={() => setShowServiceRequest(true)}>
+                📍 {t('serviceRequest.ctaButton')}
+              </button>
+            </section>
+          )}
+        </div>
+
+        {/* Center: map */}
         <div className="home-map-panel">
           <div className="home-map-toolbar">
             <div className="filters">
@@ -377,6 +412,7 @@ export function MapPage({ user }: { user?: AppUser }) {
           {!isLoading && <MapCanvas markers={visibleMarkers} user={user} />}
         </div>
 
+        {/* Right column: live alerts + upcoming events */}
         <aside className="home-live-column">
           <section className="home-widget city-alerts">
             <div className="widget-heading">
@@ -414,36 +450,6 @@ export function MapPage({ user }: { user?: AppUser }) {
               ))}
             </ol>
           </section>
-
-          <section className="home-widget parking-widget">
-            <div className="widget-heading">
-              <span className="section-eyebrow">{t('map.parking')}</span>
-              <strong>{t('map.parkingAvailability')}</strong>
-              <small className="muted-copy">{t('map.parkingHint')}</small>
-            </div>
-            {parking.length === 0 ? (
-              <p className="muted-copy">{t('map.parkingNoData')}</p>
-            ) : (
-              <div className="parking-groups">
-                {renderParkingGroup(parkingByType.cars, t('map.parkingCars'))}
-                {renderParkingGroup(parkingByType.bikes, t('map.parkingBikes'))}
-              </div>
-            )}
-          </section>
-
-          {/* Citizen needs CTA — only for registered citizens */}
-          {user?.role === 'registered_user' && (
-            <section className="liquid-card comune-panel" style={{ gap: 10 }}>
-              <div className="widget-heading">
-                <span className="section-eyebrow">{t('serviceRequest.ctaEyebrow')}</span>
-                <strong>{t('serviceRequest.ctaTitle')}</strong>
-              </div>
-              <p className="muted-copy" style={{ margin: 0, fontSize: 13 }}>{t('serviceRequest.ctaDesc')}</p>
-              <button type="button" className="primary-button" style={{ width: 'fit-content' }} onClick={() => setShowServiceRequest(true)}>
-                📍 {t('serviceRequest.ctaButton')}
-              </button>
-            </section>
-          )}
         </aside>
       </section>
 

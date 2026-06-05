@@ -150,6 +150,16 @@ export function ComuneStatistichePage() {
 
   const nonZeroDays = useMemo(() => filledDays.filter((d) => d.count > 0).length, [filledDays]);
 
+  // Group subcategories by categoria for inline display
+  const subcatsByCategory = useMemo(() => {
+    const map: Record<string, Array<{ sottocategoria: string; count: number }>> = {};
+    (needs?.bySubcategory ?? []).forEach((r) => {
+      if (!map[r.categoria]) map[r.categoria] = [];
+      map[r.categoria].push({ sottocategoria: r.sottocategoria, count: Number(r.count) });
+    });
+    return map;
+  }, [needs]);
+
   // Supply/demand table
   const supplyRows = useMemo(() => {
     if (!stats) return [];
@@ -319,15 +329,23 @@ export function ComuneStatistichePage() {
                 <section className="dashboard-section liquid-card">
                   <h2>{t('comune.stats.citizenNeedsTitle')}</h2>
                   <div className="metric-bar-list">
-                    {needs.byCategory.map((r) => {
+                    {needs.byCategory.flatMap((r) => {
                       const nMax = maxCount(needs.byCategory);
-                      return (
+                      const subcats = subcatsByCategory[r.categoria] ?? [];
+                      return [
                         <article className="metric-bar" key={r.categoria}>
                           <span>{t(`serviceRequest.categories.${r.categoria}`, { defaultValue: r.categoria })}</span>
                           <div><i style={{ inlineSize: `${(Number(r.count) / nMax) * 100}%` }} /></div>
                           <strong>{r.count}</strong>
-                        </article>
-                      );
+                        </article>,
+                        ...subcats.map((s) => (
+                          <article className="metric-bar metric-bar--subcat" key={`${r.categoria}-${s.sottocategoria}`}>
+                            <span>{t(`serviceRequest.subcategories.${s.sottocategoria}`, { defaultValue: s.sottocategoria })}</span>
+                            <div><i style={{ inlineSize: `${(s.count / nMax) * 100}%`, opacity: 0.6 }} /></div>
+                            <strong style={{ opacity: 0.7 }}>{s.count}</strong>
+                          </article>
+                        )),
+                      ];
                     })}
                   </div>
                 </section>
@@ -443,12 +461,21 @@ export function ComuneStatistichePage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {needs.byCategory.map((r) => (
-                        <tr key={r.categoria}>
-                          <td>{t(`serviceRequest.categories.${r.categoria}`, { defaultValue: r.categoria })}</td>
-                          <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{r.count}</td>
-                        </tr>
-                      ))}
+                      {needs.byCategory.flatMap((r) => {
+                        const subcats = subcatsByCategory[r.categoria] ?? [];
+                        return [
+                          <tr key={r.categoria}>
+                            <td>{t(`serviceRequest.categories.${r.categoria}`, { defaultValue: r.categoria })}</td>
+                            <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{r.count}</td>
+                          </tr>,
+                          ...subcats.map((s) => (
+                            <tr key={`${r.categoria}-${s.sottocategoria}`} className="subcat-row">
+                              <td>{t(`serviceRequest.subcategories.${s.sottocategoria}`, { defaultValue: s.sottocategoria })}</td>
+                              <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{s.count}</td>
+                            </tr>
+                          )),
+                        ];
+                      })}
                     </tbody>
                   </table>
                 </section>

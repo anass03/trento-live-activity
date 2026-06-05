@@ -87,18 +87,43 @@ function buildHints(
       }),
     }));
 
-  // 3. Citizen request spike (>2x avg per category, at least 3 reports)
-  if (needs && needs.total > 0 && needs.byCategory.length > 0) {
-    const avg = needs.total / needs.byCategory.length;
-    needs.byCategory
-      .filter((r) => r.count > avg * 2 && r.count >= 3)
-      .forEach((r) => hints.push({
-        key: `needs-spike-${r.categoria}`,
-        severity: 'attenzione',
-        icon: '📢',
-        message: t('comune.dashboard.hintNeedsSpike', {
-          cat: t(`serviceRequest.categories.${r.categoria}`, { defaultValue: r.categoria }),
+  // 3. Category-specific action hints when citizen requests reach thresholds
+  const NEEDS_THRESHOLDS: Record<string, { threshold: number; icon: string; key: string }> = {
+    parcheggio_auto: { threshold: 5, icon: '🅿️', key: 'comune.dashboard.hintNeedsAction_parcheggio_auto' },
+    parcheggio_bici: { threshold: 3, icon: '🚲', key: 'comune.dashboard.hintNeedsAction_parcheggio_bici' },
+    sport:           { threshold: 5, icon: '⚽', key: 'comune.dashboard.hintNeedsAction_sport' },
+    studio:          { threshold: 3, icon: '📚', key: 'comune.dashboard.hintNeedsAction_studio' },
+    verde:           { threshold: 4, icon: '🌳', key: 'comune.dashboard.hintNeedsAction_verde' },
+    cultura:         { threshold: 4, icon: '🎭', key: 'comune.dashboard.hintNeedsAction_cultura' },
+    ciclismo:        { threshold: 3, icon: '🚴', key: 'comune.dashboard.hintNeedsAction_ciclismo' },
+    altro:           { threshold: 8, icon: '📌', key: 'comune.dashboard.hintNeedsAction_altro' },
+  };
+  if (needs && needs.total > 0) {
+    needs.byCategory.forEach((r) => {
+      const cfg = NEEDS_THRESHOLDS[r.categoria];
+      if (!cfg || r.count < cfg.threshold) return;
+      hints.push({
+        key: `needs-action-${r.categoria}`,
+        severity: r.count >= cfg.threshold * 2 ? 'critico' : 'attenzione',
+        icon: cfg.icon,
+        message: t(cfg.key, {
           count: r.count,
+          cat: t(`serviceRequest.categories.${r.categoria}`, { defaultValue: r.categoria }),
+        }),
+      });
+    });
+
+    // 3b. Subcategory spike — when a specific subcategory reaches ≥3, suggest targeted intervention
+    (needs.bySubcategory ?? [])
+      .filter((r) => Number(r.count) >= 3)
+      .forEach((r) => hints.push({
+        key: `needs-sub-${r.categoria}-${r.sottocategoria}`,
+        severity: Number(r.count) >= 6 ? 'critico' : 'attenzione',
+        icon: NEEDS_THRESHOLDS[r.categoria]?.icon ?? '📢',
+        message: t('comune.dashboard.hintNeedsSubcat', {
+          count: r.count,
+          subcat: t(`serviceRequest.subcategories.${r.sottocategoria}`, { defaultValue: r.sottocategoria }),
+          cat: t(`serviceRequest.categories.${r.categoria}`, { defaultValue: r.categoria }),
         }),
       }));
   }
@@ -219,6 +244,16 @@ export function ComuneDashboardPage() {
     [stats, needs, filledDays, supplyDemand],
   );
   const visibleHints = hintsExpanded ? hints : hints.slice(0, 3);
+
+  // Group subcategories by categoria for inline display
+  const subcatsByCategory = useMemo(() => {
+    const map: Record<string, Array<{ sottocategoria: string; count: number }>> = {};
+    (needs?.bySubcategory ?? []).forEach((r) => {
+      if (!map[r.categoria]) map[r.categoria] = [];
+      map[r.categoria].push({ sottocategoria: r.sottocategoria, count: Number(r.count) });
+    });
+    return map;
+  }, [needs]);
 
   return (
     <section className="data-page comune-page comune-dashboard-page">
@@ -417,12 +452,25 @@ export function ComuneDashboardPage() {
                 ) : (
                   <>
                     <ul className="needs-list">
-                      {needs.byCategory.slice(0, 4).map((r) => (
-                        <li key={r.categoria}>
-                          <span>{t(`serviceRequest.categories.${r.categoria}`, { defaultValue: r.categoria })}</span>
-                          <strong>{r.count}</strong>
-                        </li>
-                      ))}
+                      {needs.byCategory.slice(0, 4).map((r) => {
+                        const subcats = subcatsByCategory[r.categoria] ?? [];
+                        return (
+                          <li key={r.categoria}>
+                            <span>{t(`serviceRequest.categories.${r.categoria}`, { defaultValue: r.categoria })}</span>
+                            <strong>{r.count}</strong>
+                            {subcats.length > 0 && (
+                              <div className="needs-subcats">
+                                {subcats.slice(0, 4).map((s) => (
+                                  <span key={s.sottocategoria} className="needs-subcat-chip">
+                                    {t(`serviceRequest.subcategories.${s.sottocategoria}`, { defaultValue: s.sottocategoria })}
+                                    <em>{s.count}</em>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </li>
+                        );
+                      })}
                     </ul>
                     <Link to="/comune/statistiche" className="link-button" style={{ fontSize: 13, justifyContent: 'flex-start', padding: '0 4px' }}>
                       {t('comune.dashboard.needsViewAll')} →

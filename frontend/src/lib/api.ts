@@ -124,8 +124,29 @@ export type ServiceRequestCategory =
   | 'parcheggio_auto' | 'parcheggio_bici' | 'sport' | 'studio'
   | 'verde' | 'cultura' | 'ciclismo' | 'altro';
 
+export type ServiceRequestSubcategory =
+  | 'coperto' | 'scoperto' | 'disabili' | 'carica_ev'       // parcheggio_auto
+  | 'rastrelliera' | 'box_bici'                              // parcheggio_bici
+  | 'ping_pong' | 'basket' | 'calcetto' | 'pallavolo' | 'atletica' | 'yoga' | 'altro_sport'  // sport
+  | 'biblioteca' | 'coworking' | 'sala_studio'               // studio
+  | 'teatro' | 'cinema' | 'museo' | 'sala_prove'             // cultura
+  | 'pista_ciclabile' | 'pump_track';                        // ciclismo
+
+/** Predefined subcategory map — mirrors backend SUBCATEGORIES_BY_CATEGORY (RNF22) */
+export const SUBCATEGORIES_BY_CATEGORY: Record<ServiceRequestCategory, ServiceRequestSubcategory[]> = {
+  parcheggio_auto: ['coperto', 'scoperto', 'disabili', 'carica_ev'],
+  parcheggio_bici: ['rastrelliera', 'box_bici'],
+  sport:           ['ping_pong', 'basket', 'calcetto', 'pallavolo', 'atletica', 'yoga', 'altro_sport'],
+  studio:          ['biblioteca', 'coworking', 'sala_studio'],
+  verde:           [],
+  cultura:         ['teatro', 'cinema', 'museo', 'sala_prove'],
+  ciclismo:        ['pista_ciclabile', 'pump_track'],
+  altro:           [],
+};
+
 export interface ServiceRequestStats {
   byCategory: Array<{ categoria: string; count: number }>;
+  bySubcategory?: Array<{ categoria: string; sottocategoria: string; count: number }>;
   total: number;
 }
 
@@ -526,9 +547,10 @@ export function getDashboardServiceRequests(
 
 export function submitServiceRequest(payload: {
   categoria: ServiceRequestCategory;
+  sottocategoria?: ServiceRequestSubcategory | null;
   latitudine: number;
   longitudine: number;
-}): Promise<{ id: string; categoria: string; createdAt: string }> {
+}): Promise<{ id: string; categoria: string; sottocategoria: string | null; createdAt: string }> {
   return request('/api/service-requests', { method: 'POST', body: payload });
 }
 
