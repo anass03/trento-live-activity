@@ -90,47 +90,47 @@ function PrivacyEN() {
         <h2>2. Data collected</h2>
         <ul>
           <li>Personal details: first name, last name, date of birth, tax code (for citizens) or organisation name and certified email (for entities).</li>
-          <li>Email address, password (stored as a bcrypt hash), preferences and interests.</li>
+          <li>Email address, password (stored as bcrypt hash), preferences and interests.</li>
           <li>Participation data for activities and events.</li>
-          <li>Approximate location, if the user grants permission, for geo-localised notifications (RF40).</li>
+          <li>Approximate location, if the user grants permission, for geo-located notifications (RF40).</li>
           <li>Technical access logs and moderation reports.</li>
         </ul>
-        <h2>3. Purpose of processing</h2>
+        <h2>3. Purposes of processing</h2>
         <p>
-          Data is processed exclusively to: (i) provide the service; (ii) secure the account
-          (authentication, 2FA for administrators); (iii) send notifications and communications related
-          to the activities the user participates in; (iv) fulfil regulatory obligations, including those
-          arising from the Digital Services Act (Regulation EU 2022/2065) for the moderation of content
-          published by certified entities.
+          Data is processed exclusively to: (i) deliver the service; (ii) ensure account security
+          (authentication, 2FA for administrators); (iii) send notifications and communications
+          related to activities the user participates in; (iv) comply with legal obligations,
+          including those arising from the Digital Services Act (EU Regulation 2022/2065) for
+          moderating content published by certified entities.
         </p>
         <h2>4. Legal basis</h2>
         <p>
-          Processing is based on explicit consent (Art. 6(1)(a) GDPR) given at registration, on the
-          performance of a requested service (Art. 6(1)(b)), and, for certain obligations, on legal
-          compliance (Art. 6(1)(c)).
+          Processing is based on explicit consent (Art. 6(1)(a) GDPR) given at registration,
+          on the performance of a requested service (Art. 6(1)(b)), and, for certain obligations,
+          on a legal requirement (Art. 6(1)(c)).
         </p>
         <h2>5. Retention</h2>
         <p>
-          Data is retained for the time necessary to provide the service. Upon a deletion request
-          (Art. 17 GDPR — right to erasure, RF26), data is removed within 30 days, unless retention is
-          required by law.
+          Data is retained for the time necessary to deliver the service. Upon a deletion request
+          (Art. 17 GDPR — right to erasure, RF26), data is removed within 30 days, unless legal
+          retention obligations apply.
         </p>
         <h2>6. Rights of the data subject</h2>
         <p>
-          You may at any time exercise your rights of access, rectification, erasure, restriction,
-          portability and objection under Arts. 15–22 GDPR. You can do so from the{' '}
+          You may exercise at any time your rights of access, rectification, erasure, restriction,
+          portability and objection under Arts. 15–22 GDPR. This can be done from the{' '}
           <em>Profile &rarr; Consent management</em> section or by writing to{' '}
           <a href="mailto:privacy@comune.trento.it">privacy@comune.trento.it</a>.
         </p>
         <h2>7. Minors</h2>
         <p>
-          Registration is only permitted for individuals who have reached the age of 13
+          Registration is permitted only for persons who have reached the age of 13
           (Art. 8 GDPR, OCL C5).
         </p>
         <h2>8. Updates</h2>
         <p>
-          This policy may be updated. Material changes will be communicated by email and will require
-          a new explicit consent.
+          This policy may be updated. Material changes will be communicated by email and will
+          require new explicit consent.
         </p>
       </article>
     </section>
