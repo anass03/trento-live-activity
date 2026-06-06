@@ -147,33 +147,41 @@ export function MapPage({ user }: { user?: AppUser }) {
     if (isAdmin && (filter === 'preferred' || filter === 'favorites')) setFilter('all');
   }, [isAdmin, filter]);
 
+  function normParkingName(name: string, type: string): string {
+    if (type === 'bike') {
+      const stripped = name.replace(/^(Servizio\s+)?Rimessaggio\s+Bici\s*[-–]?\s*/i, '').trim();
+      const prefix = t('map.bikeStoragePrefix');
+      return stripped ? `${prefix} – ${stripped}` : prefix;
+    }
+    if (type === 'car') {
+      const stripped = name.replace(/^Parcheggio\s+/i, '').trim();
+      const prefix = t('map.carParkingPrefix');
+      return stripped ? `${prefix} ${stripped}` : prefix;
+    }
+    return name;
+  }
+
   const parkingMarkers = useMemo<MapMarker[]>(
-    () => {
-      const bikePrefix = t('map.bikeStoragePrefix');
-      const bikeNorm = (s: string) => {
-        const stripped = s.replace(/^(Servizio\s+)?Rimessaggio\s+Bici\s*[-–]?\s*/i, '').trim();
-        return stripped ? `${bikePrefix} – ${stripped}` : bikePrefix;
-      };
-      return parking
-        .filter((p) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude))
-        .map((p) => ({
-          id: `parking-${p.id}`,
-          type: 'parking' as MarkerType,
-          title: p.type === 'bike' ? bikeNorm(p.name) : p.name,
-          latitude: p.latitude as number,
-          longitude: p.longitude as number,
-          crowdLevel: PARKING_CROWD_LEVEL[p.status] ?? (p.occupancyPct ?? 0),
-          crowdingStatus: PARKING_CROWD_STATUS[p.status] ?? 'green',
-          isCertified: false,
-          sourceId: p.id,
-          category: p.type === 'bike' ? t('map.parkingBikes') : t('map.parkingCars'),
-          description: p.type === 'bike' && p.description
-            ? bikeNorm(p.description)
-            : p.description || (p.type === 'bike' ? t('map.parkingBikes') : t('map.parkingCars')),
-          free: p.free,
-          total: p.capacity,
-        }));
-    },
+    () => parking
+      .filter((p) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude))
+      .map((p) => ({
+        id: `parking-${p.id}`,
+        type: 'parking' as MarkerType,
+        title: normParkingName(p.name, p.type),
+        latitude: p.latitude as number,
+        longitude: p.longitude as number,
+        crowdLevel: PARKING_CROWD_LEVEL[p.status] ?? (p.occupancyPct ?? 0),
+        crowdingStatus: PARKING_CROWD_STATUS[p.status] ?? 'green',
+        isCertified: false,
+        sourceId: p.id,
+        category: p.type === 'bike' ? t('map.parkingBikes') : t('map.parkingCars'),
+        description: p.description
+          ? normParkingName(p.description, p.type)
+          : (p.type === 'bike' ? t('map.parkingBikes') : t('map.parkingCars')),
+        free: p.free,
+        total: p.capacity,
+      })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [parking, t],
   );
 
@@ -298,7 +306,7 @@ export function MapPage({ user }: { user?: AppUser }) {
             return (
               <li key={p.id} className="parking-item" title={`${st.label} · ${p.occupancyPct ?? 0}% ${t('map.occupied')}`}>
                 <span className="parking-dot" style={{ background: st.color }} aria-hidden="true" />
-                <span className="parking-name">{p.name}</span>
+                <span className="parking-name">{normParkingName(p.name, p.type)}</span>
                 <span className="parking-free" style={{ color: st.color }}>
                   {p.free != null ? `${p.free} / ${p.capacity}` : `– / ${p.capacity}`}
                 </span>

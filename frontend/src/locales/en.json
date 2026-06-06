@@ -213,6 +213,7 @@
     "parkingCars": "🚗 Cars",
     "parkingBikes": "🚲 Bikes",
     "bikeStoragePrefix": "Bike Storage",
+    "carParkingPrefix": "Parking",
     "hotspot": "Hotspot",
     "mostActive": "Most active areas",
     "liveDots": "Live points",
