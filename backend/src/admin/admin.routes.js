@@ -4,7 +4,7 @@ const {
   CittadinoProfile, EnteProfile,
   AmministratoreComunaleProfile, AmministratoreSistemaProfile,
 } = require('../data/models');
-const { authenticate, authorize } = require('../middleware/auth');
+const { authenticate, authorize, authorizeSuperAdmin } = require('../middleware/auth');
 const { sendEntityApproved, sendEntityRejected } = require('../notifications/email.service');
 const logger = require('../lib/logger');
 
@@ -148,14 +148,40 @@ router.get('/users/sistema', authenticate, authorize('AmministratoreDiSistema'),
     } catch (error) { next(error); }
 });
 
+// PATCH toggle superAdmin flag — only the current super admin can promote/demote others.
+// Cannot demote yourself (would lock out the only super admin).
+router.patch('/users/sistema/:id/super-admin', authenticate, authorizeSuperAdmin(), async (req, res, next) => {
+    try {
+        const target = await User.findOne({
+            where: { id: req.params.id, ruolo: 'AmministratoreDiSistema' },
+            include: [{ model: AmministratoreSistemaProfile, as: 'sistemaProfile' }],
+        });
+        if (!target) return res.status(404).json({ error: 'Amministratore di sistema non trovato', code: 'NOT_FOUND' });
+        if (target.id === req.user.id) {
+            return res.status(400).json({ error: 'Non puoi modificare il tuo stesso stato super admin', code: 'SELF_MODIFY_FORBIDDEN' });
+        }
+        const profile = target.sistemaProfile;
+        if (!profile) return res.status(404).json({ error: 'Profilo sistema non trovato', code: 'NOT_FOUND' });
+        const next_val = typeof req.body.superAdmin === 'boolean' ? req.body.superAdmin : !profile.superAdmin;
+        await profile.update({ superAdmin: next_val });
+        logger.audit('superadmin.toggle', { actorId: req.user?.id, targetId: target.id, superAdmin: next_val });
+        res.json({ id: target.id, superAdmin: next_val });
+    } catch (error) { next(error); }
+});
+
 // DELETE a user account (system admin only). Manually cascades all related data.
 // DeviceToken/Consent/*Profile sono ON DELETE CASCADE nell'associazione.
+// Deleting another AmministratoreDiSistema requires superAdmin.
 router.delete('/users/:id', authenticate, authorize('AmministratoreDiSistema'), async (req, res, next) => {
     try {
         const user = await User.findByPk(req.params.id);
         if (!user) return res.status(404).json({ error: 'User not found', code: 'NOT_FOUND' });
         if (user.id === req.user.id) {
             return res.status(400).json({ error: 'Non puoi eliminare il tuo stesso account admin', code: 'SELF_DELETE_FORBIDDEN' });
+        }
+        // Only super admin can delete another sistema admin
+        if (user.ruolo === 'AmministratoreDiSistema' && !req.user.superAdmin) {
+            return res.status(403).json({ error: 'Solo il super admin può eliminare altri amministratori di sistema', code: 'SUPER_ADMIN_REQUIRED' });
         }
 
         // 1. Participations in activities created by this user
