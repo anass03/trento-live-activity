@@ -77,7 +77,7 @@ function TermsEN() {
       <header className="utility-strip liquid-card">
         <div>
           <h1>Terms of Service</h1>
-          <p>Conditions of use of the Trento Live Activity platform</p>
+          <p>Terms of use for the Trento Live Activity platform</p>
         </div>
       </header>
       <article className="liquid-card legal-content">

@@ -77,14 +77,14 @@ function PrivacyEN() {
       <header className="utility-strip liquid-card">
         <div>
           <h1>Privacy Policy</h1>
-          <p>Personal data processing pursuant to Regulation (EU) 2016/679 (GDPR)</p>
+          <p>Processing of personal data pursuant to Regulation (EU) 2016/679 (GDPR)</p>
         </div>
       </header>
       <article className="liquid-card legal-content">
         <h2>1. Data Controller</h2>
         <p>
           The Data Controller is the Municipality of Trento, as the promoting body of the{' '}
-          <strong>Trento Live Activity</strong> platform. You can contact the Controller at{' '}
+          <strong>Trento Live Activity</strong> platform. You can contact the Data Controller at{' '}
           <a href="mailto:privacy@comune.trento.it">privacy@comune.trento.it</a>.
         </p>
         <h2>2. Data collected</h2>
