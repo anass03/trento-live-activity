@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const speakeasy = require('speakeasy');
 const {
   User, Consent, CittadinoProfile, EnteProfile,
+  AmministratoreSistemaProfile,
   sequelize,
 } = require('../data/models');
 const {
@@ -234,7 +235,8 @@ async function login({ email, password, otpToken } = {}) {
       }
       const remaining = stored.filter((h) => h !== candidateHash);
       await user.update({ twoFactorRecoveryCodes: remaining });
-      const token = signToken(user);
+      const rcProfile = await AmministratoreSistemaProfile.findOne({ where: { userId: user.id } });
+      const token = signToken(user, { superAdmin: rcProfile?.superAdmin ?? false });
       return {
         user: sanitize(user),
         token,
@@ -254,7 +256,15 @@ async function login({ email, password, otpToken } = {}) {
     }
   }
 
-  const token = signToken(user);
+  // RNF-SA: embed superAdmin flag in JWT for AmministratoreDiSistema so
+  // middleware can gate super-admin-only actions without an extra DB hit.
+  let extraClaims = {};
+  if (user.ruolo === 'AmministratoreDiSistema') {
+    const sysProfile = await AmministratoreSistemaProfile.findOne({ where: { userId: user.id } });
+    extraClaims = { superAdmin: sysProfile?.superAdmin ?? false };
+  }
+
+  const token = signToken(user, extraClaims);
   return { user: sanitize(user), token };
 }
 
