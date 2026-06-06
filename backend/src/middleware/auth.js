@@ -40,6 +40,21 @@ function authorize(...roles) {
   };
 }
 
+// Gate actions that only the super admin can perform (e.g. managing other
+// AmministratoreDiSistema accounts). Requires authenticate() to run first.
+// superAdmin is embedded in the JWT at login — no extra DB hit needed.
+function authorizeSuperAdmin() {
+  return (req, res, next) => {
+    if (!req.user || req.user.ruolo !== 'AmministratoreDiSistema') {
+      return res.status(403).json({ error: 'Insufficient permissions', code: 'FORBIDDEN' });
+    }
+    if (!req.user.superAdmin) {
+      return res.status(403).json({ error: 'Solo il super admin può eseguire questa operazione', code: 'SUPER_ADMIN_REQUIRED' });
+    }
+    next();
+  };
+}
+
 async function optionalAuth(req, res, next) {
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) return next();
@@ -50,4 +65,4 @@ async function optionalAuth(req, res, next) {
   next();
 }
 
-module.exports = { authenticate, authorize, optionalAuth };
+module.exports = { authenticate, authorize, authorizeSuperAdmin, optionalAuth };

@@ -60,10 +60,10 @@ async function seed() {
   // RNF15: al primo login il backend chiede setup 2FA TOTP (twoFactorEnabled=false).
   console.log('Creating amministratori di sistema (4)...');
   const ADMIN_SISTEMA = [
-    { email: 'soussaneanas8@gmail.com',          nome: 'Anas',     cognome: 'Soussane',   dataNascita: '2003-04-08' },
-    { email: 'saifedine.safi@studenti.unitn.it', nome: 'Saifedine', cognome: 'Safi',      dataNascita: '2003-01-01' },
-    { email: 'filippo.mar2004@gmail.com',        nome: 'Filippo',  cognome: 'Marcatili',  dataNascita: '2004-01-01' },
-    { email: 'sandro.fiore@unitn.it',            nome: 'Sandro',   cognome: 'Fiore',      dataNascita: '1970-01-01' },
+    { email: 'soussaneanas8@gmail.com',          nome: 'Anas',     cognome: 'Soussane',   dataNascita: '2003-04-08', superAdmin: true  },
+    { email: 'saifedine.safi@studenti.unitn.it', nome: 'Saifedine', cognome: 'Safi',      dataNascita: '2003-01-01', superAdmin: false },
+    { email: 'filippo.mar2004@gmail.com',        nome: 'Filippo',  cognome: 'Marcatili',  dataNascita: '2004-01-01', superAdmin: false },
+    { email: 'sandro.fiore@unitn.it',            nome: 'Sandro',   cognome: 'Fiore',      dataNascita: '1970-01-01', superAdmin: false },
   ];
 
   const adminUsers = await Promise.all(
@@ -84,7 +84,7 @@ async function seed() {
       userId: u.id,
       nome: ADMIN_SISTEMA[i].nome,
       cognome: ADMIN_SISTEMA[i].cognome,
-      superAdmin: true,
+      superAdmin: ADMIN_SISTEMA[i].superAdmin,
     })),
   );
 
@@ -245,7 +245,8 @@ async function seed() {
   console.log(`\n  Password unica per tutti gli account: "${PASSWORD}"\n`);
   console.log('  Amministratori di sistema (poteri massimi):');
   ADMIN_SISTEMA.forEach((a) => {
-    console.log(`    ${a.email.padEnd(38)}  ${a.nome} ${a.cognome}`);
+    const tag = a.superAdmin ? '  ★ SUPER ADMIN' : '';
+    console.log(`    ${a.email.padEnd(38)}  ${a.nome} ${a.cognome}${tag}`);
   });
   console.log('\n  Enti certificati (EnteCertificato, già approvati):');
   console.log('    info@castellotrento.it                 Castello del Buonconsiglio');
