@@ -15,6 +15,7 @@ const AmministratoreSistemaProfile = require('./AmministratoreSistemaProfile')(s
 const EventParticipation = require('./EventParticipation')(sequelize);
 const Favorite = require('./Favorite')(sequelize);
 const RevokedToken = require('./RevokedToken')(sequelize);
+const ServiceRequest = require('./ServiceRequest')(sequelize);
 
 // User <-> Activity (creator)
 Activity.belongsTo(User, { foreignKey: 'creatorId', as: 'creator' });
@@ -71,8 +72,12 @@ EventParticipation.belongsTo(Event, { foreignKey: 'eventId', onDelete: 'CASCADE'
 Favorite.belongsTo(User, { foreignKey: 'userId', onDelete: 'CASCADE' });
 User.hasMany(Favorite, { foreignKey: 'userId', as: 'favorites' });
 
+// ServiceRequest — userId for dedup only, SET NULL on user deletion (GDPR)
+ServiceRequest.belongsTo(User, { foreignKey: 'userId', onDelete: 'SET NULL' });
+User.hasMany(ServiceRequest, { foreignKey: 'userId', as: 'serviceRequests' });
+
 module.exports = {
   sequelize, User, Activity, Event, Participation, POI, Report, DeviceToken, Consent,
   CittadinoProfile, EnteProfile, AmministratoreComunaleProfile, AmministratoreSistemaProfile,
-  EventParticipation, Favorite, RevokedToken,
+  EventParticipation, Favorite, RevokedToken, ServiceRequest,
 };

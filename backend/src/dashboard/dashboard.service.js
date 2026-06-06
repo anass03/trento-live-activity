@@ -1,9 +1,7 @@
-const { sequelize, Activity, Event, Participation, POI } = require('../data/models');
+const { sequelize, Activity, Event, Participation, POI, ServiceRequest } = require('../data/models');
 const { Op } = require('sequelize');
 
-// RF29: filter activities/events by geographic area using a bounding box
-// derived from a center point + radius (km). Approximate: ~111 km per latitude
-// degree, longitude scaled by cosine.
+// RF29: bounding box from center + radius (km)
 function boundingBox({ centerLat, centerLng, radiusKm }) {
   const latDelta = radiusKm / 111;
   const lngDelta = radiusKm / (111 * Math.cos((centerLat * Math.PI) / 180));
@@ -19,7 +17,6 @@ async function getStats({ tipo, da, a, centerLat, centerLng, radiusKm, poiId } =
   if (a) dateWhere[Op.lte] = a;
   const dateFilter = Object.keys(dateWhere).length ? { data: dateWhere } : {};
 
-  // Geographic filter (RF29)
   let geoFilter = {};
   if (poiId) {
     geoFilter = { poiId };
@@ -35,9 +32,7 @@ async function getStats({ tipo, da, a, centerLat, centerLng, radiusKm, poiId } =
   const eventWhere = { ...geoFilter };
   const poiWhere = poiId ? { id: poiId } : (centerLat !== undefined ? geoFilter : {});
 
-  // SCOPE RIDOTTO (#15): il Comune NON deve vedere informazioni sui singoli
-  // utenti né conteggi che possano identificare il numero di iscritti.
-  // Restano SOLO metriche aggregate utili a migliorare la città.
+  // SCOPE RIDOTTO (#15): solo metriche aggregate, mai dati individuali.
   const [
     totalActivities,
     totalEvents,
@@ -47,6 +42,9 @@ async function getStats({ tipo, da, a, centerLat, centerLng, radiusKm, poiId } =
     poiCrowding,
     topCrowdedPOIs,
     totalParticipations,
+    poiByType,
+    activitiesByDay,
+    activitiesByHour,
   ] = await Promise.all([
     Activity.count({ where: activityWhere }),
     Event.count({ where: eventWhere }),
@@ -69,7 +67,7 @@ async function getStats({ tipo, da, a, centerLat, centerLng, radiusKm, poiId } =
       group: ['statoAffollamento'],
       raw: true,
     }),
-    // Top 10 POI per affollamento (snapshot corrente: rosso > giallo > verde)
+    // Top 10 POI per affollamento (rosso > giallo > verde)
     POI.findAll({
       attributes: ['id', 'nome', 'tipo', 'statoAffollamento', 'capacitaMax'],
       where: poiWhere,
@@ -81,6 +79,40 @@ async function getStats({ tipo, da, a, centerLat, centerLng, radiusKm, poiId } =
       raw: true,
     }),
     Participation.count(),
+    // POI breakdown by tipo (for demand/supply analysis)
+    POI.findAll({
+      attributes: ['tipo', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
+      where: poiWhere,
+      group: ['tipo'],
+      order: [[sequelize.fn('COUNT', sequelize.col('id')), 'DESC']],
+      raw: true,
+    }),
+    // 14-day activity creation trend
+    Activity.findAll({
+      attributes: [
+        [sequelize.fn('DATE', sequelize.col('Activity.createdAt')), 'date'],
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
+      ],
+      where: {
+        ...(tipo ? { tipo } : {}),
+        ...geoFilter,
+        createdAt: { [Op.gte]: sequelize.literal("NOW() - INTERVAL '14 days'") },
+      },
+      group: [sequelize.fn('DATE', sequelize.col('Activity.createdAt'))],
+      order: [[sequelize.fn('DATE', sequelize.col('Activity.createdAt')), 'ASC']],
+      raw: true,
+    }),
+    // Activity peak start-hour distribution
+    Activity.findAll({
+      attributes: [
+        [sequelize.literal(`LEFT("orarioInizio", 2)`), 'hour'],
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
+      ],
+      where: activityWhere,
+      group: [sequelize.literal(`LEFT("orarioInizio", 2)`)],
+      order: [[sequelize.literal(`LEFT("orarioInizio", 2)`), 'ASC']],
+      raw: true,
+    }),
   ]);
 
   return {
@@ -92,8 +124,48 @@ async function getStats({ tipo, da, a, centerLat, centerLng, radiusKm, poiId } =
     eventsByCategory,
     poiCrowding,
     topCrowdedPOIs,
+    poiByType,
+    activitiesByDay,
+    activitiesByHour,
     filters: { tipo, da, a, centerLat, centerLng, radiusKm, poiId },
   };
 }
 
-module.exports = { getStats };
+// Aggregated service-request counts for the operator dashboard (scope ridotto: no userId exposed)
+async function getServiceRequestStats({ centerLat, centerLng, radiusKm } = {}) {
+  let geoFilter = {};
+  if (centerLat !== undefined && centerLng !== undefined && radiusKm) {
+    geoFilter = boundingBox({
+      centerLat: Number(centerLat),
+      centerLng: Number(centerLng),
+      radiusKm: Number(radiusKm),
+    });
+  }
+
+  const [byCategory, bySubcategory] = await Promise.all([
+    ServiceRequest.findAll({
+      attributes: ['categoria', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
+      where: geoFilter,
+      group: ['categoria'],
+      order: [[sequelize.fn('COUNT', sequelize.col('id')), 'DESC']],
+      raw: true,
+    }),
+    // Subcategory breakdown — only rows where sottocategoria is set (scope ridotto: no personal data)
+    ServiceRequest.findAll({
+      attributes: [
+        'categoria',
+        'sottocategoria',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
+      ],
+      where: { ...geoFilter, sottocategoria: { [Op.ne]: null } },
+      group: ['categoria', 'sottocategoria'],
+      order: [[sequelize.fn('COUNT', sequelize.col('id')), 'DESC']],
+      raw: true,
+    }),
+  ]);
+
+  const total = byCategory.reduce((sum, r) => sum + Number(r.count), 0);
+  return { byCategory, bySubcategory, total };
+}
+
+module.exports = { getStats, getServiceRequestStats };
