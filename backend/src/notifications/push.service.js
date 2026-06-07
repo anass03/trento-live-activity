@@ -5,17 +5,32 @@ const { User, DeviceToken } = require('../data/models');
 let messaging = null;
 let initAttempted = false;
 
+// Carica le credenziali del service account Firebase.
+// Su hosting senza filesystem persistente (Railway, Render, ecc.) il file JSON
+// non esiste: si passa il contenuto via env FIREBASE_CREDENTIALS_JSON (JSON
+// grezzo oppure base64). In locale resta supportato FIREBASE_CREDENTIALS_PATH.
+function loadServiceAccount() {
+  const raw = process.env.FIREBASE_CREDENTIALS_JSON;
+  if (raw) {
+    const json = raw.trim().startsWith('{') ? raw : Buffer.from(raw, 'base64').toString('utf8');
+    return JSON.parse(json);
+  }
+  const credPath = process.env.FIREBASE_CREDENTIALS_PATH;
+  if (credPath) {
+    const resolvedPath = path.isAbsolute(credPath) ? credPath : path.resolve(process.cwd(), credPath);
+    return require(resolvedPath);
+  }
+  return null;
+}
+
 function init() {
   if (initAttempted) return messaging;
   initAttempted = true;
 
-  const credPath = process.env.FIREBASE_CREDENTIALS_PATH;
-  if (!credPath) return null;
-
   try {
+    const serviceAccount = loadServiceAccount();
+    if (!serviceAccount) return null;
     const admin = require('firebase-admin');
-    const resolvedPath = path.isAbsolute(credPath) ? credPath : path.resolve(process.cwd(), credPath);
-    const serviceAccount = require(resolvedPath);
     if (!admin.apps.length) {
       admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
     }
