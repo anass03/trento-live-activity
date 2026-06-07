@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 
 interface CalendarButtonProps {
   icsUrl: string;
@@ -8,7 +9,9 @@ interface CalendarButtonProps {
   label?: string;
 }
 
-export function CalendarButton({ icsUrl, icsFilename, googleUrl, label = 'Calendario' }: CalendarButtonProps) {
+export function CalendarButton({ icsUrl, icsFilename, googleUrl, label }: CalendarButtonProps) {
+  const { t } = useTranslation();
+  const resolvedLabel = label ?? t('common.addToCalendar');
   const [open, setOpen] = useState(false);
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -61,7 +64,7 @@ export function CalendarButton({ icsUrl, icsFilename, googleUrl, label = 'Calend
           aria-expanded={open}
           aria-haspopup="menu"
         >
-          📅 {label}
+          📅 {resolvedLabel}
         </button>
       </div>
       {open && createPortal(
