@@ -19,6 +19,12 @@ const requestLogger = require('./middleware/requestLogger');
 
 const app = express();
 
+// Dietro il proxy di Railway (reverse proxy) Express deve fidarsi dell'header
+// X-Forwarded-For per leggere l'IP reale del client; senza, express-rate-limit
+// lancia ERR_ERL_UNEXPECTED_X_FORWARDED_FOR e il rate limiting non funziona.
+// '1' = un singolo proxy davanti all'app (l'edge di Railway).
+app.set('trust proxy', 1);
+
 const configuredOrigins = [process.env.FRONTEND_URL, process.env.CORS_ORIGIN]
   .filter(Boolean)
   .flatMap((value) => value.split(',').map((origin) => origin.trim()));
