@@ -2576,6 +2576,11 @@ select option {
     grid-template-columns: 1fr;
   }
 
+  /* Map always first when the 3-col grid collapses to single column */
+  .home-map-panel {
+    order: -1;
+  }
+
   .event-timeline-panel,
   .event-feature-story,
   .event-card-strip {
@@ -2765,7 +2770,6 @@ select option {
     display: none;
   }
 
-  .home-control-row,
   .activities-hero,
   .events-hero,
   .certified-hero {
@@ -2773,16 +2777,59 @@ select option {
     flex-direction: column;
   }
 
+  /* Home control row: 2-row layout on mobile.
+     Row 1: status strip (auto) + search bar (fills remaining space).
+     Row 2: time filter (fills remaining) + nearby button (auto). */
+  .home-control-row {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .home-control-row .city-status-strip {
+    flex: 0 0 auto;
+    min-height: 34px;
+    font-size: 0.78rem;
+  }
+
+  /* Compact search bar on all pages — reset flex so it never grows
+     vertically inside a flex-direction:column hero/control-row */
+  .city-search {
+    flex: none;
+    width: 100%;
+    min-height: 36px;
+    padding: 0 12px;
+  }
+
+  /* Restore horizontal flex growth inside the map row (row-direction) */
+  .home-control-row .city-search {
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
+
+  /* Time filter + nearby button share the row below search */
+  .home-control-row .time-filter {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+    overflow-x: auto;
+    justify-content: flex-start;
+  }
+
+  .home-control-row .nearby-button {
+    flex: 0 0 auto;
+    width: auto;
+  }
+
+  /* Activities / events hero still go full-width column */
   .city-search,
-  .time-filter,
   .weather-mood-tabs,
-  .nearby-button,
   .activities-hero-stats,
   .refresh-button {
     width: 100%;
   }
 
-  .time-filter,
   .weather-mood-tabs,
   .activities-hero-stats {
     justify-content: flex-start;
