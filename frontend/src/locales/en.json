@@ -480,6 +480,10 @@
     "continueCount": "Continue ({{count}})",
     "continue": "Continue",
     "skip": "Skip for now",
+    "birthdateTitle": "Your date of birth",
+    "birthdateSubtitle": "We need it to verify you are at least 13 years old (GDPR).",
+    "birthdateLabel": "Date of birth",
+    "birthdateRequired": "Please enter your date of birth to continue.",
     "interests": {
       "sport":        { "label": "Sport",        "description": "Football, running, padel…" },
       "cultura":      { "label": "Culture",      "description": "Exhibitions, books, talks" },

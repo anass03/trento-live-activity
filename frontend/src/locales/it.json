@@ -480,6 +480,10 @@
     "continueCount": "Continua ({{count}})",
     "continue": "Continua",
     "skip": "Salta per ora",
+    "birthdateTitle": "La tua data di nascita",
+    "birthdateSubtitle": "Ci serve per verificare che tu abbia almeno 13 anni (GDPR).",
+    "birthdateLabel": "Data di nascita",
+    "birthdateRequired": "Inserisci la tua data di nascita per continuare.",
     "interests": {
       "sport":        { "label": "Sport",        "description": "Calcetto, running, padel…" },
       "cultura":      { "label": "Cultura",      "description": "Mostre, libri, conferenze" },
