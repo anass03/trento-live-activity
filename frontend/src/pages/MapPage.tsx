@@ -255,7 +255,7 @@ export function MapPage({ user }: { user?: AppUser }) {
     return markerTypeLabel(marker.type);
   }
 
-  function translateCategory(cat: string | undefined): string {
+  function translateCategory(cat: string | null | undefined): string {
     if (!cat) return t('map.city');
     const key = cat.toLowerCase().replace(/\s+/g, '');
     return t(`categories.${key}`, { defaultValue: cat });
