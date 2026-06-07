@@ -24,22 +24,23 @@ export function AdminModerationPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  function load(stato: '' | Stato = filter, silent = false) {
+  function load(silent = false) {
     if (!silent) { setIsLoading(true); setError(null); }
-    getReports(stato || undefined)
+    // Always fetch all reports so counts stay accurate across all status tabs.
+    getReports(undefined)
       .then((r) => setReports(r.reports || []))
       .catch((e) => { if (!silent) setError(e.message); })
       .finally(() => { if (!silent) setIsLoading(false); });
   }
-  useEffect(() => { load(filter); }, [filter]);
-  useAutoRefresh(() => load(filter, true), 30_000);
+  useEffect(() => { load(); }, []);
+  useAutoRefresh(() => load(true), 30_000);
 
   async function resolve(id: string, azione: 'rimuovi' | 'archivia' | 'in_lavorazione') {
     setActionLoading(id + azione);
     try {
       const r = await resolveReport(id, azione);
       setMessage(r.message);
-      load(filter);
+      load();
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.error'));
     } finally { setActionLoading(null); }
@@ -55,6 +56,7 @@ export function AdminModerationPage() {
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     return reports.filter((r) => {
+      if (filter !== '' && r.stato !== filter) return false;
       if (tipoFilter !== 'all' && r.tipo !== tipoFilter) return false;
       if (!q) return true;
       return (
@@ -63,7 +65,7 @@ export function AdminModerationPage() {
         r.tipo.toLowerCase().includes(q)
       );
     });
-  }, [reports, search, tipoFilter]);
+  }, [reports, filter, search, tipoFilter]);
 
   return (
     <section className="data-page">

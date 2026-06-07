@@ -51,7 +51,7 @@ export function App() {
     }
     getMe()
       .then((u) => {
-        const me = u as unknown as { id: string; nome: string; cognome: string; email: string; ruolo: string; interessi?: string[]; nomeEnte?: string; approvato?: boolean };
+        const me = u as unknown as { id: string; nome: string; cognome: string; email: string; ruolo: string; interessi?: string[]; nomeEnte?: string; approvato?: boolean; profile?: { kind: string; superAdmin?: boolean } };
         setUser({
           id: me.id,
           name: me.nomeEnte || `${me.nome} ${me.cognome}`.trim() || me.email,
@@ -62,6 +62,7 @@ export function App() {
           interessi: me.interessi,
           nomeEnte: me.nomeEnte || null,
           approvato: me.approvato,
+          superAdmin: me.profile?.kind === 'sistema' ? (me.profile.superAdmin ?? false) : undefined,
         });
       })
       .catch(() => setUser(mockCurrentUser));
@@ -99,7 +100,7 @@ export function App() {
         <Route path="/comune/export" element={<ComuneExportPage />} />
 
         <Route path="/admin/poi" element={<AdminPOIPage />} />
-        <Route path="/admin/utenti" element={<AdminUsersPage />} />
+        <Route path="/admin/utenti" element={<AdminUsersPage user={user} />} />
         <Route path="/admin/enti/richieste" element={<AdminEntitiesPage />} />
         <Route path="/admin/moderazione" element={<AdminModerationPage />} />
         <Route path="/admin/notifiche" element={<AdminNotificationsPage />} />

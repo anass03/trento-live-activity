@@ -70,6 +70,7 @@ export interface CurrentUser {
   interessi?: string[];
   nomeEnte?: string | null;
   approvato?: boolean;
+  superAdmin?: boolean;
 }
 
 export interface AuthResponse {
