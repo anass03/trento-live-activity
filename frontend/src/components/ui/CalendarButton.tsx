@@ -2,6 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
+/** Convert an http(s) or relative ICS URL to a webcal:// URL.
+ *  webcal:// is natively handled by Calendar on iOS/macOS — clicking it
+ *  opens the app and proposes the event without any file download. */
+function toWebcalUrl(icsUrl: string): string {
+  const absolute = icsUrl.startsWith('http')
+    ? icsUrl
+    : `${window.location.origin}${icsUrl}`;
+  return absolute.replace(/^https?:\/\//, 'webcal://');
+}
+
 interface CalendarButtonProps {
   icsUrl: string;
   icsFilename: string;
@@ -69,14 +79,16 @@ export function CalendarButton({ icsUrl, icsFilename, googleUrl, label }: Calend
       </div>
       {open && createPortal(
         <div ref={menuRef} className="calendar-dropdown-menu" role="menu" style={menuStyle}>
+          {/* webcal:// opens Calendar app natively on iOS/macOS without a download */}
           <a
-            href={icsUrl}
-            download={icsFilename}
+            href={toWebcalUrl(icsUrl)}
+            target="_blank"
+            rel="noopener noreferrer"
             className="calendar-dropdown-item"
             role="menuitem"
             onClick={() => setOpen(false)}
           >
-            🍎 Apple / Outlook
+            🍎 {t('common.calendarApple')}
           </a>
           <a
             href={googleUrl}
@@ -86,7 +98,17 @@ export function CalendarButton({ icsUrl, icsFilename, googleUrl, label }: Calend
             role="menuitem"
             onClick={() => setOpen(false)}
           >
-            📅 Google Calendar
+            📅 {t('common.calendarGoogle')}
+          </a>
+          {/* Fallback download for Outlook, Linux, and any other client */}
+          <a
+            href={icsUrl}
+            download={icsFilename}
+            className="calendar-dropdown-item"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+          >
+            💾 {t('common.calendarDownload')}
           </a>
         </div>,
         document.body,
