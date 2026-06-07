@@ -282,7 +282,7 @@ export function ProfilePage() {
                   {AVAILABLE_INTERESTS.map((i) => (
                     <label key={i} className={`chip ${interessi.includes(i) ? 'active' : ''}`}>
                       <input type="checkbox" checked={interessi.includes(i)} onChange={() => toggleInteresse(i)} />
-                      {i}
+                      {t(`categories.${i}`, { defaultValue: i })}
                     </label>
                   ))}
                 </div>
