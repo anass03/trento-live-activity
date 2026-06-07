@@ -140,8 +140,8 @@ async function updateEnteProfile(req, res, next) {
 
 async function completeOnboarding(req, res, next) {
   try {
-    const { interessi } = req.body || {};
-    const profile = await service.completeOnboarding(req.user.id, { interessi });
+    const { interessi, dataNascita } = req.body || {};
+    const profile = await service.completeOnboarding(req.user.id, { interessi, dataNascita });
     res.json(profile);
   } catch (e) { next(e); }
 }

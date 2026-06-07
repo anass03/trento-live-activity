@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { completeOnboarding, getSuggestedInterests } from '../lib/api';
+import { completeOnboarding, getSuggestedInterests, getMe } from '../lib/api';
 
 const INTEREST_KEYS = ['sport', 'cultura', 'musica', 'arte', 'gastronomia', 'studio', 'natura', 'tecnologia', 'volontariato'];
 const EMOJIS: Record<string, string> = {
@@ -16,6 +16,7 @@ export function OnboardingInteressiPage() {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dataNascita, setDataNascita] = useState('');
   const suggestionTimer = useRef<number | null>(null);
 
   const toggle = (key: string) =>
@@ -31,11 +32,26 @@ export function OnboardingInteressiPage() {
 
   useEffect(() => { fetchSuggestions(selected); }, [selected, fetchSuggestions]);
 
+  // Pre-compila la data di nascita se l'utente ne ha già una reale (es. registrato
+  // con email). Gli account social hanno il placeholder 2000-01-01 → lasciamo vuoto
+  // così la inseriscono davvero.
+  useEffect(() => {
+    getMe().then((me) => {
+      const p = me.profile;
+      const d = p && p.kind === 'cittadino' ? p.dataNascita : undefined;
+      if (d && !d.startsWith('2000-01-01')) setDataNascita(d.slice(0, 10));
+    }).catch(() => {});
+  }, []);
+
   async function handleSave(skip: boolean) {
     setError(null);
+    if (!dataNascita) {
+      setError(t('onboarding.birthdateRequired'));
+      return;
+    }
     setSaving(true);
     try {
-      await completeOnboarding({ interessi: skip ? [] : selected });
+      await completeOnboarding({ interessi: skip ? [] : selected, dataNascita });
       window.dispatchEvent(new CustomEvent('tla:user-updated'));
       navigate('/');
     } catch (e) {
@@ -53,6 +69,23 @@ export function OnboardingInteressiPage() {
           <h1 id="onboarding-title">{t('onboarding.title')}</h1>
           <p>{t('onboarding.subtitle')}</p>
         </header>
+
+        <section className="onboarding-birthdate-section" aria-labelledby="onboarding-birthdate-title">
+          <div className="onboarding-section-copy">
+            <h2 id="onboarding-birthdate-title">{t('onboarding.birthdateTitle')}</h2>
+            <p>{t('onboarding.birthdateSubtitle')}</p>
+          </div>
+          <label className="onboarding-birthdate-field">
+            <span>{t('onboarding.birthdateLabel')}</span>
+            <input
+              type="date"
+              value={dataNascita}
+              max={new Date().toISOString().slice(0, 10)}
+              onChange={(e) => setDataNascita(e.target.value)}
+              required
+            />
+          </label>
+        </section>
 
         <section className="onboarding-interest-section" aria-labelledby="interest-selection-title">
           <div className="onboarding-section-copy">

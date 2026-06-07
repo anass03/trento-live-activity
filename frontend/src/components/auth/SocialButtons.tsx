@@ -17,9 +17,10 @@ interface Props {
 // Lo separiamo dal componente esterno per poter condizionare il render del provider
 // solo quando GOOGLE_CLIENT_ID è configurato.
 function GoogleButton({ onError, onSuccess }: { onError: (msg: string) => void; onSuccess: () => void | Promise<void> }) {
-  // Flusso "implicit" — restituisce access_token (non id_token). Lo scope
-  // `user.birthday.read` è necessario per leggere la data di nascita via People API.
-  // L'utente vedrà nel consenso Google "vedere la tua data di nascita".
+  // Flusso "implicit" — restituisce access_token (non id_token). Usiamo solo
+  // scope NON sensibili (openid email profile): Google non mostra l'avviso
+  // "app non verificata" e non serve la verifica per scope sensibili. La data
+  // di nascita non si chiede piu' qui ma nello step di onboarding interessi.
   const login = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
       if (!tokenResponse.access_token) {
@@ -34,7 +35,7 @@ function GoogleButton({ onError, onSuccess }: { onError: (msg: string) => void; 
       }
     },
     onError: () => onError('Login Google annullato o non riuscito'),
-    scope: 'openid email profile https://www.googleapis.com/auth/user.birthday.read',
+    scope: 'openid email profile',
   });
 
   return (

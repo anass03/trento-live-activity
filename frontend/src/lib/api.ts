@@ -336,7 +336,7 @@ export type MeProfile = MeProfileCittadino | MeProfileEnte | MeProfileComunale |
 export function updateEnteProfile(payload: { noteAdmin?: string }): Promise<{ noteAdmin: string | null }> {
   return request('/api/auth/me/ente', { method: 'PATCH', body: payload });
 }
-export function completeOnboarding(payload: { interessi: string[] }): Promise<{ interessi: string[]; onboardingComplete: true }> {
+export function completeOnboarding(payload: { interessi: string[]; dataNascita?: string }): Promise<{ interessi: string[]; onboardingComplete: true }> {
   return request('/api/auth/me/onboarding', { method: 'POST', body: payload });
 }
 
