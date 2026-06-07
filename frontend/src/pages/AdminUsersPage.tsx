@@ -4,13 +4,14 @@ import {
   deleteAdminUser,
   getAdminCittadini, getAdminComunali, getAdminEnti, getAdminSistema,
   type AdminCittadino, type AdminComunale, type AdminEnte, type AdminSistema,
+  type CurrentUser,
 } from '../lib/api';
 import { useAutoRefresh } from '../lib/useAutoRefresh';
 import { formatDate } from '../lib/formatters';
 
 type Tab = 'cittadini' | 'enti' | 'comunali' | 'sistema';
 
-export function AdminUsersPage() {
+export function AdminUsersPage({ user }: { user?: CurrentUser }) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>('cittadini');
   const [cittadini, setCittadini] = useState<AdminCittadino[]>([]);
@@ -77,15 +78,19 @@ export function AdminUsersPage() {
     sistema.filter((u) => !lc || [u.email, u.nome, u.cognome].some((v) => (v || '').toLowerCase().includes(lc))),
     [sistema, lc]);
 
-  function deleteBtn(id: string, label: string) {
+  function deleteBtn(id: string, label: string, permitted = true) {
+    const isBusy = deletingId === id;
+    const isDisabled = isBusy || !permitted;
     return (
       <button
         type="button"
         className="danger-button compact-button"
-        disabled={deletingId === id}
-        onClick={() => handleDelete(id, label)}
+        disabled={isDisabled}
+        onClick={permitted ? () => handleDelete(id, label) : undefined}
+        style={!permitted ? { pointerEvents: 'none' } : undefined}
+        title={!permitted ? t('common.error') : undefined}
       >
-        {deletingId === id ? '...' : t('common.delete')}
+        {isBusy ? '...' : t('common.delete')}
       </button>
     );
   }
@@ -243,7 +248,7 @@ export function AdminUsersPage() {
                   </td>
                   <td>{u.superAdmin ? '✓' : '—'}</td>
                   <td>{formatDate(u.createdAt)}</td>
-                  <td>{deleteBtn(u.id, u.email)}</td>
+                  <td>{deleteBtn(u.id, u.email, user?.superAdmin === true)}</td>
                 </tr>
               ))}
               {visibleSistema.length === 0 && (
