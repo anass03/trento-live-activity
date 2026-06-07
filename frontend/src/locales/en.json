@@ -29,6 +29,9 @@
     "lastName": "Last name",
     "open": "Open",
     "addToCalendar": "Add to calendar",
+    "calendarApple": "Apple Calendar",
+    "calendarGoogle": "Google Calendar",
+    "calendarDownload": "Download .ics (Outlook / other)",
     "addToFavorites": "Add to favourites",
     "removeFromFavorites": "Remove from favourites"
   },

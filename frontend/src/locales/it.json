@@ -29,6 +29,9 @@
     "lastName": "Cognome",
     "open": "Apri",
     "addToCalendar": "Aggiungi al calendario",
+    "calendarApple": "Apple Calendar",
+    "calendarGoogle": "Google Calendar",
+    "calendarDownload": "Scarica .ics (Outlook / altro)",
     "addToFavorites": "Aggiungi ai preferiti",
     "removeFromFavorites": "Rimuovi dai preferiti"
   },
