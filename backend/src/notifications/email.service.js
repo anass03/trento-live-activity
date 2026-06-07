@@ -39,27 +39,56 @@ function extractUrl(html) {
   return m ? m[1] : null;
 }
 
+function fromAddress() {
+  return process.env.SMTP_FROM || 'Trento Live Activity <noreply@example.com>';
+}
+
+// Railway (e molti PaaS) bloccano le porte SMTP in uscita (25/465/587): la
+// connessione nodemailer va in timeout. Se la config punta a Resend usiamo la
+// sua API HTTP (porta 443, non bloccata), riusando la stessa chiave re_...
+// Si può anche forzare con RESEND_API_KEY.
+function resendApiKey() {
+  if (process.env.RESEND_API_KEY) return process.env.RESEND_API_KEY;
+  const host = process.env.SMTP_HOST || '';
+  if (host.includes('resend.com') && (process.env.SMTP_PASS || '').startsWith('re_')) {
+    return process.env.SMTP_PASS;
+  }
+  return null;
+}
+
+async function sendViaResend(apiKey, to, subject, html) {
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: fromAddress(), to: [to], subject, html }),
+  });
+  if (!res.ok) throw new Error(`Resend API ${res.status}: ${await res.text().catch(() => '')}`);
+}
+
+function logDevFallback(to, subject, html) {
+  const url = extractUrl(html);
+  if (url) {
+    console.log(`\n[email:dev] ──────────────────────────────────`);
+    console.log(`  To:      ${to}`);
+    console.log(`  Subject: ${subject}`);
+    console.log(`  Link:    ${url}`);
+    console.log(`────────────────────────────────────────\n`);
+  } else {
+    console.log(`[email:dev] to=${to} subject="${subject}"`);
+  }
+}
+
 async function send(to, subject, html) {
   if (!to) return;
-  const t = getTransporter();
-  if (!t) {
-    const url = extractUrl(html);
-    if (url) {
-      console.log(`\n[email:dev] ──────────────────────────────────`);
-      console.log(`  To:      ${to}`);
-      console.log(`  Subject: ${subject}`);
-      console.log(`  Link:    ${url}`);
-      console.log(`────────────────────────────────────────\n`);
-    } else {
-      console.log(`[email:dev] to=${to} subject="${subject}"`);
-    }
+  const apiKey = resendApiKey();
+  const t = apiKey ? null : getTransporter();
+  if (!apiKey && !t) {
+    logDevFallback(to, subject, html);
     return;
   }
   try {
-    await t.sendMail({
-      from: process.env.SMTP_FROM || 'Trento Live Activity <noreply@example.com>',
-      to, subject, html,
-    });
+    if (apiKey) await sendViaResend(apiKey, to, subject, html);
+    else await t.sendMail({ from: fromAddress(), to, subject, html });
     console.log(`[email] sent to=${to} subject="${subject}"`);
   } catch (e) {
     console.error(`[email] FAILED to=${to} subject="${subject}": ${e.message}`);
