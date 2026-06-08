@@ -3616,6 +3616,14 @@ select option {
   line-height: 1.55;
 }
 
+.onboarding-birthdate-section {
+  display: grid;
+  gap: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-surface-line);
+  margin-bottom: 4px;
+}
+
 .onboarding-interest-section {
   display: grid;
   gap: 14px;
