@@ -54,6 +54,17 @@ export function OnboardingInteressiPage() {
 
   useEffect(() => { fetchSuggestions(selected); }, [selected, fetchSuggestions]);
 
+  // Pre-compila la data di nascita se l'utente ne ha già una reale (es. registrato
+  // con email). Gli account social hanno il placeholder 2000-01-01 → lasciamo vuoto
+  // così la inseriscono davvero.
+  useEffect(() => {
+    getMe().then((me) => {
+      const p = me.profile;
+      const d = p && p.kind === 'cittadino' ? p.dataNascita : undefined;
+      if (d && !d.startsWith('2000-01-01')) setDataNascita(d.slice(0, 10));
+    }).catch(() => {});
+  }, []);
+
   async function handleSave(skip: boolean) {
     setError(null);
     if (needsBirthdate) {

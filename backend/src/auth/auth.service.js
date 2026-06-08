@@ -361,22 +361,37 @@ async function updateEnteProfile(userId, { noteAdmin }) {
 }
 
 // Marca onboarding interessi come completato (cittadini).
-async function completeOnboarding(userId, { interessi } = {}) {
+async function completeOnboarding(userId, { interessi, dataNascita } = {}) {
   const { CittadinoProfile: _CittadinoProfile } = require('../data/models');
   const profile = await _CittadinoProfile.findOne({ where: { userId } });
   if (!profile) throw { status: 404, code: 'NOT_FOUND', error: 'Cittadino profile not found' };
   const nextInteressi = Array.isArray(interessi) ? interessi : profile.interessi;
 
+  // Data di nascita: per gli utenti social non arriva piu' da Google, la
+  // chiediamo qui. Se fornita, validiamo formato + eta' minima (GDPR / OCL C5).
+  let nextDataNascita;
+  if (dataNascita !== undefined && dataNascita !== null && dataNascita !== '') {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dataNascita) || Number.isNaN(new Date(dataNascita).getTime())) {
+      throw { status: 400, code: 'INVALID_BIRTHDATE', error: 'Data di nascita non valida' };
+    }
+    if (calcAge(dataNascita) < 13) {
+      throw { status: 400, code: 'AGE_TOO_YOUNG', error: 'Devi avere almeno 13 anni (GDPR).' };
+    }
+    nextDataNascita = dataNascita;
+  }
+
   const updates = {
     interessi: nextInteressi,
     onboardingComplete: true,
   };
+  if (nextDataNascita) updates.dataNascita = nextDataNascita;
   await profile.update(updates);
 
-  // Sync su User: interessi sempre.
+  // Sync su User: interessi sempre, data di nascita se fornita.
   const user = await User.findByPk(userId);
   if (user) {
     const userUpdates = { interessi: nextInteressi };
+    if (nextDataNascita) userUpdates.dataNascita = nextDataNascita;
     await user.update(userUpdates);
   }
   return profile;
