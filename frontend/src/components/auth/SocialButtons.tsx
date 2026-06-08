@@ -124,8 +124,9 @@ export function SocialButtons({ onSpidClick, showSpid = false }: Props) {
       )}
 
       {showSpid && (
-        <button type="button" className="social-button spid" onClick={onSpidClick}>
-          <span className="spid-logo" aria-hidden="true">SP</span> Entra con SPID
+        <button type="button" className="social-button spid spid-coming-soon" disabled>
+          <span className="spid-label-default"><span className="spid-logo" aria-hidden="true">SP</span> {t('auth.continueWithSpid')}</span>
+          <span className="spid-label-hover">{t('auth.spidComingSoon')}</span>
         </button>
       )}
 

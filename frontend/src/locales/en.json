@@ -124,7 +124,9 @@
     "spidConfirm": "Confirm and sign in",
     "spidError": "SPID error",
     "continueWithApple": "Continue with Apple",
-    "appleComingSoon": "Coming soon"
+    "appleComingSoon": "Coming soon",
+    "continueWithSpid": "Sign in with SPID",
+    "spidComingSoon": "Coming soon"
   },
   "settings": {
     "title": "Settings",

@@ -4093,6 +4093,7 @@ select option {
 .social-button.apple:hover:not(:disabled) { background: #1a1a1a; border-color: #1a1a1a; }
 
 .social-button.apple-coming-soon { position: relative; overflow: hidden; cursor: default; }
+.social-button.spid-coming-soon  { position: relative; overflow: hidden; cursor: default; }
 .apple-label-default,
 .apple-label-hover {
   position: absolute;
@@ -4107,6 +4108,22 @@ select option {
 .apple-label-hover   { opacity: 0; transform: translateY(6px); font-style: italic; letter-spacing: 0.03em; }
 .social-button.apple-coming-soon:hover .apple-label-default { opacity: 0; transform: translateY(-6px); }
 .social-button.apple-coming-soon:hover .apple-label-hover   { opacity: 1; transform: translateY(0); }
+
+.spid-label-default,
+.spid-label-hover {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: opacity 260ms ease, transform 260ms ease;
+  pointer-events: none;
+}
+.spid-label-default { opacity: 1; transform: translateY(0); }
+.spid-label-hover   { opacity: 0; transform: translateY(6px); font-style: italic; letter-spacing: 0.03em; }
+.social-button.spid-coming-soon:hover .spid-label-default { opacity: 0; transform: translateY(-6px); }
+.social-button.spid-coming-soon:hover .spid-label-hover   { opacity: 1; transform: translateY(0); }
 .social-button.spid {
   background: linear-gradient(135deg, #0066cc, #003d80);
   color: #fff;
