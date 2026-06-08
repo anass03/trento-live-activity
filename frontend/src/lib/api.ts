@@ -627,6 +627,12 @@ export function getAdminComunali(): Promise<AdminComunale[]> {
 export function getAdminSistema(): Promise<AdminSistema[]> {
   return request('/api/admin/users/sistema');
 }
+export function createAdminComunale(payload: { nome: string; cognome: string; email: string; password: string; ufficio?: string }): Promise<AdminComunale> {
+  return request('/api/admin/users/comunali', { method: 'POST', body: payload });
+}
+export function createAdminSistema(payload: { nome: string; cognome: string; email: string; password: string }): Promise<AdminSistema> {
+  return request('/api/admin/users/sistema', { method: 'POST', body: payload });
+}
 
 export interface POI {
   id: string; nome: string; latitudine: number; longitudine: number;

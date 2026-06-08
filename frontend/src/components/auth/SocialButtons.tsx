@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 import AppleSignin from 'react-apple-signin-auth';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { getMe, oauthAppleLogin, oauthGoogleLogin } from '../../lib/api';
 
 const GOOGLE_CLIENT_ID = (import.meta as ImportMeta & { env: { VITE_GOOGLE_CLIENT_ID?: string } }).env.VITE_GOOGLE_CLIENT_ID || '';
@@ -47,6 +48,7 @@ function GoogleButton({ onError, onSuccess }: { onError: (msg: string) => void; 
 
 export function SocialButtons({ onSpidClick, showSpid = false }: Props) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [error, setError] = useState<string | null>(null);
 
   // Dopo OAuth: se è un nuovo cittadino (o uno esistente senza interessi),
@@ -116,14 +118,16 @@ export function SocialButtons({ onSpidClick, showSpid = false }: Props) {
           )}
         />
       ) : (
-        <button type="button" className="social-button apple" disabled title="Configura VITE_APPLE_CLIENT_ID per abilitare">
-           Continua con Apple
+        <button type="button" className="social-button apple apple-coming-soon" disabled>
+          <span className="apple-label-default"> {t('auth.continueWithApple')}</span>
+          <span className="apple-label-hover">{t('auth.appleComingSoon')}</span>
         </button>
       )}
 
       {showSpid && (
-        <button type="button" className="social-button spid" onClick={onSpidClick}>
-          <span className="spid-logo" aria-hidden="true">SP</span> Entra con SPID
+        <button type="button" className="social-button spid spid-coming-soon" disabled>
+          <span className="spid-label-default"><span className="spid-logo" aria-hidden="true">SP</span> {t('auth.continueWithSpid')}</span>
+          <span className="spid-label-hover">{t('auth.spidComingSoon')}</span>
         </button>
       )}
 

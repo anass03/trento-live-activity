@@ -122,7 +122,11 @@
     "institutionalEmail": "Institutional email",
     "spidLoading": "Signing in…",
     "spidConfirm": "Confirm and sign in",
-    "spidError": "SPID error"
+    "spidError": "SPID error",
+    "continueWithApple": "Continue with Apple",
+    "appleComingSoon": "Coming soon",
+    "continueWithSpid": "Sign in with SPID",
+    "spidComingSoon": "Coming soon"
   },
   "settings": {
     "title": "Settings",
@@ -485,15 +489,42 @@
     "birthdateLabel": "Date of birth",
     "birthdateRequired": "Please enter your date of birth to continue.",
     "interests": {
-      "sport":        { "label": "Sport",        "description": "Football, running, padel…" },
-      "cultura":      { "label": "Culture",      "description": "Exhibitions, books, talks" },
-      "musica":       { "label": "Music",        "description": "Concerts, jam sessions" },
-      "arte":         { "label": "Art",          "description": "Exhibitions, ateliers, performances" },
-      "gastronomia":  { "label": "Food",         "description": "Aperitivo, food tours" },
-      "studio":       { "label": "Study",        "description": "Study rooms, study groups" },
-      "natura":       { "label": "Nature",       "description": "Hiking, parks, excursions" },
-      "tecnologia":   { "label": "Technology",   "description": "Hackathons, tech meetups" },
-      "volontariato": { "label": "Volunteering", "description": "Civic initiatives" }
+      "sport": {
+        "label": "Sport",
+        "description": "Football, running, padel…"
+      },
+      "cultura": {
+        "label": "Culture",
+        "description": "Exhibitions, books, talks"
+      },
+      "musica": {
+        "label": "Music",
+        "description": "Concerts, jam sessions"
+      },
+      "arte": {
+        "label": "Art",
+        "description": "Exhibitions, ateliers, performances"
+      },
+      "gastronomia": {
+        "label": "Food",
+        "description": "Aperitivo, food tours"
+      },
+      "studio": {
+        "label": "Study",
+        "description": "Study rooms, study groups"
+      },
+      "natura": {
+        "label": "Nature",
+        "description": "Hiking, parks, excursions"
+      },
+      "tecnologia": {
+        "label": "Technology",
+        "description": "Hackathons, tech meetups"
+      },
+      "volontariato": {
+        "label": "Volunteering",
+        "description": "Civic initiatives"
+      }
     }
   },
   "admin": {
@@ -504,30 +535,61 @@
       "searchLabel": "Search in this category",
       "searchPlaceholder": "Email, name, tax code, PEC…",
       "tabs": {
-        "cittadini": { "label": "Citizens",             "hint": "Registered users with tax code" },
-        "enti":      { "label": "Certified entities",   "hint": "Organisations with verified PEC" },
-        "comunali":  { "label": "Municipal",            "hint": "Municipal administrators (SPID access)" },
-        "sistema":   { "label": "System",               "hint": "System administrators (2FA required)" }
+        "cittadini": {
+          "label": "Citizens",
+          "hint": "Registered users with tax code"
+        },
+        "enti": {
+          "label": "Certified entities",
+          "hint": "Organisations with verified PEC"
+        },
+        "comunali": {
+          "label": "Municipal",
+          "hint": "Municipal administrators (SPID access)"
+        },
+        "sistema": {
+          "label": "System",
+          "hint": "System administrators (2FA required)"
+        }
       },
       "cols": {
-        "name": "Name", "email": "Email", "fiscalCode": "Tax code",
-        "birthDate": "Date of birth", "verified": "Verified", "registered": "Registered",
-        "actions": "Actions", "entityName": "Name", "loginEmail": "Login email",
-        "pec": "PEC", "status": "Status", "office": "Office", "spidId": "SPID ID",
-        "twofa": "2FA", "superAdmin": "Super admin"
+        "name": "Name",
+        "email": "Email",
+        "fiscalCode": "Tax code",
+        "birthDate": "Date of birth",
+        "verified": "Verified",
+        "registered": "Registered",
+        "actions": "Actions",
+        "entityName": "Name",
+        "loginEmail": "Login email",
+        "pec": "PEC",
+        "status": "Status",
+        "office": "Office",
+        "spidId": "SPID ID",
+        "twofa": "2FA",
+        "superAdmin": "Super admin"
       },
       "none": {
         "cittadini": "No citizens.",
-        "enti":      "No certified entities.",
-        "comunali":  "No municipal administrators.",
-        "sistema":   "No system administrators."
+        "enti": "No certified entities.",
+        "comunali": "No municipal administrators.",
+        "sistema": "No system administrators."
       },
       "approved": "Approved",
       "pending": "Pending",
       "twoFactorOn": "Active",
       "twoFactorOff": "Inactive",
       "deleteConfirm": "Delete \"{{label}}\"?\nThis also deletes associated activities, events, participations and profiles (GDPR art. 17).",
-      "deleted": "User \"{{label}}\" deleted."
+      "deleted": "User \"{{label}}\" deleted.",
+      "addComunale": "Add municipal admin",
+      "addSistema": "Add system admin",
+      "addComunaleTitle": "New municipal administrator",
+      "addSistemaTitle": "New system administrator",
+      "addComunaleHint": "The admin will log in with email and password. They can set up 2FA after first login.",
+      "addSistemaHint": "The new admin will have basic privileges. A super admin can promote them later.",
+      "tempPassword": "Temporary password",
+      "creating": "Creating…",
+      "created": "Account created successfully."
     },
     "entities": {
       "title": "Certified entity registration requests",
@@ -606,10 +668,22 @@
       "noDevices": "No registered devices for \"{{audience}}\". Notification not delivered.",
       "disclaimer": "The notification only reaches users who have enabled push notifications on their device. If Firebase is not configured server-side, the send is logged (stub mode).",
       "audiences": {
-        "all":       { "label": "All users",                 "hint": "Every registered device" },
-        "cittadini": { "label": "Citizens",                  "hint": "Registered users only" },
-        "enti":      { "label": "Certified entities",        "hint": "Entity accounts only" },
-        "comunali":  { "label": "Municipal administrators",  "hint": "Municipal dashboard only" }
+        "all": {
+          "label": "All users",
+          "hint": "Every registered device"
+        },
+        "cittadini": {
+          "label": "Citizens",
+          "hint": "Registered users only"
+        },
+        "enti": {
+          "label": "Certified entities",
+          "hint": "Entity accounts only"
+        },
+        "comunali": {
+          "label": "Municipal administrators",
+          "hint": "Municipal dashboard only"
+        }
       }
     }
   },
@@ -698,7 +772,6 @@
       "activeActivities": "Active activities",
       "certifiedEvents": "Certified events",
       "pointsOfInterest": "Points of interest",
-      "participations": "Participations",
       "overcrowdedPOIs": "Overcrowded POIs",
       "crowdingTitle": "Crowding",
       "topPOIs": "Top POIs by crowding",

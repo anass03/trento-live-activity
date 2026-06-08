@@ -1,7 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { completeOnboarding, getSuggestedInterests, getMe } from '../lib/api';
+import { completeOnboarding, getMe, getSuggestedInterests } from '../lib/api';
+
+function ageFromIso(iso: string): number {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return NaN;
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age -= 1;
+  return age;
+}
 
 const INTEREST_KEYS = ['sport', 'cultura', 'musica', 'arte', 'gastronomia', 'studio', 'natura', 'tecnologia', 'volontariato'];
 const EMOJIS: Record<string, string> = {
@@ -16,8 +26,20 @@ export function OnboardingInteressiPage() {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [dataNascita, setDataNascita] = useState('');
+  const [needsBirthdate, setNeedsBirthdate] = useState(false);
+  const [birthdate, setBirthdate] = useState('');
   const suggestionTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    getMe()
+      .then((me) => {
+        if (me.profile?.kind === 'cittadino') {
+          const dob = (me.profile as { dataNascita?: string }).dataNascita;
+          if (!dob || dob.startsWith('2000-01-01')) setNeedsBirthdate(true);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const toggle = (key: string) =>
     setSelected((prev) => (prev.includes(key) ? prev.filter((p) => p !== key) : [...prev, key]));
@@ -45,13 +67,20 @@ export function OnboardingInteressiPage() {
 
   async function handleSave(skip: boolean) {
     setError(null);
-    if (!dataNascita) {
-      setError(t('onboarding.birthdateRequired'));
-      return;
+    if (needsBirthdate) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(birthdate)) {
+        setError(t('registration.birthDate') + ': ' + t('registration.ageGate'));
+        return;
+      }
+      const age = ageFromIso(birthdate);
+      if (Number.isNaN(age) || age < 13 || age > 120) {
+        setError(t('registration.ageGate'));
+        return;
+      }
     }
     setSaving(true);
     try {
-      await completeOnboarding({ interessi: skip ? [] : selected, dataNascita });
+      await completeOnboarding({ interessi: skip ? [] : selected, ...(needsBirthdate ? { dataNascita: birthdate } : {}) });
       window.dispatchEvent(new CustomEvent('tla:user-updated'));
       navigate('/');
     } catch (e) {
@@ -70,22 +99,25 @@ export function OnboardingInteressiPage() {
           <p>{t('onboarding.subtitle')}</p>
         </header>
 
-        <section className="onboarding-birthdate-section" aria-labelledby="onboarding-birthdate-title">
-          <div className="onboarding-section-copy">
-            <h2 id="onboarding-birthdate-title">{t('onboarding.birthdateTitle')}</h2>
-            <p>{t('onboarding.birthdateSubtitle')}</p>
-          </div>
-          <label className="onboarding-birthdate-field">
-            <span>{t('onboarding.birthdateLabel')}</span>
-            <input
-              type="date"
-              value={dataNascita}
-              max={new Date().toISOString().slice(0, 10)}
-              onChange={(e) => setDataNascita(e.target.value)}
-              required
-            />
-          </label>
-        </section>
+        {needsBirthdate && (
+          <section className="onboarding-birthdate-section">
+            <div className="onboarding-section-copy">
+              <h2>{t('registration.birthDate')}</h2>
+              <p>{t('registration.ageGate')}</p>
+            </div>
+            <label>
+              <span>{t('registration.birthDate')}</span>
+              <input
+                type="date"
+                value={birthdate}
+                onChange={(e) => setBirthdate(e.target.value)}
+                max={new Date().toISOString().slice(0, 10)}
+                required
+              />
+              <small>{t('registration.ageGate')}</small>
+            </label>
+          </section>
+        )}
 
         <section className="onboarding-interest-section" aria-labelledby="interest-selection-title">
           <div className="onboarding-section-copy">
@@ -139,7 +171,7 @@ export function OnboardingInteressiPage() {
           <button
             type="button"
             className="primary-button"
-            disabled={saving || selected.length === 0}
+            disabled={saving || selected.length === 0 || (needsBirthdate && !birthdate)}
             onClick={() => handleSave(false)}
           >
             {saving ? t('onboarding.saving') : selected.length > 0 ? t('onboarding.continueCount', { count: selected.length }) : t('onboarding.continue')}
@@ -147,7 +179,7 @@ export function OnboardingInteressiPage() {
           <button
             type="button"
             className="ghost-button"
-            disabled={saving}
+            disabled={saving || (needsBirthdate && !birthdate)}
             onClick={() => handleSave(true)}
           >
             {t('onboarding.skip')}
