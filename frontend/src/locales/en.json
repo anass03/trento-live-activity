@@ -576,7 +576,16 @@
       "twoFactorOn": "Active",
       "twoFactorOff": "Inactive",
       "deleteConfirm": "Delete \"{{label}}\"?\nThis also deletes associated activities, events, participations and profiles (GDPR art. 17).",
-      "deleted": "User \"{{label}}\" deleted."
+      "deleted": "User \"{{label}}\" deleted.",
+      "addComunale": "Add municipal admin",
+      "addSistema": "Add system admin",
+      "addComunaleTitle": "New municipal administrator",
+      "addSistemaTitle": "New system administrator",
+      "addComunaleHint": "The admin will log in with email and password. They can set up 2FA after first login.",
+      "addSistemaHint": "The new admin will have basic privileges. A super admin can promote them later.",
+      "tempPassword": "Temporary password",
+      "creating": "Creating…",
+      "created": "Account created successfully."
     },
     "entities": {
       "title": "Certified entity registration requests",

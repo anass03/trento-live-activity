@@ -576,7 +576,16 @@
       "twoFactorOn": "Attiva",
       "twoFactorOff": "Non attiva",
       "deleteConfirm": "Eliminare \"{{label}}\"?\nL'operazione elimina anche attività, eventi, partecipazioni e profili associati (GDPR art. 17).",
-      "deleted": "Utente \"{{label}}\" eliminato."
+      "deleted": "Utente \"{{label}}\" eliminato.",
+      "addComunale": "Aggiungi amministratore comunale",
+      "addSistema": "Aggiungi amministratore di sistema",
+      "addComunaleTitle": "Nuovo amministratore comunale",
+      "addSistemaTitle": "Nuovo amministratore di sistema",
+      "addComunaleHint": "L'amministratore accederà con email e password. Potrà configurare il 2FA dopo il primo accesso.",
+      "addSistemaHint": "Il nuovo admin avrà privilegi base. Un super admin potrà promuoverlo in seguito.",
+      "tempPassword": "Password temporanea",
+      "creating": "Creazione…",
+      "created": "Account creato con successo."
     },
     "entities": {
       "title": "Richieste di registrazione enti certificati",
