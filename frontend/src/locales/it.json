@@ -122,7 +122,9 @@
     "institutionalEmail": "Email istituzionale",
     "spidLoading": "Accesso…",
     "spidConfirm": "Conferma e accedi",
-    "spidError": "Errore SPID"
+    "spidError": "Errore SPID",
+    "continueWithApple": "Continua con Apple",
+    "appleComingSoon": "In arrivo"
   },
   "settings": {
     "title": "Impostazioni",
@@ -481,15 +483,42 @@
     "continue": "Continua",
     "skip": "Salta per ora",
     "interests": {
-      "sport":        { "label": "Sport",        "description": "Calcetto, running, padel…" },
-      "cultura":      { "label": "Cultura",      "description": "Mostre, libri, conferenze" },
-      "musica":       { "label": "Musica",       "description": "Concerti, jam session" },
-      "arte":         { "label": "Arte",         "description": "Mostre, atelier, performance" },
-      "gastronomia":  { "label": "Gastronomia",  "description": "Aperitivi, food tour" },
-      "studio":       { "label": "Studio",       "description": "Aule, gruppi di studio" },
-      "natura":       { "label": "Natura",       "description": "Trekking, parchi, escursioni" },
-      "tecnologia":   { "label": "Tecnologia",   "description": "Hackathon, meetup tech" },
-      "volontariato": { "label": "Volontariato", "description": "Iniziative civiche" }
+      "sport": {
+        "label": "Sport",
+        "description": "Calcetto, running, padel…"
+      },
+      "cultura": {
+        "label": "Cultura",
+        "description": "Mostre, libri, conferenze"
+      },
+      "musica": {
+        "label": "Musica",
+        "description": "Concerti, jam session"
+      },
+      "arte": {
+        "label": "Arte",
+        "description": "Mostre, atelier, performance"
+      },
+      "gastronomia": {
+        "label": "Gastronomia",
+        "description": "Aperitivi, food tour"
+      },
+      "studio": {
+        "label": "Studio",
+        "description": "Aule, gruppi di studio"
+      },
+      "natura": {
+        "label": "Natura",
+        "description": "Trekking, parchi, escursioni"
+      },
+      "tecnologia": {
+        "label": "Tecnologia",
+        "description": "Hackathon, meetup tech"
+      },
+      "volontariato": {
+        "label": "Volontariato",
+        "description": "Iniziative civiche"
+      }
     }
   },
   "admin": {
@@ -500,23 +529,45 @@
       "searchLabel": "Cerca in questa categoria",
       "searchPlaceholder": "Email, nome, codice fiscale, PEC…",
       "tabs": {
-        "cittadini": { "label": "Cittadini",         "hint": "Utenti registrati con codice fiscale" },
-        "enti":      { "label": "Enti certificati",  "hint": "Organizzazioni con PEC verificata" },
-        "comunali":  { "label": "Comune",            "hint": "Amministratori comunali (accesso SPID)" },
-        "sistema":   { "label": "Sistema",           "hint": "Amministratori di sistema (2FA obbligatoria)" }
+        "cittadini": {
+          "label": "Cittadini",
+          "hint": "Utenti registrati con codice fiscale"
+        },
+        "enti": {
+          "label": "Enti certificati",
+          "hint": "Organizzazioni con PEC verificata"
+        },
+        "comunali": {
+          "label": "Comune",
+          "hint": "Amministratori comunali (accesso SPID)"
+        },
+        "sistema": {
+          "label": "Sistema",
+          "hint": "Amministratori di sistema (2FA obbligatoria)"
+        }
       },
       "cols": {
-        "name": "Nome", "email": "Email", "fiscalCode": "Codice fiscale",
-        "birthDate": "Data nascita", "verified": "Verificato", "registered": "Registrato",
-        "actions": "Azioni", "entityName": "Denominazione", "loginEmail": "Email login",
-        "pec": "PEC", "status": "Stato", "office": "Ufficio", "spidId": "SPID ID",
-        "twofa": "2FA", "superAdmin": "Super admin"
+        "name": "Nome",
+        "email": "Email",
+        "fiscalCode": "Codice fiscale",
+        "birthDate": "Data nascita",
+        "verified": "Verificato",
+        "registered": "Registrato",
+        "actions": "Azioni",
+        "entityName": "Denominazione",
+        "loginEmail": "Email login",
+        "pec": "PEC",
+        "status": "Stato",
+        "office": "Ufficio",
+        "spidId": "SPID ID",
+        "twofa": "2FA",
+        "superAdmin": "Super admin"
       },
       "none": {
         "cittadini": "Nessun cittadino.",
-        "enti":      "Nessun ente certificato.",
-        "comunali":  "Nessun amministratore comunale.",
-        "sistema":   "Nessun amministratore di sistema."
+        "enti": "Nessun ente certificato.",
+        "comunali": "Nessun amministratore comunale.",
+        "sistema": "Nessun amministratore di sistema."
       },
       "approved": "Approvato",
       "pending": "In attesa",
@@ -602,10 +653,22 @@
       "noDevices": "Nessun dispositivo registrato per \"{{audience}}\". Notifica non recapitata.",
       "disclaimer": "La notifica raggiunge solo gli utenti che hanno attivato le notifiche push sul proprio dispositivo. Se Firebase non è configurato lato server, l'invio viene registrato nei log (modalità stub).",
       "audiences": {
-        "all":       { "label": "Tutti gli utenti",          "hint": "Ogni dispositivo registrato" },
-        "cittadini": { "label": "Cittadini",                 "hint": "Solo utenti registrati" },
-        "enti":      { "label": "Enti certificati",          "hint": "Solo account ente" },
-        "comunali":  { "label": "Amministratori comunali",   "hint": "Solo dashboard Comune" }
+        "all": {
+          "label": "Tutti gli utenti",
+          "hint": "Ogni dispositivo registrato"
+        },
+        "cittadini": {
+          "label": "Cittadini",
+          "hint": "Solo utenti registrati"
+        },
+        "enti": {
+          "label": "Enti certificati",
+          "hint": "Solo account ente"
+        },
+        "comunali": {
+          "label": "Amministratori comunali",
+          "hint": "Solo dashboard Comune"
+        }
       }
     }
   },
@@ -694,7 +757,6 @@
       "activeActivities": "Attività attive",
       "certifiedEvents": "Eventi certificati",
       "pointsOfInterest": "Punti di interesse",
-      "participations": "Partecipazioni",
       "overcrowdedPOIs": "POI sovraffolati",
       "crowdingTitle": "Affollamento",
       "topPOIs": "Top POI per affollamento",

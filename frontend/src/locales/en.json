@@ -122,7 +122,9 @@
     "institutionalEmail": "Institutional email",
     "spidLoading": "Signing in…",
     "spidConfirm": "Confirm and sign in",
-    "spidError": "SPID error"
+    "spidError": "SPID error",
+    "continueWithApple": "Continue with Apple",
+    "appleComingSoon": "Coming soon"
   },
   "settings": {
     "title": "Settings",
@@ -481,15 +483,42 @@
     "continue": "Continue",
     "skip": "Skip for now",
     "interests": {
-      "sport":        { "label": "Sport",        "description": "Football, running, padel…" },
-      "cultura":      { "label": "Culture",      "description": "Exhibitions, books, talks" },
-      "musica":       { "label": "Music",        "description": "Concerts, jam sessions" },
-      "arte":         { "label": "Art",          "description": "Exhibitions, ateliers, performances" },
-      "gastronomia":  { "label": "Food",         "description": "Aperitivo, food tours" },
-      "studio":       { "label": "Study",        "description": "Study rooms, study groups" },
-      "natura":       { "label": "Nature",       "description": "Hiking, parks, excursions" },
-      "tecnologia":   { "label": "Technology",   "description": "Hackathons, tech meetups" },
-      "volontariato": { "label": "Volunteering", "description": "Civic initiatives" }
+      "sport": {
+        "label": "Sport",
+        "description": "Football, running, padel…"
+      },
+      "cultura": {
+        "label": "Culture",
+        "description": "Exhibitions, books, talks"
+      },
+      "musica": {
+        "label": "Music",
+        "description": "Concerts, jam sessions"
+      },
+      "arte": {
+        "label": "Art",
+        "description": "Exhibitions, ateliers, performances"
+      },
+      "gastronomia": {
+        "label": "Food",
+        "description": "Aperitivo, food tours"
+      },
+      "studio": {
+        "label": "Study",
+        "description": "Study rooms, study groups"
+      },
+      "natura": {
+        "label": "Nature",
+        "description": "Hiking, parks, excursions"
+      },
+      "tecnologia": {
+        "label": "Technology",
+        "description": "Hackathons, tech meetups"
+      },
+      "volontariato": {
+        "label": "Volunteering",
+        "description": "Civic initiatives"
+      }
     }
   },
   "admin": {
@@ -500,23 +529,45 @@
       "searchLabel": "Search in this category",
       "searchPlaceholder": "Email, name, tax code, PEC…",
       "tabs": {
-        "cittadini": { "label": "Citizens",             "hint": "Registered users with tax code" },
-        "enti":      { "label": "Certified entities",   "hint": "Organisations with verified PEC" },
-        "comunali":  { "label": "Municipal",            "hint": "Municipal administrators (SPID access)" },
-        "sistema":   { "label": "System",               "hint": "System administrators (2FA required)" }
+        "cittadini": {
+          "label": "Citizens",
+          "hint": "Registered users with tax code"
+        },
+        "enti": {
+          "label": "Certified entities",
+          "hint": "Organisations with verified PEC"
+        },
+        "comunali": {
+          "label": "Municipal",
+          "hint": "Municipal administrators (SPID access)"
+        },
+        "sistema": {
+          "label": "System",
+          "hint": "System administrators (2FA required)"
+        }
       },
       "cols": {
-        "name": "Name", "email": "Email", "fiscalCode": "Tax code",
-        "birthDate": "Date of birth", "verified": "Verified", "registered": "Registered",
-        "actions": "Actions", "entityName": "Name", "loginEmail": "Login email",
-        "pec": "PEC", "status": "Status", "office": "Office", "spidId": "SPID ID",
-        "twofa": "2FA", "superAdmin": "Super admin"
+        "name": "Name",
+        "email": "Email",
+        "fiscalCode": "Tax code",
+        "birthDate": "Date of birth",
+        "verified": "Verified",
+        "registered": "Registered",
+        "actions": "Actions",
+        "entityName": "Name",
+        "loginEmail": "Login email",
+        "pec": "PEC",
+        "status": "Status",
+        "office": "Office",
+        "spidId": "SPID ID",
+        "twofa": "2FA",
+        "superAdmin": "Super admin"
       },
       "none": {
         "cittadini": "No citizens.",
-        "enti":      "No certified entities.",
-        "comunali":  "No municipal administrators.",
-        "sistema":   "No system administrators."
+        "enti": "No certified entities.",
+        "comunali": "No municipal administrators.",
+        "sistema": "No system administrators."
       },
       "approved": "Approved",
       "pending": "Pending",
@@ -602,10 +653,22 @@
       "noDevices": "No registered devices for \"{{audience}}\". Notification not delivered.",
       "disclaimer": "The notification only reaches users who have enabled push notifications on their device. If Firebase is not configured server-side, the send is logged (stub mode).",
       "audiences": {
-        "all":       { "label": "All users",                 "hint": "Every registered device" },
-        "cittadini": { "label": "Citizens",                  "hint": "Registered users only" },
-        "enti":      { "label": "Certified entities",        "hint": "Entity accounts only" },
-        "comunali":  { "label": "Municipal administrators",  "hint": "Municipal dashboard only" }
+        "all": {
+          "label": "All users",
+          "hint": "Every registered device"
+        },
+        "cittadini": {
+          "label": "Citizens",
+          "hint": "Registered users only"
+        },
+        "enti": {
+          "label": "Certified entities",
+          "hint": "Entity accounts only"
+        },
+        "comunali": {
+          "label": "Municipal administrators",
+          "hint": "Municipal dashboard only"
+        }
       }
     }
   },
@@ -694,7 +757,6 @@
       "activeActivities": "Active activities",
       "certifiedEvents": "Certified events",
       "pointsOfInterest": "Points of interest",
-      "participations": "Participations",
       "overcrowdedPOIs": "Overcrowded POIs",
       "crowdingTitle": "Crowding",
       "topPOIs": "Top POIs by crowding",

@@ -4091,6 +4091,22 @@ select option {
 }
 .social-button.apple { background: #000; color: #fff; border-color: #000; }
 .social-button.apple:hover:not(:disabled) { background: #1a1a1a; border-color: #1a1a1a; }
+
+.social-button.apple-coming-soon { position: relative; overflow: hidden; cursor: default; }
+.apple-label-default,
+.apple-label-hover {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 260ms ease, transform 260ms ease;
+  pointer-events: none;
+}
+.apple-label-default { opacity: 1; transform: translateY(0); }
+.apple-label-hover   { opacity: 0; transform: translateY(6px); font-style: italic; letter-spacing: 0.03em; }
+.social-button.apple-coming-soon:hover .apple-label-default { opacity: 0; transform: translateY(-6px); }
+.social-button.apple-coming-soon:hover .apple-label-hover   { opacity: 1; transform: translateY(0); }
 .social-button.spid {
   background: linear-gradient(135deg, #0066cc, #003d80);
   color: #fff;
