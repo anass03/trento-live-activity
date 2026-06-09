@@ -41,7 +41,7 @@ const KNOWN_PEC_DOMAINS = [
   'gigapec.it', 'sicurezzapostale.it', 'ticertifica.it', 'pec.actalis.it',
   'pec.cgn.it', 'pec.giuffre.it', 'cert.legalmail.it', 'cert-posta.it',
   'pec.intesigroup.com', 'pec.aiga.it', 'cert.namirial.it', 'pec.libero.it',
-  'arubapec.it',
+  'arubapec.it', 'spidmail.it',
 ];
 
 function normalizePec(value) {

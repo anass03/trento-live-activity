@@ -41,7 +41,7 @@ const KNOWN_PEC_DOMAINS = [
   'pec.it', 'legalmail.it', 'pec.aruba.it', 'postecert.it', 'pec.poste.it',
   'gigapec.it', 'sicurezzapostale.it', 'ticertifica.it', 'pec.actalis.it',
   'pec.cgn.it', 'pec.giuffre.it', 'cert.legalmail.it', 'cert-posta.it',
-  'pec.libero.it', 'arubapec.it',
+  'pec.libero.it', 'arubapec.it', 'spidmail.it',
 ];
 
 function isValidPec(value: string): boolean {
