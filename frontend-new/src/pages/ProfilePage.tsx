@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
 import { getMyParticipations, leaveEvent, leaveActivity, getMe } from "../lib/api";
 
 const PROFILE_INTERESTS = [
-  { id: "outdoor",  label: "Outdoor",     icon: "bike",     color: "var(--teal)" },
-  { id: "cultura",  label: "Cultura",     icon: "landmark", color: "var(--violet)" },
-  { id: "musica",   label: "Musica",      icon: "music",    color: "var(--magenta)" },
-  { id: "food",     label: "Food & Drink",icon: "food",     color: "var(--amber)" },
-  { id: "sport",    label: "Sport",       icon: "run",      color: "var(--green)" },
+  { id: "outdoor",  icon: "bike",     color: "var(--teal)" },
+  { id: "cultura",  icon: "landmark", color: "var(--violet)" },
+  { id: "musica",   icon: "music",    color: "var(--magenta)" },
+  { id: "food",     icon: "food",     color: "var(--amber)" },
+  { id: "sport",    icon: "run",      color: "var(--green)" },
 ];
 
 const getCatColor = (cat?: string) => {
@@ -36,10 +37,13 @@ const getCatIcon = (cat?: string) => {
 };
 
 export function ProfilePage({ page, setPage, theme, setTheme, user }: any) {
+  const { t, i18n } = useTranslation();
   const [activeTab, setActiveTab] = useState("attivita");
   const [participations, setParticipations] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
+
+  const dateLocale = i18n.language?.startsWith("en") ? "en-GB" : "it-IT";
 
   const fetchParticipations = async () => {
     setLoading(true);
@@ -86,26 +90,26 @@ export function ProfilePage({ page, setPage, theme, setTheme, user }: any) {
               {user.avatar || "MR"}
             </div>
             <div className="revamp-profile-info">
-              <div className="revamp-profile-name">{user.name || "Ospite"}</div>
-              <div className="revamp-profile-email">{user.email || "Accesso ospite"}</div>
+              <div className="revamp-profile-name">{user.name || t("settings.guestName")}</div>
+              <div className="revamp-profile-email">{user.email || t("settings.guestEmail")}</div>
               <div className="revamp-profile-badge">
-                <Icon name="shieldCheck" size={10} style={{ color: "var(--cyan)" }} /> Autore Verificato
+                <Icon name="shieldCheck" size={10} style={{ color: "var(--cyan)" }} /> {t("profile.verifiedAuthor")}
               </div>
             </div>
             <div className="revamp-profile-stats">
               <div className="revamp-profile-stat">
                 <b>{participations.length}</b>
-                <span>Partecipazioni</span>
+                <span>{t("profile.participations")}</span>
               </div>
               <div style={{ width: 1, background: "var(--border-soft-2)" }}></div>
               <div className="revamp-profile-stat">
                 <b>4.8</b>
-                <span>Rating</span>
+                <span>{t("profile.rating")}</span>
               </div>
               <div style={{ width: 1, background: "var(--border-soft-2)" }}></div>
               <div className="revamp-profile-stat">
-                <b>{user?.role === "certified_entity" ? "SI" : "NO"}</b>
-                <span>Ente Certificato</span>
+                <b>{user?.role === "certified_entity" ? t("profile.yes") : t("profile.no")}</b>
+                <span>{t("profile.certifiedEntity")}</span>
               </div>
             </div>
           </div>
@@ -117,19 +121,19 @@ export function ProfilePage({ page, setPage, theme, setTheme, user }: any) {
               className={"revamp-profile-tab" + (activeTab === "attivita" ? " active" : "")}
               onClick={() => setActiveTab("attivita")}
             >
-              Le mie Prenotazioni
+              {t("profile.tabBookings")}
             </button>
             <button
               className={"revamp-profile-tab" + (activeTab === "interessi" ? " active" : "")}
               onClick={() => setActiveTab("interessi")}
             >
-              Interessi Selezionati
+              {t("profile.tabInterests")}
             </button>
             <button
               className={"revamp-profile-tab" + (activeTab === "info" ? " active" : "")}
               onClick={() => setActiveTab("info")}
             >
-              Informazioni
+              {t("profile.tabInfo")}
             </button>
           </div>
 
@@ -138,20 +142,20 @@ export function ProfilePage({ page, setPage, theme, setTheme, user }: any) {
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {loading && (
                   <div style={{ color: "var(--text-muted)", fontSize: 13.5, padding: "20px 0", textAlign: "center" }}>
-                    Caricamento prenotazioni...
+                    {t("profile.loadingBookings")}
                   </div>
                 )}
                 {!loading && participations.length === 0 && (
                   <div style={{ color: "var(--text-muted)", fontSize: 13.5, padding: "20px 0", textAlign: "center" }}>
-                    Nessuna prenotazione attiva.
+                    {t("profile.noBookings")}
                   </div>
                 )}
                 {!loading && participations.map((item) => {
-                  const title = item.target?.title || item.target?.titolo || "Attività/Evento";
+                  const title = item.target?.title || item.target?.titolo || t("profile.fallbackTitle");
                   const cat = item.target?.category || item.target?.categoria || "altro";
                   const color = getCatColor(cat);
                   const iconName = getCatIcon(cat);
-                  const when = item.target?.dateTime || item.target?.data || "Da definire";
+                  const when = item.target?.dateTime || item.target?.data || t("profile.toBeDefined");
 
                   return (
                     <div key={item.id} className="area-row" style={{ padding: "12px 14px", border: "1px solid var(--border-soft-2)", borderRadius: 12, background: "var(--chip-fill)" }}>
@@ -170,7 +174,7 @@ export function ProfilePage({ page, setPage, theme, setTheme, user }: any) {
                           </div>
                         </div>
                         <button className="revamp-action-btn danger" style={{ height: 34 }} onClick={() => handleCancel(item)}>
-                          <Icon name="x" size={12} /> Disdici
+                          <Icon name="x" size={12} /> {t("profile.cancelBooking")}
                         </button>
                       </div>
                     </div>
@@ -182,16 +186,16 @@ export function ProfilePage({ page, setPage, theme, setTheme, user }: any) {
             {activeTab === "interessi" && (
               <div>
                 <p style={{ fontSize: 13.5, color: "var(--text-secondary)", marginBottom: 12 }}>
-                  Filtri attivi consigliati basati sui tuoi interessi personali:
+                  {t("profile.interestsIntro")}
                 </p>
                 <div className="s-interests">
                   {PROFILE_INTERESTS.filter(item => interestsList.includes(item.id) || interestsList.length === 0).map((item) => (
                     <div key={item.id} className="s-int-chip on" style={{ "--ic": item.color } as React.CSSProperties}>
-                      <Icon name={item.icon} size={14} /> {item.label}
+                      <Icon name={item.icon} size={14} /> {t(`settings.interests.${item.id}`)}
                     </div>
                   ))}
                   <button className="s-int-chip" style={{ "--ic": "var(--cyan)" } as React.CSSProperties} onClick={() => setPage("onboarding")}>
-                    <Icon name="settings" size={14} /> Gestisci Interessi
+                    <Icon name="settings" size={14} /> {t("profile.manageInterests")}
                   </button>
                 </div>
               </div>
@@ -199,18 +203,18 @@ export function ProfilePage({ page, setPage, theme, setTheme, user }: any) {
 
             {activeTab === "info" && (
               <div style={{ fontSize: 13.5, color: "var(--text-secondary)", display: "flex", flexDirection: "column", gap: 8 }}>
-                <div><b>Membro dal:</b> {userProfile?.createdAt ? new Date(userProfile.createdAt).toLocaleDateString("it-IT") : "12 Maggio 2024"}</div>
-                <div><b>Ruolo:</b> {userProfile?.ruolo || "Ospite"}</div>
-                <div><b>Email:</b> {user?.email || "Nessuna"}</div>
+                <div><b>{t("profile.memberSince")}</b> {userProfile?.createdAt ? new Date(userProfile.createdAt).toLocaleDateString(dateLocale) : "12/05/2024"}</div>
+                <div><b>{t("profile.role")}</b> {userProfile?.ruolo || t("profile.guestRole")}</div>
+                <div><b>{t("profile.email")}</b> {user?.email || t("profile.none")}</div>
                 {userProfile?.ruolo === "EnteCertificato" && (
                   <>
-                    <div><b>Nome Ente:</b> {userProfile.nomeEnte}</div>
-                    <div><b>Stato Approvazione:</b> {userProfile.approvato ? "Approvato" : "In attesa"}</div>
+                    <div><b>{t("profile.entityName")}</b> {userProfile.nomeEnte}</div>
+                    <div><b>{t("profile.approvalStatus")}</b> {userProfile.approvato ? t("profile.approved") : t("profile.pending")}</div>
                   </>
                 )}
                 <div style={{ marginTop: 8 }}>
                   <button className="revamp-action-btn" onClick={() => setPage("impostazioni")}>
-                    <Icon name="settings" size={14} /> Modifica Impostazioni
+                    <Icon name="settings" size={14} /> {t("profile.editSettings")}
                   </button>
                 </div>
               </div>

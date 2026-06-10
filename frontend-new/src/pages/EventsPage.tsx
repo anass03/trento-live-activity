@@ -2,6 +2,8 @@
    Trento Live Activity — EVENTI page
    =========================================================== */
 import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import i18n from "../lib/i18n";
 import { Header } from "../components/layout/Header";
 import { Avatars } from "../components/redesign/Avatars";
 import { Widget, useGlow } from "../components/redesign/widgets";
@@ -22,15 +24,16 @@ const EV_GRAD: Record<string, string> = {
 };
 
 const EV_FILTERS = [
-  { id: "all",      label: "Tutti gli eventi", color: "var(--cyan)",    icon: "grid" },
-  { id: "musica",   label: "Musica",           color: "var(--magenta)", icon: "music" },
-  { id: "cultura",  label: "Cultura",          color: "var(--violet)",  icon: "landmark" },
-  { id: "cibo",     label: "Food & Drink",     color: "var(--amber)",   icon: "food" },
-  { id: "outdoor",  label: "Outdoor",          color: "var(--teal)",    icon: "bike" },
-  { id: "famiglia", label: "Famiglia",         color: "var(--cyan)",    icon: "family" },
+  { id: "all",      label: "events.filters.all",      color: "var(--cyan)",    icon: "grid" },
+  { id: "musica",   label: "events.filters.musica",   color: "var(--magenta)", icon: "music" },
+  { id: "cultura",  label: "events.filters.cultura",  color: "var(--violet)",  icon: "landmark" },
+  { id: "cibo",     label: "events.filters.cibo",     color: "var(--amber)",   icon: "food" },
+  { id: "outdoor",  label: "events.filters.outdoor",  color: "var(--teal)",    icon: "bike" },
+  { id: "famiglia", label: "events.filters.famiglia", color: "var(--cyan)",    icon: "family" },
 ];
 
-const fmt = (n?: number) => (n || 0).toLocaleString("it-IT");
+const uiLocale = () => (i18n.language?.startsWith("en") ? "en-GB" : "it-IT");
+const fmt = (n?: number) => (n || 0).toLocaleString(uiLocale());
 
 /* ===================== MINI CALENDAR ===================== */
 const sameDay = (a: Date, b: Date) =>
@@ -47,10 +50,11 @@ function parseEventDate(e: any): Date | null {
 }
 
 function MiniCalendar({ events = [] }: any) {
+  const { t } = useTranslation();
   const onMove = useGlow();
   const today = React.useMemo(() => new Date(), []);
   const [weekOffset, setWeekOffset] = useState(0);
-  const dows = ["L", "M", "M", "G", "V", "S", "D"];
+  const dows = t("events.calendar.dows", { returnObjects: true }) as string[];
 
   // Monday-anchored week, shifted by weekOffset.
   const weekDays = React.useMemo(() => {
@@ -71,7 +75,7 @@ function MiniCalendar({ events = [] }: any) {
     return weekDays.map((wd) => days.some((d) => sameDay(d, wd)));
   }, [events, weekDays]);
 
-  const monthLabel = weekDays[0].toLocaleDateString("it-IT", { month: "long", year: "numeric" });
+  const monthLabel = weekDays[0].toLocaleDateString(uiLocale(), { month: "long", year: "numeric" });
 
   return (
     <div className="widget anim-in" style={{ "--accent": "var(--violet)", animationDelay: "60ms" } as React.CSSProperties} onMouseMove={onMove}>
@@ -79,8 +83,8 @@ function MiniCalendar({ events = [] }: any) {
         <div className="cal-head">
           <div className="cal-month">{monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}</div>
           <div className="cal-nav">
-            <button aria-label="Settimana precedente" onClick={() => setWeekOffset((w) => w - 1)}><Icon name="chevronL" size={14} /></button>
-            <button aria-label="Settimana successiva" onClick={() => setWeekOffset((w) => w + 1)}><Icon name="chevron" size={14} /></button>
+            <button aria-label={t("events.calendar.prevWeek")} onClick={() => setWeekOffset((w) => w - 1)}><Icon name="chevronL" size={14} /></button>
+            <button aria-label={t("events.calendar.nextWeek")} onClick={() => setWeekOffset((w) => w + 1)}><Icon name="chevron" size={14} /></button>
           </div>
         </div>
         <div className="cal-grid">
@@ -99,14 +103,15 @@ function MiniCalendar({ events = [] }: any) {
 
 /* ===================== QUICK FILTERS ===================== */
 function QuickFilters({ active, setActive, counts }: any) {
+  const { t } = useTranslation();
   return (
-    <Widget title="Filtri rapidi" accent="var(--cyan)" delay={140}>
+    <Widget title={t("events.filters.title")} accent="var(--cyan)" delay={140}>
       <div className="qf-list">
         {EV_FILTERS.map((f) => (
           <button key={f.id} className={"qf-item" + (active === f.id ? " active" : "")}
             style={{ "--qc": f.color } as React.CSSProperties} onClick={() => setActive(f.id)}>
             <span className="qf-ic"><Icon name={f.icon} size={16} /></span>
-            <span className="qf-label">{f.label}</span>
+            <span className="qf-label">{t(f.label)}</span>
             <span className="qf-count">{counts[f.id] || 0}</span>
           </button>
         ))}
@@ -117,11 +122,12 @@ function QuickFilters({ active, setActive, counts }: any) {
 
 /* ===================== MOST PARTICIPATED ===================== */
 function MostParticipated({ list, onPick }: any) {
+  const { t } = useTranslation();
   const top = [...list]
     .sort((a: any, b: any) => (b.participantCount || 0) - (a.participantCount || 0))
     .slice(0, 3);
   return (
-    <Widget title="Più partecipati" accent="var(--magenta)" delay={220}>
+    <Widget title={t("events.mostParticipated")} accent="var(--magenta)" delay={220}>
       {top.map((t: any, i: number) => (
         <button className="trend-row" key={t.id} onClick={() => onPick(t.id)}>
           <span className="trend-rank">{i + 1}</span>
@@ -134,7 +140,7 @@ function MostParticipated({ list, onPick }: any) {
       ))}
       {top.length === 0 && (
         <div style={{ color: "var(--text-secondary)", fontSize: 12, padding: "10px 0", textAlign: "center" }}>
-          Nessun evento con partecipanti
+          {t("events.noneWithParticipants")}
         </div>
       )}
     </Widget>
@@ -143,6 +149,7 @@ function MostParticipated({ list, onPick }: any) {
 
 /* ===================== SEARCH BAR ===================== */
 function Composer({ search, setSearch }: any) {
+  const { t } = useTranslation();
   return (
     <div className="composer">
       <div className="composer-field" style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
@@ -151,7 +158,7 @@ function Composer({ search, setSearch }: any) {
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Cerca eventi a Trento…"
+          placeholder={t("events.searchPlaceholder")}
           style={{ background: "none", border: "none", color: "white", outline: "none", width: "100%", fontSize: 14 }}
         />
       </div>
@@ -161,6 +168,7 @@ function Composer({ search, setSearch }: any) {
 
 /* ===================== EVENT POST CARD ===================== */
 function PostCard({ e, liked, saved, onLike, onSave, onOpen, flash }: any) {
+  const { t } = useTranslation();
   const onMove = useGlow();
   const color = catColor(e.category);
   const catLabel = tlaCatLabel(e.category);
@@ -176,9 +184,9 @@ function PostCard({ e, liked, saved, onLike, onSave, onOpen, flash }: any) {
       <div className="post-media">
         <div className="pm-badges">
           {e.isCertified
-            ? <span className="pm-live" style={{ background: "var(--teal)" }}><Icon name="shieldCheck" size={11} />Certificato</span>
+            ? <span className="pm-live" style={{ background: "var(--teal)" }}><Icon name="shieldCheck" size={11} />{t("events.certified")}</span>
             : <span className="pm-tag"><Icon name={CAT_ICON[e.category] || "activity"} size={12} />{catLabel}</span>}
-          {e.participantCount && e.participantCount > 20 && <span className="pm-feat"><Icon name="flame" size={11} />Popolare</span>}
+          {e.participantCount && e.participantCount > 20 && <span className="pm-feat"><Icon name="flame" size={11} />{t("events.popular")}</span>}
         </div>
         <span className="pm-ghost"><Icon name={CAT_ICON[e.category] || "activity"} size={116} /></span>
       </div>
@@ -188,20 +196,20 @@ function PostCard({ e, liked, saved, onLike, onSave, onOpen, flash }: any) {
         <div className="post-desc">{e.description}</div>
         <div className="post-meta">
           <span className="pm"><Icon name="pin" size={14} />{e.location || "Trento"}</span>
-          <span className="pm"><Icon name="clock" size={14} />{e.dateTime || e.createdAt || "Oggi"}</span>
+          <span className="pm"><Icon name="clock" size={14} />{e.dateTime || e.createdAt || t("events.today")}</span>
         </div>
         <div className="post-foot">
           <Avatars ids={[0, 1, 2]} extra={Math.max(0, (e.participantCount || 0) - 3)} />
-          <span className="attend-count"><b>{fmt(e.participantCount)}</b> partecipanti</span>
+          <span className="attend-count"><b>{fmt(e.participantCount)}</b> {t("events.participantsWord", { count: e.participantCount || 0 })}</span>
           <div className="post-actions">
-            <button className={"act-btn" + (liked ? " on" : "")} onClick={stop(() => onLike(e.id))} aria-label="Mi interessa" aria-pressed={liked}>
+            <button className={"act-btn" + (liked ? " on" : "")} onClick={stop(() => onLike(e.id))} aria-label={t("events.ariaLike")} aria-pressed={liked}>
               <Icon name="heart" size={17} />{hasLikeCount ? fmt(likes) : null}
             </button>
-            <button className="act-btn" onClick={stop(() => onOpen(e.id))} aria-label="Commenti">
+            <button className="act-btn" onClick={stop(() => onOpen(e.id))} aria-label={t("events.ariaComments")}>
               <Icon name="comment" size={17} />{hasCommentCount ? e.commentsCount : null}
             </button>
-            <button className="act-btn icon-only" onClick={stop(() => {})} aria-label="Condividi"><Icon name="share" size={17} /></button>
-            <button className={"act-btn save icon-only" + (saved ? " on" : "")} onClick={stop(() => onSave(e.id))} aria-label="Salva"><Icon name="bookmark" size={17} /></button>
+            <button className="act-btn icon-only" onClick={stop(() => {})} aria-label={t("events.ariaShare")}><Icon name="share" size={17} /></button>
+            <button className={"act-btn save icon-only" + (saved ? " on" : "")} onClick={stop(() => onSave(e.id))} aria-label={t("events.ariaSave")}><Icon name="bookmark" size={17} /></button>
           </div>
         </div>
       </div>
@@ -211,21 +219,22 @@ function PostCard({ e, liked, saved, onLike, onSave, onOpen, flash }: any) {
 
 /* ===================== FEED ===================== */
 const Feed = React.forwardRef<any, any>(function Feed({ events, user, search, setSearch, likes, saves, onLike, onSave, onOpen, flashId }, ref) {
+  const { t } = useTranslation();
   return (
     <div className="ev-col feed" ref={ref}>
       <Composer user={user} search={search} setSearch={setSearch} />
       {events.length === 0 && (
         <div className="feed-state empty">
           <Icon name="calendar" size={20} />
-          <div className="feed-state-title">{search ? "Nessun risultato" : "Nessun evento disponibile"}</div>
-          <div className="feed-state-msg">{search ? "Prova con un altro termine di ricerca." : "Non ci sono ancora eventi pubblicati. Torna più tardi."}</div>
+          <div className="feed-state-title">{search ? t("events.emptyNoResultsTitle") : t("events.emptyNoEventsTitle")}</div>
+          <div className="feed-state-msg">{search ? t("events.emptyNoResultsMsg") : t("events.emptyNoEventsMsg")}</div>
         </div>
       )}
       {events.map((e: any) => (
         <div className="feed-row" key={e.id}>
           <div className="tl">
             <span className={"tl-node" + (e.isCertified ? " live" : "")} style={{ "--tc": catColor(e.category) } as React.CSSProperties}></span>
-            <span className={"tl-label" + (e.isCertified ? " live" : "")}>{e.startTime || "Live"}</span>
+            <span className={"tl-label" + (e.isCertified ? " live" : "")}>{e.startTime || t("events.live")}</span>
           </div>
           <div className="feed-body">
             <PostCard e={e} liked={!!likes[e.id]} saved={!!saves[e.id]}
@@ -239,22 +248,23 @@ const Feed = React.forwardRef<any, any>(function Feed({ events, user, search, se
 
 /* ===================== NEXT ACTIVITY ===================== */
 function NextActivity({ event, joined, saved, onJoin, onSave }: any) {
+  const { t } = useTranslation();
   if (!event) {
     return (
-      <Widget title="Prossimo evento" accent="var(--cyan)" upd="Nessuno" delay={120}>
+      <Widget title={t("events.next")} accent="var(--cyan)" upd={t("events.none")} delay={120}>
         <div style={{ color: "var(--text-muted)", fontSize: 13, padding: "20px 0", textAlign: "center" }}>
-          Nessun evento programmato in arrivo
+          {t("events.noUpcoming")}
         </div>
       </Widget>
     );
   }
   const pct = Math.round(((event.participantCount || 0) / (event.maxPartecipanti || 100)) * 100);
   return (
-    <Widget title="Prossimo evento" accent="var(--accent)" upd="In arrivo" delay={120}>
+    <Widget title={t("events.next")} accent="var(--accent)" upd={t("events.upcoming")} delay={120}>
       <div className="next-media" style={{ "--nimg": EV_GRAD[event.category] || EV_GRAD.musica } as React.CSSProperties}>
         <span className="nm-count">
           <span className="led live green"></span>
-          <span><span className="lbl">IN ARRIVO</span></span>
+          <span><span className="lbl">{t("events.upcomingBadge")}</span></span>
         </span>
         <span className="nm-ghost"><Icon name={CAT_ICON[event.category] || "activity"} size={96} /></span>
       </div>
@@ -262,25 +272,25 @@ function NextActivity({ event, joined, saved, onJoin, onSave }: any) {
       <div className="next-fields">
         <div className="next-field">
           <span className="nf-ic"><Icon name="pin" size={14} /></span>
-          <div><div className="nf-lbl">Luogo</div><div className="nf-val">{event.location || "Trento"}</div></div>
+          <div><div className="nf-lbl">{t("events.place")}</div><div className="nf-val">{event.location || "Trento"}</div></div>
         </div>
         <div className="next-field">
           <span className="nf-ic"><Icon name="clock" size={14} /></span>
-          <div><div className="nf-lbl">Quando</div><div className="nf-val">{event.dateTime || "Oggi"}</div></div>
+          <div><div className="nf-lbl">{t("events.when")}</div><div className="nf-val">{event.dateTime || t("events.today")}</div></div>
         </div>
       </div>
       <div className="next-part">
         <div className="np-l">
-          <div className="nf-lbl">Partecipanti</div>
+          <div className="nf-lbl">{t("events.participantsLabel")}</div>
           <div className="np-bar"><i style={{ width: Math.max(8, pct) + "%" }}></i></div>
         </div>
         <div className="np-n"><b>{event.participantCount || 0}</b> {event.maxPartecipanti ? `/ ${event.maxPartecipanti}` : ""}</div>
       </div>
       <div className="next-cta-row">
         <button className={"next-cta" + (joined ? " joined" : "")} onClick={onJoin} aria-pressed={joined}>
-          <Icon name={joined ? "check" : "ticket"} size={17} />{joined ? "Partecipi · annulla" : "Partecipa all'evento"}
+          <Icon name={joined ? "check" : "ticket"} size={17} />{joined ? t("events.joinedCta") : t("events.joinCta")}
         </button>
-        <button className={"next-save" + (saved ? " on" : "")} onClick={onSave} aria-label="Salva evento"><Icon name="bookmark" size={19} /></button>
+        <button className={"next-save" + (saved ? " on" : "")} onClick={onSave} aria-label={t("events.ariaSaveEvent")}><Icon name="bookmark" size={19} /></button>
       </div>
     </Widget>
   );

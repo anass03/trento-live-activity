@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
 import { getAdminUsers, deleteAdminUser } from "../lib/api";
 
 export function AdminUsersPage({ page, setPage, theme, setTheme, user }: any) {
+  const { t, i18n } = useTranslation();
   const [search, setSearch] = useState("");
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -17,7 +19,7 @@ export function AdminUsersPage({ page, setPage, theme, setTheme, user }: any) {
       setUsers(data);
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || "Impossibile caricare la lista utenti.");
+      setErrorMsg(err.message || t("admin.users.loadError"));
     } finally {
       setLoading(false);
     }
@@ -28,7 +30,7 @@ export function AdminUsersPage({ page, setPage, theme, setTheme, user }: any) {
   }, []);
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm("Sei sicuro di voler eliminare questo utente? Questa operazione è irreversibile.")) {
+    if (!window.confirm(t("admin.users.deleteConfirm"))) {
       return;
     }
     setErrorMsg("");
@@ -37,20 +39,20 @@ export function AdminUsersPage({ page, setPage, theme, setTheme, user }: any) {
       setUsers((prev) => prev.filter((u) => u.id !== id));
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || "Errore durante l'eliminazione dell'utente.");
+      setErrorMsg(err.message || t("admin.users.deleteError"));
     }
   };
 
   const getRoleLabel = (role: string) => {
     switch (role) {
       case "AmministratoreDiSistema":
-        return "Admin Sistema";
+        return t("admin.users.roles.system");
       case "AmministratoreComunale":
-        return "Admin Comunale";
+        return t("admin.users.roles.municipal");
       case "EnteCertificato":
-        return "Ente Certificato";
+        return t("admin.users.roles.entity");
       case "UtenteRegistrato":
-        return "Cittadino";
+        return t("admin.users.roles.citizen");
       default:
         return role;
     }
@@ -71,8 +73,8 @@ export function AdminUsersPage({ page, setPage, theme, setTheme, user }: any) {
     <div className="revamp-legal-scene">
       <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
       <div className="revamp-admin-layout">
-        <h1>Gestione Utenti del Sistema</h1>
-        <p>Amministra gli account registrati ed assegna i privilegi amministrativi</p>
+        <h1>{t("admin.users.title")}</h1>
+        <p>{t("admin.users.subtitle")}</p>
 
         {errorMsg && (
           <div className="revamp-status-pill error" style={{ margin: "0 0 20px 0", padding: "12px", width: "100%", justifyContent: "center" }}>
@@ -84,7 +86,7 @@ export function AdminUsersPage({ page, setPage, theme, setTheme, user }: any) {
           <div className="act-search" style={{ background: "var(--surface-1)" }}>
             <Icon name="search" size={16} />
             <input
-              placeholder="Cerca utenti per nome, email o ente..."
+              placeholder={t("admin.users.searchPlaceholder")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -93,25 +95,25 @@ export function AdminUsersPage({ page, setPage, theme, setTheme, user }: any) {
 
         <div className="revamp-chart-card anim-in" style={{ "--accent": "var(--violet)" }}>
           <div style={{ display: "flex", justifyContent: "between", alignItems: "center", marginBottom: 15 }}>
-            <h3 style={{ margin: 0 }}>Registro Account Utenti</h3>
+            <h3 style={{ margin: 0 }}>{t("admin.users.tableTitle")}</h3>
             {loading && <Icon name="refresh" size={16} className="spin" style={{ color: "var(--text-muted)" }} />}
           </div>
           <div className="revamp-table-wrap">
             <table className="revamp-table">
               <thead>
                 <tr>
-                  <th>Nome Utente / Ente</th>
-                  <th>Email</th>
-                  <th>Ruolo Principale</th>
-                  <th>Data Creazione</th>
-                  <th>Azioni</th>
+                  <th>{t("admin.users.colName")}</th>
+                  <th>{t("admin.users.colEmail")}</th>
+                  <th>{t("admin.users.colRole")}</th>
+                  <th>{t("admin.users.colCreated")}</th>
+                  <th>{t("admin.users.colActions")}</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredUsers.length === 0 && !loading ? (
                   <tr>
                     <td colSpan={5} style={{ textAlign: "center", color: "var(--text-muted)", padding: 20 }}>
-                      Nessun utente trovato
+                      {t("admin.users.empty")}
                     </td>
                   </tr>
                 ) : (
@@ -121,7 +123,7 @@ export function AdminUsersPage({ page, setPage, theme, setTheme, user }: any) {
                         <b>
                           {u.ruolo === "EnteCertificato"
                             ? u.nomeEnte
-                            : `${u.nome || ""} ${u.cognome || ""}`.trim() || "Senza Nome"}
+                            : `${u.nome || ""} ${u.cognome || ""}`.trim() || t("admin.users.noName")}
                         </b>
                       </td>
                       <td>{u.email}</td>
@@ -130,14 +132,14 @@ export function AdminUsersPage({ page, setPage, theme, setTheme, user }: any) {
                           {getRoleLabel(u.ruolo)}
                         </span>
                       </td>
-                      <td>{u.createdAt ? new Date(u.createdAt).toLocaleDateString("it-IT") : "—"}</td>
+                      <td>{u.createdAt ? new Date(u.createdAt).toLocaleDateString(i18n.language) : "—"}</td>
                       <td>
                         {u.id !== user?.id ? (
                           <button className="revamp-action-btn danger" onClick={() => handleDelete(u.id)}>
-                            <Icon name="x" size={12} /> Elimina
+                            <Icon name="x" size={12} /> {t("admin.users.delete")}
                           </button>
                         ) : (
-                          <span style={{ color: "var(--text-muted)", fontSize: 11 }}>Attuale</span>
+                          <span style={{ color: "var(--text-muted)", fontSize: 11 }}>{t("admin.users.current")}</span>
                         )}
                       </td>
                     </tr>

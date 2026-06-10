@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { logout as apiLogout } from "../../lib/api";
 import { Icon } from "../ui/Icon";
 
 export function Header({ page, setPage, theme, setTheme, user }: any) {
+  const { t } = useTranslation();
   const role = user?.role || "anonymous";
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement | null>(null);
@@ -28,36 +30,36 @@ export function Header({ page, setPage, theme, setTheme, user }: any) {
   };
 
   let nav = [
-    { id: "home", label: "Home", icon: "home" },
-    { id: "eventi", label: "Eventi", icon: "calendar" },
-    { id: "attivita", label: "Attività", icon: "activity" },
-    { id: "impostazioni", label: "Impostazioni", icon: "settings" },
+    { id: "home", label: t("header.nav.home"), icon: "home" },
+    { id: "eventi", label: t("header.nav.events"), icon: "calendar" },
+    { id: "attivita", label: t("header.nav.activities"), icon: "activity" },
+    { id: "impostazioni", label: t("header.nav.settings"), icon: "settings" },
   ];
 
   if (role === "municipal_admin") {
     nav = [
-      { id: "home", label: "Mappa", icon: "home" },
-      { id: "comune-dashboard", label: "Pannello Comune", icon: "grid" },
-      { id: "comune-statistiche", label: "Statistiche", icon: "trending" },
-      { id: "comune-export", label: "Export", icon: "share" },
-      { id: "impostazioni", label: "Impostazioni", icon: "settings" },
+      { id: "home", label: t("header.nav.map"), icon: "home" },
+      { id: "comune-dashboard", label: t("header.nav.comuneDashboard"), icon: "grid" },
+      { id: "comune-statistiche", label: t("header.nav.stats"), icon: "trending" },
+      { id: "comune-export", label: t("header.nav.export"), icon: "share" },
+      { id: "impostazioni", label: t("header.nav.settings"), icon: "settings" },
     ];
   } else if (role === "system_admin") {
     nav = [
-      { id: "home", label: "Mappa", icon: "home" },
-      { id: "admin-users", label: "Utenti", icon: "users" },
-      { id: "admin-poi", label: "POI", icon: "pin" },
-      { id: "admin-enti-richieste", label: "Enti", icon: "shieldCheck" },
-      { id: "admin-moderazione", label: "Moderazione", icon: "warn" },
-      { id: "admin-notifications", label: "Notifiche", icon: "bell" },
-      { id: "impostazioni", label: "Impostazioni", icon: "settings" },
+      { id: "home", label: t("header.nav.map"), icon: "home" },
+      { id: "admin-users", label: t("header.nav.users"), icon: "users" },
+      { id: "admin-poi", label: t("header.nav.poi"), icon: "pin" },
+      { id: "admin-enti-richieste", label: t("header.nav.entities"), icon: "shieldCheck" },
+      { id: "admin-moderazione", label: t("header.nav.moderation"), icon: "warn" },
+      { id: "admin-notifications", label: t("header.nav.notifications"), icon: "bell" },
+      { id: "impostazioni", label: t("header.nav.settings"), icon: "settings" },
     ];
   } else if (role === "certified_entity") {
     nav = [
-      { id: "home", label: "Mappa", icon: "home" },
-      { id: "eventi", label: "Eventi", icon: "calendar" },
-      { id: "ente-pubblica", label: "Pubblica", icon: "sparkle" },
-      { id: "impostazioni", label: "Impostazioni", icon: "settings" },
+      { id: "home", label: t("header.nav.map"), icon: "home" },
+      { id: "eventi", label: t("header.nav.events"), icon: "calendar" },
+      { id: "ente-pubblica", label: t("header.nav.publish"), icon: "sparkle" },
+      { id: "impostazioni", label: t("header.nav.settings"), icon: "settings" },
     ];
   }
 
@@ -75,7 +77,7 @@ export function Header({ page, setPage, theme, setTheme, user }: any) {
         </div>
         <div>
           <div className="brand-name">Trento <span className="live">Live</span> Activity</div>
-          <div className="brand-sub">Smart City · Tempo reale</div>
+          <div className="brand-sub">{t("header.brandSub")}</div>
         </div>
       </div>
 
@@ -90,17 +92,17 @@ export function Header({ page, setPage, theme, setTheme, user }: any) {
       <div className="header-right">
         <div className="search-bar">
           <Icon name="search" size={16} style={{ opacity: 0.6 }} />
-          <input placeholder="Cerca luoghi, eventi…" />
+          <input placeholder={t("header.searchPlaceholder")} />
           <kbd>⌘K</kbd>
         </div>
-        <button className="icon-btn" onClick={() => setPage(role === "system_admin" ? "admin-notifications" : "home")}><Icon name="bell" size={18} /><span className="badge"></span></button>
-        <button className="theme-toggle" onClick={() => setTheme(theme === "day" ? "night" : "day")} aria-label="Cambia tema" title="Giorno / Notte">
+        <button className="icon-btn" aria-label={t("header.notificationsAria")} onClick={() => setPage(role === "system_admin" ? "admin-notifications" : "home")}><Icon name="bell" size={18} /><span className="badge"></span></button>
+        <button className="theme-toggle" onClick={() => setTheme(theme === "day" ? "night" : "day")} aria-label={t("header.themeToggleAria")} title={t("header.themeToggleTitle")}>
           <span className="tt-thumb"></span>
           <span className={"tt-ic" + (theme === "night" ? " on" : "")}><Icon name="moon" size={15} /></span>
           <span className={"tt-ic" + (theme === "day" ? " on" : "")}><Icon name="sun" size={15} /></span>
         </button>
         <div className="profile-menu-wrap" ref={profileRef}>
-          <button className="avatar avatar-btn" onClick={() => setProfileOpen((v) => !v)} aria-label="Profilo" aria-expanded={profileOpen}>
+          <button className="avatar avatar-btn" onClick={() => setProfileOpen((v) => !v)} aria-label={t("header.profileAria")} aria-expanded={profileOpen}>
             {user?.avatar || "O"}
           </button>
           {profileOpen && (
@@ -108,19 +110,19 @@ export function Header({ page, setPage, theme, setTheme, user }: any) {
               <div className="profile-menu-head">
                 <div className="profile-menu-av">{user?.avatar || "O"}</div>
                 <div>
-                  <div className="profile-menu-name">{user?.name || "Ospite"}</div>
-                  <div className="profile-menu-email">{role === "anonymous" ? "Accesso ospite" : user?.email}</div>
+                  <div className="profile-menu-name">{role === "anonymous" ? t("header.guest") : (user?.name || t("header.guest"))}</div>
+                  <div className="profile-menu-email">{role === "anonymous" ? t("header.guestAccess") : user?.email}</div>
                 </div>
               </div>
               {role === "anonymous" ? (
-                <button className="profile-menu-item primary" onClick={() => go("login")}><Icon name="logIn" size={15} />Accedi</button>
+                <button className="profile-menu-item primary" onClick={() => go("login")}><Icon name="logIn" size={15} />{t("header.login")}</button>
               ) : (
                 <>
-                  <button className="profile-menu-item" onClick={() => go("profilo")}><Icon name="user" size={15} />Profilo</button>
-                  <button className="profile-menu-item" onClick={() => go("attivita")}><Icon name="activity" size={15} />Le mie attivita</button>
-                  <button className="profile-menu-item" onClick={() => go("profilo")}><Icon name="bookmark" size={15} />Salvati</button>
-                  <button className="profile-menu-item" onClick={() => go("impostazioni")}><Icon name="settings" size={15} />Impostazioni</button>
-                  <button className="profile-menu-item danger" onClick={handleLogout}><Icon name="logOut" size={15} />Logout</button>
+                  <button className="profile-menu-item" onClick={() => go("profilo")}><Icon name="user" size={15} />{t("header.profile")}</button>
+                  <button className="profile-menu-item" onClick={() => go("attivita")}><Icon name="activity" size={15} />{t("header.myActivities")}</button>
+                  <button className="profile-menu-item" onClick={() => go("profilo")}><Icon name="bookmark" size={15} />{t("header.saved")}</button>
+                  <button className="profile-menu-item" onClick={() => go("impostazioni")}><Icon name="settings" size={15} />{t("header.settings")}</button>
+                  <button className="profile-menu-item danger" onClick={handleLogout}><Icon name="logOut" size={15} />{t("header.logout")}</button>
                 </>
               )}
             </div>

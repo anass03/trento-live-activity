@@ -1,8 +1,11 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "../components/ui/Icon";
+import { SocialLoginButtons, needsOnboardingAfterOauth } from "../components/auth/LoginModal";
 import { login } from "../lib/api";
 
 export function LoginPage({ page, setPage }: any) {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [otpToken, setOtpToken] = useState("");
@@ -13,11 +16,11 @@ export function LoginPage({ page, setPage }: any) {
   const handleLogin = async (e: any) => {
     e.preventDefault();
     if (!email || !password) {
-      setError("Inserisci sia l'email che la password.");
+      setError(t("auth.errors.missingCredentials"));
       return;
     }
     if (showOtp && !otpToken) {
-      setError("Inserisci il codice 2FA.");
+      setError(t("auth.errors.missingOtp"));
       return;
     }
     setError("");
@@ -32,13 +35,21 @@ export function LoginPage({ page, setPage }: any) {
     } catch (err: any) {
       if (err.code === "2FA_REQUIRED") {
         setShowOtp(true);
-        setError("Inserisci il codice di verifica 2FA.");
+        setError(t("auth.errors.otpRequired"));
       } else {
-        setError(err.message || "Errore durante l'accesso.");
+        setError(err.message || t("auth.errors.generic"));
       }
     } finally {
       setLoading(false);
     }
+  };
+
+  // Successo Google: token già salvato da oauthGoogleLogin. Se il cittadino
+  // non ha completato l'onboarding, manda all'onboarding interessi.
+  const handleSocialLoggedIn = async () => {
+    window.dispatchEvent(new CustomEvent("tla:user-updated"));
+    const needsOnboarding = await needsOnboardingAfterOauth();
+    setPage(needsOnboarding ? "onboarding" : "home");
   };
 
   return (
@@ -52,8 +63,8 @@ export function LoginPage({ page, setPage }: any) {
               <path d="M15 12H3" stroke="var(--cyan)" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </div>
-          <h2>Accedi</h2>
-          <p>Inserisci le tue credenziali per accedere a Trento Live Activity</p>
+          <h2>{t("auth.title")}</h2>
+          <p>{t("auth.pageSubtitle")}</p>
         </div>
 
         {error && (
@@ -64,13 +75,13 @@ export function LoginPage({ page, setPage }: any) {
 
         <form onSubmit={handleLogin}>
           <div className="revamp-form-group">
-            <label className="revamp-form-label">Email</label>
+            <label className="revamp-form-label">{t("auth.email")}</label>
             <div className="revamp-form-input-wrap">
               <Icon name="mail" size={16} />
               <input
                 type="email"
                 className="revamp-form-input"
-                placeholder="nome@esempio.com"
+                placeholder={t("auth.emailPlaceholder")}
                 value={email}
                 disabled={loading || showOtp}
                 onChange={(e) => setEmail(e.target.value)}
@@ -79,7 +90,7 @@ export function LoginPage({ page, setPage }: any) {
           </div>
 
           <div className="revamp-form-group">
-            <label className="revamp-form-label">Password</label>
+            <label className="revamp-form-label">{t("auth.password")}</label>
             <div className="revamp-form-input-wrap">
               <Icon name="key" size={16} />
               <input
@@ -95,7 +106,7 @@ export function LoginPage({ page, setPage }: any) {
 
           {showOtp && (
             <div className="revamp-form-group anim-in">
-              <label className="revamp-form-label">Codice 2FA (o Codice di Recupero)</label>
+              <label className="revamp-form-label">{t("auth.otpLabelLong")}</label>
               <div className="revamp-form-input-wrap" style={{ borderColor: "var(--cyan)" }}>
                 <Icon name="shieldCheck" size={16} />
                 <input
@@ -112,23 +123,25 @@ export function LoginPage({ page, setPage }: any) {
 
           <div className="revamp-form-row">
             <label className="revamp-checkbox-label">
-              <input type="checkbox" /> Ricordami
+              <input type="checkbox" /> {t("auth.rememberMe")}
             </label>
             <button type="button" className="revamp-form-link" style={{ background: "none", border: "none", padding: 0 }} onClick={() => setPage("password-reset")}>
-              Password dimenticata?
+              {t("auth.forgotPassword")}
             </button>
           </div>
 
           <button type="submit" className="revamp-form-btn" style={{ "--accent": "var(--cyan)" } as React.CSSProperties} disabled={loading}>
-            {loading ? "Caricamento..." : "Accedi"}{" "}
+            {loading ? t("auth.loading") : t("auth.submit")}{" "}
             {!loading && <Icon name="arrow" size={16} style={{ transform: "rotate(-45deg)" }} />}
           </button>
         </form>
 
+        <SocialLoginButtons onError={setError} onLoggedIn={handleSocialLoggedIn} busy={loading} />
+
         <div className="revamp-form-foot">
-          Non hai un account?{" "}
+          {t("auth.noAccount")}{" "}
           <button className="revamp-form-link" style={{ background: "none", border: "none", padding: 0 }} onClick={() => setPage("registrazione")}>
-            Registrati ora
+            {t("auth.registerNow")}
           </button>
         </div>
       </div>

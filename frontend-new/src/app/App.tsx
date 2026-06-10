@@ -2,6 +2,7 @@
    Trento Live Activity — App
    =========================================================== */
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Header } from "../components/layout/Header";
 import { TrentoMap } from "../components/map/TrentoMap";
 import { ActiveAreasWidget, AlertsWidget, EventsWidget, MapLabels, MarkersLayer, ParkingWidget, WeatherWidget } from "../components/redesign/widgets";
@@ -9,6 +10,8 @@ import { TrentoTweaks } from "../components/redesign/TrentoTweaks";
 import { LoginModal } from "../components/auth/LoginModal";
 import { Icon } from "../components/ui/Icon";
 import { DetailModal } from "../components/ui/DetailModal";
+import { Toaster, showToast } from "../components/ui/Toaster";
+import { onForegroundMessage } from "../lib/firebase";
 import { CATEGORIES, MARKERS, catColor } from "../data/redesignData";
 import { ActivityPage } from "../pages/ActivitiesPage";
 import { EventsPage } from "../pages/EventsPage";
@@ -69,14 +72,19 @@ function distanceKm(aLat?: number | null, aLng?: number | null, bLat?: number | 
   return 2 * R * Math.asin(Math.sqrt(s1 + s2));
 }
 
+// Restituisce la chiave i18n dell'etichetta (tradotta poi con t() nel componente).
 function areaLabel(score: number) {
-  if (score >= 0.78) return { label: "Molto attiva", color: "var(--magenta)" };
-  if (score >= 0.55) return { label: "Attiva", color: "var(--orange)" };
-  if (score >= 0.36) return { label: "Moderata", color: "var(--amber)" };
-  return { label: "Tranquilla", color: "var(--teal)" };
+  if (score >= 0.78) return { labelKey: "home.area.veryActive", color: "var(--magenta)" };
+  if (score >= 0.55) return { labelKey: "home.area.active", color: "var(--orange)" };
+  if (score >= 0.36) return { labelKey: "home.area.moderate", color: "var(--amber)" };
+  return { labelKey: "home.area.quiet", color: "var(--teal)" };
 }
 
+// Locale per date/orari formattati: segue la lingua corrente di i18n.
+const dateLocale = (lang?: string) => (lang?.startsWith("en") ? "en-GB" : "it-IT");
+
 function FilterBar({ active, setActive, markers }: any) {
+  const { t } = useTranslation();
   const displayMarkers = markers || MARKERS;
   const count = (id: string) => (id === "all" ? displayMarkers.length : displayMarkers.filter((m: any) => m.cat === id).length);
   return (
@@ -87,7 +95,7 @@ function FilterBar({ active, setActive, markers }: any) {
           style={{ "--fc": c.color }}
           onClick={() => setActive(c.id)}>
           <Icon name={c.icon} size={16} />
-          {c.label}
+          {t(c.labelKey)}
           <span className="cnt">{count(c.id)}</span>
         </button>
       ))}
@@ -96,28 +104,31 @@ function FilterBar({ active, setActive, markers }: any) {
 }
 
 function MapControls({ zoom, setZoom, is3d, setIs3d, onLocate, onReset }: any) {
+  const { t } = useTranslation();
   return (
     <div className="map-controls">
       <button className={"mc-btn" + (is3d ? " on" : "")} onClick={() => setIs3d(!is3d)}><Icon name="cube" size={17} />3D</button>
-      <button className="mc-btn" onClick={onLocate}><Icon name="locate" size={17} />Posizione</button>
+      <button className="mc-btn" onClick={onLocate}><Icon name="locate" size={17} />{t("home.locate")}</button>
       <div className="mc-div"></div>
       <button className="mc-btn" onClick={() => setZoom((z: number) => Math.max(11, +(z - 0.5).toFixed(2)))}><Icon name="minus" size={17} /></button>
       <div className="mc-btn" style={{ fontFamily: "var(--mono)", fontSize: 12, minWidth: 50, pointerEvents: "none" }}>{Math.round(zoom * 10)}%</div>
       <button className="mc-btn" onClick={() => setZoom((z: number) => Math.min(19, +(z + 0.5).toFixed(2)))}><Icon name="plus" size={17} /></button>
       <div className="mc-div"></div>
-      <button className="mc-btn" onClick={onReset}><Icon name="layers" size={17} />Reset</button>
+      <button className="mc-btn" onClick={onReset}><Icon name="layers" size={17} />{t("home.reset")}</button>
     </div>
   );
 }
 
 function Clock() {
+  const { i18n } = useTranslation();
   const [now, setNow] = useState(new Date());
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
   }, []);
-  const time = now.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-  const date = now.toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" });
+  const locale = dateLocale(i18n.language);
+  const time = now.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const date = now.toLocaleDateString(locale, { weekday: "short", day: "numeric", month: "short" });
   return (
     <div className="clock-pill">
       <span className="led live green"></span>
@@ -128,6 +139,7 @@ function Clock() {
 }
 
 function HomeScene({ page, setPage, theme, setTheme, user }: any) {
+  const { t, i18n } = useTranslation();
   const [active, setActive] = useState("all");
   const [zoom, setZoom] = useState(14.2);
   const locateRef = React.useRef<(() => void) | null>(null);
@@ -269,7 +281,7 @@ function HomeScene({ page, setPage, theme, setTheme, user }: any) {
         name: p.nome || p.title,
         cat: p.tipo || "outdoor",
         level,
-        label: label.label,
+        label: t(label.labelKey),
         color: label.color,
         status,
         eventsNearby: nearbyEvents.length,
@@ -282,7 +294,7 @@ function HomeScene({ page, setPage, theme, setTheme, user }: any) {
     });
     const sorted = rows.sort((a: any, b: any) => b.level - a.level);
     return sorted.slice(0, 8);
-  }, [mapData]);
+  }, [mapData, t, i18n.language]);
 
   const focusOn = (xPct: number, yPct: number) => {
     // pan so the point moves toward center; clamp gently

@@ -1,0 +1,196 @@
+{
+  "common": {
+    "close": "Chiudi",
+    "notAvailable": "Non disponibile",
+    "na": "N/D",
+    "today": "Oggi",
+    "source": "Fonte"
+  },
+  "header": {
+    "brandSub": "Smart City · Tempo reale",
+    "nav": {
+      "home": "Home",
+      "map": "Mappa",
+      "events": "Eventi",
+      "activities": "Attività",
+      "settings": "Impostazioni",
+      "comuneDashboard": "Pannello Comune",
+      "stats": "Statistiche",
+      "export": "Export",
+      "users": "Utenti",
+      "poi": "POI",
+      "entities": "Enti",
+      "moderation": "Moderazione",
+      "notifications": "Notifiche",
+      "publish": "Pubblica"
+    },
+    "searchPlaceholder": "Cerca luoghi, eventi…",
+    "notificationsAria": "Notifiche",
+    "themeToggleAria": "Cambia tema",
+    "themeToggleTitle": "Giorno / Notte",
+    "profileAria": "Profilo",
+    "guest": "Ospite",
+    "guestAccess": "Accesso ospite",
+    "login": "Accedi",
+    "profile": "Profilo",
+    "myActivities": "Le mie attività",
+    "saved": "Salvati",
+    "settings": "Impostazioni",
+    "logout": "Logout"
+  },
+  "home": {
+    "locate": "Posizione",
+    "reset": "Reset",
+    "timeTBD": "Orario da definire",
+    "dateTBD": "Data da definire",
+    "placeTBC": "Luogo da confermare",
+    "area": {
+      "veryActive": "Molto attiva",
+      "active": "Attiva",
+      "moderate": "Moderata",
+      "quiet": "Tranquilla"
+    }
+  },
+  "widgets": {
+    "weather": {
+      "title": "Meteo",
+      "modalTitle": "Meteo a Trento",
+      "unavailable": "Non disponibile",
+      "condUnavailable": "Meteo temporaneamente non disponibile",
+      "emptyHourly": "Meteo temporaneamente non disponibile.",
+      "maxMin": "Max / Min",
+      "rain": "Pioggia",
+      "wind": "Vento"
+    },
+    "alerts": {
+      "title": "Avvisi città",
+      "active": "{{count}} attivi",
+      "empty": "Avvisi città temporaneamente non disponibili.",
+      "seeAll": "Vedi tutti gli avvisi ({{count}})",
+      "tagUrgent": "Urgente",
+      "tagMedium": "Medio",
+      "tagInfo": "Info"
+    },
+    "parking": {
+      "title": "Parcheggi",
+      "modalTitle": "Parcheggi Trento",
+      "cacheLive": "Cache live",
+      "unavailable": "Non disponibile",
+      "occupied": "Occupato",
+      "avgOccupancy": "Occupazione media",
+      "scopeCar": "aree auto",
+      "scopeBike": "aree bici",
+      "scopeBoth": "aree auto e bici",
+      "monitored": "{{count}} {{scope}} monitorate in tempo reale nel centro di Trento.",
+      "empty": "Dati parcheggi momentaneamente non disponibili.",
+      "emptyFilter": "Nessun parcheggio per il filtro selezionato.",
+      "cars": "Auto",
+      "bikes": "Bici"
+    },
+    "areas": {
+      "title": "Aree più attive",
+      "live": "Live",
+      "none": "Nessuna",
+      "empty": "Nessuna area monitorata disponibile."
+    },
+    "events": {
+      "title": "Prossimi eventi",
+      "today": "{{count}} oggi",
+      "empty": "Nessun evento disponibile al momento."
+    },
+    "popup": {
+      "place": "Luogo",
+      "when": "Quando",
+      "participants": "Partecipanti",
+      "join": "Partecipa",
+      "close": "Chiudi"
+    }
+  },
+  "detail": {
+    "closeAria": "Chiudi",
+    "noLocation": "Nessuna posizione precisa disponibile",
+    "parking": {
+      "empty": "Dati parcheggi momentaneamente non disponibili.",
+      "occupied": "occupato",
+      "statusFull": "Pieno",
+      "statusAlmostFull": "Quasi pieno",
+      "statusModerate": "Moderato",
+      "statusAvailable": "Disponibile",
+      "typeCar": "Auto",
+      "typeBike": "Bici",
+      "typeFallback": "Parcheggio",
+      "area": "Area",
+      "freeSpots": "Posti liberi",
+      "type": "Tipo",
+      "updated": "Aggiornato",
+      "defaultSource": "Comune di Trento",
+      "defaultArea": "Trento"
+    },
+    "areas": {
+      "empty": "Nessuna area monitorata disponibile.",
+      "rowMeta": "{{events}} eventi · {{participants}} partecipanti"
+    },
+    "weather": {
+      "unavailable": "Meteo non disponibile",
+      "humidity": "Umidità",
+      "wind": "Vento",
+      "cover": "Copertura",
+      "reading": "Rilevazione",
+      "nextHours": "Prossime ore",
+      "rainPct": "{{pct}}% pioggia",
+      "emptyHourly": "Previsione oraria non disponibile.",
+      "days": "Giorni",
+      "emptyDaily": "Previsione giornaliera non disponibile."
+    },
+    "alerts": {
+      "empty": "Nessun avviso città disponibile.",
+      "loadingDetail": "Dettaglio in caricamento...",
+      "severity": "Severità",
+      "category": "Categoria",
+      "published": "Pubblicato",
+      "updated": "Aggiornato",
+      "showOnMap": "Mostra sulla mappa"
+    },
+    "area": {
+      "noActivity": "Attività non disponibile",
+      "scoreHint": "Indice basato su affollamento POI, eventi vicini, partecipanti e stato in tempo reale.",
+      "area": "Area",
+      "nearbyEvents": "Eventi vicini",
+      "estParticipants": "Partecipanti stimati",
+      "poiStatus": "Stato POI",
+      "rankNote": "Le zone tranquille vengono ordinate sotto le aree con attività reale, così una zona poco movimentata non può guidare la classifica quando sono presenti eventi o affollamento altrove."
+    },
+    "event": {
+      "place": "Luogo",
+      "when": "Quando",
+      "participants": "Partecipanti",
+      "category": "Categoria",
+      "fallbackDesc": "Scheda evento con informazioni principali, provenienza mappa e azioni rapide.",
+      "open": "Apri in Eventi"
+    },
+    "activity": {
+      "place": "Luogo",
+      "duration": "Durata",
+      "rating": "Valutazione",
+      "participants": "Partecipanti",
+      "fallbackDesc": "Dettaglio attività con dati utili per decidere se partecipare.",
+      "open": "Apri attività"
+    },
+    "generic": {
+      "empty": "Nessun dato disponibile."
+    }
+  },
+  "categories": {
+    "all": "Tutti",
+    "cultura": "Cultura",
+    "musica": "Musica",
+    "sport": "Sport",
+    "cibo": "Cibo & Drink",
+    "outdoor": "Outdoor",
+    "famiglia": "Famiglia"
+  },
+  "toast": {
+    "closeAria": "Chiudi notifica",
+    "pushFallbackTitle": "Notifica"
+  }
+}

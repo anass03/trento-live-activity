@@ -1,0 +1,132 @@
+import { useState, type FormEvent } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { ApiError, login } from '../lib/api';
+import { PasswordInput } from '../components/ui/PasswordInput';
+import { SocialButtons } from '../components/auth/SocialButtons';
+import { SpidModal } from '../components/auth/SpidModal';
+
+type CodeMode = 'totp' | 'recovery';
+
+export function LoginPage() {
+  const navigate = useNavigate();
+  const { t } = useTranslation();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [otpToken, setOtpToken] = useState('');
+  const [codeMode, setCodeMode] = useState<CodeMode>('totp');
+  const [needs2fa, setNeeds2fa] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [spidOpen, setSpidOpen] = useState(false);
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
+    setIsLoading(true);
+    try {
+      const codeToSend = otpToken || undefined;
+      const result = await login(email, password, codeToSend);
+      if (result.needs2faSetup) {
+        navigate('/setup-2fa');
+        return;
+      }
+      if (result.recoveryUsed) {
+        const remaining = result.recoveryCodesRemaining ?? 0;
+        window.alert(t('auth.usedRecoveryCode', { remaining }));
+      }
+      navigate('/');
+      window.location.reload();
+    } catch (e) {
+      if (e instanceof ApiError && e.code === '2FA_REQUIRED') {
+        setNeeds2fa(true);
+        setError(t('auth.need2fa'));
+      } else if (e instanceof ApiError && e.code === 'EMAIL_NOT_VERIFIED') {
+        setError(t('auth.emailNotVerified'));
+      } else {
+        setError(e instanceof Error ? e.message : t('auth.loginError'));
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  function toggleMode() {
+    setCodeMode((m) => (m === 'totp' ? 'recovery' : 'totp'));
+    setOtpToken('');
+    setError(null);
+  }
+
+  return (
+    <section className="auth-page">
+      <form className="auth-form liquid-card" onSubmit={handleSubmit}>
+        <h1>{t('auth.login')}</h1>
+        <p>{t('auth.loginSubtitle')}</p>
+
+        <SocialButtons showSpid onSpidClick={() => setSpidOpen(true)} />
+
+        <div className="social-divider">{t('auth.withEmail')}</div>
+
+        <label>
+          <span>{t('auth.email')}</span>
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+        </label>
+        <label>
+          <span>{t('auth.password')}</span>
+          <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
+        </label>
+
+        {needs2fa && codeMode === 'totp' && (
+          <label>
+            <span>{t('auth.code2fa')}</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]{6}"
+              value={otpToken}
+              onChange={(e) => setOtpToken(e.target.value.replace(/\D/g, ''))}
+              maxLength={6}
+              placeholder="000000"
+              required
+              autoFocus
+            />
+          </label>
+        )}
+
+        {needs2fa && codeMode === 'recovery' && (
+          <label>
+            <span>{t('auth.recoveryCode')}</span>
+            <input
+              type="text"
+              value={otpToken}
+              onChange={(e) => setOtpToken(e.target.value.toUpperCase())}
+              maxLength={9}
+              placeholder="XXXX-XXXX"
+              required
+              autoFocus
+            />
+            <small>{t('auth.recoveryCodeHint')}</small>
+          </label>
+        )}
+
+        {needs2fa && (
+          <button type="button" className="link-button" onClick={toggleMode}>
+            {codeMode === 'totp' ? t('auth.lostAuthenticator') : t('auth.backToAuthenticator')}
+          </button>
+        )}
+
+        {error && <div className="form-error">{error}</div>}
+
+        <button className="primary-button" type="submit" disabled={isLoading}>
+          {isLoading ? t('auth.logging') : t('auth.loginAction')}
+        </button>
+
+        <div className="auth-links">
+          <Link to="/password-reset">{t('auth.forgotPassword')}</Link>
+          <Link to="/registrazione">{t('auth.noAccount')}</Link>
+        </div>
+      </form>
+      <SpidModal open={spidOpen} onClose={() => setSpidOpen(false)} />
+    </section>
+  );
+}

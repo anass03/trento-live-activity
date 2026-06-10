@@ -2,6 +2,8 @@
    Trento Live Activity — data
    Shared data module
    =========================================================== */
+import i18n from "../lib/i18n";
+
 // category color tokens (match styles.css)
 export const C = {
     cyan: "#38bdf8", teal: "#2dd4bf", violet: "#a78bfa",
@@ -9,14 +11,17 @@ export const C = {
     orange: "#fb923c", red: "#f87171",
 };
 
+// Le etichette sono chiavi i18n ("categories.*" in locales/{it,en}/common.json):
+// i componenti React le traducono con t(c.labelKey); per i moduli non-React
+// resta catLabel(), che traduce al volo con la lingua corrente.
 export const CATEGORIES: any[] = [
-    { id: "all",      label: "Tutti",        color: C.cyan,    icon: "grid" },
-    { id: "cultura",  label: "Cultura",      color: C.violet,  icon: "landmark" },
-    { id: "musica",   label: "Musica",       color: C.magenta, icon: "music" },
-    { id: "sport",    label: "Sport",        color: C.green,   icon: "run" },
-    { id: "cibo",     label: "Cibo & Drink", color: C.amber,   icon: "food" },
-    { id: "outdoor",  label: "Outdoor",      color: C.teal,    icon: "bike" },
-    { id: "famiglia", label: "Famiglia",     color: C.cyan,    icon: "family" },
+    { id: "all",      labelKey: "categories.all",      color: C.cyan,    icon: "grid" },
+    { id: "cultura",  labelKey: "categories.cultura",  color: C.violet,  icon: "landmark" },
+    { id: "musica",   labelKey: "categories.musica",   color: C.magenta, icon: "music" },
+    { id: "sport",    labelKey: "categories.sport",    color: C.green,   icon: "run" },
+    { id: "cibo",     labelKey: "categories.cibo",     color: C.amber,   icon: "food" },
+    { id: "outdoor",  labelKey: "categories.outdoor",  color: C.teal,    icon: "bike" },
+    { id: "famiglia", labelKey: "categories.famiglia", color: C.cyan,    icon: "family" },
 ];
 export const CAT_ICON: Record<string, string> = {
     musica: "music",
@@ -27,7 +32,12 @@ export const CAT_ICON: Record<string, string> = {
     famiglia: "family",
 };
 export const catColor = (id: string) => (CATEGORIES.find((c) => c.id === id) || {}).color || C.cyan;
-export const catLabel = (id: string) => (CATEGORIES.find((c) => c.id === id) || {}).label || "";
+export const catLabelKey = (id: string) => (CATEGORIES.find((c) => c.id === id) || {}).labelKey || "";
+// Traduzione runtime nella lingua corrente (per codice non-React, es. popup mappa).
+export const catLabel = (id: string) => {
+    const key = catLabelKey(id);
+    return key ? i18n.t(key) : "";
+};
 
 export const MARKERS: any[] = [];
 

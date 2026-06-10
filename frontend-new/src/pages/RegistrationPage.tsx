@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "../components/ui/Icon";
 import { register, registerEntity } from "../lib/api";
 
 export function RegistrationPage({ page, setPage }: any) {
+  const { t } = useTranslation();
   const [isEntity, setIsEntity] = useState(false);
   
   // standard user fields
@@ -31,19 +33,19 @@ export function RegistrationPage({ page, setPage }: any) {
     setSuccessMsg("");
 
     if (!email || !password || !confirmPassword) {
-      setError("Inserisci i dati obbligatori (Email e Password).");
+      setError(t("register.errors.missingRequired"));
       return;
     }
     if (password !== confirmPassword) {
-      setError("Le password inserite non coincidono.");
+      setError(t("register.errors.passwordMismatch"));
       return;
     }
     if (password.length < 8) {
-      setError("La password deve essere di almeno 8 caratteri.");
+      setError(t("register.errors.passwordLength"));
       return;
     }
     if (!acceptConsents) {
-      setError("Devi accettare la Privacy Policy e i Termini di Servizio.");
+      setError(t("register.errors.consentsRequired"));
       return;
     }
 
@@ -51,7 +53,7 @@ export function RegistrationPage({ page, setPage }: any) {
     try {
       if (isEntity) {
         if (!nomeEnte || !pec) {
-          setError("Inserisci il nome dell'ente e la PEC.");
+          setError(t("register.errors.missingEntityFields"));
           setLoading(false);
           return;
         }
@@ -67,10 +69,10 @@ export function RegistrationPage({ page, setPage }: any) {
             analytics: false,
           }
         });
-        setSuccessMsg("Richiesta di registrazione inviata! Il Comune deve approvare la tua richiesta.");
+        setSuccessMsg(t("register.entitySuccess"));
       } else {
         if (!nome || !cognome || !codiceFiscale) {
-          setError("Inserisci nome, cognome e codice fiscale.");
+          setError(t("register.errors.missingCitizenFields"));
           setLoading(false);
           return;
         }
@@ -95,7 +97,7 @@ export function RegistrationPage({ page, setPage }: any) {
         }
       }
     } catch (err: any) {
-      setError(err.message || "Errore durante la registrazione.");
+      setError(err.message || t("register.errors.generic"));
     } finally {
       setLoading(false);
     }
@@ -113,8 +115,8 @@ export function RegistrationPage({ page, setPage }: any) {
               <line x1="23" y1="11" x2="17" y2="11" stroke="var(--violet)" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </div>
-          <h2>Registrati</h2>
-          <p>Crea un account per accedere a Trento Live Activity</p>
+          <h2>{t("register.title")}</h2>
+          <p>{t("register.subtitle")}</p>
         </div>
 
         {error && (
@@ -126,7 +128,7 @@ export function RegistrationPage({ page, setPage }: any) {
         {successMsg && (
           <div className="revamp-status-pill success" style={{ width: "100%", marginBottom: 16, justifyContent: "center", display: "flex", flexDirection: "column", gap: 10 }}>
             <div><Icon name="check" size={12} /> {successMsg}</div>
-            <button className="revamp-form-link" style={{ background: "none", border: "none", color: "white", textDecoration: "underline" }} onClick={() => setPage("login")}>Torna al Login</button>
+            <button className="revamp-form-link" style={{ background: "none", border: "none", color: "white", textDecoration: "underline" }} onClick={() => setPage("login")}>{t("register.backToLogin")}</button>
           </div>
         )}
 
@@ -142,20 +144,20 @@ export function RegistrationPage({ page, setPage }: any) {
                     setError("");
                   }}
                 />
-                Registrati come Ente Certificato
+                {t("register.asEntity")}
               </label>
             </div>
 
             {isEntity ? (
               <>
                 <div className="revamp-form-group">
-                  <label className="revamp-form-label">Nome Ente</label>
+                  <label className="revamp-form-label">{t("register.entityName")}</label>
                   <div className="revamp-form-input-wrap">
                     <Icon name="users" size={16} />
                     <input
                       type="text"
                       className="revamp-form-input"
-                      placeholder="Associazione Outdoor Trento"
+                      placeholder={t("register.entityNamePlaceholder")}
                       value={nomeEnte}
                       onChange={(e) => setNomeEnte(e.target.value)}
                     />
@@ -163,13 +165,13 @@ export function RegistrationPage({ page, setPage }: any) {
                 </div>
 
                 <div className="revamp-form-group">
-                  <label className="revamp-form-label">PEC (Posta Elettronica Certificata)</label>
+                  <label className="revamp-form-label">{t("register.pec")}</label>
                   <div className="revamp-form-input-wrap">
                     <Icon name="mail" size={16} />
                     <input
                       type="email"
                       className="revamp-form-input"
-                      placeholder="ente@pec.it"
+                      placeholder={t("register.pecPlaceholder")}
                       value={pec}
                       onChange={(e) => setPec(e.target.value)}
                     />
@@ -180,12 +182,12 @@ export function RegistrationPage({ page, setPage }: any) {
               <>
                 <div style={{ display: "flex", gap: "12px" }}>
                   <div className="revamp-form-group" style={{ flex: 1 }}>
-                    <label className="revamp-form-label">Nome</label>
+                    <label className="revamp-form-label">{t("register.firstName")}</label>
                     <div className="revamp-form-input-wrap">
                       <input
                         type="text"
                         className="revamp-form-input"
-                        placeholder="Mario"
+                        placeholder={t("register.firstNamePlaceholder")}
                         value={nome}
                         onChange={(e) => setNome(e.target.value)}
                       />
@@ -193,12 +195,12 @@ export function RegistrationPage({ page, setPage }: any) {
                   </div>
 
                   <div className="revamp-form-group" style={{ flex: 1 }}>
-                    <label className="revamp-form-label">Cognome</label>
+                    <label className="revamp-form-label">{t("register.lastName")}</label>
                     <div className="revamp-form-input-wrap">
                       <input
                         type="text"
                         className="revamp-form-input"
-                        placeholder="Rossi"
+                        placeholder={t("register.lastNamePlaceholder")}
                         value={cognome}
                         onChange={(e) => setCognome(e.target.value)}
                       />
@@ -207,7 +209,7 @@ export function RegistrationPage({ page, setPage }: any) {
                 </div>
 
                 <div className="revamp-form-group">
-                  <label className="revamp-form-label">Codice Fiscale</label>
+                  <label className="revamp-form-label">{t("register.fiscalCode")}</label>
                   <div className="revamp-form-input-wrap">
                     <Icon name="shieldCheck" size={16} />
                     <input
@@ -221,7 +223,7 @@ export function RegistrationPage({ page, setPage }: any) {
                 </div>
 
                 <div className="revamp-form-group">
-                  <label className="revamp-form-label">Data di Nascita</label>
+                  <label className="revamp-form-label">{t("register.birthDate")}</label>
                   <div className="revamp-form-input-wrap">
                     <input
                       type="date"
@@ -235,13 +237,13 @@ export function RegistrationPage({ page, setPage }: any) {
             )}
 
             <div className="revamp-form-group">
-              <label className="revamp-form-label">Email dell'account</label>
+              <label className="revamp-form-label">{t("register.accountEmail")}</label>
               <div className="revamp-form-input-wrap">
                 <Icon name="mail" size={16} />
                 <input
                   type="email"
                   className="revamp-form-input"
-                  placeholder="mario.rossi@esempio.com"
+                  placeholder={t("register.accountEmailPlaceholder")}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
@@ -250,7 +252,7 @@ export function RegistrationPage({ page, setPage }: any) {
 
             <div style={{ display: "flex", gap: "12px" }}>
               <div className="revamp-form-group" style={{ flex: 1 }}>
-                <label className="revamp-form-label">Password</label>
+                <label className="revamp-form-label">{t("register.password")}</label>
                 <div className="revamp-form-input-wrap">
                   <Icon name="key" size={16} />
                   <input
@@ -264,7 +266,7 @@ export function RegistrationPage({ page, setPage }: any) {
               </div>
 
               <div className="revamp-form-group" style={{ flex: 1 }}>
-                <label className="revamp-form-label">Conferma</label>
+                <label className="revamp-form-label">{t("register.confirmPassword")}</label>
                 <div className="revamp-form-input-wrap">
                   <input
                     type="password"
@@ -284,21 +286,21 @@ export function RegistrationPage({ page, setPage }: any) {
                   checked={acceptConsents}
                   onChange={(e) => setAcceptConsents(e.target.checked)}
                 />
-                Accetto la <button type="button" className="revamp-form-link" style={{ background: "none", border: "none", padding: 0 }} onClick={() => setPage("privacy")}>Privacy Policy</button> e i <button type="button" className="revamp-form-link" style={{ background: "none", border: "none", padding: 0 }} onClick={() => setPage("termini")}>Termini di Servizio</button>
+                {t("register.acceptThe")} <button type="button" className="revamp-form-link" style={{ background: "none", border: "none", padding: 0 }} onClick={() => setPage("privacy")}>{t("register.privacyPolicy")}</button> {t("register.andThe")} <button type="button" className="revamp-form-link" style={{ background: "none", border: "none", padding: 0 }} onClick={() => setPage("termini")}>{t("register.terms")}</button>
               </label>
             </div>
 
             <button type="submit" className="revamp-form-btn" style={{ "--accent": "var(--violet)" } as React.CSSProperties} disabled={loading}>
-              {loading ? "Registrazione in corso..." : "Crea account"}{" "}
+              {loading ? t("register.submitting") : t("register.submit")}{" "}
               {!loading && <Icon name="arrow" size={16} style={{ transform: "rotate(-45deg)" }} />}
             </button>
           </form>
         )}
 
         <div className="revamp-form-foot">
-          Hai già un account?{" "}
+          {t("register.haveAccount")}{" "}
           <button className="revamp-form-link" style={{ background: "none", border: "none", padding: 0 }} onClick={() => setPage("login")}>
-            Accedi
+            {t("register.login")}
           </button>
         </div>
       </div>

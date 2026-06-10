@@ -2,6 +2,7 @@
    Trento Live Activity — IMPOSTAZIONI page
    =========================================================== */
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
 import {
@@ -14,8 +15,15 @@ import {
   updateAccessibility,
   deleteAccount,
   logout as apiLogout,
-  UserSettings
+  registerDeviceToken,
+  unregisterDeviceToken,
+  sendTestPush,
+  updateConsent,
 } from "../lib/api";
+import { requestFcmToken, revokeFcmToken } from "../lib/firebase";
+import { setLanguage as setUiLanguage, currentLanguage } from "../lib/i18n";
+
+const FCM_TOKEN_KEY = "tla:fcmToken";
 
 /* ===================== CARD SHELL ===================== */
 function SetCard({ num, title, desc, icon, color, children, full }: any) {
@@ -68,10 +76,11 @@ function SetRadio({ options, value, onChange, disabled }: any) {
 
 /* ===================== THEME CARDS ===================== */
 function SetTheme({ value, onChange, disabled }: any) {
+  const { t } = useTranslation();
   const opts = [
-    { id: "light", label: "Chiaro",    cls: "tc-light" },
-    { id: "dark",  label: "Scuro",     cls: "tc-dark"  },
-    { id: "system",label: "Automatico",cls: "tc-auto"  },
+    { id: "light",  label: t("settings.appearance.themeLight"), cls: "tc-light" },
+    { id: "dark",   label: t("settings.appearance.themeDark"),  cls: "tc-dark"  },
+    { id: "system", label: t("settings.appearance.themeAuto"),  cls: "tc-auto"  },
   ];
   return (
     <div className="s-theme-cards">
@@ -88,19 +97,20 @@ function SetTheme({ value, onChange, disabled }: any) {
 
 /* ===================== INTEREST CHIPS ===================== */
 const SET_INTERESTS = [
-  { id: "outdoor",  label: "Outdoor",     icon: "bike",     color: "var(--teal)" },
-  { id: "cultura",  label: "Cultura",     icon: "landmark", color: "var(--violet)" },
-  { id: "musica",   label: "Musica",      icon: "music",    color: "var(--magenta)" },
-  { id: "food",     label: "Food & Drink",icon: "food",     color: "var(--amber)" },
-  { id: "sport",    label: "Sport",       icon: "run",      color: "var(--green)" },
+  { id: "outdoor",  icon: "bike",     color: "var(--teal)" },
+  { id: "cultura",  icon: "landmark", color: "var(--violet)" },
+  { id: "musica",   icon: "music",    color: "var(--magenta)" },
+  { id: "food",     icon: "food",     color: "var(--amber)" },
+  { id: "sport",    icon: "run",      color: "var(--green)" },
 ];
 function SetInterests({ value, onChange, disabled }: any) {
+  const { t } = useTranslation();
   const toggle = (id) => onChange(value.includes(id) ? value.filter((x) => x !== id) : [...value, id]);
   return (
     <div className="s-interests">
       {SET_INTERESTS.map((i) => (
         <button key={i.id} disabled={disabled} className={"s-int-chip" + (value.includes(i.id) ? " on" : "")} style={{ "--ic": i.color } as React.CSSProperties} onClick={() => toggle(i.id)}>
-          <Icon name={i.icon} size={14} />{i.label}
+          <Icon name={i.icon} size={14} />{t(`settings.interests.${i.id}`)}
         </button>
       ))}
     </div>
@@ -109,6 +119,7 @@ function SetInterests({ value, onChange, disabled }: any) {
 
 /* ===================== DELETE MODAL ===================== */
 function DeleteModal({ onCancel, onConfirm }: any) {
+  const { t } = useTranslation();
   const [pass, setPass] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -125,7 +136,7 @@ function DeleteModal({ onCancel, onConfirm }: any) {
     try {
       await onConfirm(pass);
     } catch (err: any) {
-      setError(err.message || "Errore durante la cancellazione.");
+      setError(err.message || t("settings.deleteModal.error"));
     } finally {
       setLoading(false);
     }
@@ -136,10 +147,10 @@ function DeleteModal({ onCancel, onConfirm }: any) {
       <div className="del-modal" onClick={(e) => e.stopPropagation()}>
         <div className="del-modal-head">
           <div className="del-ic"><Icon name="warn" size={22} /></div>
-          <h2>Eliminare l'account?</h2>
-          <p>Questa azione è irreversibile. Inserisci la tua password per confermare la rimozione definitiva di tutti i tuoi dati.</p>
+          <h2>{t("settings.deleteModal.title")}</h2>
+          <p>{t("settings.deleteModal.desc")}</p>
         </div>
-        
+
         {error && (
           <div className="revamp-status-pill danger" style={{ margin: "10px 0", justifyContent: "center" }}>
             {error}
@@ -147,7 +158,7 @@ function DeleteModal({ onCancel, onConfirm }: any) {
         )}
 
         <div className="revamp-form-group" style={{ margin: "16px 0", textAlign: "left" }}>
-          <label className="revamp-form-label">Password Corrente</label>
+          <label className="revamp-form-label">{t("settings.deleteModal.currentPassword")}</label>
           <div className="revamp-form-input-wrap">
             <Icon name="key" size={16} />
             <input
@@ -162,9 +173,9 @@ function DeleteModal({ onCancel, onConfirm }: any) {
         </div>
 
         <div className="del-modal-foot">
-          <button className="del-cancel" disabled={loading} onClick={onCancel}>Annulla</button>
+          <button className="del-cancel" disabled={loading} onClick={onCancel}>{t("settings.deleteModal.cancel")}</button>
           <button className="del-confirm" disabled={loading} onClick={handleDel}>
-            {loading ? "Rimozione..." : "Elimina account"}
+            {loading ? t("settings.deleteModal.deleting") : t("settings.deleteModal.confirm")}
           </button>
         </div>
       </div>
@@ -174,19 +185,22 @@ function DeleteModal({ onCancel, onConfirm }: any) {
 
 /* ===================== PAGE ===================== */
 export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, themeMode, setThemeMode }: any) {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [savingSection, setSavingSection] = useState<string | null>(null);
 
   /* appearance */
   const [visualEffects, setVisualEffects] = useState("full");
 
-  /* language & format */
-  const [language, setLanguage] = useState("it");
+  /* language & format — la lingua UI parte da quella attiva in i18n */
+  const [language, setLanguage] = useState<string>(() => currentLanguage());
   const [timeFormat, setTimeFormat] = useState("24h");
   const [distUnit, setDistUnit] = useState("km");
 
   /* notifications */
   const [notif, setNotif] = useState({ email: true, push: true, events: true, activities: true, cityAlerts: true });
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushMsg, setPushMsg] = useState<{ kind: "success" | "danger"; text: string } | null>(null);
 
   /* privacy */
   const [locationMode, setLocationMode] = useState("while_using");
@@ -220,7 +234,10 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
       try {
         const s = await getSettings();
         setVisualEffects(s.visualEffects || "full");
-        setLanguage(s.language || "it");
+        const lang = s.language || currentLanguage();
+        setLanguage(lang);
+        // Allinea la lingua reale della UI a quella salvata sul backend.
+        if (lang === "it" || lang === "en") setUiLanguage(lang);
         setTimeFormat(s.timeFormat || "24h");
         setDistUnit(s.distanceUnit || "km");
         setNotif({
@@ -283,7 +300,11 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
       timeFormat: key === "time" ? val : timeFormat,
       distanceUnit: key === "dist" ? val : distUnit,
     };
-    if (key === "lang") setLanguage(val);
+    if (key === "lang") {
+      setLanguage(val);
+      // US-40: cambia davvero la lingua dell'interfaccia (persistita in tla:lang).
+      if (val === "it" || val === "en") setUiLanguage(val);
+    }
     if (key === "time") setTimeFormat(val);
     if (key === "dist") setDistUnit(val);
 
@@ -317,6 +338,51 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
       } finally {
         setSavingSection(null);
       }
+    }
+  };
+
+  /* Push reali: FCM token + registrazione device + consenso.
+     Se la parte FCM fallisce (permesso negato, browser non supportato)
+     il toggle NON cambia stato e mostriamo l'errore. */
+  const handlePushToggle = async (val: boolean) => {
+    setPushMsg(null);
+    setPushBusy(true);
+    try {
+      if (val) {
+        const token = await requestFcmToken();
+        await registerDeviceToken(token);
+        try { localStorage.setItem(FCM_TOKEN_KEY, token); } catch { /* ignore */ }
+        try { await updateConsent("notif_push", true); } catch { /* best-effort */ }
+        setPushMsg({ kind: "success", text: t("settings.notif.pushEnabled") });
+      } else {
+        let stored: string | null = null;
+        try { stored = localStorage.getItem(FCM_TOKEN_KEY); } catch { /* ignore */ }
+        if (stored) {
+          try { await unregisterDeviceToken(stored); } catch { /* best-effort */ }
+        }
+        try { localStorage.removeItem(FCM_TOKEN_KEY); } catch { /* ignore */ }
+        try { await revokeFcmToken(); } catch { /* best-effort */ }
+        try { await updateConsent("notif_push", false); } catch { /* best-effort */ }
+        setPushMsg({ kind: "success", text: t("settings.notif.pushDisabled") });
+      }
+      window.dispatchEvent(new CustomEvent("tla:consents-changed"));
+    } catch (err: any) {
+      setPushMsg({ kind: "danger", text: err?.message || t("settings.notif.pushError") });
+      setPushBusy(false);
+      return; // il toggle resta com'era
+    }
+    setPushBusy(false);
+    // Mantieni anche il flag sul backend (comportamento preesistente).
+    await handleNotifications("push", val);
+  };
+
+  const handleTestPush = async () => {
+    setPushMsg(null);
+    try {
+      const result = await sendTestPush();
+      setPushMsg({ kind: "success", text: t("settings.notif.testSent", { count: result.tokensTargeted }) });
+    } catch (err: any) {
+      setPushMsg({ kind: "danger", text: err?.message || t("settings.notif.pushError") });
     }
   };
 
@@ -437,7 +503,7 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
       <div className="settings-scene">
         <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
         <div style={{ color: "var(--text-muted)", fontSize: 15, padding: "100px 0", textAlign: "center" }}>
-          Caricamento impostazioni in corso...
+          {t("settings.loading")}
         </div>
       </div>
     );
@@ -451,114 +517,124 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
 
       <div className="settings-wrap">
         <div className="settings-heading">
-          <h1>Impostazioni</h1>
-          <p>Personalizza l'aspetto, le notifiche e la tua esperienza nell'app.</p>
+          <h1>{t("settings.title")}</h1>
+          <p>{t("settings.subtitle")}</p>
         </div>
 
         <div className="settings-grid">
 
           {/* 1 — Aspetto */}
-          <SetCard num={1} title="Aspetto" desc="Tema e intensità degli effetti visivi." icon="sun" color="var(--amber)">
+          <SetCard num={1} title={t("settings.appearance.title")} desc={t("settings.appearance.desc")} icon="sun" color="var(--amber)">
             <div>
-              <div className="s-sublabel" style={{ marginBottom: 10 }}>Tema</div>
+              <div className="s-sublabel" style={{ marginBottom: 10 }}>{t("settings.appearance.theme")}</div>
               <SetTheme value={themeMode} onChange={applyThemeMode} disabled={savingSection === "aspetto"} />
             </div>
             <div className="s-div"></div>
             <div>
-              <div className="s-sublabel" style={{ marginBottom: 8 }}>Effetti visivi</div>
+              <div className="s-sublabel" style={{ marginBottom: 8 }}>{t("settings.appearance.effects")}</div>
               <SetRadio value={visualEffects} onChange={handleVisualEffects} disabled={savingSection === "aspetto"} options={[
-                { id: "full",    label: "Completi", icon: "sparkle" },
-                { id: "reduced", label: "Ridotti",  icon: "gauge" },
+                { id: "full",    label: t("settings.appearance.effectsFull"),    icon: "sparkle" },
+                { id: "reduced", label: t("settings.appearance.effectsReduced"), icon: "gauge" },
               ]} />
             </div>
           </SetCard>
 
           {/* 2 — Lingua e formato */}
-          <SetCard num={2} title="Lingua e formato" desc="Lingua dell'interfaccia e formati di base." icon="globe" color="var(--cyan)">
+          <SetCard num={2} title={t("settings.format.title")} desc={t("settings.format.desc")} icon="globe" color="var(--cyan)">
             <div>
-              <div className="s-sublabel" style={{ marginBottom: 8 }}>Lingua</div>
+              <div className="s-sublabel" style={{ marginBottom: 8 }}>{t("settings.format.language")}</div>
               <SetRadio value={language} onChange={(val) => handleLanguageFormat("lang", val)} disabled={savingSection === "format"} options={[
-                { id: "it", label: "Italiano" }, { id: "en", label: "English" }, { id: "de", label: "Deutsch" },
+                { id: "it", label: "Italiano" }, { id: "en", label: "English" },
               ]} />
             </div>
             <div className="s-div"></div>
             <div>
-              <div className="s-sublabel" style={{ marginBottom: 8 }}>Formato orario</div>
+              <div className="s-sublabel" style={{ marginBottom: 8 }}>{t("settings.format.timeFormat")}</div>
               <SetRadio value={timeFormat} onChange={(val) => handleLanguageFormat("time", val)} disabled={savingSection === "format"} options={[
-                { id: "24h", label: "24 ore" }, { id: "12h", label: "12 ore" },
+                { id: "24h", label: t("settings.format.h24") }, { id: "12h", label: t("settings.format.h12") },
               ]} />
             </div>
             <div className="s-div"></div>
             <div>
-              <div className="s-sublabel" style={{ marginBottom: 8 }}>Distanze</div>
+              <div className="s-sublabel" style={{ marginBottom: 8 }}>{t("settings.format.distances")}</div>
               <SetRadio value={distUnit} onChange={(val) => handleLanguageFormat("dist", val)} disabled={savingSection === "format"} options={[
-                { id: "km", label: "Chilometri" }, { id: "mi", label: "Miglia" },
+                { id: "km", label: t("settings.format.km") }, { id: "mi", label: t("settings.format.mi") },
               ]} />
             </div>
           </SetCard>
 
           {/* 3 — Notifiche */}
-          <SetCard num={3} title="Notifiche" desc="Canali e categorie di aggiornamento." icon="bell" color="var(--magenta)">
-            <div className="s-sublabel">Canali</div>
-            <SetRow label="Email" sub="Ricevi aggiornamenti via email." on={notif.email} onChange={(val) => handleNotifications("email", val)} disabled={savingSection === "notif"} />
-            <SetRow label="Push" sub="Notifiche in tempo reale su questo dispositivo." on={notif.push} onChange={(val) => handleNotifications("push", val)} disabled={savingSection === "notif"} />
+          <SetCard num={3} title={t("settings.notif.title")} desc={t("settings.notif.desc")} icon="bell" color="var(--magenta)">
+            <div className="s-sublabel">{t("settings.notif.channels")}</div>
+            <SetRow label={t("settings.notif.email")} sub={t("settings.notif.emailSub")} on={notif.email} onChange={(val) => handleNotifications("email", val)} disabled={savingSection === "notif"} />
+            <SetRow label={t("settings.notif.push")} sub={t("settings.notif.pushSub")} on={notif.push} onChange={handlePushToggle} disabled={pushBusy || savingSection === "notif"} />
+            {pushMsg && (
+              <div className={"revamp-status-pill " + pushMsg.kind} style={{ width: "100%", justifyContent: "center", marginTop: 6 }}>
+                <Icon name={pushMsg.kind === "success" ? "check" : "warn"} size={12} /> {pushMsg.text}
+              </div>
+            )}
+            {notif.push && user?.role !== "anonymous" && (
+              <button className="s-acc-btn" style={{ marginTop: 8, alignSelf: "flex-start" }} onClick={handleTestPush} disabled={pushBusy}>
+                <Icon name="bell" size={15} />{t("settings.notif.sendTest")}
+              </button>
+            )}
             <div className="s-div"></div>
-            <div className="s-sublabel">Categorie</div>
-            <SetRow label="Eventi" sub="Promemoria ed aggiornamenti sugli eventi." on={notif.events} onChange={(val) => handleNotifications("events", val)} disabled={savingSection === "notif"} />
-            <SetRow label="Attività" sub="Nuove attività e aggiornamenti." on={notif.activities} onChange={(val) => handleNotifications("activities", val)} disabled={savingSection === "notif"} />
-            <SetRow label="Avvisi città" sub="Comunicazioni importanti dal comune." on={notif.cityAlerts} onChange={(val) => handleNotifications("cityAlerts", val)} disabled={savingSection === "notif"} />
+            <div className="s-sublabel">{t("settings.notif.categories")}</div>
+            <SetRow label={t("settings.notif.events")} sub={t("settings.notif.eventsSub")} on={notif.events} onChange={(val) => handleNotifications("events", val)} disabled={savingSection === "notif"} />
+            <SetRow label={t("settings.notif.activities")} sub={t("settings.notif.activitiesSub")} on={notif.activities} onChange={(val) => handleNotifications("activities", val)} disabled={savingSection === "notif"} />
+            <SetRow label={t("settings.notif.cityAlerts")} sub={t("settings.notif.cityAlertsSub")} on={notif.cityAlerts} onChange={(val) => handleNotifications("cityAlerts", val)} disabled={savingSection === "notif"} />
           </SetCard>
 
           {/* 4 — Privacy e posizione */}
-          <SetCard num={4} title="Privacy e posizione" desc="Controllo sulla tua posizione e visibilità." icon="pin" color="var(--teal)">
+          <SetCard num={4} title={t("settings.privacy.title")} desc={t("settings.privacy.desc")} icon="pin" color="var(--teal)">
             <div>
-              <div className="s-sublabel" style={{ marginBottom: 8 }}>Usa la mia posizione</div>
+              <div className="s-sublabel" style={{ marginBottom: 8 }}>{t("settings.privacy.useLocation")}</div>
               <SetRadio value={locationMode} onChange={(val) => handlePrivacyLocation("loc", val)} disabled={savingSection === "privacy"} options={[
-                { id: "always",      label: "Sempre" },
-                { id: "while_using", label: "In uso" },
-                { id: "never",       label: "Mai" },
+                { id: "always",      label: t("settings.privacy.always") },
+                { id: "while_using", label: t("settings.privacy.whileUsing") },
+                { id: "never",       label: t("settings.privacy.never") },
               ]} />
             </div>
             <div className="s-div"></div>
             <div>
-              <div className="s-sublabel" style={{ marginBottom: 8 }}>Visibilità partecipazioni</div>
+              <div className="s-sublabel" style={{ marginBottom: 8 }}>{t("settings.privacy.participVis")}</div>
               <SetRadio value={participVis} onChange={(val) => handlePrivacyLocation("vis", val)} disabled={savingSection === "privacy"} options={[
-                { id: "public",            label: "Pubblica" },
-                { id: "organizers_only",   label: "Solo organizzatori" },
-                { id: "private",           label: "Privata" },
+                { id: "public",            label: t("settings.privacy.public") },
+                { id: "organizers_only",   label: t("settings.privacy.organizersOnly") },
+                { id: "private",           label: t("settings.privacy.private") },
               ]} />
             </div>
             <div className="s-div"></div>
-            <SetRow label="Mostra profilo nei partecipanti" sub="Visibile nelle liste partecipanti." on={showProfile} onChange={(val) => handlePrivacyLocation("show", val)} disabled={savingSection === "privacy"} />
+            <SetRow label={t("settings.privacy.showProfile")} sub={t("settings.privacy.showProfileSub")} on={showProfile} onChange={(val) => handlePrivacyLocation("show", val)} disabled={savingSection === "privacy"} />
           </SetCard>
 
           {/* 5 — Preferenze */}
-          <SetCard num={5} title="Preferenze" desc="Interessi e filtri per i contenuti consigliati." icon="sparkle" color="var(--violet)">
+          <SetCard num={5} title={t("settings.pref.title")} desc={t("settings.pref.desc")} icon="sparkle" color="var(--violet)">
             <div>
-              <div className="s-sublabel" style={{ marginBottom: 10 }}>I tuoi interessi</div>
+              <div className="s-sublabel" style={{ marginBottom: 10 }}>{t("settings.pref.interests")}</div>
               <SetInterests value={interests} onChange={(val) => handlePreferences("ints", val)} disabled={savingSection === "pref"} />
             </div>
             <div className="s-div"></div>
-            <SetRow label="Solo attività affidabili" sub="Mostra solo attività con autori certificati." on={reliableOnly} onChange={(val) => handlePreferences("rel", val)} disabled={savingSection === "pref"} />
-            <SetRow label="Solo attività verificate" sub="Filtra contenuti verificati dalla community." on={verifiedOnly} onChange={(val) => handlePreferences("ver", val)} disabled={savingSection === "pref"} />
+            <SetRow label={t("settings.pref.reliableOnly")} sub={t("settings.pref.reliableOnlySub")} on={reliableOnly} onChange={(val) => handlePreferences("rel", val)} disabled={savingSection === "pref"} />
+            <SetRow label={t("settings.pref.verifiedOnly")} sub={t("settings.pref.verifiedOnlySub")} on={verifiedOnly} onChange={(val) => handlePreferences("ver", val)} disabled={savingSection === "pref"} />
             <div className="s-div"></div>
             <div>
-              <div className="s-sublabel" style={{ marginBottom: 8 }}>Parcheggi mostrati</div>
+              <div className="s-sublabel" style={{ marginBottom: 8 }}>{t("settings.pref.parking")}</div>
               <SetRadio value={parkingPref} onChange={handleParkingPref} options={[
-                { id: "both", label: "Auto e bici", icon: "grid" },
-                { id: "car",  label: "Solo auto",   icon: "car" },
-                { id: "bike", label: "Solo bici",   icon: "bike" },
+                { id: "both", label: t("settings.pref.parkingBoth"), icon: "grid" },
+                { id: "car",  label: t("settings.pref.parkingCar"),  icon: "car" },
+                { id: "bike", label: t("settings.pref.parkingBike"), icon: "bike" },
               ]} />
             </div>
           </SetCard>
 
           {/* 6 — Accessibilità */}
-          <SetCard num={6} title="Accessibilità" desc="Opzioni per migliorare leggibilità e usabilità." icon="gauge" color="var(--green)">
-            <SetRow label="Riduci animazioni" sub="Disabilita transizioni ed effetti pulsanti." on={reduceAnim} onChange={(val) => handleAccessibility("anim", val)} disabled={savingSection === "a11y"} />
+          <SetCard num={6} title={t("settings.a11y.title")} desc={t("settings.a11y.desc")} icon="gauge" color="var(--green)">
+            <SetRow label={t("settings.a11y.reduceAnim")} sub={t("settings.a11y.reduceAnimSub")} on={reduceAnim} onChange={(val) => handleAccessibility("anim", val)} disabled={savingSection === "a11y"} />
             <div className="s-div"></div>
-            <SetRow label="Aumenta contrasto" sub="Migliora la leggibilità di testi e bordi." on={highContrast} onChange={(val) => handleAccessibility("contrast", val)} disabled={savingSection === "a11y"} />
+            <SetRow label={t("settings.a11y.contrast")} sub={t("settings.a11y.contrastSub")} on={highContrast} onChange={(val) => handleAccessibility("contrast", val)} disabled={savingSection === "a11y"} />
             <div className="s-div"></div>
-            <SetRow label="Testo più grande" sub="Scala la tipografia per una lettura più comoda." on={largerText} onChange={(val) => handleAccessibility("text", val)} disabled={savingSection === "a11y"} />
+            <SetRow label={t("settings.a11y.largerText")} sub={t("settings.a11y.largerTextSub")} on={largerText} onChange={(val) => handleAccessibility("text", val)} disabled={savingSection === "a11y"} />
           </SetCard>
 
           {/* 7 — Account (full-width) */}
@@ -567,27 +643,27 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
               <span className="s-card-ic"><Icon name="users" size={19} /></span>
               <div className="s-num-title">
                 <div className="s-num">07</div>
-                <div className="s-title">Account</div>
-                <div className="s-desc">Gestisci il tuo profilo e le opzioni di sessione.</div>
+                <div className="s-title">{t("settings.account.title")}</div>
+                <div className="s-desc">{t("settings.account.desc")}</div>
               </div>
             </div>
             <div className="s-account-body">
               <div className="s-account-user">
                 <div className="s-account-av">{user?.avatar || "MR"}</div>
                 <div className="s-account-info">
-                  <div className="s-account-name">{user?.name || "Ospite"}</div>
-                  <div className="s-account-email">{user?.email || "Accesso ospite"}</div>
-                  <div className="s-account-badge"><Icon name="shieldCheck" size={9} />Account attivo</div>
+                  <div className="s-account-name">{user?.name || t("settings.guestName")}</div>
+                  <div className="s-account-email">{user?.email || t("settings.guestEmail")}</div>
+                  <div className="s-account-badge"><Icon name="shieldCheck" size={9} />{t("settings.account.activeBadge")}</div>
                 </div>
 
               </div>
               <div className="s-account-actions">
-                <button className="s-acc-btn accent" onClick={() => setPage("profilo")}><Icon name="users" size={17} />Vai al profilo</button>
-                <button className="s-acc-btn" onClick={() => setPage("privacy")}><Icon name="settings" size={17} />Privacy policy</button>
-                <button className="s-acc-btn" onClick={() => setPage("termini")}><Icon name="ticket" size={17} />Termini di servizio</button>
-                <button className="s-acc-btn" style={{ marginLeft: "auto" }} onClick={handleLogout}><Icon name="x" size={17} />Logout</button>
+                <button className="s-acc-btn accent" onClick={() => setPage("profilo")}><Icon name="users" size={17} />{t("settings.account.goToProfile")}</button>
+                <button className="s-acc-btn" onClick={() => setPage("privacy")}><Icon name="settings" size={17} />{t("settings.account.privacyPolicy")}</button>
+                <button className="s-acc-btn" onClick={() => setPage("termini")}><Icon name="ticket" size={17} />{t("settings.account.terms")}</button>
+                <button className="s-acc-btn" style={{ marginLeft: "auto" }} onClick={handleLogout}><Icon name="x" size={17} />{t("settings.account.logout")}</button>
                 {user?.role !== "anonymous" && (
-                  <button className="s-acc-btn danger" onClick={() => setDeleting(true)}><Icon name="warn" size={17} />Elimina account</button>
+                  <button className="s-acc-btn danger" onClick={() => setDeleting(true)}><Icon name="warn" size={17} />{t("settings.account.delete")}</button>
                 )}
               </div>
             </div>
