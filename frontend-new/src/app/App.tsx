@@ -346,80 +346,17 @@ function HomeScene({ page, setPage, theme, setTheme, user }: any) {
   );
 }
 
-function RoleSimulationWidget({ user, setUser, setPage }: any) {
-  const [loading, setLoading] = useState(false);
-  const handleSimulate = async (newRole: string) => {
-    setLoading(true);
-    try {
-      if (newRole === "anonymous") {
-        await apiLogout();
-        setPage("home");
-      } else {
-        let email = "";
-        if (newRole === "registered_user") email = "cittadino@example.com";
-        else if (newRole === "certified_entity") email = "ente@example.com";
-        else if (newRole === "municipal_admin") email = "comune@example.com";
-        else if (newRole === "system_admin") email = "admin@example.com";
-
-        await apiLogin(email, "password123");
-        
-        if (newRole === "municipal_admin") setPage("comune-dashboard");
-        else if (newRole === "system_admin") setPage("admin-users");
-        else if (newRole === "certified_entity") setPage("ente-pubblica");
-        else setPage("home");
-      }
-    } catch (err) {
-      console.error("Failed to simulate role:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="revamp-role-widget anim-in" style={{
-      position: "fixed",
-      bottom: "26px",
-      left: "28px",
-      zIndex: 9999,
-      pointerEvents: "auto",
-      padding: "8px 14px",
-      borderRadius: "999px",
-      background: "linear-gradient(150deg, var(--bar-1), var(--bar-2))",
-      border: "1px solid var(--border-soft)",
-      backdropFilter: "blur(22px)",
-      boxShadow: "var(--controls-shadow), inset 0 1px 0 var(--inset-hi)",
-      display: "flex",
-      alignItems: "center",
-      gap: "10px",
-    }}>
-      <span style={{ fontFamily: "var(--mono)", fontSize: "9.5px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-muted)" }}>
-        {loading ? "Caricamento..." : "Simula Ruolo:"}
-      </span>
-      <select
-        className="revamp-select"
-        value={user?.role || "anonymous"}
-        disabled={loading}
-        onChange={(e) => handleSimulate(e.target.value)}
-        style={{
-          height: "28px",
-          border: "none",
-          background: "var(--chip-fill)",
-          borderRadius: "6px",
-          color: "var(--text-primary)",
-          fontSize: "12.5px",
-          fontWeight: 600,
-          outline: "none",
-          padding: "0 6px",
-        }}
-      >
-        <option value="anonymous">Ospite (Anonimo)</option>
-        <option value="registered_user">Utente Registrato</option>
-        <option value="certified_entity">Ente Certificato</option>
-        <option value="municipal_admin">Admin Comunale</option>
-        <option value="system_admin">Admin Sistema</option>
-      </select>
-    </div>
-  );
+function decodeJwt(token: string): any {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    return null;
+  }
 }
 
 function mapBackendRole(ruolo?: string): UserRole {
@@ -467,6 +404,23 @@ export function App() {
       });
       return;
     }
+
+    // Decode the token locally to see if it needs 2FA setup (admin first login)
+    const decoded = decodeJwt(token);
+    if (decoded && decoded.needs2faSetup) {
+      const role = mapBackendRole(decoded.ruolo);
+      setUser({
+        id: decoded.id,
+        name: "Amministratore (Setup 2FA)",
+        email: "admin@example.com",
+        role,
+        avatar: "A",
+      });
+      // Do not query /me, it is blocked with 403 on the backend until 2FA setup is completed.
+      setPage("setup-2fa");
+      return;
+    }
+
     try {
       const data: any = await getMe();
       const role = mapBackendRole(data.ruolo);
@@ -480,9 +434,22 @@ export function App() {
         role,
         avatar,
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error loading user profile:", err);
-      setToken(null);
+      if (err.code !== "2FA_SETUP_REQUIRED") {
+        setToken(null);
+      } else if (decoded) {
+        // Fallback for 2fa setup state if getMe returns 2FA_SETUP_REQUIRED
+        const role = mapBackendRole(decoded.ruolo);
+        setUser({
+          id: decoded.id,
+          name: "Amministratore (Setup 2FA)",
+          email: "admin@example.com",
+          role,
+          avatar: "A",
+        });
+        setPage("setup-2fa");
+      }
     }
   };
 
@@ -591,7 +558,6 @@ export function App() {
         ? <PlaceholderPage {...shared} />
         : <HomeScene {...shared} />}
       <TrentoTweaks theme={theme} />
-      <RoleSimulationWidget user={user} setUser={setUser} setPage={setPage} />
     </React.Fragment>
   );
 }

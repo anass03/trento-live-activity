@@ -410,31 +410,7 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
     setPage("login");
   };
 
-  // Simulated logins inside Settings
-  const handleSimulateRole = async (newRole: string) => {
-    setLoading(true);
-    try {
-      if (newRole === "anonymous") {
-        await apiLogout();
-        setPage("home");
-      } else {
-        let email = "cittadino@example.com";
-        if (newRole === "certified_entity") email = "ente@example.com";
-        else if (newRole === "municipal_admin") email = "comune@example.com";
-        else if (newRole === "system_admin") email = "admin@example.com";
 
-        await apiLogin(email, "password123");
-        if (newRole === "municipal_admin") setPage("comune-dashboard");
-        else if (newRole === "system_admin") setPage("admin-users");
-        else if (newRole === "certified_entity") setPage("ente-pubblica");
-        else setPage("home");
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   /* sync visual effects → glow */
   useEffect(() => {
@@ -584,21 +560,7 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
                   <div className="s-account-email">{user?.email || "marco.rossi@example.com"}</div>
                   <div className="s-account-badge"><Icon name="shieldCheck" size={9} />Account attivo</div>
                 </div>
-                {/* Simulated role selector for testing the revamped pages */}
-                <div style={{ marginLeft: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
-                  <label className="s-sublabel" style={{ fontSize: 9, marginBottom: 0 }}>Simula Ruolo</label>
-                  <select
-                    className="revamp-select"
-                    value={user?.role || "registered_user"}
-                    onChange={(e) => handleSimulateRole(e.target.value)}
-                  >
-                    <option value="anonymous">Ospite (Anonimo)</option>
-                    <option value="registered_user">Utente Registrato</option>
-                    <option value="certified_entity">Ente Certificato</option>
-                    <option value="municipal_admin">Admin Comunale</option>
-                    <option value="system_admin">Admin di Sistema</option>
-                  </select>
-                </div>
+
               </div>
               <div className="s-account-actions">
                 <button className="s-acc-btn accent" onClick={() => setPage("profilo")}><Icon name="users" size={17} />Vai al profilo</button>
