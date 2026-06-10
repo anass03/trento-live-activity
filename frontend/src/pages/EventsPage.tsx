@@ -1,28 +1,71 @@
-import { useEffect, useMemo, useState } from 'react';
+import { type CSSProperties, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { InteractiveMapCard } from '../components/ui/InteractiveMapCard';
 import {
-  getEventCalendarUrl, getEvents, getToken, googleCalendarUrl,
-  joinEvent, leaveEvent, reportEvent,
+  Bike, Bookmark, ChevronLeft, ChevronRight, Clock, Dumbbell,
+  Flame, Heart, Landmark, MapPin, Music, Search, Share2,
+  TrendingUp, Users, UtensilsCrossed, Zap,
+} from 'lucide-react';
+import {
+  getEvents, getToken, joinEvent, leaveEvent, reportEvent,
   type ApiEvent,
 } from '../lib/api';
-import { CalendarButton } from '../components/ui/CalendarButton';
-import { GeocodedLocation } from '../components/ui/GeocodedLocation';
 import { useAutoRefresh } from '../lib/useAutoRefresh';
-import type { AppUser } from '../data/mockUser';
 import { formatDateTime, formatDay } from '../lib/formatters';
+import type { AppUser } from '../data/mockUser';
+import { Widget, Avatars, EventModal, useGlow, type EventData } from '../components/redesign';
+
+/* ─── category visuals ──────────────────────────────────── */
+
+const CAT_COLORS: Record<string, string> = {
+  musica: '#db2777', cultura: '#7c3aed', sport: '#059669',
+  cibo: '#d97706', outdoor: '#0d9488', famiglia: '#0ea5e9',
+};
+const CAT_GRADIENTS: Record<string, string> = {
+  musica: 'linear-gradient(140deg,#db2777,#831843)',
+  cultura: 'linear-gradient(140deg,#7c3aed,#4c1d95)',
+  cibo: 'linear-gradient(140deg,#d97706,#7c2d12)',
+  outdoor: 'linear-gradient(140deg,#0d9488,#134e4a)',
+  sport: 'linear-gradient(140deg,#059669,#064e3b)',
+  famiglia: 'linear-gradient(140deg,#0ea5e9,#075985)',
+};
+const CAT_ICON: Record<string, typeof Music> = {
+  musica: Music, cultura: Landmark, sport: Dumbbell,
+  cibo: UtensilsCrossed, outdoor: Bike, famiglia: Users,
+};
+const CATEGORY_LIST = ['musica', 'cultura', 'sport', 'cibo', 'outdoor', 'famiglia'] as const;
 
 const REPORT_TYPES = ['contenuto_inappropriato', 'spam', 'disinformazione', 'altro'];
 
-function eventCrowdLevel(event: ApiEvent) { return event.isCertified ? 68 : 44; }
+/* ─── avatar palette helpers ────────────────────────────── */
+
+const AVATAR_GRADIENTS = [
+  'linear-gradient(135deg,#6366f1,#a855f7)',
+  'linear-gradient(135deg,#ec4899,#f43f5e)',
+  'linear-gradient(135deg,#14b8a6,#06b6d4)',
+  'linear-gradient(135deg,#f59e0b,#ef4444)',
+  'linear-gradient(135deg,#8b5cf6,#3b82f6)',
+];
+
+function generateAvatars(count: number) {
+  const n = Math.min(count, 3);
+  return {
+    avatars: Array.from({ length: n }, (_, i) => ({
+      initials: String.fromCharCode(65 + (i % 26)),
+      gradient: AVATAR_GRADIENTS[i % AVATAR_GRADIENTS.length],
+    })),
+    extra: Math.max(0, count - 3),
+  };
+}
+
+/* ─── date helpers (same logic as before) ───────────────── */
 
 function parseLocalDateTime(value: string | null | undefined): Date | null {
   if (!value) return null;
   const hasExplicitTimezone = /(?:z|[+-]\d{2}:?\d{2})$/i.test(value);
   if (!hasExplicitTimezone) {
-    const localDate = value.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/);
-    if (localDate) return new Date(Number(localDate[1]), Number(localDate[2]) - 1, Number(localDate[3]), Number(localDate[4] ?? 0), Number(localDate[5] ?? 0), Number(localDate[6] ?? 0));
+    const m = value.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+    if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4] ?? 0), Number(m[5] ?? 0), Number(m[6] ?? 0));
   }
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
@@ -54,37 +97,82 @@ function isUpcomingWeekend(dateStr: string | null | undefined): boolean {
   return date >= new Date() && (day === 0 || day === 6);
 }
 
+function isHappeningNow(event: ApiEvent): boolean {
+  const start = parseLocalDateTime(event.dateTime);
+  if (!start) return false;
+  const end = endDateFromStartAndTime(start, event.endTime);
+  const now = new Date();
+  return start <= now && end >= now;
+}
+
+/* ─── calendar helpers ──────────────────────────────────── */
+
+function getMonthMatrix(year: number, month: number): (number | null)[][] {
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const start = firstDay === 0 ? 6 : firstDay - 1; // Monday start
+  const weeks: (number | null)[][] = [];
+  let week: (number | null)[] = Array(start).fill(null);
+  for (let d = 1; d <= daysInMonth; d++) {
+    week.push(d);
+    if (week.length === 7) { weeks.push(week); week = []; }
+  }
+  if (week.length > 0) {
+    while (week.length < 7) week.push(null);
+    weeks.push(week);
+  }
+  return weeks;
+}
+
+/* ════════════════════════════════════════════════════════════
+ *  EVENTS PAGE
+ * ════════════════════════════════════════════════════════════ */
+
 export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: boolean; user?: AppUser }) {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const openId = searchParams.get('open');
+
+  /* ── core state ─────────────────────────────────────── */
   const [events, setEvents] = useState<ApiEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [reportingId, setReportingId] = useState<string | null>(null);
-  const [reportTipo, setReportTipo] = useState(REPORT_TYPES[0]);
-  const [reportMsg, setReportMsg] = useState<{ id: string; ok: boolean; text: string } | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<ApiEvent | null>(null);
   const [search, setSearch] = useState('');
   const [timeFilter, setTimeFilter] = useState<'all' | 'today' | 'weekend'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [partLoading, setPartLoading] = useState<string | null>(null);
   const [partError, setPartError] = useState<{ id: string; text: string } | null>(null);
+  const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+
+  /* report state */
+  const [reportingId, setReportingId] = useState<string | null>(null);
+  const [reportTipo, setReportTipo] = useState(REPORT_TYPES[0]);
+  const [reportMsg, setReportMsg] = useState<{ id: string; ok: boolean; text: string } | null>(null);
+
+  /* calendar state */
+  const now = useMemo(() => new Date(), []);
+  const [calMonth, setCalMonth] = useState(now.getMonth());
+  const [calYear, setCalYear] = useState(now.getFullYear());
 
   const isLoggedIn = !!getToken() && user?.role !== 'anonymous';
-  const userInterests = user?.interessi ?? [];
   const userId = user?.id;
   const isCitizen = user?.role === 'registered_user';
   const canReport = isLoggedIn && user?.role !== 'certified_entity';
-  const hasInterests = userInterests.length > 0;
 
-  async function loadEvents(silent = false) {
+  const onMove = useGlow();
+
+  /* ── data loading ───────────────────────────────────── */
+
+  const loadEvents = useCallback(async (silent = false) => {
     if (!silent) { setIsLoading(true); setError(null); }
     try { setEvents(await getEvents()); }
     catch (e) { if (!silent) setError(e instanceof Error ? e.message : t('events.loading')); }
     finally { if (!silent) setIsLoading(false); }
-  }
+  }, [t]);
 
-  useEffect(() => { void loadEvents(); }, []);
+  useEffect(() => { void loadEvents(); }, [loadEvents]);
   useAutoRefresh(() => loadEvents(true), 30_000);
 
   useEffect(() => {
@@ -93,36 +181,71 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
     if (target) setSelectedEvent(target);
   }, [events, openId]);
 
-  useEffect(() => {
-    if (!selectedEvent) return undefined;
-    const handleEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setSelectedEvent(null); };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [selectedEvent]);
+  /* ── filtering ──────────────────────────────────────── */
 
   const filteredEvents = useMemo(() => events.filter((event) => {
     if (certifiedOnly && !event.isCertified) return false;
     if (timeFilter === 'today' && !happensToday(event, new Date())) return false;
     if (timeFilter === 'weekend' && !isUpcomingWeekend(event.dateTime)) return false;
+    if (categoryFilter && event.category !== categoryFilter) return false;
     const q = search.trim().toLowerCase();
     if (!q) return true;
     return `${event.title} ${event.description || ''} ${event.category} ${event.location || ''}`.toLowerCase().includes(q);
-  }), [certifiedOnly, events, search, timeFilter]);
+  }), [certifiedOnly, events, search, timeFilter, categoryFilter]);
 
-  const recommendedEvents = useMemo(
-    () => (hasInterests ? filteredEvents.filter((event) => event.category && userInterests.includes(event.category)) : filteredEvents),
-    [filteredEvents, hasInterests, userInterests],
+  /* ── derived data ───────────────────────────────────── */
+
+  const liveNowCount = useMemo(() => events.filter(isHappeningNow).length, [events]);
+
+  const trendingEvents = useMemo(
+    () => [...filteredEvents].sort((a, b) => (b.participantCount ?? 0) - (a.participantCount ?? 0)).slice(0, 5),
+    [filteredEvents],
   );
-  const otherFilteredEvents = useMemo(
-    () => (hasInterests ? filteredEvents.filter((event) => !event.category || !userInterests.includes(event.category)) : []),
-    [filteredEvents, hasInterests, userInterests],
+
+  const upcomingEvent = useMemo(() => {
+    const upcoming = filteredEvents
+      .filter((ev) => ev.dateTime && new Date(ev.dateTime) >= new Date())
+      .sort((a, b) => new Date(a.dateTime!).getTime() - new Date(b.dateTime!).getTime());
+    return upcoming[0] ?? null;
+  }, [filteredEvents]);
+
+  const cityEvents = useMemo(
+    () => filteredEvents.filter((ev) => ev.dateTime && new Date(ev.dateTime) >= new Date()).slice(0, 6),
+    [filteredEvents],
   );
+
+  /* days with events (for calendar widget) */
+  const eventDays = useMemo(() => {
+    const days = new Set<number>();
+    events.forEach((ev) => {
+      const d = parseLocalDateTime(ev.dateTime);
+      if (d && d.getMonth() === calMonth && d.getFullYear() === calYear) {
+        days.add(d.getDate());
+      }
+    });
+    return days;
+  }, [events, calMonth, calYear]);
+
+  const calendarMatrix = useMemo(() => getMonthMatrix(calYear, calMonth), [calYear, calMonth]);
+
+  /* count by category */
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    filteredEvents.forEach((ev) => {
+      counts[ev.category] = (counts[ev.category] || 0) + 1;
+    });
+    return counts;
+  }, [filteredEvents]);
+
+  /* ── participation handlers ─────────────────────────── */
 
   async function handleJoinEvent(eventId: string) {
     setPartLoading(eventId); setPartError(null);
     try {
       const result = await joinEvent(eventId);
-      setEvents((prev) => prev.map((ev) => ev.id === eventId && userId ? { ...ev, participantCount: result.participantCount, participantIds: [...(ev.participantIds || []), userId] } : ev));
+      setEvents((prev) => prev.map((ev) => ev.id === eventId && userId
+        ? { ...ev, participantCount: result.participantCount, participantIds: [...(ev.participantIds || []), userId] }
+        : ev));
     } catch (e) { setPartError({ id: eventId, text: e instanceof Error ? e.message : t('common.error') }); }
     finally { setPartLoading(null); }
   }
@@ -131,20 +254,11 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
     setPartLoading(eventId); setPartError(null);
     try {
       const result = await leaveEvent(eventId);
-      setEvents((prev) => prev.map((ev) => ev.id === eventId && userId ? { ...ev, participantCount: result.participantCount, participantIds: (ev.participantIds || []).filter((p) => p !== userId) } : ev));
+      setEvents((prev) => prev.map((ev) => ev.id === eventId && userId
+        ? { ...ev, participantCount: result.participantCount, participantIds: (ev.participantIds || []).filter((p) => p !== userId) }
+        : ev));
     } catch (e) { setPartError({ id: eventId, text: e instanceof Error ? e.message : t('common.error') }); }
     finally { setPartLoading(null); }
-  }
-
-  function participateButton(event: ApiEvent) {
-    if (!isCitizen) return null;
-    const isJoined = !!(userId && event.participantIds?.includes(userId));
-    const isPast = event.dateTime ? new Date(event.dateTime) < new Date() : false;
-    const isFull = !!(event.maxPartecipanti && event.participantCount !== undefined && event.participantCount >= event.maxPartecipanti);
-    if (isPast) return <span className="muted-copy" style={{ fontSize: 12 }}>{t('events.ended')}</span>;
-    if (isJoined) return <button type="button" className="ghost-button compact-button" disabled={partLoading === event.id} onClick={(e) => { e.stopPropagation(); handleLeaveEvent(event.id); }}>{partLoading === event.id ? '...' : t('events.leave')}</button>;
-    if (isFull) return <span className="muted-copy" style={{ fontSize: 12 }}>{t('events.full')}</span>;
-    return <button type="button" className="primary-button compact-button" disabled={partLoading === event.id} onClick={(e) => { e.stopPropagation(); handleJoinEvent(event.id); }}>{partLoading === event.id ? '...' : t('events.join')}</button>;
   }
 
   async function submitReport(eventId: string) {
@@ -153,290 +267,408 @@ export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: bo
     finally { setReportingId(null); }
   }
 
-  const now = new Date();
-  const upcomingVisible = recommendedEvents.filter((ev) => !ev.dateTime || new Date(ev.dateTime) >= now).slice().sort((a, b) => {
-    const ta = a.dateTime ? new Date(a.dateTime).getTime() : Number.MAX_SAFE_INTEGER;
-    const tb = b.dateTime ? new Date(b.dateTime).getTime() : Number.MAX_SAFE_INTEGER;
-    return ta - tb;
-  });
-  const pastVisible = recommendedEvents.filter((ev) => ev.dateTime && new Date(ev.dateTime) < now).slice().sort((a, b) => new Date(b.dateTime!).getTime() - new Date(a.dateTime!).getTime());
-  const myEvents = useMemo(() => events.filter((ev) => userId && ev.participantIds?.includes(userId)), [events, userId]);
-  const featuredEvent = upcomingVisible[0];
-  const timelineEvents = upcomingVisible.slice(0, 5);
-  const timelineByDay = useMemo(() => {
-    const groups = new Map<string, typeof timelineEvents>();
-    timelineEvents.forEach((ev) => {
-      const key = ev.dateTime ? new Date(ev.dateTime).toISOString().slice(0, 10) : 'unknown';
-      const arr = groups.get(key) || [];
-      arr.push(ev);
-      groups.set(key, arr);
-    });
-    return Array.from(groups.entries());
-  }, [timelineEvents]);
-  const [showPast, setShowPast] = useState(false);
+  /* ── like / save (local toggle) ─────────────────────── */
 
-  function renderEventCard(event: ApiEvent, className = '') {
+  const toggleLike = useCallback((id: string) => {
+    setLikedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleSave = useCallback((id: string) => {
+    setSavedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  /* ── calendar nav ───────────────────────────────────── */
+
+  function prevMonth() {
+    if (calMonth === 0) { setCalMonth(11); setCalYear((y) => y - 1); }
+    else setCalMonth((m) => m - 1);
+  }
+  function nextMonth() {
+    if (calMonth === 11) { setCalMonth(0); setCalYear((y) => y + 1); }
+    else setCalMonth((m) => m + 1);
+  }
+
+  const monthName = new Date(calYear, calMonth).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
+
+  /* ── PostCard renderer ──────────────────────────────── */
+
+  function renderPostCard(event: ApiEvent) {
+    const catKey = event.category?.toLowerCase() ?? '';
+    const color = CAT_COLORS[catKey] || '#7c3aed';
+    const gradient = CAT_GRADIENTS[catKey] || CAT_GRADIENTS.cultura;
+    const CatIcon = CAT_ICON[catKey] || Landmark;
+    const { avatars, extra } = generateAvatars(event.participantCount ?? 0);
+    const isJoined = !!(userId && event.participantIds?.includes(userId));
+    const liked = likedIds.has(event.id);
+    const saved = savedIds.has(event.id);
+
     return (
-      <InteractiveMapCard key={event.id} id={event.id} className={`activity-card ${className}`} onSelect={() => setSelectedEvent(event)} map={{ latitude: event.latitude, longitude: event.longitude, title: event.title, category: event.category, description: event.description || t('events.noDescription'), dateTime: event.dateTime, type: 'event', crowdLevel: eventCrowdLevel(event) }}>
-        <div className="interactive-map-card-header">
-          <span>{event.category}</span>
-          {event.isCertified && <small className="badge">{t('events.certified')}</small>}
+      <div
+        key={event.id}
+        className="post"
+        style={{ '--pc': color } as CSSProperties}
+        onMouseMove={onMove}
+        onClick={() => setSelectedEvent(event)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter') setSelectedEvent(event); }}
+      >
+        <div className="post-media" style={{ '--pimg': gradient } as CSSProperties}>
+          <div className="pm-tag"><CatIcon size={12} />{event.category}</div>
+          {event.isCertified && <div className="pm-feat">{t('events.certified')}</div>}
         </div>
-        <h2>{event.title}</h2>
-        <p>{event.description || t('events.noDescription')}</p>
-        <dl>
-          <div><dt>{t('common.where')}</dt><dd><GeocodedLocation value={event.location} /></dd></div>
-          <div><dt>{t('common.when')}</dt><dd>{formatDateTime(event.dateTime)}</dd></div>
-        </dl>
-        {event.dateTime && <CalendarButton icsUrl={getEventCalendarUrl(event.id)} icsFilename={`${event.title}.ics`} googleUrl={googleCalendarUrl(event.title, event.dateTime, event.location)} />}
-        {(event.maxPartecipanti !== null && event.maxPartecipanti !== undefined) && (
-          <small className="muted-copy" style={{ display: 'block', marginTop: 4 }}>{event.participantCount ?? 0} / {event.maxPartecipanti} {t('common.participants').toLowerCase()}</small>
-        )}
-        <div className="card-actions-row">
-          {participateButton(event)}
-          {partError?.id === event.id && <small className="error-message">{partError.text}</small>}
+        <div className="post-content">
+          <div className="post-cat">
+            <span className="pc-ic"><CatIcon size={12} /></span>{event.category}
+          </div>
+          <div className="post-title">{event.title}</div>
+          <div className="post-desc">{event.description || t('events.noDescription')}</div>
+          <div className="post-meta">
+            <span className="pm"><MapPin size={14} /><b>{event.location || t('common.dateTBD')}</b></span>
+            <span className="pm"><Clock size={14} />{formatDateTime(event.dateTime)}</span>
+          </div>
+          <div className="post-foot">
+            <Avatars avatars={avatars} extra={extra} />
+            <span className="attend-count"><b>{event.participantCount ?? 0}</b> {t('common.participants').toLowerCase()}</span>
+            <div className="post-actions">
+              {isCitizen && (
+                isJoined
+                  ? <button
+                      type="button"
+                      className="pa-btn joined"
+                      disabled={partLoading === event.id}
+                      onClick={(e) => { e.stopPropagation(); handleLeaveEvent(event.id); }}
+                      aria-label={t('events.leave')}
+                    >
+                      <Users size={14} />
+                    </button>
+                  : <button
+                      type="button"
+                      className="pa-btn"
+                      disabled={partLoading === event.id}
+                      onClick={(e) => { e.stopPropagation(); handleJoinEvent(event.id); }}
+                      aria-label={t('events.join')}
+                    >
+                      <Users size={14} />
+                    </button>
+              )}
+              <button
+                type="button"
+                className={`pa-btn${liked ? ' active' : ''}`}
+                onClick={(e) => { e.stopPropagation(); toggleLike(event.id); }}
+                aria-label="Like"
+              >
+                <Heart size={14} fill={liked ? 'currentColor' : 'none'} />
+              </button>
+              <button
+                type="button"
+                className={`pa-btn${saved ? ' active' : ''}`}
+                onClick={(e) => { e.stopPropagation(); toggleSave(event.id); }}
+                aria-label="Save"
+              >
+                <Bookmark size={14} fill={saved ? 'currentColor' : 'none'} />
+              </button>
+              <button
+                type="button"
+                className="pa-btn"
+                onClick={(e) => { e.stopPropagation(); }}
+                aria-label="Share"
+              >
+                <Share2 size={14} />
+              </button>
+            </div>
+          </div>
+          {/* participation error inline */}
+          {partError?.id === event.id && (
+            <small className="error-message" style={{ marginTop: 4 }}>{partError.text}</small>
+          )}
+          {/* report controls */}
           {canReport && reportMsg?.id !== event.id && (
             reportingId === event.id ? (
-              <div className="report-controls">
+              <div className="report-controls" onClick={(e) => e.stopPropagation()}>
                 <select value={reportTipo} onChange={(e) => setReportTipo(e.target.value)}>
                   {REPORT_TYPES.map((tipo) => <option key={tipo} value={tipo}>{tipo.replace(/_/g, ' ')}</option>)}
                 </select>
-                <button className="danger-button compact-button" onClick={() => submitReport(event.id)}>{t('common.submit')}</button>
-                <button className="ghost-button compact-button" onClick={() => setReportingId(null)}>{t('common.cancel')}</button>
-              </div>
-            ) : (
-              <button className="ghost-button compact-button" onClick={() => { setReportingId(event.id); setReportMsg(null); }}>{t('events.report')}</button>
-            )
-          )}
-          {reportMsg?.id === event.id && <small className={reportMsg.ok ? 'success-message' : 'error-message'}>{reportMsg.text}</small>}
-        </div>
-      </InteractiveMapCard>
-    );
-  }
-
-  const stateContent = (
-    <>
-      {isLoading && <div className="state-panel liquid-panel">{t('events.loading')}</div>}
-      {error && <div className="state-panel liquid-panel"><p>{error}</p><button onClick={() => loadEvents()} type="button">{t('common.retry')}</button></div>}
-      {!isLoading && !error && recommendedEvents.length === 0 && otherFilteredEvents.length === 0 && <div className="state-panel liquid-panel">{t('events.noResults')}</div>}
-    </>
-  );
-
-  const eventPopup = selectedEvent && (
-    <div className="activity-popup-backdrop event-popup-backdrop" role="presentation" onClick={() => setSelectedEvent(null)}>
-      <article className="activity-popup event-popup" role="dialog" aria-modal="true" aria-labelledby="event-popup-title" onClick={(event) => event.stopPropagation()}>
-        <button className="activity-popup-close" type="button" onClick={() => setSelectedEvent(null)} aria-label={t('common.close')}>×</button>
-        <span className="section-eyebrow">{selectedEvent.isCertified ? t('events.certifiedEvent') : selectedEvent.category}</span>
-        <h2 id="event-popup-title">{selectedEvent.title}</h2>
-        <p>{selectedEvent.description || t('events.noDescription')}</p>
-        <dl>
-          <div><dt>{t('common.category')}</dt><dd>{selectedEvent.category}</dd></div>
-          <div><dt>{t('common.where')}</dt><dd><GeocodedLocation value={selectedEvent.location} /></dd></div>
-          <div><dt>{t('common.when')}</dt><dd>{formatDateTime(selectedEvent.dateTime)}</dd></div>
-        </dl>
-        <div className="activity-popup-actions">
-          {selectedEvent.dateTime && <CalendarButton icsUrl={getEventCalendarUrl(selectedEvent.id)} icsFilename={`${selectedEvent.title}.ics`} googleUrl={googleCalendarUrl(selectedEvent.title, selectedEvent.dateTime, selectedEvent.location)} />}
-          {participateButton(selectedEvent)}
-          {canReport && reportMsg?.id !== selectedEvent.id && (
-            reportingId === selectedEvent.id ? (
-              <div className="report-controls">
-                <select value={reportTipo} onChange={(event) => setReportTipo(event.target.value)}>
-                  {REPORT_TYPES.map((tipo) => <option key={tipo} value={tipo}>{tipo.replace(/_/g, ' ')}</option>)}
-                </select>
-                <button className="danger-button compact-button" type="button" onClick={() => submitReport(selectedEvent.id)}>{t('common.submit')}</button>
+                <button className="danger-button compact-button" type="button" onClick={() => submitReport(event.id)}>{t('common.submit')}</button>
                 <button className="ghost-button compact-button" type="button" onClick={() => setReportingId(null)}>{t('common.cancel')}</button>
               </div>
             ) : (
-              <button className="ghost-button" type="button" onClick={() => { setReportingId(selectedEvent.id); setReportMsg(null); }}>{t('events.report')}</button>
+              <button
+                className="ghost-button compact-button"
+                type="button"
+                style={{ marginTop: 4, fontSize: 11 }}
+                onClick={(e) => { e.stopPropagation(); setReportingId(event.id); setReportMsg(null); }}
+              >
+                {t('events.report')}
+              </button>
             )
           )}
-          <button className="ghost-button" type="button" onClick={() => setSelectedEvent(null)}>{t('common.close')}</button>
-          {reportMsg?.id === selectedEvent.id && <small className={reportMsg.ok ? 'success-message' : 'error-message'}>{reportMsg.text}</small>}
+          {reportMsg?.id === event.id && (
+            <small className={reportMsg.ok ? 'success-message' : 'error-message'} style={{ marginTop: 4 }}>
+              {reportMsg.text}
+            </small>
+          )}
         </div>
-      </article>
-    </div>
-  );
-
-  if (certifiedOnly) {
-    return (
-      <section className="certified-page">
-        <header className="certified-hero">
-          <label className="city-search">
-            <span>{t('common.search')}</span>
-            <input value={search} onChange={(event) => setSearch(event.target.value)} type="search" placeholder={t('events.searchCertifiedPlaceholder')} />
-          </label>
-          <div className="time-filter" aria-label={t('events.certified')}>
-            <button className={timeFilter === 'all' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('all')}>{t('filters.all')}</button>
-            <button className={timeFilter === 'today' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('today')}>{t('filters.today')}</button>
-            <button className={timeFilter === 'weekend' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('weekend')}>{t('filters.weekend')}</button>
-          </div>
-          {isLoading && <span className="muted-copy auto-refresh-hint">{t('common.updating')}</span>}
-        </header>
-        {stateContent}
-        {!isLoading && !error && filteredEvents.length > 0 && hasInterests && (
-          <div className="preference-page-stack">
-            <section className="preference-section" aria-label={t('events.recommendedTitle')}>
-              <div className="preference-section-header">
-                <div>
-                  <span className="section-eyebrow">{t('events.recommended')}</span>
-                  <h2>{t('events.recommendedTitle')} <span className="section-count">{recommendedEvents.length}</span></h2>
-                </div>
-              </div>
-              {recommendedEvents.length === 0 ? (
-                <div className="preference-empty-state">{t('events.noRecommendedCertified')}</div>
-              ) : (
-                <div className="certified-layout">
-                  <aside className="certified-trust-panel">
-                    <strong>{t('events.eventsCount', { count: recommendedEvents.length })}</strong>
-                    <ul>
-                      <li>{t('events.trustVerified')}</li>
-                      <li>{t('events.trustCalendar')}</li>
-                      <li>{t('events.trustReport')}</li>
-                    </ul>
-                  </aside>
-                  <div className="certified-registry">{recommendedEvents.map((event) => renderEventCard(event, 'certified-event-card'))}</div>
-                </div>
-              )}
-            </section>
-            {otherFilteredEvents.length > 0 && (
-              <section className="preference-section preference-section-secondary" aria-label={t('events.others')}>
-                <div className="preference-section-header"><div><span className="section-eyebrow">{t('events.discover')}</span><h2>{t('events.others')} <span className="section-count">{otherFilteredEvents.length}</span></h2></div></div>
-                <div className="certified-registry">{otherFilteredEvents.map((event) => renderEventCard(event, 'certified-event-card'))}</div>
-              </section>
-            )}
-          </div>
-        )}
-        {!isLoading && !error && filteredEvents.length > 0 && !hasInterests && (
-          <section className="preference-section" aria-label={t('events.allEvents')}>
-            <div className="preference-section-header"><div><span className="section-eyebrow">{t('events.registry')}</span><h2>{t('events.allEvents')} <span className="section-count">{recommendedEvents.length}</span></h2></div></div>
-            <div className="certified-layout">
-              <aside className="certified-trust-panel">
-                <strong>{t('events.eventsCount', { count: recommendedEvents.length })}</strong>
-                <ul>
-                  <li>{t('events.trustVerified')}</li>
-                  <li>{t('events.trustCalendar')}</li>
-                  <li>{t('events.trustReport')}</li>
-                </ul>
-              </aside>
-              <div className="certified-registry">{recommendedEvents.map((event) => renderEventCard(event, 'certified-event-card'))}</div>
-            </div>
-          </section>
-        )}
-        {eventPopup}
-      </section>
+      </div>
     );
   }
 
+  /* ── EventModal adapter ─────────────────────────────── */
+
+  function toEventData(ev: ApiEvent): EventData {
+    return {
+      id: ev.id,
+      title: ev.title,
+      description: ev.description || '',
+      place: ev.location || t('common.dateTBD'),
+      dateTime: formatDateTime(ev.dateTime),
+      category: ev.category,
+      going: ev.participantCount ?? 0,
+      cap: ev.maxPartecipanti ?? 999,
+      isLiked: likedIds.has(ev.id),
+      isSaved: savedIds.has(ev.id),
+    };
+  }
+
+  /* ── time filter chips ──────────────────────────────── */
+
+  const timeChips: { key: 'all' | 'today' | 'weekend'; label: string }[] = [
+    { key: 'all', label: t('filters.all') },
+    { key: 'today', label: t('filters.today') },
+    { key: 'weekend', label: t('filters.weekend') },
+  ];
+
+  /* ════════════════════════════════════════════════════════
+   *  RENDER
+   * ════════════════════════════════════════════════════════ */
+
   return (
-    <section className="events-page">
-      <header className="events-hero">
-        <label className="city-search">
-          <span>{t('common.search')}</span>
-          <input value={search} onChange={(event) => setSearch(event.target.value)} type="search" placeholder={t('events.searchPlaceholder')} />
-        </label>
-        <div className="time-filter" aria-label={t('events.featured')}>
-          <button className={timeFilter === 'all' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('all')}>{t('filters.all')}</button>
-          <button className={timeFilter === 'today' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('today')}>{t('filters.today')}</button>
-          <button className={timeFilter === 'weekend' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('weekend')}>{t('filters.weekend')}</button>
-        </div>
-        {isLoading && <span className="muted-copy auto-refresh-hint">{t('common.updating')}</span>}
-      </header>
-      {stateContent}
-
-      {isCitizen && myEvents.length > 0 && (
-        <section className="my-activities-section" aria-label={t('events.myEvents')}>
-          <h2>{t('events.myEvents')} <span className="section-count">{myEvents.length}</span></h2>
-          <div className="event-card-strip">{myEvents.map((event) => renderEventCard(event, 'event-explorer-card'))}</div>
-        </section>
-      )}
-
-      {!isLoading && !error && hasInterests && filteredEvents.length > 0 && (
-        <section className="preference-section" aria-label={t('events.recommendedTitle')}>
-          <div className="preference-section-header"><div><span className="section-eyebrow">{t('events.recommended')}</span><h2>{t('events.recommendedTitle')} <span className="section-count">{recommendedEvents.length}</span></h2></div></div>
-          {recommendedEvents.length === 0 && <div className="preference-empty-state">{t('events.noRecommended')}</div>}
-          {recommendedEvents.length > 0 && upcomingVisible.length === 0 && <div className="preference-empty-state">{t('events.noRecommendedScheduled')}</div>}
-          {upcomingVisible.length > 0 && (
-            <div className="event-editorial-layout">
-              {featuredEvent && (
-                <>
-                  <h3 className="section-eyebrow featured-section-title">{t('events.next')}</h3>
-                  <article className="event-feature-story">
-                    <div className="event-date-tile"><strong>{formatDay(featuredEvent.dateTime)}</strong><span>{formatDateTime(featuredEvent.dateTime)}</span></div>
-                    <div>
-                      <div className="feature-badges" aria-label={t('common.category')}><span>{featuredEvent.category}</span></div>
-                      <h2>{featuredEvent.title}</h2>
-                      <p>{featuredEvent.description || t('events.noDescription')}</p>
-                    </div>
-                  </article>
-                </>
-              )}
-              <aside className="event-timeline-panel">
-                <span className="section-eyebrow">{t('activities.timeline')}</span>
-                <ol className="event-timeline-grouped">
-                  {timelineByDay.map(([day, evs]) => (
-                    <li key={day} className="event-timeline-day">
-                      <time>{day !== 'unknown' ? formatDay(day) : t('common.dateTBD')}</time>
-                      <ul>{evs.map((event) => <li key={event.id}>{event.title}</li>)}</ul>
-                    </li>
-                  ))}
-                </ol>
-              </aside>
-              <div className="event-card-strip">{upcomingVisible.map((event) => renderEventCard(event, 'event-explorer-card'))}</div>
+    <div className="events-scene">
+      <div className="events-layout">
+        {/* ─────────── LEFT COLUMN ─────────── */}
+        <div className="ev-col">
+          {/* Calendar Widget */}
+          <Widget title={t('events.calendar', 'CALENDARIO')} delay={0}>
+            <div className="cal-head">
+              <button type="button" className="cal-nav" onClick={prevMonth} aria-label={t('common.previous', 'Precedente')}>
+                <ChevronLeft size={14} />
+              </button>
+              <span className="cal-month">{monthName}</span>
+              <button type="button" className="cal-nav" onClick={nextMonth} aria-label={t('common.next', 'Successivo')}>
+                <ChevronRight size={14} />
+              </button>
             </div>
-          )}
-        </section>
-      )}
+            <table className="cal-grid">
+              <thead>
+                <tr>
+                  {['L', 'M', 'M', 'G', 'V', 'S', 'D'].map((d, i) => <th key={i}>{d}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {calendarMatrix.map((week, wi) => (
+                  <tr key={wi}>
+                    {week.map((day, di) => {
+                      const hasEvent = day !== null && eventDays.has(day);
+                      const isToday = day === now.getDate() && calMonth === now.getMonth() && calYear === now.getFullYear();
+                      return (
+                        <td key={di} className={[hasEvent ? 'has-ev' : '', isToday ? 'today' : ''].filter(Boolean).join(' ')}>
+                          {day ?? ''}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Widget>
 
-      {!isLoading && !error && !hasInterests && upcomingVisible.length > 0 && (
-        <section className="preference-section" aria-label={t('events.featuredTitle')}>
-          <div className="preference-section-header"><div><span className="section-eyebrow">{t('events.featured')}</span><h2>{t('events.featuredTitle')} <span className="section-count">{upcomingVisible.length}</span></h2></div></div>
-          <div className="event-editorial-layout">
-            {featuredEvent && (
-              <>
-                <h3 className="section-eyebrow featured-section-title">{t('events.next')}</h3>
-                <article className="event-feature-story">
-                  <div className="event-date-tile"><strong>{formatDay(featuredEvent.dateTime)}</strong><span>{formatDateTime(featuredEvent.dateTime)}</span></div>
-                  <div>
-                    <div className="feature-badges" aria-label={t('common.category')}><span>{featuredEvent.category}</span></div>
-                    <h2>{featuredEvent.title}</h2>
-                    <p>{featuredEvent.description || t('events.noDescription')}</p>
-                  </div>
-                </article>
-              </>
-            )}
-            <aside className="event-timeline-panel">
-              <span className="section-eyebrow">{t('activities.timeline')}</span>
-              <ol className="event-timeline-grouped">
-                {timelineByDay.map(([day, evs]) => (
-                  <li key={day} className="event-timeline-day">
-                    <time>{day !== 'unknown' ? formatDay(day) : t('common.dateTBD')}</time>
-                    <ul>{evs.map((event) => <li key={event.id}>{event.title}</li>)}</ul>
+          {/* Quick Filters Widget */}
+          <Widget title={t('events.quickFilters', 'FILTRI RAPIDI')} delay={80}>
+            <ul className="filter-list">
+              {CATEGORY_LIST.map((cat) => {
+                const CIcon = CAT_ICON[cat] || Landmark;
+                const active = categoryFilter === cat;
+                return (
+                  <li key={cat}>
+                    <button
+                      type="button"
+                      className={`fl-btn${active ? ' active' : ''}`}
+                      style={{ '--fc': CAT_COLORS[cat] } as CSSProperties}
+                      onClick={() => setCategoryFilter(active ? null : cat)}
+                    >
+                      <CIcon size={14} />
+                      <span>{cat}</span>
+                      <small>{categoryCounts[cat] || 0}</small>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </Widget>
+
+          {/* Trending Widget */}
+          <Widget title={t('events.trending', 'IN TENDENZA')} accent="#f59e0b" delay={160}>
+            {trendingEvents.length === 0 ? (
+              <p className="widget-empty">{t('events.noResults')}</p>
+            ) : (
+              <ol className="trending-list">
+                {trendingEvents.map((ev, i) => (
+                  <li key={ev.id} onClick={() => setSelectedEvent(ev)} role="button" tabIndex={0}>
+                    <span className="tr-rank">{i + 1}</span>
+                    <div className="tr-info">
+                      <span className="tr-title">{ev.title}</span>
+                      <small><TrendingUp size={10} /> {ev.participantCount ?? 0}</small>
+                    </div>
                   </li>
                 ))}
               </ol>
-            </aside>
-            <div className="event-card-strip">{upcomingVisible.map((event) => renderEventCard(event, 'event-explorer-card'))}</div>
+            )}
+          </Widget>
+
+          {/* Live Now Widget */}
+          <Widget title={t('events.liveNow', 'LIVE ORA')} delay={240}>
+            <div className="live-now-box">
+              <Zap size={20} />
+              <span className="live-count">{liveNowCount}</span>
+              <span className="live-label">{t('events.happeningNow', 'eventi in corso')}</span>
+            </div>
+          </Widget>
+        </div>
+
+        {/* ─────────── CENTER COLUMN (FEED) ─────────── */}
+        <div className="ev-col feed">
+          {/* Search / Discovery bar */}
+          <div className="composer" onMouseMove={onMove}>
+            <div className="composer-search">
+              <Search size={16} />
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={certifiedOnly ? t('events.searchCertifiedPlaceholder') : t('events.searchPlaceholder')}
+              />
+            </div>
+            <div className="composer-chips">
+              {timeChips.map((chip) => (
+                <button
+                  key={chip.key}
+                  type="button"
+                  className={`chip${timeFilter === chip.key ? ' active' : ''}`}
+                  onClick={() => setTimeFilter(chip.key)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+              {certifiedOnly && <span className="chip cert-chip">{t('events.certified')}</span>}
+            </div>
           </div>
-        </section>
-      )}
 
-      {!isLoading && pastVisible.length > 0 && (
-        <section className="my-activities-section" aria-label={t('events.past')}>
-          <button type="button" className="ghost-button compact-button" onClick={() => setShowPast((v) => !v)} aria-expanded={showPast}>
-            {showPast ? '▾' : '▸'} {t('events.past')} <span className="section-count">{pastVisible.length}</span>
-          </button>
-          {showPast && <div className="event-card-strip" style={{ marginTop: 14, opacity: 0.85 }}>{pastVisible.map((event) => renderEventCard(event, 'event-explorer-card'))}</div>}
-        </section>
-      )}
+          {/* Loading state */}
+          {isLoading && (
+            <div className="state-panel liquid-panel">{t('events.loading')}</div>
+          )}
 
-      {!isLoading && !error && hasInterests && otherFilteredEvents.length > 0 && (
-        <section className="preference-section preference-section-secondary" aria-label={t('events.others')}>
-          <div className="preference-section-header"><div><span className="section-eyebrow">{t('events.discover')}</span><h2>{t('events.others')} <span className="section-count">{otherFilteredEvents.length}</span></h2></div></div>
-          <div className="event-card-strip">{otherFilteredEvents.map((event) => renderEventCard(event, 'event-explorer-card'))}</div>
-        </section>
-      )}
+          {/* Error state */}
+          {error && (
+            <div className="state-panel liquid-panel">
+              <p>{error}</p>
+              <button onClick={() => loadEvents()} type="button">{t('common.retry')}</button>
+            </div>
+          )}
 
-      {eventPopup}
-    </section>
+          {/* Empty state */}
+          {!isLoading && !error && filteredEvents.length === 0 && (
+            <div className="state-panel liquid-panel">{t('events.noResults')}</div>
+          )}
+
+          {/* Event cards feed */}
+          {!isLoading && !error && filteredEvents.map((event) => renderPostCard(event))}
+        </div>
+
+        {/* ─────────── RIGHT COLUMN ─────────── */}
+        <div className="ev-col right">
+          {/* Next Activity Widget */}
+          <Widget title={t('events.nextActivity', 'PROSSIMA ATTIVITÀ')} delay={50}>
+            {upcomingEvent ? (
+              <div
+                className="next-ev-card"
+                onClick={() => setSelectedEvent(upcomingEvent)}
+                role="button"
+                tabIndex={0}
+              >
+                <div
+                  className="nec-banner"
+                  style={{ background: CAT_GRADIENTS[upcomingEvent.category] || CAT_GRADIENTS.cultura }}
+                />
+                <div className="nec-body">
+                  <span className="nec-cat" style={{ color: CAT_COLORS[upcomingEvent.category] || '#7c3aed' }}>
+                    {upcomingEvent.category}
+                  </span>
+                  <strong>{upcomingEvent.title}</strong>
+                  <span className="nec-meta">
+                    <MapPin size={12} /> {upcomingEvent.location || t('common.dateTBD')}
+                  </span>
+                  <span className="nec-meta">
+                    <Clock size={12} /> {formatDateTime(upcomingEvent.dateTime)}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <p className="widget-empty">{t('events.noResults')}</p>
+            )}
+          </Widget>
+
+          {/* City Events Widget */}
+          <Widget title={t('events.cityEvents', 'EVENTI IN CITTÀ')} delay={130}>
+            {cityEvents.length === 0 ? (
+              <p className="widget-empty">{t('events.noResults')}</p>
+            ) : (
+              <div className="city-ev-grid">
+                {cityEvents.map((ev) => {
+                  const CIcon = CAT_ICON[ev.category] || Landmark;
+                  return (
+                    <div
+                      key={ev.id}
+                      className="city-ev-mini"
+                      style={{ '--cec': CAT_COLORS[ev.category] || '#7c3aed' } as CSSProperties}
+                      onClick={() => setSelectedEvent(ev)}
+                      role="button"
+                      tabIndex={0}
+                    >
+                      <CIcon size={14} />
+                      <span className="cem-title">{ev.title}</span>
+                      <small>{formatDay(ev.dateTime)}</small>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Widget>
+        </div>
+      </div>
+
+      {/* ─────────── EVENT MODAL ─────────── */}
+      {selectedEvent && (
+        <EventModal
+          event={toEventData(selectedEvent)}
+          onClose={() => setSelectedEvent(null)}
+          onJoin={() => {
+            const isJoined = !!(userId && selectedEvent.participantIds?.includes(userId));
+            if (isJoined) handleLeaveEvent(selectedEvent.id);
+            else handleJoinEvent(selectedEvent.id);
+          }}
+          onLike={() => toggleLike(selectedEvent.id)}
+          onSave={() => toggleSave(selectedEvent.id)}
+        />
+      )}
+    </div>
   );
 }

@@ -107,7 +107,7 @@ export function App() {
 
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/termini" element={<TermsPage />} />
-        <Route path="/impostazioni" element={<SettingsPage />} />
+        <Route path="/impostazioni" element={<SettingsPage user={user} />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

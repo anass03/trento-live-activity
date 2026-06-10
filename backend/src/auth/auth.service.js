@@ -63,8 +63,15 @@ function validatePassword(password) {
 
 function signToken(user, extraClaims = {}) {
   const jti = crypto.randomUUID();
+  const roleMapping = {
+    'UtenteRegistrato': 'USER',
+    'EnteCertificato': 'PARTNER',
+    'AmministratoreComunale': 'MODERATOR',
+    'AmministratoreDiSistema': 'ADMIN'
+  };
+  const role = user.role || roleMapping[user.ruolo] || 'USER';
   const token = jwt.sign(
-    { id: user.id, ruolo: user.ruolo, jti, ...extraClaims },
+    { id: user.id, ruolo: user.ruolo, role, jti, ...extraClaims },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   );

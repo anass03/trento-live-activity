@@ -727,3 +727,54 @@ export function getPushStats(): Promise<PushStats> {
 export function sendAdminBroadcast(payload: { title: string; body: string; audience: PushAudience }): Promise<{ tokensTargeted: number; audience: PushAudience }> {
   return request('/api/notifications/admin/broadcast', { method: 'POST', body: payload });
 }
+
+// ─── Settings ────────────────────────────────────────────────────
+export interface UserSettings {
+  themeMode: string;
+  visualEffects: string;
+  language: string;
+  timeFormat: string;
+  distanceUnit: string;
+  emailNotificationsEnabled: boolean;
+  pushNotificationsEnabled: boolean;
+  eventNotificationsEnabled: boolean;
+  activityNotificationsEnabled: boolean;
+  cityAlertNotificationsEnabled: boolean;
+  locationMode: string;
+  participationVisibility: string;
+  showProfileInParticipants: boolean;
+  interestsJson: string[];
+  showOnlyReliableActivities: boolean;
+  showVerifiedActivities: boolean;
+  reduceAnimations: boolean;
+  increaseContrast: boolean;
+  largerText: boolean;
+}
+
+export function getSettings() {
+  return request<UserSettings>('/api/me/settings');
+}
+
+export function updateAppearance(data: { themeMode?: string; visualEffects?: string }) {
+  return request<UserSettings>('/api/me/settings/appearance', { method: 'PATCH', body: data });
+}
+
+export function updateLanguageFormat(data: { language?: string; timeFormat?: string; distanceUnit?: string }) {
+  return request<UserSettings>('/api/me/settings/language-format', { method: 'PATCH', body: data });
+}
+
+export function updateNotifications(data: Partial<Pick<UserSettings, 'emailNotificationsEnabled' | 'pushNotificationsEnabled' | 'eventNotificationsEnabled' | 'activityNotificationsEnabled' | 'cityAlertNotificationsEnabled'>>) {
+  return request<UserSettings>('/api/me/settings/notifications', { method: 'PATCH', body: data });
+}
+
+export function updatePrivacyLocation(data: { locationMode?: string; participationVisibility?: string; showProfileInParticipants?: boolean }) {
+  return request<UserSettings>('/api/me/settings/privacy-location', { method: 'PATCH', body: data });
+}
+
+export function updatePreferences(data: { interestsJson?: string[]; showOnlyReliableActivities?: boolean; showVerifiedActivities?: boolean }) {
+  return request<UserSettings>('/api/me/settings/preferences', { method: 'PATCH', body: data });
+}
+
+export function updateAccessibility(data: { reduceAnimations?: boolean; increaseContrast?: boolean; largerText?: boolean }) {
+  return request<UserSettings>('/api/me/settings/accessibility', { method: 'PATCH', body: data });
+}

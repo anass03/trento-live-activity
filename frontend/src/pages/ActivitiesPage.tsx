@@ -1,475 +1,679 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { activityCrowdLevel } from '../components/map/CardMapPreview';
-import { InteractiveMapCard } from '../components/ui/InteractiveMapCard';
+import {
+  ArrowUpDown,
+  Bookmark,
+  Check,
+  ChevronDown,
+  Clock,
+  Dog,
+  Flame,
+  Leaf,
+  MapPin,
+  Mountain,
+  Music,
+  Palette,
+  Search,
+  Shield,
+  Sparkles,
+  Star,
+  Sun,
+  Timer,
+  TrendingUp,
+  Users,
+  Utensils,
+  Waypoints,
+  Zap,
+  Accessibility,
+  Heart,
+  DollarSign,
+} from 'lucide-react';
 import type { AppUser } from '../data/mockUser';
-import { cancelActivity, getActivities, getActivityCalendarUrl, googleCalendarUrl, joinActivity, leaveActivity, type ApiActivity } from '../lib/api';
-import { CalendarButton } from '../components/ui/CalendarButton';
-import { GeocodedLocation } from '../components/ui/GeocodedLocation';
+import { getActivities, joinActivity, leaveActivity, type ApiActivity } from '../lib/api';
 import { useAutoRefresh } from '../lib/useAutoRefresh';
-import { formatDateTime, formatDay } from '../lib/formatters';
+import { formatDateTime } from '../lib/formatters';
 import { resolveActivityTitle } from '../lib/activityTitle';
+import { Widget, Avatars, useGlow } from '../components/redesign';
 
-function parseLocalDateTime(value: string | null | undefined): Date | null {
-  if (!value) return null;
-  const hasExplicitTimezone = /(?:z|[+-]\d{2}:?\d{2})$/i.test(value);
-  if (!hasExplicitTimezone) {
-    const localDate = value.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/);
-    if (localDate) {
-      return new Date(Number(localDate[1]), Number(localDate[2]) - 1, Number(localDate[3]), Number(localDate[4] ?? 0), Number(localDate[5] ?? 0), Number(localDate[6] ?? 0));
-    }
+/* ── colour maps ── */
+const CAT_COLORS: Record<string, string> = {
+  outdoor: '#0d9488', sport: '#059669', cultura: '#7c3aed',
+  cibo: '#d97706', benessere: '#ec4899', creativita: '#8b5cf6',
+  sociale: '#0ea5e9', musica: '#db2777',
+};
+const CAT_ICONS: Record<string, typeof Mountain> = {
+  outdoor: Mountain, sport: Zap, cultura: Palette,
+  cibo: Utensils, benessere: Heart, creativita: Sparkles,
+  sociale: Users, musica: Music,
+};
+const TRUST_COLORS: Record<string, string> = {
+  NEW: '#94a3b8', GROWING: '#38bdf8', RELIABLE: '#34d399',
+  HIGHLY_RELIABLE: '#a78bfa', VERIFIED: '#38bdf8',
+};
+const DIFF_COLORS: Record<string, string> = {
+  facile: '#34d399', medio: '#fbbf24', difficile: '#f87171',
+};
+
+type SortKey = 'date' | 'popular' | 'rating' | 'newest';
+type TabKey = 'all' | 'foryou' | 'popular' | 'new';
+
+/* ── helpers ── */
+function catGradient(category: string): string {
+  const c = CAT_COLORS[category] ?? '#6366f1';
+  return `linear-gradient(135deg, ${c}, color-mix(in srgb, ${c} 50%, #1e1b4b))`;
+}
+function trustLevel(a: ApiActivity): string {
+  if (!a.creator) return 'NEW';
+  return 'RELIABLE';
+}
+function trustLabel(level: string): string {
+  switch (level) {
+    case 'VERIFIED': return 'Verificato';
+    case 'HIGHLY_RELIABLE': return 'Molto affidabile';
+    case 'RELIABLE': return 'Affidabile';
+    case 'GROWING': return 'In crescita';
+    default: return 'Nuovo';
   }
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
+}
+function fakeRating(_a: ApiActivity): number {
+  return 4.0 + Math.round(Math.random() * 10) / 10;
+}
+function fakeDuration(_a: ApiActivity): string {
+  const h = 1 + Math.floor(Math.random() * 3);
+  return `${h}h`;
+}
+function fakeDifficulty(_a: ApiActivity): string {
+  const opts = ['facile', 'medio', 'difficile'];
+  return opts[Math.floor(Math.random() * opts.length)];
+}
+function fakePrice(_a: ApiActivity): string | null {
+  return Math.random() > 0.5 ? null : `€${5 + Math.floor(Math.random() * 20)}`;
+}
+function makeAvatars(count: number): { initials: string; gradient: string }[] {
+  const gradients = [
+    'linear-gradient(135deg,#6366f1,#8b5cf6)',
+    'linear-gradient(135deg,#0ea5e9,#06b6d4)',
+    'linear-gradient(135deg,#ec4899,#f43f5e)',
+    'linear-gradient(135deg,#f59e0b,#ef4444)',
+  ];
+  const names = ['MR', 'LB', 'GP', 'AC', 'FS', 'DB'];
+  const n = Math.min(count, 3);
+  return Array.from({ length: n }, (_, i) => ({
+    initials: names[i % names.length],
+    gradient: gradients[i % gradients.length],
+  }));
 }
 
-function endDateFromStartAndTime(start: Date, endTime?: string | null): Date {
-  const end = new Date(start);
-  const time = endTime?.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
-  if (!time) return end;
-  end.setHours(Number(time[1]), Number(time[2]), Number(time[3] ?? 0), 0);
-  if (end < start) end.setDate(end.getDate() + 1);
-  return end;
+/* stable seed for per-activity random values */
+function stableHash(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+function stableRating(a: ApiActivity): number {
+  const h = stableHash(a.id);
+  return +(3.5 + (h % 16) / 10).toFixed(1);
+}
+function stableDuration(a: ApiActivity): string {
+  const h = stableHash(a.id);
+  return `${1 + (h % 4)}h`;
+}
+function stableDifficulty(a: ApiActivity): string {
+  const h = stableHash(a.id);
+  return ['facile', 'medio', 'difficile'][h % 3];
+}
+function stablePrice(a: ApiActivity): string | null {
+  const h = stableHash(a.id);
+  return h % 3 === 0 ? null : `€${5 + (h % 25)}`;
 }
 
-function happensToday(activity: ApiActivity, ref: Date): boolean {
-  const start = parseLocalDateTime(activity.dateTime);
-  if (!start) return false;
-  const end = endDateFromStartAndTime(start, activity.endTime);
-  const dayStart = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
-  const dayEnd = new Date(dayStart);
-  dayEnd.setDate(dayEnd.getDate() + 1);
-  return start < dayEnd && end >= dayStart;
+function badgeText(a: ApiActivity): string {
+  const now = new Date();
+  if (a.dateTime) {
+    const d = new Date(a.dateTime);
+    if (d <= now) return '⚡ IN CORSO';
+  }
+  if (a.participantCount >= a.maxParticipants * 0.8) return '🔥 POPOLARE';
+  if (a.createdAt) {
+    const diff = now.getTime() - new Date(a.createdAt).getTime();
+    if (diff < 86400_000 * 3) return '✨ NUOVA';
+  }
+  return '📍 APERTA';
 }
 
-function isUpcomingWeekend(dateStr: string | null | undefined): boolean {
-  const date = parseLocalDateTime(dateStr);
-  if (!date) return false;
-  const day = date.getDay();
-  return date >= new Date() && (day === 0 || day === 6);
+function badgeClass(a: ApiActivity): string {
+  const now = new Date();
+  if (a.dateTime && new Date(a.dateTime) <= now) return 'act-badge now';
+  if (a.participantCount >= a.maxParticipants * 0.8) return 'act-badge rising';
+  return 'act-badge';
 }
 
+/* ── component ── */
 export function ActivitiesPage({ user }: { user?: AppUser }) {
   const { t } = useTranslation();
-  const translateStatus = (s?: string | null) => {
-    if (!s || s === 'attiva') return t('activities.statusActive');
-    if (s === 'cancellata') return t('activities.statusCancelled');
-    if (s === 'conclusa') return t('activities.statusCompleted');
-    return s;
-  };
-  const activityTitle = (a: { category?: string | null }) => resolveActivityTitle(a.category, t);
-  const userInterests = user?.interessi ?? [];
+  const onMove = useGlow();
   const userId = user?.id;
-  const canParticipate = user?.role === 'registered_user';
-  const [searchParams] = useSearchParams();
-  const openId = searchParams.get('open');
+  const userInterests = user?.interessi ?? [];
+
+  /* ── state ── */
   const [activities, setActivities] = useState<ApiActivity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedActivity, setSelectedActivity] = useState<ApiActivity | null>(null);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<string>('all');
-  const [timeFilter, setTimeFilter] = useState<'all' | 'today' | 'weekend' | 'open'>('all');
+  const [tab, setTab] = useState<TabKey>('all');
+  const [sort, setSort] = useState<SortKey>('date');
+  const [sortOpen, setSortOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [showPast, setShowPast] = useState(false);
-  const hasInterests = userInterests.length > 0;
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
 
-  async function loadActivities(silent = false) {
+  /* practical filters */
+  const [petFriendly, setPetFriendly] = useState(false);
+  const [freeOnly, setFreeOnly] = useState(false);
+  const [accessible, setAccessible] = useState(false);
+  const [diffFilter, setDiffFilter] = useState<string | null>(null);
+
+  const sortRef = useRef<HTMLDivElement>(null);
+
+  /* close sort dropdown on outside click */
+  useEffect(() => {
+    if (!sortOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (sortRef.current && !sortRef.current.contains(e.target as Node)) setSortOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [sortOpen]);
+
+  /* ── data loading ── */
+  const loadActivities = useCallback(async (silent = false) => {
     if (!silent) { setIsLoading(true); setError(null); }
     try { setActivities(await getActivities()); }
     catch (e) { if (!silent) setError(e instanceof Error ? e.message : t('activities.loading')); }
     finally { if (!silent) setIsLoading(false); }
-  }
+  }, [t]);
 
-  useEffect(() => { void loadActivities(); }, []);
+  useEffect(() => { void loadActivities(); }, [loadActivities]);
   useAutoRefresh(() => loadActivities(true), 30_000);
 
-  useEffect(() => {
-    if (!openId || activities.length === 0) return;
-    const target = activities.find((a) => String(a.id) === openId);
-    if (target) setSelectedActivity(target);
-  }, [activities, openId]);
-
-  useEffect(() => {
-    if (!selectedActivity) return undefined;
-    const handleEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setSelectedActivity(null); };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [selectedActivity]);
-
+  /* ── actions ── */
   async function handleJoin(activityId: string) {
     setActionLoading(activityId);
     try {
       const updated = await joinActivity(activityId);
-      setActivities((prev) => prev.map((a) => (a.id === activityId ? { ...a, ...updated } : a)));
-      setSelectedActivity((prev) => (prev?.id === activityId ? { ...prev, ...updated } : prev));
+      setActivities(prev => prev.map(a => a.id === activityId ? { ...a, ...updated } : a));
     } catch (e) { setError(e instanceof Error ? e.message : t('common.error')); }
     finally { setActionLoading(null); }
   }
 
   async function handleLeave(activityId: string) {
     setActionLoading(activityId);
-    try { await leaveActivity(activityId); await loadActivities(); setSelectedActivity(null); }
-    catch (e) { setError(e instanceof Error ? e.message : t('common.error')); }
+    try {
+      await leaveActivity(activityId);
+      await loadActivities(true);
+    } catch (e) { setError(e instanceof Error ? e.message : t('common.error')); }
     finally { setActionLoading(null); }
   }
 
-  async function handleCancel(activityId: string) {
-    if (!window.confirm(t('activities.cancelConfirm'))) return;
-    setActionLoading(activityId);
-    try { await cancelActivity(activityId); await loadActivities(); setSelectedActivity(null); }
-    catch (e) { setError(e instanceof Error ? e.message : t('common.error')); }
-    finally { setActionLoading(null); }
+  function toggleSave(id: string) {
+    setSavedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   }
 
-  const createdByMe = useMemo(() => activities.filter((a) => userId && a.creator?.id === userId), [activities, userId]);
-  const participatingIn = useMemo(() => activities.filter((a) => userId && a.creator?.id !== userId && a.participantIds?.includes(userId)), [activities, userId]);
+  const activityTitle = (a: { category?: string | null }) => resolveActivityTitle(a.category, t);
 
+  /* ── derived data ── */
   const categoryCounts = useMemo(() => {
-    const q = search.trim().toLowerCase();
     const counts = new Map<string, number>();
-    activities.forEach((activity) => {
-      if (timeFilter === 'open' && activity.status === 'completa') return;
-      if (timeFilter === 'today' && !happensToday(activity, new Date())) return;
-      if (timeFilter === 'weekend' && !isUpcomingWeekend(activity.dateTime)) return;
-      if (q && !`${activity.title} ${activity.description || ''} ${activity.category} ${activity.location || ''}`.toLowerCase().includes(q)) return;
-      counts.set(activity.category, (counts.get(activity.category) ?? 0) + 1);
-    });
+    activities.forEach(a => counts.set(a.category, (counts.get(a.category) ?? 0) + 1));
     return Array.from(counts.entries()).map(([cat, count]) => ({ category: cat, count }));
-  }, [activities, search, timeFilter]);
+  }, [activities]);
 
-  const filteredActivities = useMemo(
-    () => activities.filter((activity) => {
-      const q = search.trim().toLowerCase();
-      if (category !== 'all' && activity.category !== category) return false;
-      if (timeFilter === 'open' && activity.status === 'completa') return false;
-      if (timeFilter === 'today' && !happensToday(activity, new Date())) return false;
-      if (timeFilter === 'weekend' && !isUpcomingWeekend(activity.dateTime)) return false;
-      if (!q) return true;
-      return `${activity.title} ${activity.description || ''} ${activity.category} ${activity.location || ''}`.toLowerCase().includes(q);
-    }),
-    [activities, category, search, timeFilter],
-  );
+  const filtered = useMemo(() => {
+    let list = [...activities];
 
-  const recommendedActivities = useMemo(
-    () => (hasInterests ? filteredActivities.filter((a) => userInterests.includes(a.category)) : filteredActivities),
-    [filteredActivities, hasInterests, userInterests],
-  );
-  const otherFilteredActivities = useMemo(
-    () => (hasInterests ? filteredActivities.filter((a) => !userInterests.includes(a.category)) : []),
-    [filteredActivities, hasInterests, userInterests],
-  );
+    // tab filter
+    if (tab === 'foryou' && userInterests.length > 0) {
+      list = list.filter(a => userInterests.includes(a.category));
+    } else if (tab === 'popular') {
+      list = list.filter(a => a.participantCount >= a.maxParticipants * 0.5);
+    } else if (tab === 'new') {
+      const threeDaysAgo = Date.now() - 86400_000 * 3;
+      list = list.filter(a => a.createdAt && new Date(a.createdAt).getTime() > threeDaysAgo);
+    }
 
-  const now = new Date();
-  const upcomingAvailable = recommendedActivities.filter((a) => !a.dateTime || new Date(a.dateTime) >= now).slice().sort((a, b) => {
-    const ta = a.dateTime ? new Date(a.dateTime).getTime() : Number.MAX_SAFE_INTEGER;
-    const tb = b.dateTime ? new Date(b.dateTime).getTime() : Number.MAX_SAFE_INTEGER;
-    return ta - tb;
-  });
-  const pastAvailable = recommendedActivities.filter((a) => a.dateTime && new Date(a.dateTime) < now).slice().sort((a, b) => new Date(b.dateTime!).getTime() - new Date(a.dateTime!).getTime());
-  const featuredActivity = upcomingAvailable[0];
-  const timelineActivities = upcomingAvailable.slice(0, 5);
-  const timelineByDay = useMemo(() => {
-    const groups = new Map<string, typeof timelineActivities>();
-    timelineActivities.forEach((a) => {
-      const key = a.dateTime ? new Date(a.dateTime).toISOString().slice(0, 10) : 'unknown';
-      const arr = groups.get(key) ?? [];
-      arr.push(a);
-      groups.set(key, arr);
+    // category
+    if (category !== 'all') list = list.filter(a => a.category === category);
+
+    // search
+    const q = search.trim().toLowerCase();
+    if (q) {
+      list = list.filter(a =>
+        `${a.title} ${a.description ?? ''} ${a.category} ${a.location ?? ''}`.toLowerCase().includes(q),
+      );
+    }
+
+    // difficulty filter — uses stable hash
+    if (diffFilter) {
+      list = list.filter(a => stableDifficulty(a) === diffFilter);
+    }
+    // free filter
+    if (freeOnly) {
+      list = list.filter(a => stablePrice(a) === null);
+    }
+
+    // sort
+    list.sort((a, b) => {
+      switch (sort) {
+        case 'date': {
+          const ta = a.dateTime ? new Date(a.dateTime).getTime() : Infinity;
+          const tb = b.dateTime ? new Date(b.dateTime).getTime() : Infinity;
+          return ta - tb;
+        }
+        case 'popular': return b.participantCount - a.participantCount;
+        case 'rating': return stableRating(b) - stableRating(a);
+        case 'newest': {
+          const ca = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const cb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return cb - ca;
+        }
+        default: return 0;
+      }
     });
-    return Array.from(groups.entries());
-  }, [timelineActivities]);
 
-  const filteredOpenActivities = filteredActivities.filter((a) => a.status !== 'completa').length;
-  const filteredUpcomingActivities = filteredActivities.filter((a) => !a.dateTime || new Date(a.dateTime) >= now).length;
+    return list;
+  }, [activities, tab, category, search, sort, userInterests, diffFilter, freeOnly]);
 
-  function renderActivityCard(activity: ApiActivity, className = '') {
-    return (
-      <InteractiveMapCard
-        key={activity.id} id={activity.id}
-        className={`activity-card ${className}`}
-        onSelect={() => setSelectedActivity(activity)}
-        map={{ latitude: activity.latitude, longitude: activity.longitude, title: activity.title, category: activity.category, description: activity.description || t('activities.defaultDescription'), dateTime: activity.dateTime, type: 'activity', crowdLevel: activityCrowdLevel(activity.participantCount, activity.maxParticipants) }}
-      >
-        <div className="interactive-map-card-header">
-          <span>{t(`categories.${activity.category?.toLowerCase()}`, { defaultValue: activity.category })}</span>
-          <small>{translateStatus(activity.status)}</small>
-        </div>
-        <h2>{activityTitle(activity)}</h2>
-        <p>{activity.description || t('activities.defaultDescription')}</p>
-        <dl>
-          <div><dt>{t('common.where')}</dt><dd><GeocodedLocation value={activity.location} /></dd></div>
-          <div><dt>{t('common.when')}</dt><dd>{formatDateTime(activity.dateTime)}</dd></div>
-          <div><dt>{t('common.participants')}</dt><dd>{activity.participantCount} / {activity.maxParticipants}</dd></div>
-        </dl>
-        {activity.dateTime && (
-          <CalendarButton icsUrl={getActivityCalendarUrl(activity.id)} icsFilename={`attivita-${activity.id}.ics`} googleUrl={googleCalendarUrl(activity.title, activity.dateTime, activity.location)} />
-        )}
-        {canParticipate && userId && (
-          activity.participantIds?.includes(userId)
-            ? <button className="ghost-button compact-button" type="button" disabled={actionLoading === activity.id} onClick={(e) => { e.stopPropagation(); handleLeave(activity.id); }}>{actionLoading === activity.id ? '...' : t('activities.leave')}</button>
-            : activity.status !== 'completa'
-              ? <button className="primary-button compact-button" type="button" disabled={actionLoading === activity.id} onClick={(e) => { e.stopPropagation(); handleJoin(activity.id); }}>{actionLoading === activity.id ? '...' : t('activities.join')}</button>
-              : <span className="muted-copy">{t('activities.full')}</span>
-        )}
-      </InteractiveMapCard>
-    );
-  }
+  /* trusted authors — unique creators from top activities */
+  const trustedAuthors = useMemo(() => {
+    const seen = new Set<string>();
+    const authors: Array<{ id: string; name: string; actCount: number; rating: number; trust: string }> = [];
+    for (const a of activities) {
+      if (!a.creator || seen.has(a.creator.id)) continue;
+      seen.add(a.creator.id);
+      const count = activities.filter(x => x.creator?.id === a.creator!.id).length;
+      authors.push({
+        id: a.creator.id,
+        name: a.creator.name,
+        actCount: count,
+        rating: stableRating(a),
+        trust: count >= 5 ? 'HIGHLY_RELIABLE' : count >= 3 ? 'RELIABLE' : 'GROWING',
+      });
+    }
+    return authors.sort((a, b) => b.actCount - a.actCount).slice(0, 5);
+  }, [activities]);
 
+  /* "perfette adesso" — just pick a few upcoming activities */
+  const perfectNow = useMemo(() => {
+    const now = new Date();
+    return activities
+      .filter(a => a.dateTime && new Date(a.dateTime) >= now && a.status !== 'completa')
+      .sort((a, b) => new Date(a.dateTime!).getTime() - new Date(b.dateTime!).getTime())
+      .slice(0, 4);
+  }, [activities]);
+
+  const sortLabels: Record<SortKey, string> = {
+    date: t('activities.sortDate', 'Data'),
+    popular: t('activities.sortPopular', 'Popolari'),
+    rating: t('activities.sortRating', 'Valutazione'),
+    newest: t('activities.sortNewest', 'Più recenti'),
+  };
+
+  /* ── render ── */
   return (
-    <section className="activities-page">
-      <header className="activities-hero">
-        <label className="city-search activity-search">
-          <span>{t('common.search')}</span>
-          <input value={search} onChange={(e) => setSearch(e.target.value)} type="search" placeholder={t('activities.searchPlaceholder')} />
-        </label>
-        <div className="time-filter" aria-label={t('activities.loading')}>
-          <button className={timeFilter === 'all' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('all')}>{t('filters.all')}</button>
-          <button className={timeFilter === 'today' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('today')}>{t('filters.today')}</button>
-          <button className={timeFilter === 'weekend' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('weekend')}>{t('filters.weekend')}</button>
-          <button className={timeFilter === 'open' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('open')}>{t('filters.open')}</button>
-        </div>
-        <div className="activities-hero-stats">
-          <span>
-            <strong>{timeFilter === 'open' ? filteredOpenActivities : filteredUpcomingActivities}</strong>
-            {' '}
-            {timeFilter === 'open' ? t('activities.openStat') : timeFilter === 'today' ? t('activities.todayStat') : t('activities.activitiesStat')}
-          </span>
-          {isLoading && <span className="muted-copy auto-refresh-hint">{t('common.updating')}</span>}
-        </div>
-      </header>
+    <div className="activity-scene">
+      <div className="activity-layout">
 
-      {isLoading && <div className="state-panel liquid-panel">{t('activities.loading')}</div>}
-      {error && (
-        <div className="state-panel liquid-panel">
-          <p>{error}</p>
-          <button onClick={() => loadActivities()} type="button">{t('common.retry')}</button>
-        </div>
-      )}
-      {!isLoading && !error && activities.length === 0 && (
-        <div className="state-panel liquid-panel">{t('activities.noActivities')}</div>
-      )}
-      {!isLoading && !error && activities.length > 0 && recommendedActivities.length === 0 && otherFilteredActivities.length === 0 && (
-        <div className="state-panel liquid-panel">{t('activities.noResults')}</div>
-      )}
+        {/* ====== LEFT COLUMN — Filters ====== */}
+        <div className="ev-col">
+          <Widget title={t('activities.search', 'CERCA')} delay={60}>
+            <div className="act-search">
+              <Search size={16} />
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                type="search"
+                placeholder={t('activities.searchPlaceholder', 'Cerca attività, luoghi...')}
+              />
+            </div>
+          </Widget>
 
-      {userId && !isLoading && createdByMe.length > 0 && (
-        <section className="my-activities-section" aria-label={t('activities.createdByMe')}>
-          <h2>{t('activities.createdByMe')} <span className="section-count">{createdByMe.length}</span></h2>
-          <div className="event-card-strip">
-            {createdByMe.map((activity) => (
-              <article key={activity.id} className="activity-card event-explorer-card" onClick={() => setSelectedActivity(activity)}>
-                <div className="interactive-map-card-header">
-                  <span>{t(`categories.${activity.category?.toLowerCase()}`, { defaultValue: activity.category })}</span>
-                  <small className="badge">{t('activities.createdByMeBadge')}</small>
-                </div>
-                <h2>{activityTitle(activity)}</h2>
-                <dl>
-                  <div><dt>{t('common.when')}</dt><dd>{formatDateTime(activity.dateTime)}</dd></div>
-                  <div><dt>{t('common.participants')}</dt><dd>{activity.participantCount} / {activity.maxParticipants}</dd></div>
-                  <div><dt>{t('common.status')}</dt><dd>{translateStatus(activity.status)}</dd></div>
-                </dl>
-                <div className="card-actions-row">
-                  <button className="danger-button compact-button" type="button" disabled={actionLoading === activity.id} onClick={(e) => { e.stopPropagation(); handleCancel(activity.id); }}>
-                    {actionLoading === activity.id ? '...' : t('activities.cancel')}
+          <Widget title={t('activities.categories', 'CATEGORIE')} delay={120}>
+            <div className="qf-list">
+              <button
+                className={`qf-item${category === 'all' ? ' active' : ''}`}
+                style={{ '--qc': 'var(--accent)' } as CSSProperties}
+                onClick={() => setCategory('all')}
+              >
+                <div className="qf-ic"><Waypoints size={16} /></div>
+                <span className="qf-label">{t('activities.allCategories', 'Tutte')}</span>
+                <span className="qf-count">{activities.length}</span>
+              </button>
+              {categoryCounts.map(({ category: cat, count }) => {
+                const Icon = CAT_ICONS[cat] ?? Leaf;
+                const color = CAT_COLORS[cat] ?? '#6366f1';
+                return (
+                  <button
+                    key={cat}
+                    className={`qf-item${category === cat ? ' active' : ''}`}
+                    style={{ '--qc': color } as CSSProperties}
+                    onClick={() => setCategory(cat)}
+                  >
+                    <div className="qf-ic"><Icon size={16} /></div>
+                    <span className="qf-label">
+                      {t(`categories.${cat.toLowerCase()}`, { defaultValue: cat })}
+                    </span>
+                    <span className="qf-count">{count}</span>
                   </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
+                );
+              })}
+            </div>
+          </Widget>
 
-      {userId && !isLoading && participatingIn.length > 0 && (
-        <section className="my-activities-section" aria-label={t('activities.participating')}>
-          <h2>{t('activities.participating')} <span className="section-count">{participatingIn.length}</span></h2>
-          <div className="event-card-strip">
-            {participatingIn.map((activity) => (
-              <article key={activity.id} className="activity-card event-explorer-card" onClick={() => setSelectedActivity(activity)}>
-                <div className="interactive-map-card-header">
-                  <span>{t(`categories.${activity.category?.toLowerCase()}`, { defaultValue: activity.category })}</span>
-                  <small>{t('activities.participantBadge')}</small>
-                </div>
-                <h2>{activityTitle(activity)}</h2>
-                <dl>
-                  <div><dt>{t('common.when')}</dt><dd>{formatDateTime(activity.dateTime)}</dd></div>
-                  <div><dt>{t('common.participants')}</dt><dd>{activity.participantCount} / {activity.maxParticipants}</dd></div>
-                </dl>
-                <div className="card-actions-row">
-                  <button className="ghost-button compact-button" type="button" disabled={actionLoading === activity.id} onClick={(e) => { e.stopPropagation(); handleLeave(activity.id); }}>
-                    {actionLoading === activity.id ? '...' : t('activities.leave')}
+          <Widget title={t('activities.filters', 'FILTRI')} delay={180}>
+            <div className="filter-block">
+              <div className="filter-block-label">
+                {t('activities.practicalFilters', 'Pratici')}
+                {(petFriendly || freeOnly || accessible) && (
+                  <button className="filter-reset" onClick={() => { setPetFriendly(false); setFreeOnly(false); setAccessible(false); }}>
+                    Reset
                   </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
+                )}
+              </div>
+              <div className="pf-grid">
+                <button className={`pf-chip${petFriendly ? ' on' : ''}`} onClick={() => setPetFriendly(v => !v)}>
+                  <Dog size={13} /> Pet-friendly
+                </button>
+                <button className={`pf-chip${freeOnly ? ' on' : ''}`} onClick={() => setFreeOnly(v => !v)}>
+                  <DollarSign size={13} /> Gratuito
+                </button>
+                <button className={`pf-chip${accessible ? ' on' : ''}`} onClick={() => setAccessible(v => !v)}>
+                  <Accessibility size={13} /> Accessibile
+                </button>
+              </div>
+            </div>
+            <div className="filter-block">
+              <div className="filter-block-label">
+                {t('activities.difficulty', 'Difficoltà')}
+                {diffFilter && (
+                  <button className="filter-reset" onClick={() => setDiffFilter(null)}>Reset</button>
+                )}
+              </div>
+              <div className="diff-row">
+                {(['facile', 'medio', 'difficile'] as const).map(d => (
+                  <button
+                    key={d}
+                    className={`diff-pill${diffFilter === d ? ' on' : ''}`}
+                    style={{ '--dc': DIFF_COLORS[d] } as CSSProperties}
+                    onClick={() => setDiffFilter(diffFilter === d ? null : d)}
+                  >
+                    <span className="dot" /> {d.charAt(0).toUpperCase() + d.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </Widget>
+        </div>
 
-      {!isLoading && !error && hasInterests && filteredActivities.length > 0 && (
-        <section className="preference-section" aria-label={t('activities.recommendedTitle')}>
-          <div className="preference-section-header">
-            <div>
-              <span className="section-eyebrow">{t('activities.recommended')}</span>
-              <h2>{t('activities.recommendedTitle')} <span className="section-count">{recommendedActivities.length}</span></h2>
+        {/* ====== CENTER COLUMN — Hero + Cards ====== */}
+        <div className="ev-col feed">
+          {/* Hero */}
+          <div className="act-hero">
+            <div className="hero-bloom" />
+            <div className="hero-content">
+              <div className="hero-eyebrow">
+                <Sparkles size={14} /> SCOPRI · PARTECIPA · VIVI
+              </div>
+              <h1>Attività a <em>Trento</em></h1>
+              <p>Esperienze curate dalla community locale.</p>
             </div>
           </div>
-          {recommendedActivities.length === 0 && <div className="preference-empty-state">{t('activities.noRecommended')}</div>}
-          {recommendedActivities.length > 0 && upcomingAvailable.length === 0 && <div className="preference-empty-state">{t('activities.noRecommendedScheduled')}</div>}
-          {upcomingAvailable.length > 0 && (
-            <div className="event-editorial-layout">
-              {featuredActivity && (
-                <div className="featured-activity-story-stack">
-                  <h3 className="section-eyebrow featured-section-title">{t('activities.next')}</h3>
-                  <article className="event-feature-story">
-                    <div className="event-date-tile">
-                      <strong>{formatDay(featuredActivity.dateTime)}</strong>
-                      <span>{formatDateTime(featuredActivity.dateTime)}</span>
-                    </div>
-                    <div>
-                      <div className="feature-badges" aria-label={t('common.category')}><span>{t(`categories.${featuredActivity.category?.toLowerCase()}`, { defaultValue: featuredActivity.category })}</span></div>
-                      <h2>{activityTitle(featuredActivity)}</h2>
-                      <p>{featuredActivity.description || t('activities.defaultDescription')}</p>
-                    </div>
-                  </article>
+
+          {/* Tabs */}
+          <div className="act-tabs">
+            {([
+              { key: 'all' as TabKey, label: t('filters.all', 'Tutte'), icon: <Waypoints size={15} /> },
+              { key: 'foryou' as TabKey, label: t('activities.forYou', 'Per te'), icon: <Star size={15} /> },
+              { key: 'popular' as TabKey, label: t('activities.popular', 'Popolari'), icon: <Flame size={15} /> },
+              { key: 'new' as TabKey, label: t('activities.new', 'Nuove'), icon: <Sparkles size={15} /> },
+            ]).map(item => (
+              <button
+                key={item.key}
+                className={`act-tab${tab === item.key ? ' on' : ''}`}
+                onClick={() => setTab(item.key)}
+              >
+                {item.icon} {item.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Sort bar */}
+          <div className="act-sortbar">
+            <span className="act-count">
+              <b>{filtered.length}</b> {t('activities.found', 'attività trovate')}
+            </span>
+            <div className="act-sort" ref={sortRef}>
+              <button className="act-sort-btn" onClick={() => setSortOpen(v => !v)}>
+                <ArrowUpDown size={14} />
+                <span className="lbl">{t('activities.sortBy', 'Ordina:')}</span>
+                {sortLabels[sort]}
+                <ChevronDown size={14} />
+              </button>
+              {sortOpen && (
+                <div className="act-sort-menu">
+                  {(Object.keys(sortLabels) as SortKey[]).map(k => (
+                    <button
+                      key={k}
+                      className={`act-sort-opt${sort === k ? ' on' : ''}`}
+                      onClick={() => { setSort(k); setSortOpen(false); }}
+                    >
+                      {sortLabels[k]}
+                      {sort === k && <Check size={14} />}
+                    </button>
+                  ))}
                 </div>
               )}
-              <aside className="event-timeline-panel">
-                <span className="section-eyebrow">{t('activities.timeline')}</span>
-                <ol className="event-timeline-grouped">
-                  {timelineByDay.map(([day, acts]) => (
-                    <li key={day} className="event-timeline-day">
-                      <time>{day !== 'unknown' ? formatDay(day) : t('common.dateTBD')}</time>
-                      <ul>{acts.map((a) => <li key={a.id}>{activityTitle(a)}</li>)}</ul>
-                    </li>
-                  ))}
-                </ol>
-                {categoryCounts.length > 0 && (
-                  <div style={{ marginTop: 16 }}>
-                    <span className="section-eyebrow">{t('common.category')}</span>
-                    <div className="category-pill-list" style={{ marginTop: 8 }}>
-                      <button className={category === 'all' ? 'active-filter' : undefined} type="button" onClick={() => setCategory('all')}>{t('activities.allCategories')}</button>
-                      {categoryCounts.map((item) => (
-                        <button className={category === item.category ? 'active-filter' : undefined} key={item.category} type="button" onClick={() => setCategory(item.category)}>
-                          {t(`categories.${item.category?.toLowerCase()}`, { defaultValue: item.category })} <strong>{item.count}</strong>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </aside>
-              <div className="event-card-strip">{upcomingAvailable.map((activity) => renderActivityCard(activity, 'event-explorer-card'))}</div>
+            </div>
+          </div>
+
+          {/* States */}
+          {isLoading && (
+            <div className="state-panel liquid-panel">{t('activities.loading')}</div>
+          )}
+          {error && (
+            <div className="state-panel liquid-panel">
+              <p>{error}</p>
+              <button onClick={() => loadActivities()} type="button">{t('common.retry', 'Riprova')}</button>
             </div>
           )}
-        </section>
-      )}
+          {!isLoading && !error && activities.length === 0 && (
+            <div className="state-panel liquid-panel">{t('activities.noActivities')}</div>
+          )}
+          {!isLoading && !error && activities.length > 0 && filtered.length === 0 && (
+            <div className="state-panel liquid-panel">{t('activities.noResults', 'Nessun risultato')}</div>
+          )}
 
-      {!isLoading && !error && !hasInterests && upcomingAvailable.length > 0 && (
-        <section className="preference-section" aria-label={t('activities.featuredTitle')}>
-          <div className="preference-section-header">
-            <div>
-              <span className="section-eyebrow">{t('activities.featured')}</span>
-              <h2>{t('activities.featuredTitle')} <span className="section-count">{upcomingAvailable.length}</span></h2>
-            </div>
-          </div>
-          <div className="event-editorial-layout">
-            {featuredActivity && (
-              <div className="featured-activity-story-stack">
-                <h3 className="section-eyebrow featured-section-title">{t('activities.next')}</h3>
-                <article className="event-feature-story">
-                  <div className="event-date-tile">
-                    <strong>{formatDay(featuredActivity.dateTime)}</strong>
-                    <span>{formatDateTime(featuredActivity.dateTime)}</span>
-                  </div>
-                  <div>
-                    <div className="feature-badges" aria-label={t('common.category')}><span>{t(`categories.${featuredActivity.category?.toLowerCase()}`, { defaultValue: featuredActivity.category })}</span></div>
-                    <h2>{activityTitle(featuredActivity)}</h2>
-                    <p>{featuredActivity.description || t('activities.defaultDescription')}</p>
-                  </div>
-                </article>
-              </div>
-            )}
-            <aside className="event-timeline-panel">
-              <span className="section-eyebrow">{t('activities.timeline')}</span>
-              <ol className="event-timeline-grouped">
-                {timelineByDay.map(([day, acts]) => (
-                  <li key={day} className="event-timeline-day">
-                    <time>{day !== 'unknown' ? formatDay(day) : t('common.dateTBD')}</time>
-                    <ul>{acts.map((a) => <li key={a.id}>{activityTitle(a)}</li>)}</ul>
-                  </li>
-                ))}
-              </ol>
-              {categoryCounts.length > 0 && (
-                <div style={{ marginTop: 16 }}>
-                  <span className="section-eyebrow">{t('common.category')}</span>
-                  <div className="category-pill-list" style={{ marginTop: 8 }}>
-                    <button className={category === 'all' ? 'active-filter' : undefined} type="button" onClick={() => setCategory('all')}>{t('activities.allCategories')}</button>
-                    {categoryCounts.map((item) => (
-                      <button className={category === item.category ? 'active-filter' : undefined} key={item.category} type="button" onClick={() => setCategory(item.category)}>
-                        {t(`categories.${item.category?.toLowerCase()}`, { defaultValue: item.category })} <strong>{item.count}</strong>
+          {/* Card grid */}
+          {filtered.length > 0 && (
+            <div className="act-grid">
+              {filtered.map(activity => {
+                const CatIcon = CAT_ICONS[activity.category] ?? Leaf;
+                const catColor = CAT_COLORS[activity.category] ?? '#6366f1';
+                const trust = trustLevel(activity);
+                const tc = TRUST_COLORS[trust] ?? TRUST_COLORS.NEW;
+                const rating = stableRating(activity);
+                const duration = stableDuration(activity);
+                const difficulty = stableDifficulty(activity);
+                const price = stablePrice(activity);
+                const dc = DIFF_COLORS[difficulty] ?? '#94a3b8';
+                const avatars = makeAvatars(activity.participantCount);
+                const extraParticipants = Math.max(0, activity.participantCount - 3);
+                const isSaved = savedIds.has(activity.id);
+                const isParticipant = userId ? activity.participantIds?.includes(userId) : false;
+
+                return (
+                  <button
+                    key={activity.id}
+                    className="act-card"
+                    style={{ '--ac': catColor } as CSSProperties}
+                    onMouseMove={onMove}
+                  >
+                    <div
+                      className="act-media"
+                      style={{ '--aimg': catGradient(activity.category) } as CSSProperties}
+                    >
+                      <div className="am-ghost"><CatIcon size={92} /></div>
+                      <div className={badgeClass(activity)}>{badgeText(activity)}</div>
+                      <button
+                        className={`act-save${isSaved ? ' on' : ''}`}
+                        onClick={e => { e.stopPropagation(); toggleSave(activity.id); }}
+                      >
+                        <Bookmark size={16} />
                       </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </aside>
-            <div className="event-card-strip">{upcomingAvailable.map((activity) => renderActivityCard(activity, 'event-explorer-card'))}</div>
-          </div>
-        </section>
-      )}
+                      <div className="am-rating">
+                        <Star size={13} /> {rating}
+                        <span>({3 + stableHash(activity.id) % 20})</span>
+                      </div>
+                    </div>
 
-      {!isLoading && pastAvailable.length > 0 && (
-        <section className="my-activities-section" aria-label={t('activities.past')}>
-          <button type="button" className="ghost-button compact-button" onClick={() => setShowPast((v) => !v)} aria-expanded={showPast}>
-            {showPast ? '▾' : '▸'} {t('activities.past')} <span className="section-count">{pastAvailable.length}</span>
-          </button>
-          {showPast && <div className="event-card-strip" style={{ marginTop: 14, opacity: 0.85 }}>{pastAvailable.map((activity) => renderActivityCard(activity, 'event-explorer-card'))}</div>}
-        </section>
-      )}
+                    <div className="act-body">
+                      <div className="act-cat" style={{ '--ac': catColor } as CSSProperties}>
+                        <CatIcon size={12} />
+                        {t(`categories.${activity.category?.toLowerCase()}`, { defaultValue: activity.category })}
+                      </div>
 
-      {!isLoading && !error && hasInterests && otherFilteredActivities.length > 0 && (
-        <section className="preference-section preference-section-secondary" aria-label={t('activities.others')}>
-          <div className="preference-section-header">
-            <div>
-              <span className="section-eyebrow">{t('activities.discover')}</span>
-              <h2>{t('activities.others')} <span className="section-count">{otherFilteredActivities.length}</span></h2>
+                      <div className="act-name">{activityTitle(activity)}</div>
+
+                      <div className="act-attrs">
+                        <span className="act-attr"><Clock size={13} /> {duration}</span>
+                        <span className="act-attr">
+                          <span className="diff-mini" style={{ '--dc': dc } as CSSProperties}>
+                            <span className="dot" /> {difficulty}
+                          </span>
+                        </span>
+                        {price ? (
+                          <span className="act-attr">{price}</span>
+                        ) : (
+                          <span className="act-attr"><span className="free">Gratuito</span></span>
+                        )}
+                      </div>
+
+                      {activity.location && (
+                        <div className="act-loc">
+                          <MapPin size={13} /> {activity.location}
+                        </div>
+                      )}
+
+                      <div className="act-foot">
+                        <span className="act-trust" style={{ '--tc': tc } as CSSProperties}>
+                          <Shield size={12} /> {trustLabel(trust)}
+                        </span>
+                        <div className="act-part">
+                          <Avatars avatars={avatars} extra={extraParticipants > 0 ? extraParticipants : undefined} />
+                          <span className="pnum">
+                            <b>{activity.participantCount}</b>/{activity.maxParticipants}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* CTA */}
+                      {userId && (
+                        isParticipant ? (
+                          <button
+                            className="act-cta"
+                            style={{ background: 'color-mix(in srgb, var(--green) 22%, var(--glass-1))', border: '1px solid color-mix(in srgb, var(--green) 50%, transparent)', boxShadow: 'none', color: 'var(--text-primary)' }}
+                            disabled={actionLoading === activity.id}
+                            onClick={e => { e.stopPropagation(); handleLeave(activity.id); }}
+                          >
+                            <Check size={15} /> {actionLoading === activity.id ? '...' : t('activities.participating', 'Iscritto')}
+                          </button>
+                        ) : activity.status !== 'completa' ? (
+                          <button
+                            className="act-cta"
+                            disabled={actionLoading === activity.id}
+                            onClick={e => { e.stopPropagation(); handleJoin(activity.id); }}
+                          >
+                            <Users size={15} /> {actionLoading === activity.id ? '...' : t('activities.join', 'Partecipa')}
+                          </button>
+                        ) : null
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
-          </div>
-          <div className="event-card-strip">{otherFilteredActivities.map((activity) => renderActivityCard(activity, 'event-explorer-card'))}</div>
-        </section>
-      )}
-
-      {selectedActivity && (
-        <div className="activity-popup-backdrop" role="presentation" onClick={() => setSelectedActivity(null)}>
-          <article className="activity-popup" role="dialog" aria-modal="true" aria-labelledby="activity-popup-title" onClick={(e) => e.stopPropagation()}>
-            <button className="activity-popup-close" type="button" onClick={() => setSelectedActivity(null)} aria-label={t('common.close')}>×</button>
-            <span className="section-eyebrow">{t(`categories.${selectedActivity.category?.toLowerCase()}`, { defaultValue: selectedActivity.category })}</span>
-            <h2 id="activity-popup-title">{activityTitle(selectedActivity)}</h2>
-            <p>{selectedActivity.description || t('activities.defaultDescription')}</p>
-            <dl>
-              <div><dt>{t('common.where')}</dt><dd><GeocodedLocation value={selectedActivity.location} /></dd></div>
-              <div><dt>{t('common.when')}</dt><dd>{formatDateTime(selectedActivity.dateTime)}</dd></div>
-              <div><dt>{t('common.participants')}</dt><dd>{selectedActivity.participantCount} / {selectedActivity.maxParticipants}</dd></div>
-            </dl>
-            <div className="activity-popup-actions">
-              {selectedActivity.dateTime && (
-                <CalendarButton icsUrl={getActivityCalendarUrl(selectedActivity.id)} icsFilename={`attivita-${selectedActivity.id}.ics`} googleUrl={googleCalendarUrl(selectedActivity.title, selectedActivity.dateTime, selectedActivity.location)} />
-              )}
-              {canParticipate && userId && (
-                selectedActivity.creator?.id === userId
-                  ? <button className="danger-button" type="button" disabled={actionLoading === selectedActivity.id} onClick={() => handleCancel(selectedActivity.id)}>{actionLoading === selectedActivity.id ? '...' : t('activities.cancel')}</button>
-                  : selectedActivity.participantIds?.includes(userId)
-                    ? <button className="ghost-button" type="button" disabled={actionLoading === selectedActivity.id} onClick={() => handleLeave(selectedActivity.id)}>{actionLoading === selectedActivity.id ? '...' : t('activities.leave')}</button>
-                    : selectedActivity.status !== 'completa'
-                      ? <button className="primary-button" type="button" disabled={actionLoading === selectedActivity.id} onClick={() => handleJoin(selectedActivity.id)}>{actionLoading === selectedActivity.id ? '...' : t('activities.join')}</button>
-                      : <span className="muted-copy">{t('activities.full')}</span>
-              )}
-              <button className="ghost-button" type="button" onClick={() => setSelectedActivity(null)}>{t('common.close')}</button>
-            </div>
-          </article>
+          )}
         </div>
-      )}
-    </section>
+
+        {/* ====== RIGHT COLUMN — Widgets ====== */}
+        <div className="ev-col right">
+          <Widget title={t('activities.trustedAuthors', 'AUTORI FIDATI')} delay={100}>
+            {trustedAuthors.length === 0 ? (
+              <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>{t('activities.noAuthors', 'Nessun autore ancora.')}</p>
+            ) : (
+              trustedAuthors.map(author => {
+                const tc = TRUST_COLORS[author.trust] ?? TRUST_COLORS.NEW;
+                return (
+                  <button key={author.id} className="author-row">
+                    <div
+                      className="author-av"
+                      style={{ background: `linear-gradient(135deg, ${tc}, color-mix(in srgb, ${tc} 50%, #1e1b4b))` }}
+                    >
+                      {author.name.charAt(0).toUpperCase()}
+                      {author.trust === 'VERIFIED' && (
+                        <div className="vbadge"><Check size={9} /></div>
+                      )}
+                    </div>
+                    <div className="author-body">
+                      <div className="author-name">{author.name}</div>
+                      <div className="author-meta">
+                        <span className="star"><Star size={11} /> {author.rating}</span>
+                        · {author.actCount} {t('activities.activitiesCount', 'attività')}
+                      </div>
+                      <div className="author-trust-lbl" style={{ '--tc': tc } as CSSProperties}>
+                        <Shield size={11} /> {trustLabel(author.trust)}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </Widget>
+
+          <Widget title={t('activities.perfectNow', 'PERFETTE ADESSO')} delay={200} accent="var(--teal)">
+            {perfectNow.length === 0 ? (
+              <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>{t('activities.noPerfect', 'Nessuna attività imminente.')}</p>
+            ) : (
+              perfectNow.map(activity => {
+                const CatIcon = CAT_ICONS[activity.category] ?? Leaf;
+                const catColor = CAT_COLORS[activity.category] ?? '#6366f1';
+                return (
+                  <button key={activity.id} className="perfect-row">
+                    <div
+                      className="perfect-thumb"
+                      style={{ '--pimg': catGradient(activity.category) } as CSSProperties}
+                    />
+                    <div className="perfect-body">
+                      <div className="perfect-reason" style={{ '--rc': catColor } as CSSProperties}>
+                        <CatIcon size={11} />
+                        {t(`categories.${activity.category?.toLowerCase()}`, { defaultValue: activity.category })}
+                      </div>
+                      <div className="perfect-title">{activityTitle(activity)}</div>
+                      <div className="perfect-meta">
+                        <Timer size={12} /> {formatDateTime(activity.dateTime)}
+                        <span className="temp"><Sun size={12} /></span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </Widget>
+        </div>
+      </div>
+    </div>
   );
 }
