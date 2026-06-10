@@ -3,6 +3,8 @@ node_modules/
 __pycache__/
 *.pyc
 .venv/
+frontend-new/node_modules/
+frontend-new/dist/
 
 #Environment
 .env
