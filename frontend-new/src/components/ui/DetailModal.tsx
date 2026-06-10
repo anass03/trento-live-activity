@@ -51,42 +51,106 @@ function MiniMap({ location }: { location?: any }) {
   );
 }
 
+// Occupancy → traffic-light colour. Near-full and full read red, matching the
+// site palette and the home parking widget.
+const parkingOcc = (item: any) => {
+  const total = item?.totalSpaces ?? item?.capacity ?? 0;
+  const free = item?.availableSpaces ?? item?.free ?? null;
+  return item?.occupancyPercentage ?? item?.occupancyPct ?? (total && free != null ? Math.round((1 - free / total) * 100) : null);
+};
+const parkingColor = (pct?: number | null) => {
+  if (pct == null) return "var(--text-muted)";
+  if (pct >= 85) return "var(--red)";
+  if (pct >= 60) return "var(--amber)";
+  return "var(--green)";
+};
+const parkingStatusLabel = (item: any, pct?: number | null) => {
+  if (item?.status === "full") return "Pieno";
+  if (pct == null) return "N/D";
+  // Keep the label in step with the colour bands (parkingColor) so an amber bar
+  // never reads "Disponibile".
+  return pct >= 85 ? "Quasi pieno" : pct >= 60 ? "Moderato" : "Disponibile";
+};
+const parkingTypeLabel = (item: any) => (item?.type === "bike" ? "Bici" : item?.type === "car" ? "Auto" : null);
+
 function ParkingContent({ data }: any) {
   const items = data?.items || data?.parkings || [];
   const [selected, setSelected] = useState<any>(items[0] || null);
   useEffect(() => setSelected(items[0] || null), [data]);
 
   if (!items.length) {
-    return <div className="widget-empty big">Parking data temporarily unavailable.</div>;
+    return <div className="widget-empty big">Dati parcheggi momentaneamente non disponibili.</div>;
   }
+
+  const selOcc = parkingOcc(selected);
+  const selColor = parkingColor(selOcc);
 
   return (
     <div className="dm-split">
       <div className="dm-list">
         {items.map((item: any) => {
-          const total = item.totalSpaces ?? item.capacity ?? 0;
-          const free = item.availableSpaces ?? item.free ?? null;
-          const occ = item.occupancyPercentage ?? item.occupancyPct ?? (total && free != null ? Math.round((1 - free / total) * 100) : null);
+          const occ = parkingOcc(item);
+          const c = parkingColor(occ);
+          const typeLbl = parkingTypeLabel(item);
           return (
             <button key={item.id || item.name} className={"dm-list-row" + ((selected?.id || selected?.name) === (item.id || item.name) ? " active" : "")} onClick={() => setSelected(item)}>
               <span>
                 <b>{item.name}</b>
-                <small>{item.address || item.area || item.description || "Trento"}</small>
+                <small>{[typeLbl, item.address || item.area || item.description || "Trento"].filter(Boolean).join(" · ")}</small>
               </span>
-              <span className="dm-pill">{pctLabel(occ)}</span>
+              <span className="dm-pill" style={{ color: c, borderColor: `color-mix(in srgb, ${c} 45%, transparent)`, background: `color-mix(in srgb, ${c} 16%, transparent)` }}>{pctLabel(occ)}</span>
             </button>
           );
         })}
       </div>
       <div className="dm-detail">
         <MiniMap location={selected} />
+        <div className="dm-occ" style={{ ["--occ" as any]: selColor }}>
+          <div className="dm-occ-top">
+            <span className="dm-occ-status">{parkingStatusLabel(selected, selOcc)}</span>
+            <span className="dm-occ-pct">{pctLabel(selOcc)} <small>occupato</small></span>
+          </div>
+          <div className="dm-occ-bar"><i style={{ width: `${selOcc ?? 0}%` }}></i></div>
+        </div>
         <div className="dm-fields-grid">
           <Field icon="pin" label="Area" value={selected?.address || selected?.area || selected?.description} />
           <Field icon="grid" label="Posti liberi" value={`${selected?.availableSpaces ?? selected?.free ?? "N/D"} / ${selected?.totalSpaces ?? selected?.capacity ?? "N/D"}`} />
-          <Field icon="gauge" label="Occupazione" value={pctLabel(selected?.occupancyPercentage ?? selected?.occupancyPct)} />
+          <Field icon="gauge" label="Tipo" value={parkingTypeLabel(selected) || "Parcheggio"} />
           <Field icon="clock" label="Aggiornato" value={fmtDate(selected?.lastUpdatedAt || selected?.updatedAt || data?.fetchedAt)} />
         </div>
         <div className="dm-source">Fonte: {selected?.sourceLabel || data?.source?.name || "Comune di Trento"}</div>
+      </div>
+    </div>
+  );
+}
+
+function AreasContent({ data }: any) {
+  const areas: any[] = data?.areas || [];
+  const [selected, setSelected] = useState<any>(areas[0] || null);
+  useEffect(() => setSelected(areas[0] || null), [data]);
+
+  if (!areas.length) {
+    return <div className="widget-empty big">Nessuna area monitorata disponibile.</div>;
+  }
+
+  return (
+    <div className="dm-split">
+      <div className="dm-list">
+        {areas.map((a: any, i: number) => {
+          const isActive = (selected?.name) === a.name;
+          return (
+            <button key={a.name || i} className={"dm-list-row" + (isActive ? " active" : "")} onClick={() => setSelected(a)}>
+              <span>
+                <b>{String(i + 1).padStart(2, "0")} · {a.name}</b>
+                <small>{a.eventsNearby ?? 0} eventi · {a.participants ?? 0} partecipanti</small>
+              </span>
+              <span className="dm-pill" style={{ color: a.color, borderColor: `color-mix(in srgb, ${a.color} 45%, transparent)`, background: `color-mix(in srgb, ${a.color} 16%, transparent)` }}>{a.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="dm-detail">
+        <AreaContent data={selected} />
       </div>
     </div>
   );
@@ -275,6 +339,7 @@ export function DetailModal({ open, type, title, accent = "var(--accent)", data,
     type === "parking" ? <ParkingContent data={data} /> :
     type === "weather" ? <WeatherContent data={data} /> :
     type === "alerts" ? <AlertsContent data={data} onAction={onAction} /> :
+    type === "areas" ? <AreasContent data={data} /> :
     type === "area" ? <AreaContent data={data} /> :
     type === "event" ? <EventContent data={data} onAction={onAction} /> :
     type === "activity" ? <ActivityContent data={data} onAction={onAction} /> :

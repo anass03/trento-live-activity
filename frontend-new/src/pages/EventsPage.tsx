@@ -335,21 +335,27 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
         categoria: filter === "all" ? undefined : filter
       });
       setEvents(data);
+    } catch (err: any) {
+      setError(err instanceof ApiError ? err.message : "Impossibile caricare gli eventi. Riprova.");
+      setLoading(false);
+      return;
+    }
 
-      // Load favorites
-      if (user?.id) {
+    // Favorites are a secondary enhancement: a failure here must never blank the
+    // events feed (which already loaded successfully above).
+    if (user?.id) {
+      try {
         const favs = await getFavorites();
         const savesMap: Record<string, boolean> = {};
         favs.forEach((f) => {
           if (f.markerType === "event") savesMap[f.markerId] = true;
         });
         setSaves(savesMap);
+      } catch (err) {
+        console.warn("Impossibile caricare i preferiti:", err);
       }
-    } catch (err: any) {
-      setError(err instanceof ApiError ? err.message : "Impossibile caricare gli eventi. Riprova.");
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   };
 
   useEffect(() => {

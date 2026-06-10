@@ -25,6 +25,7 @@ export const Icon = ({ name, size, style, className }: IconProps) => {
     run:      <><circle cx="13" cy="4.5" r="1.8" /><path d="M5 21l3-5 3.5-2 1-4 3 3 3 1" /><path d="M8 11l3-2 3 1" /></>,
     food:     <><path d="M5 3v7a2 2 0 0 0 2 2v9" /><path d="M9 3v9" /><path d="M5 3v4" /><path d="M9 3v4" /><path d="M18 3c-1.5 0-3 2-3 5s1 4 1 4v9" /><path d="M18 3v18" /></>,
     bike:     <><circle cx="6" cy="17" r="3.2" /><circle cx="18" cy="17" r="3.2" /><path d="M6 17l4-7h5l-3 7" /><path d="M10 10l-1.5-3H6" /><circle cx="15" cy="5" r="1" /></>,
+    car:      <><path d="M5 11l1.6-4.2A2 2 0 0 1 8.5 5.5h7a2 2 0 0 1 1.9 1.3L19 11" /><path d="M3 11h18v5a1 1 0 0 1-1 1h-1.5" /><path d="M5.5 17H4a1 1 0 0 1-1-1v-5" /><circle cx="7.5" cy="17" r="1.6" /><circle cx="16.5" cy="17" r="1.6" /></>,
     family:   <><circle cx="9" cy="6" r="2.4" /><circle cx="16" cy="7" r="2" /><path d="M5 21v-4a4 4 0 0 1 8 0v4" /><path d="M14 21v-3a3.5 3.5 0 0 1 6 0v3" /></>,
     warn:     <><path d="M12 3l9 16H3z" /><path d="M12 10v4" /><path d="M12 17h.01" /></>,
     cone:     <><path d="M10.5 4.5L6 19h12l-4.5-14.5a1.5 1.5 0 0 0-3 0z" /><path d="M4 19h16" /><path d="M8.2 11h7.6" /></>,

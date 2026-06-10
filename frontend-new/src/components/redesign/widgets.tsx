@@ -311,8 +311,48 @@ function ParkingRing({ pct }: any) {
   );
 }
 
+// Display preference for the parking widget: 'both' | 'car' | 'bike'.
+// Stored client-side so it works for anonymous visitors too (mirrors the theme).
+function getParkingPref(): string {
+  try { return localStorage.getItem("tla:parkingPref") || "both"; } catch { return "both"; }
+}
+
+function ParkingSection({ label, icon, items, color }: any) {
+  if (!items.length) return null;
+  return (
+    <div className="pk-section">
+      <div className="pk-section-label"><Icon name={icon} size={12} />{label}<span className="pk-section-count">{items.length}</span></div>
+      {items.map((p: any, i: number) => {
+        const occ = p.total > 0 ? 1 - p.free / p.total : 0;
+        const col = color(p.free, p.total);
+        return (
+          <div className="pk-item" key={i}>
+            <div className="pk-name">
+              <span className="led" style={{ "--led-color": col } as any}></span>{p.name}
+            </div>
+            <div className="pk-bar"><i style={{ width: (occ * 100) + "%", background: col, boxShadow: `0 0 8px ${col}` }}></i></div>
+            <div className="pk-count"><b>{p.free}</b> / {p.total}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function ParkingWidget({ delay, onOpen }: any) {
   const [parking, setParking] = useState<any>(null);
+  const [pref, setPref] = useState<string>(getParkingPref);
+
+  // Live-sync with the Settings control (same tab via custom event, other tabs via storage).
+  useEffect(() => {
+    const sync = () => setPref(getParkingPref());
+    window.addEventListener("tla:parkingpref", sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener("tla:parkingpref", sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -325,14 +365,10 @@ export function ParkingWidget({ delay, onOpen }: any) {
             free: p.free ?? 0,
             total: p.capacity,
             occupied: p.occupied ?? (p.capacity - (p.free ?? 0)),
-            status: p.status
+            status: p.status,
+            type: p.type === "bike" ? "bike" : "car",
           }));
-          const totalCapacity = list.reduce((acc, p) => acc + p.total, 0);
-          const totalFree = list.reduce((acc, p) => acc + p.free, 0);
-          const totalOccupied = totalCapacity - totalFree;
-          const avg = totalCapacity > 0 ? Math.round((totalOccupied / totalCapacity) * 100) : 0;
-          
-          setParking({ avg, list, raw: res });
+          setParking({ list, raw: res });
         }
       } catch (err) {
         console.warn("Parcheggi temporaneamente non disponibili:", err);
@@ -346,38 +382,41 @@ export function ParkingWidget({ delay, onOpen }: any) {
     };
   }, []);
 
-  const displayParking = parking || { avg: 0, list: [] };
+  const displayParking = parking || { list: [] };
 
   const color = (free: number, total: number) => {
-    const occ = 1 - free / total;
-    return occ > 0.8 ? "var(--red)" : occ > 0.55 ? "var(--amber)" : "var(--green)";
+    const occ = total > 0 ? 1 - free / total : 0;
+    return occ >= 0.85 ? "var(--red)" : occ >= 0.6 ? "var(--amber)" : "var(--green)";
   };
+
+  const showCar = pref !== "bike";
+  const showBike = pref !== "car";
+  const cars = displayParking.list.filter((p: any) => p.type === "car");
+  const bikes = displayParking.list.filter((p: any) => p.type === "bike");
+  const shown = [...(showCar ? cars : []), ...(showBike ? bikes : [])];
+
+  // Average occupancy across the currently-shown areas (capacity-weighted).
+  const cap = shown.reduce((acc: number, p: any) => acc + p.total, 0);
+  const free = shown.reduce((acc: number, p: any) => acc + p.free, 0);
+  const avg = cap > 0 ? Math.round(((cap - free) / cap) * 100) : 0;
+
+  const scopeLabel = pref === "car" ? "aree auto" : pref === "bike" ? "aree bici" : "aree auto e bici";
 
   return (
     <Widget title="Parcheggi" accent="var(--teal)" upd={parking?.raw?.source?.scrapedAt ? "Cache live" : "Non disponibile"} delay={delay}
       onClick={() => onOpen && onOpen({ type: "parking", title: "Parcheggi Trento", data: parking?.raw || { city: "Trento", items: [] } })}>
       <div className="pk-top">
-        <ParkingRing pct={displayParking.avg} />
+        <ParkingRing pct={avg} />
         <div className="pk-summary">
           <div className="big">Occupazione media</div>
-          <div className="sub">{displayParking.list.length} aree monitorate in tempo reale nel centro di Trento.</div>
+          <div className="sub">{shown.length} {scopeLabel} monitorate in tempo reale nel centro di Trento.</div>
         </div>
       </div>
-      <div className="pk-list widget-scroll" style={{ maxHeight: 96 }}>
-        {displayParking.list.length === 0 && <div className="widget-empty">Parking data temporarily unavailable.</div>}
-        {displayParking.list.map((p: any, i: number) => {
-          const occ = 1 - p.free / p.total;
-          const col = color(p.free, p.total);
-          return (
-            <div className="pk-item" key={i}>
-              <div className="pk-name">
-                <span className="led" style={{ "--led-color": col } as any}></span>{p.name}
-              </div>
-              <div className="pk-bar"><i style={{ width: (occ * 100) + "%", background: col, boxShadow: `0 0 8px ${col}` }}></i></div>
-              <div className="pk-count"><b>{p.free}</b> / {p.total}</div>
-            </div>
-          );
-        })}
+      <div className="pk-list widget-scroll" style={{ maxHeight: 150 }}>
+        {displayParking.list.length === 0 && <div className="widget-empty">Dati parcheggi momentaneamente non disponibili.</div>}
+        {displayParking.list.length > 0 && shown.length === 0 && <div className="widget-empty">Nessun parcheggio per il filtro selezionato.</div>}
+        {showCar && <ParkingSection label="Auto" icon="car" items={cars} color={color} />}
+        {showBike && <ParkingSection label="Bici" icon="bike" items={bikes} color={color} />}
       </div>
     </Widget>
   );
@@ -386,16 +425,17 @@ export function ParkingWidget({ delay, onOpen }: any) {
 /* ---------------- ACTIVE AREAS ---------------- */
 export function ActiveAreasWidget({ delay, areas, onOpen }: any) {
   const displayAreas = (areas || []).slice().sort((a: any, b: any) => (b.level || 0) - (a.level || 0));
+  // Clicking the widget chrome opens the full ranked list (not just the top area);
+  // clicking a row drills into that specific area.
   const openSummary = () => {
-    const first = displayAreas[0] || { name: "Aree più attive", level: 0, score: 0, label: "Nessuna area disponibile", color: "var(--text-muted)", events: 0, crowd: 0 };
-    onOpen && onOpen({ type: "area", title: first.name, data: first });
+    onOpen && onOpen({ type: "areas", title: "Aree più attive", accent: "var(--magenta)", data: { areas: displayAreas } });
   };
   return (
     <Widget title="Aree più attive" accent="var(--magenta)" upd={displayAreas.length ? "Live" : "Nessuna"} delay={delay} onClick={openSummary}>
       <div className="widget-scroll" style={{ maxHeight: 232 }}>
         {displayAreas.length === 0 && <div className="widget-empty">Nessuna area monitorata disponibile.</div>}
         {displayAreas.map((a: any, i: number) => (
-          <div className="area-row clickable-row" key={i} onClick={(event) => { event.stopPropagation(); onOpen && onOpen({ type: "area", title: a.name, data: a }); }}>
+          <div className="area-row clickable-row" key={i} onClick={(event) => { event.stopPropagation(); onOpen && onOpen({ type: "area", title: a.name, accent: a.color, data: a }); }}>
             <div className={"area-rank" + (i === 0 ? " top" : "")}>{String(i + 1).padStart(2, "0")}</div>
             <div className="area-body">
               <div className="area-name">{a.name}</div>

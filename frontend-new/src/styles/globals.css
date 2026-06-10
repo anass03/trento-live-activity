@@ -433,9 +433,11 @@ button { font-family: inherit; cursor: pointer; }
   box-shadow: 0 0 22px color-mix(in srgb, var(--accent) calc(45% * var(--glow)), transparent), inset 0 1px 0 rgba(255,255,255,0.18);
 }
 .brand-logo svg { width: 22px; height: 22px; }
-.brand-name { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
+.brand-name { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; text-shadow: var(--map-label-shadow); }
 .brand-name .live { color: var(--cyan); }
-.brand-sub { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.16em; color: var(--text-faint); text-transform: uppercase; margin-top: 4px; white-space: nowrap; }
+/* The brand sits directly on the map (no panel behind it), so the subtitle needs
+   a real text colour + the map-label shadow to stay legible over night tiles. */
+.brand-sub { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.16em; color: var(--text-muted); text-transform: uppercase; margin-top: 4px; white-space: nowrap; text-shadow: var(--map-label-shadow); }
 
 /* nav */
 .nav {
@@ -716,6 +718,19 @@ button { font-family: inherit; cursor: pointer; }
 .pk-summary .big { font-size: 13.5px; font-weight: 700; }
 .pk-summary .sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; line-height: 1.4; }
 .pk-list { display: flex; flex-direction: column; gap: 2px; }
+.pk-section + .pk-section { margin-top: 6px; }
+.pk-section-label {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--mono); font-size: 9px; font-weight: 600; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--text-muted);
+  padding: 7px 0 5px; border-bottom: 1px solid var(--border-soft-2);
+}
+.pk-section-label svg { width: 12px; height: 12px; opacity: 0.85; }
+.pk-section-count {
+  margin-left: auto; font-size: 9px; letter-spacing: 0.08em;
+  padding: 1px 7px; border-radius: 999px;
+  background: var(--chip-fill); color: var(--text-secondary);
+}
 .pk-item { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border-soft-2); }
 .pk-item:last-child { border-bottom: none; }
 .pk-name { font-size: 13px; font-weight: 600; flex: 1; display: flex; align-items: center; gap: 8px; }
@@ -1106,6 +1121,15 @@ button { font-family: inherit; cursor: pointer; }
 .dm-area-score b { display: block; font-size: 16px; }
 .dm-area-score small { display: block; color: var(--text-muted); margin-top: 4px; line-height: 1.35; }
 
+/* parking occupancy readout (colour driven by --occ) */
+.dm-occ { margin: 0 0 14px; padding: 13px 15px; border-radius: 15px; background: var(--chip-fill); border: 1px solid color-mix(in srgb, var(--occ, var(--accent)) 28%, var(--border-soft-2)); }
+.dm-occ-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.dm-occ-status { font-size: 14px; font-weight: 800; letter-spacing: -0.01em; color: var(--occ, var(--accent)); }
+.dm-occ-pct { font-family: var(--mono); font-size: 14px; font-weight: 700; color: var(--text-primary); white-space: nowrap; }
+.dm-occ-pct small { font-family: var(--mono); font-size: 9px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.12em; margin-left: 2px; }
+.dm-occ-bar { height: 9px; border-radius: 999px; background: var(--track-fill); overflow: hidden; }
+.dm-occ-bar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, color-mix(in srgb, var(--occ, var(--accent)) 55%, transparent), var(--occ, var(--accent))); box-shadow: 0 0 10px color-mix(in srgb, var(--occ, var(--accent)) 50%, transparent); transition: width 600ms cubic-bezier(.2,.8,.3,1); }
+
 @media (max-width: 760px) {
   .detail-modal,
   .login-modal { max-height: calc(100vh - 20px); border-radius: 18px; }
@@ -1134,6 +1158,12 @@ button { font-family: inherit; cursor: pointer; }
   --border-soft: rgba(47, 111, 78, 0.18);
   --border-soft-2: rgba(47, 111, 78, 0.10);
   --glass-highlight: rgba(255, 255, 255, 0.7);
+
+  /* Glass fills must invert in daylight: the night navies would read as a dead
+     grey slab over the Alpine-light scene (and bury dark day text on widgets).
+     Frosted whites with a faint brand-green tint keep panels legible. */
+  --glass-1: rgba(255, 255, 255, 0.82);
+  --glass-2: rgba(233, 243, 237, 0.70);
 
   --surface-1: rgba(255, 255, 255, 0.62);
   --bar-1: rgba(255, 255, 255, 0.80);

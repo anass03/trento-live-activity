@@ -197,6 +197,10 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
   const [interests, setInterests] = useState<string[]>([]);
   const [reliableOnly, setReliableOnly] = useState(false);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
+  /* parking display preference — client-side so it also applies to guests */
+  const [parkingPref, setParkingPref] = useState<string>(() => {
+    try { return localStorage.getItem("tla:parkingPref") || "both"; } catch { return "both"; }
+  });
 
   /* accessibility */
   const [reduceAnim, setReduceAnim] = useState(false);
@@ -366,6 +370,13 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
     }
   };
 
+  const handleParkingPref = (val: string) => {
+    setParkingPref(val);
+    try { localStorage.setItem("tla:parkingPref", val); } catch { /* ignore */ }
+    // Notify the parking widget (same tab) to re-read the preference instantly.
+    window.dispatchEvent(new CustomEvent("tla:parkingpref"));
+  };
+
   const handleAccessibility = async (key: string, val: boolean) => {
     let anim = reduceAnim;
     let contrast = highContrast;
@@ -530,6 +541,15 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
             <div className="s-div"></div>
             <SetRow label="Solo attività affidabili" sub="Mostra solo attività con autori certificati." on={reliableOnly} onChange={(val) => handlePreferences("rel", val)} disabled={savingSection === "pref"} />
             <SetRow label="Solo attività verificate" sub="Filtra contenuti verificati dalla community." on={verifiedOnly} onChange={(val) => handlePreferences("ver", val)} disabled={savingSection === "pref"} />
+            <div className="s-div"></div>
+            <div>
+              <div className="s-sublabel" style={{ marginBottom: 8 }}>Parcheggi mostrati</div>
+              <SetRadio value={parkingPref} onChange={handleParkingPref} options={[
+                { id: "both", label: "Auto e bici", icon: "grid" },
+                { id: "car",  label: "Solo auto",   icon: "car" },
+                { id: "bike", label: "Solo bici",   icon: "bike" },
+              ]} />
+            </div>
           </SetCard>
 
           {/* 6 — Accessibilità */}

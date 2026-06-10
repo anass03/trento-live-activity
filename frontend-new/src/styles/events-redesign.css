@@ -40,6 +40,11 @@
 /* header sits in normal flow here (sticky top) */
 .events-header {
   flex: none;
+  /* `.events-scene > *` puts every direct child (header + layout) on z-index:1,
+     so the later-in-DOM widget column would otherwise paint over the header's
+     profile dropdown. Lift the header above the content it overlaps. */
+  position: relative;
+  z-index: 30;
   border-bottom: 1px solid var(--border-soft-2);
   backdrop-filter: blur(14px);
   background: linear-gradient(180deg, color-mix(in srgb, var(--bg-deep) 42%, transparent), transparent);

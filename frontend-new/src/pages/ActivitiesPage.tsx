@@ -440,18 +440,24 @@ export function ActivityPage({ page, setPage, theme, setTheme, user, setSelected
         };
       });
       setBackendActivities(mapped);
+    } catch (err: any) {
+      setError(err instanceof ApiError ? err.message : "Impossibile caricare le attività. Riprova.");
+      setLoading(false);
+      return;
+    }
 
-      if (user?.id) {
+    // Favorites are secondary: a failure here must not blank the activities list.
+    if (user?.id) {
+      try {
         const favs = await getFavorites();
         const savesMap: Record<string, boolean> = {};
         favs.forEach((f) => { if (f.markerType === "activity") savesMap[f.markerId] = true; });
         setSaves(savesMap);
+      } catch (err) {
+        console.warn("Impossibile caricare i preferiti:", err);
       }
-    } catch (err: any) {
-      setError(err instanceof ApiError ? err.message : "Impossibile caricare le attività. Riprova.");
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   };
 
   useEffect(() => {
