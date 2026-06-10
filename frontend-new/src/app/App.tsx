@@ -5,6 +5,7 @@ import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Header } from "../components/layout/Header";
 import { TrentoMap } from "../components/map/TrentoMap";
+import { CreateActivityPanel } from "../components/map/CreateActivityPanel";
 import { ActiveAreasWidget, AlertsWidget, EventsWidget, MapLabels, MarkersLayer, ParkingWidget, WeatherWidget } from "../components/redesign/widgets";
 import { TrentoTweaks } from "../components/redesign/TrentoTweaks";
 import { LoginModal } from "../components/auth/LoginModal";
@@ -111,7 +112,8 @@ function MapControls({ zoom, setZoom, is3d, setIs3d, onLocate, onReset }: any) {
       <button className="mc-btn" onClick={onLocate}><Icon name="locate" size={17} />{t("home.locate")}</button>
       <div className="mc-div"></div>
       <button className="mc-btn" onClick={() => setZoom((z: number) => Math.max(11, +(z - 0.5).toFixed(2)))}><Icon name="minus" size={17} /></button>
-      <div className="mc-btn" style={{ fontFamily: "var(--mono)", fontSize: 12, minWidth: 50, pointerEvents: "none" }}>{Math.round(zoom * 10)}%</div>
+      {/* percentuale sul range di zoom della mappa (11–19) */}
+      <div className="mc-btn" style={{ fontFamily: "var(--mono)", fontSize: 12, minWidth: 50, pointerEvents: "none" }}>{Math.round(((Math.min(19, Math.max(11, zoom)) - 11) / 8) * 100)}%</div>
       <button className="mc-btn" onClick={() => setZoom((z: number) => Math.min(19, +(z + 0.5).toFixed(2)))}><Icon name="plus" size={17} /></button>
       <div className="mc-div"></div>
       <button className="mc-btn" onClick={onReset}><Icon name="layers" size={17} />{t("home.reset")}</button>
@@ -150,6 +152,8 @@ function HomeScene({ page, setPage, theme, setTheme, user }: any) {
   const [detail, setDetail] = useState<any>(null);
   const [mapData, setMapData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  // POI scelto dal popup mappa per creare un'attività (id + nome)
+  const [createPoi, setCreatePoi] = useState<{ id: string; title: string } | null>(null);
 
   useEffect(() => { document.documentElement.style.setProperty("--zoom", String(zoom)); }, [zoom]);
   
@@ -182,16 +186,21 @@ function HomeScene({ page, setPage, theme, setTheme, user }: any) {
     return mapData.markers.filter((m: any) => m.latitude != null && m.longitude != null).map((m: any) => {
       const { x, y } = getSvgCoordinates(m.latitude, m.longitude, m.title);
       
+      // I POI non sono eventi: tengono cat "poi" (pin dedicato sulla mappa,
+      // esclusi dai conteggi del filtro categorie).
       let cat = m.category || "cultura";
-      if (cat === "poi") cat = "outdoor";
-      if (cat === "parking") cat = "outdoor";
-      if (cat === "ciclismo" || cat === "verde" || cat === "sport") cat = "sport";
-      if (cat === "teatro" || cat === "cinema" || cat === "museo") cat = "cultura";
-      if (cat === "biblioteca" || cat === "studio" || cat === "aula_studio") cat = "cultura";
-      
-      const validCategories = ["musica", "cultura", "sport", "cibo", "outdoor", "famiglia"];
-      if (!validCategories.includes(cat)) {
-        cat = "cultura";
+      if (m.type === "poi") {
+        cat = "poi";
+      } else {
+        if (cat === "parking") cat = "outdoor";
+        if (cat === "ciclismo" || cat === "verde" || cat === "sport") cat = "sport";
+        if (cat === "teatro" || cat === "cinema" || cat === "museo") cat = "cultura";
+        if (cat === "biblioteca" || cat === "studio" || cat === "aula_studio") cat = "cultura";
+
+        const validCategories = ["musica", "cultura", "sport", "cibo", "outdoor", "famiglia"];
+        if (!validCategories.includes(cat)) {
+          cat = "cultura";
+        }
       }
 
       let timeStr = "Orario da definire";
@@ -361,6 +370,11 @@ function HomeScene({ page, setPage, theme, setTheme, user }: any) {
                 is3d={is3d}
                 onLocateRef={locateRef}
                 onResetRef={resetRef}
+                canCreateActivity={user?.role === "registered_user"}
+                onCreatePoi={(m) => {
+                  setPopup(null);
+                  setCreatePoi({ id: m.sourceId || m.id, title: m.title });
+                }}
               />
             </div>
           </div>
@@ -409,6 +423,14 @@ function HomeScene({ page, setPage, theme, setTheme, user }: any) {
           if (action === "open-activity-page") setPage("attivita");
         }}
       />
+
+      {createPoi && (
+        <CreateActivityPanel
+          poi={createPoi}
+          onClose={() => setCreatePoi(null)}
+          onCreated={loadMapData}
+        />
+      )}
 
     </div>
   );

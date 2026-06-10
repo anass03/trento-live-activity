@@ -17,6 +17,7 @@ const PUBLISH_CATEGORIES = [
 const DARK_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 const LIGHT_STYLE = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
 const TRENTO_CENTER: [number, number] = [11.1211, 46.0679];
+const isDarkTheme = (theme: string) => theme === "dark" || theme === "night";
 
 /* Mini-mappa per piazzare il pin dell'evento: un click posiziona/sposta il marker. */
 function PinPickerMap({ theme, pin, onPin }: {
@@ -34,7 +35,7 @@ function PinPickerMap({ theme, pin, onPin }: {
     if (!containerRef.current) return;
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: theme === "dark" ? DARK_STYLE : LIGHT_STYLE,
+      style: isDarkTheme(theme) ? DARK_STYLE : LIGHT_STYLE,
       center: TRENTO_CENTER,
       zoom: 13,
       attributionControl: false,
@@ -48,7 +49,7 @@ function PinPickerMap({ theme, pin, onPin }: {
   }, []);
 
   useEffect(() => {
-    mapRef.current?.setStyle(theme === "dark" ? DARK_STYLE : LIGHT_STYLE);
+    mapRef.current?.setStyle(isDarkTheme(theme) ? DARK_STYLE : LIGHT_STYLE);
   }, [theme]);
 
   useEffect(() => {
@@ -225,7 +226,7 @@ export function EntityPublishPage({ page, setPage, theme, setTheme, user }: any)
                     className="revamp-select"
                     value={poiId}
                     onChange={(e) => setPoiId(e.target.value)}
-                    style={{ height: "38px", width: "100%", background: "var(--chip-fill)", color: "var(--text-primary)", padding: "0 10px" }}
+                    style={{ height: "38px", width: "100%", padding: "0 10px" }}
                   >
                     <option value="">Seleziona un POI...</option>
                     {pois.map((p) => (

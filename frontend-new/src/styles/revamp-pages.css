@@ -338,11 +338,20 @@
 
 .revamp-select {
   height: 34px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--border-soft);
-  background: var(--glass-2); color: var(--text-secondary); font-family: inherit; font-size: 12.5px;
-  outline: none; transition: border-color 150ms ease;
+  background: var(--surface-1, var(--glass-2)); color: var(--text-primary); font-family: inherit; font-size: 13px;
+  font-weight: 500; outline: none; transition: border-color 150ms ease;
 }
 .revamp-select:focus { border-color: var(--accent); }
 .revamp-select option { background: var(--bg-deep-2); color: var(--text-primary); }
+:root[data-theme="day"] .revamp-select option { background: #ffffff; color: #1a2e22; }
+
+/* box suggerimenti AI nel pannello di creazione attività */
+.cap-ai-box {
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--chip-fill);
+  border: 1px solid var(--border-soft-2);
+}
 
 .revamp-textarea {
   width: 100%; min-height: 100px; padding: 12px; border-radius: 11px;

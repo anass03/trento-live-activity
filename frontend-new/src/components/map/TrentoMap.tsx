@@ -8,6 +8,10 @@ const DARK_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.
 const LIGHT_STYLE = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
 const TRENTO_CENTER: [number, number] = [11.1211, 46.0679];
 
+// Il tema dell'app circola come "night"/"day" (data-theme), ma storicamente
+// arrivava anche "dark": accetta entrambi per scegliere le tile scure.
+const isDarkTheme = (theme: string) => theme === "dark" || theme === "night";
+
 function getIconSvg(name: string, size = 15): string {
   const paths: Record<string, string> = {
     grid: `<rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" />`,
@@ -25,6 +29,17 @@ function getIconSvg(name: string, size = 15): string {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${paths[name] || paths.grid}</svg>`;
 }
 
+const CROWD_COLOR: Record<string, string> = {
+  green: "var(--green)",
+  yellow: "var(--amber)",
+  red: "var(--red)",
+};
+const CROWD_LABEL: Record<string, string> = {
+  green: "Affollamento basso",
+  yellow: "Affollamento medio",
+  red: "Affollamento alto",
+};
+
 interface TrentoMapProps {
   theme: "light" | "dark" | "auto";
   markers: any[];
@@ -36,6 +51,10 @@ interface TrentoMapProps {
   is3d: boolean;
   onLocateRef?: React.MutableRefObject<(() => void) | null>;
   onResetRef?: React.MutableRefObject<(() => void) | null>;
+  /* true quando l'utente loggato è un cittadino: abilita la CTA
+     "Crea attività qui" nel popup dei POI */
+  canCreateActivity?: boolean;
+  onCreatePoi?: (marker: any) => void;
 }
 
 export const TrentoMap = React.memo(function TrentoMap({
@@ -48,18 +67,21 @@ export const TrentoMap = React.memo(function TrentoMap({
   setZoom,
   is3d,
   onLocateRef,
-  onResetRef
+  onResetRef,
+  canCreateActivity,
+  onCreatePoi
 }: TrentoMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapInstance = useRef<maplibregl.Map | null>(null);
   const mapMarkers = useRef<maplibregl.Marker[]>([]);
+  const userDotMarker = useRef<maplibregl.Marker | null>(null);
   const [styleLoaded, setStyleLoaded] = useState(false);
 
   // Initialize Map
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const initialStyle = theme === "dark" ? DARK_STYLE : LIGHT_STYLE;
+    const initialStyle = isDarkTheme(theme) ? DARK_STYLE : LIGHT_STYLE;
 
     const map = new maplibregl.Map({
       container: containerRef.current,
@@ -81,11 +103,11 @@ export const TrentoMap = React.memo(function TrentoMap({
       setStyleLoaded(true);
     });
 
-    // Handle zoom callbacks to synchronize state
-    map.on("zoom", () => {
-      const currentZoom = parseFloat(map.getZoom().toFixed(2));
-      // Avoid circular updates by checking diff
-      setZoom(currentZoom);
+    // Sincronizza lo stato React solo a fine zoom: ascoltare "zoom" (che spara
+    // ad ogni frame) faceva rientrare il nuovo valore nell'effetto zoomTo e
+    // interrompeva le animazioni flyTo/easeTo a metà.
+    map.on("zoomend", () => {
+      setZoom(parseFloat(map.getZoom().toFixed(2)));
     });
 
     mapInstance.current = map;
@@ -100,18 +122,20 @@ export const TrentoMap = React.memo(function TrentoMap({
   useEffect(() => {
     const map = mapInstance.current;
     if (!map) return;
-    const styleUrl = theme === "dark" ? DARK_STYLE : LIGHT_STYLE;
+    const styleUrl = isDarkTheme(theme) ? DARK_STYLE : LIGHT_STYLE;
     setStyleLoaded(false);
     map.setStyle(styleUrl);
   }, [theme]);
 
-  // Handle camera changes based on zoom prop
+  // Handle camera changes based on zoom prop (i bottoni +/- dei controlli).
+  // Non interferire se la mappa sta già animando verso una destinazione
+  // (flyTo da marker/locate/reset): lo stato si riallinea sullo zoomend.
   useEffect(() => {
     const map = mapInstance.current;
-    if (!map) return;
+    if (!map || map.isMoving()) return;
     const currentZoom = parseFloat(map.getZoom().toFixed(2));
     if (Math.abs(currentZoom - zoom) > 0.05) {
-      map.zoomTo(zoom);
+      map.easeTo({ zoom, duration: 250 });
     }
   }, [zoom]);
 
@@ -132,13 +156,25 @@ export const TrentoMap = React.memo(function TrentoMap({
       onLocateRef.current = () => {
         const map = mapInstance.current;
         if (!map) return;
-        map.flyTo({
-          center: TRENTO_CENTER,
-          zoom: 15.5,
-          pitch: 60,
-          bearing: -20,
-          duration: 1200
-        });
+        const flyToFallback = () => map.flyTo({ center: TRENTO_CENTER, zoom: 15.5, duration: 1100 });
+        if (!navigator.geolocation) { flyToFallback(); return; }
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const m = mapInstance.current;
+            if (!m) return;
+            const coords: [number, number] = [pos.coords.longitude, pos.coords.latitude];
+            if (!userDotMarker.current) {
+              const dot = document.createElement("div");
+              dot.className = "tla-user-dot";
+              userDotMarker.current = new maplibregl.Marker({ element: dot }).setLngLat(coords).addTo(m);
+            } else {
+              userDotMarker.current.setLngLat(coords);
+            }
+            m.flyTo({ center: coords, zoom: Math.max(m.getZoom(), 16), duration: 1100 });
+          },
+          flyToFallback,
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+        );
       };
     }
     if (onResetRef) {
@@ -181,27 +217,36 @@ export const TrentoMap = React.memo(function TrentoMap({
 
     // Filter and add markers
     markers.forEach((m) => {
+      const isPoi = m.type === "poi";
       const dim = activeFilter !== "all" && activeFilter !== m.cat;
       const selected = selectedMarkerId === m.id;
-      
+      const crowd = m.raw?.crowdingStatus || "green";
+      const color = isPoi ? CROWD_COLOR[crowd] : catColor(m.cat);
+
+      // L'elemento esterno è posizionato da maplibre via transform inline:
+      // niente transform in CSS qui, le animazioni vivono sul .tla-pin interno.
       const el = document.createElement("div");
-      el.className = `marker ${m.live ? "live" : ""} ${dim ? "dimmed" : ""} ${selected ? "selected" : ""}`;
-      el.style.setProperty("--mc", catColor(m.cat));
-      el.style.pointerEvents = "auto";
-      
-      const dot = document.createElement("div");
-      dot.className = "marker-dot";
-      
-      const iconName = CAT_ICON[m.cat] || "grid";
-      dot.innerHTML = getIconSvg(iconName, 17);
-      el.appendChild(dot);
+      el.className = `tla-marker${isPoi ? " poi" : ""}${m.live ? " live" : ""}${dim ? " dimmed" : ""}${selected ? " selected" : ""}`;
+      el.style.setProperty("--mc", color);
+      if (selected) el.style.zIndex = "30";
+
+      const pin = document.createElement("div");
+      pin.className = "tla-pin";
+      pin.innerHTML = `<span class="tla-pin-ic">${getIconSvg(isPoi ? "pin" : (CAT_ICON[m.cat] || "grid"), 14)}</span>`;
+      el.appendChild(pin);
 
       // Add popup tooltip content only if NOT selected
       if (!selected) {
         const tip = document.createElement("div");
         tip.className = "marker-tip";
-        tip.style.setProperty("--mc", catColor(m.cat));
-        tip.innerHTML = `
+        tip.style.setProperty("--mc", color);
+        tip.innerHTML = isPoi
+          ? `
+          <div class="tip-cat">Punto di interesse</div>
+          <div class="tip-title">${m.title}</div>
+          <div class="tip-meta"><span class="tip-crowd-dot"></span>${CROWD_LABEL[crowd] || CROWD_LABEL.green}</div>
+        `
+          : `
           <div class="tip-cat">${catLabel(m.cat)}</div>
           <div class="tip-title">${m.title}</div>
           <div class="tip-meta">
@@ -209,6 +254,42 @@ export const TrentoMap = React.memo(function TrentoMap({
           </div>
         `;
         el.appendChild(tip);
+      } else if (isPoi) {
+        // POI selezionato: card con stato affollamento e creazione attività.
+        // Il flusso cittadino parte da qui: prima il POI, poi la categoria.
+        const popupDiv = document.createElement("div");
+        const placeBelow = (m.latitude ?? 46.067) > 46.07;
+        popupDiv.className = `event-popup poi-popup ${placeBelow ? "below" : ""}`;
+        popupDiv.style.setProperty("--ec", color);
+        popupDiv.innerHTML = `
+          <div class="ep-head">
+            <div class="ep-cat"><span class="ep-cat-ic">${getIconSvg("pin", 12)}</span>Punto di interesse</div>
+            <div class="ep-title">${m.title}</div>
+            <button class="ep-close" aria-label="Chiudi">${getIconSvg("x", 13)}</button>
+          </div>
+          <div class="ep-body">
+            <div class="ep-field">
+              <span class="ep-fic">${getIconSvg("grid", 14)}</span>
+              <div class="ep-ftext">
+                <div class="ep-flbl">Stato</div>
+                <div class="ep-fval">${CROWD_LABEL[crowd] || CROWD_LABEL.green}</div>
+              </div>
+            </div>
+            ${canCreateActivity
+              ? `<button class="ep-cta ep-create">${getIconSvg("pin", 15)} Crea attività qui</button>`
+              : `<div class="ep-flbl" style="text-align:center;padding:4px 0">Accedi come cittadino per creare un'attività qui</div>`}
+          </div>
+        `;
+        popupDiv.addEventListener("click", (e) => e.stopPropagation());
+        popupDiv.querySelector(".ep-close")?.addEventListener("click", (e) => {
+          e.stopPropagation();
+          onMarkerClick(null);
+        });
+        popupDiv.querySelector(".ep-create")?.addEventListener("click", (e) => {
+          e.stopPropagation();
+          onCreatePoi && onCreatePoi(m);
+        });
+        el.appendChild(popupDiv);
       } else {
         // Detailed Event Popup (React component HTML equivalent)
         const popupDiv = document.createElement("div");
@@ -283,13 +364,14 @@ export const TrentoMap = React.memo(function TrentoMap({
         onMarkerClick(m);
       });
 
-      const maplibreMarker = new maplibregl.Marker({ element: el })
+      // anchor "bottom": la punta del pin tocca la coordinata esatta
+      const maplibreMarker = new maplibregl.Marker({ element: el, anchor: "bottom" })
         .setLngLat([m.longitude ?? 11.121, m.latitude ?? 46.067])
         .addTo(map);
 
       mapMarkers.current.push(maplibreMarker);
     });
-  }, [markers, activeFilter, selectedMarkerId, styleLoaded]);
+  }, [markers, activeFilter, selectedMarkerId, styleLoaded, canCreateActivity]);
 
   return (
     <div 
