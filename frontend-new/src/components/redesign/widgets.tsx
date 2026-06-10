@@ -2,11 +2,9 @@
    Trento Live Activity — widgets, markers, labels
    =========================================================== */
 import { useEffect, useState } from "react";
-import { ALERTS, AREAS, EVENTS, MARKERS, PARKING, PLACES, WEATHER, catColor, catLabel } from "../../data/redesignData";
+import { CAT_ICON, MARKERS, PLACES, catColor, catLabel } from "../../data/redesignData";
 import { Icon, WxIcon } from "../ui/Icon";
-import { getParking } from "../../lib/api";
-
-export const CAT_ICON: Record<string, string> = { musica: "music", cultura: "landmark", sport: "run", cibo: "food", outdoor: "bike", famiglia: "family" };
+import { getCityAlerts, getParking, getTrentoWeather } from "../../lib/api";
 
 /* mouse-follow radial glow */
 export function useGlow() {
@@ -19,10 +17,18 @@ export function useGlow() {
 }
 
 /* generic glass widget shell */
-export function Widget({ title, accent, upd, children, style, delay }: any) {
+export function Widget({ title, accent, upd, children, style, delay, onClick, className }: any) {
   const onMove = useGlow();
   return (
-    <div className="widget anim-in" style={{ "--accent": accent, animationDelay: (delay || 0) + "ms", ...style }} onMouseMove={onMove}>
+    <div
+      className={"widget anim-in" + (onClick ? " clickable" : "") + (className ? ` ${className}` : "")}
+      style={{ "--accent": accent, animationDelay: (delay || 0) + "ms", ...style }}
+      onMouseMove={onMove}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e: any) => { if (e.key === "Enter" || e.key === " ") onClick(e); } : undefined}
+    >
       <div className="widget-inner">
         {title && (
           <div className="widget-head">
@@ -61,7 +67,7 @@ export function MapLabels() {
 
 /* ---------------- EVENT POPUP ---------------- */
 function EventPopup({ data, color, placeBelow, onClose }: any) {
-  const pct = Math.min(100, Math.round((data.going / data.cap) * 100));
+  const pct = data.cap > 0 ? Math.min(100, Math.round((data.going / data.cap) * 100)) : 0;
   return (
     <div className={"event-popup" + (placeBelow ? " below" : "")} style={{ "--ec": color }} onClick={(e) => e.stopPropagation()}>
       <div className="ep-head">
@@ -83,7 +89,7 @@ function EventPopup({ data, color, placeBelow, onClose }: any) {
             <div className="ep-flbl">Partecipanti</div>
             <div className="ep-part-bar"><i style={{ width: pct + "%" }}></i></div>
           </div>
-          <div className="ep-part-n"><b>{data.going}</b> / {data.cap}</div>
+          <div className="ep-part-n"><b>{data.going}</b>{data.cap > 0 ? ` / ${data.cap}` : ""}</div>
         </div>
         <button className="ep-cta"><Icon name="ticket" size={15} /> Partecipa</button>
       </div>
@@ -130,22 +136,65 @@ export function MarkersLayer({ active, onFocus, popup, onClosePopup, markers }: 
 }
 
 /* ---------------- WEATHER ---------------- */
-export function WeatherWidget({ delay }: any) {
+export function WeatherWidget({ delay, onOpen }: any) {
+  const [weather, setWeather] = useState<any>(null);
+
+  useEffect(() => {
+    let active = true;
+    const loadWeather = async () => {
+      try {
+        const data = await getTrentoWeather();
+        if (active) setWeather(data);
+      } catch (err) {
+        console.warn("Meteo temporaneamente non disponibile:", err);
+      }
+    };
+    loadWeather();
+    const interval = setInterval(loadWeather, 10 * 60 * 1000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  const current = weather?.current;
+  const daily = weather?.daily?.[0];
+  const hourly = weather?.hourly?.length
+    ? weather.hourly.slice(0, 6).map((h: any) => ({
+      h: new Date(h.time).toLocaleTimeString("it-IT", { hour: "2-digit" }),
+      t: h.temperature != null ? Math.round(h.temperature) : "--",
+      p: Math.max(0.12, Math.min(1, (h.precipitationProbability ?? 0) / 100)),
+    }))
+    : [];
+  const hasWeather = current?.temperature != null;
+  const display = {
+    loc: weather?.city ? `${weather.city}, IT` : "Trento, IT",
+    temp: hasWeather ? String(Math.round(current.temperature)) : "--",
+    cond: current?.condition || "Meteo temporaneamente non disponibile",
+    high: daily?.temperatureMax != null ? String(Math.round(daily.temperatureMax)) : "--",
+    low: daily?.temperatureMin != null ? String(Math.round(daily.temperatureMin)) : "--",
+    rain: daily?.precipitationProbabilityMax ?? "--",
+    wind: current?.windSpeed != null ? String(Math.round(current.windSpeed)) : "--",
+    hourly,
+  };
+
   return (
-    <Widget title="Meteo" accent="var(--cyan)" upd="In diretta" delay={delay}>
+    <Widget title="Meteo" accent="var(--cyan)" upd={weather?.unavailable ? "Non disponibile" : "Open-Meteo"} delay={delay}
+      onClick={() => onOpen && onOpen({ type: "weather", title: "Meteo a Trento", data: weather })}>
       <div className="wx-main">
         <WxIcon className="wx-icon" />
-        <div className="wx-temp">{WEATHER.temp}<sup>°C</sup></div>
-        <div className="wx-cond">{WEATHER.cond}</div>
-        <div className="wx-loc"><Icon name="pin" size={13} style={{ opacity: 0.6 }} />{WEATHER.loc}</div>
+        <div className="wx-temp">{display.temp}<sup>°C</sup></div>
+        <div className="wx-cond">{display.cond}</div>
+        <div className="wx-loc"><Icon name="pin" size={13} style={{ opacity: 0.6 }} />{display.loc}</div>
       </div>
       <div className="wx-stats">
-        <div className="wx-stat"><div className="lbl">Max / Min</div><div className="val">{WEATHER.high}° <span>/ {WEATHER.low}°</span></div></div>
-        <div className="wx-stat"><div className="lbl">Pioggia</div><div className="val">{WEATHER.rain}<span>%</span></div></div>
-        <div className="wx-stat"><div className="lbl">Vento</div><div className="val">{WEATHER.wind}<span> km/h</span></div></div>
+        <div className="wx-stat"><div className="lbl">Max / Min</div><div className="val">{display.high}° <span>/ {display.low}°</span></div></div>
+        <div className="wx-stat"><div className="lbl">Pioggia</div><div className="val">{display.rain}<span>%</span></div></div>
+        <div className="wx-stat"><div className="lbl">Vento</div><div className="val">{display.wind}<span> km/h</span></div></div>
       </div>
       <div className="wx-hourly">
-        {WEATHER.hourly.map((h, i) => (
+        {display.hourly.length === 0 && <div className="widget-empty compact">Meteo temporaneamente non disponibile.</div>}
+        {display.hourly.map((h: any, i: number) => (
           <div className="wx-hour" key={i}>
             <div className="t">{h.t}°</div>
             <div className="bar"><i style={{ height: 8 + h.p * 22 }}></i></div>
@@ -158,13 +207,46 @@ export function WeatherWidget({ delay }: any) {
 }
 
 /* ---------------- ALERTS ---------------- */
-export function AlertsWidget({ delay }: any) {
+export function AlertsWidget({ delay, onOpen }: any) {
+  const [alertsData, setAlertsData] = useState<any>(null);
+
+  useEffect(() => {
+    let active = true;
+    const loadAlerts = async () => {
+      try {
+        const data = await getCityAlerts();
+        if (active) setAlertsData(data);
+      } catch (err) {
+        console.warn("Avvisi città temporaneamente non disponibili:", err);
+      }
+    };
+    loadAlerts();
+    const interval = setInterval(loadAlerts, 5 * 60 * 1000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
+
   const ledClass: any = { red: "red", amber: "amber", blue: "blue", green: "green" };
+  const sevMap: any = {
+    high: { sev: "red", color: "var(--red)", icon: "cone", tag: "Urgente" },
+    medium: { sev: "amber", color: "var(--amber)", icon: "calendar", tag: "Medio" },
+    low: { sev: "blue", color: "var(--cyan)", icon: "cloud", tag: "Info" },
+    info: { sev: "green", color: "var(--green)", icon: "bus", tag: "Info" },
+  };
+  const displayAlerts = alertsData?.items?.length
+    ? alertsData.items.map((a: any) => ({ ...a, ...(sevMap[a.severity] || sevMap.info), desc: a.summary }))
+    : [];
+  const modalAlertsData = alertsData || { city: "Trento", items: [] };
+
   return (
-    <Widget title="Avvisi città" accent="var(--amber)" upd={ALERTS.length + " attivi"} delay={delay}>
+    <Widget title="Avvisi città" accent="var(--amber)" upd={displayAlerts.length + " attivi"} delay={delay}
+      onClick={() => onOpen && onOpen({ type: "alerts", title: "Avvisi città", data: modalAlertsData })}>
       <div className="widget-scroll" style={{ maxHeight: 150 }}>
-        {ALERTS.map((a) => (
-          <div className="alert-row" key={a.id} style={{ "--ac": a.color }}>
+        {displayAlerts.length === 0 && <div className="widget-empty big">Avvisi città temporaneamente non disponibili.</div>}
+        {displayAlerts.map((a: any) => (
+          <div className="alert-row" key={a.id} style={{ "--ac": a.color }} onClick={(e) => { e.stopPropagation(); onOpen && onOpen({ type: "alerts", title: "Avvisi città", data: modalAlertsData }); }}>
             <div className="alert-ic"><Icon name={a.icon} size={17} /></div>
             <div className="alert-body">
               <div className="alert-top">
@@ -178,7 +260,7 @@ export function AlertsWidget({ delay }: any) {
         ))}
       </div>
       <div className="widget-foot">
-        <button className="link-btn"><span>Vedi tutti gli avvisi ({ALERTS.length})</span> <Icon name="arrow" size={15} /></button>
+        <button className="link-btn"><span>Vedi tutti gli avvisi ({displayAlerts.length})</span> <Icon name="arrow" size={15} /></button>
       </div>
     </Widget>
   );
@@ -229,7 +311,7 @@ function ParkingRing({ pct }: any) {
   );
 }
 
-export function ParkingWidget({ delay }: any) {
+export function ParkingWidget({ delay, onOpen }: any) {
   const [parking, setParking] = useState<any>(null);
 
   useEffect(() => {
@@ -250,10 +332,10 @@ export function ParkingWidget({ delay }: any) {
           const totalOccupied = totalCapacity - totalFree;
           const avg = totalCapacity > 0 ? Math.round((totalOccupied / totalCapacity) * 100) : 0;
           
-          setParking({ avg, list });
+          setParking({ avg, list, raw: res });
         }
       } catch (err) {
-        console.error("Errore nel caricamento dei parcheggi:", err);
+        console.warn("Parcheggi temporaneamente non disponibili:", err);
       }
     };
     loadParking();
@@ -264,7 +346,7 @@ export function ParkingWidget({ delay }: any) {
     };
   }, []);
 
-  const displayParking = parking || PARKING;
+  const displayParking = parking || { avg: 0, list: [] };
 
   const color = (free: number, total: number) => {
     const occ = 1 - free / total;
@@ -272,7 +354,8 @@ export function ParkingWidget({ delay }: any) {
   };
 
   return (
-    <Widget title="Parcheggi" accent="var(--teal)" upd="Aggiornato ora" delay={delay}>
+    <Widget title="Parcheggi" accent="var(--teal)" upd={parking?.raw?.source?.scrapedAt ? "Cache live" : "Non disponibile"} delay={delay}
+      onClick={() => onOpen && onOpen({ type: "parking", title: "Parcheggi Trento", data: parking?.raw || { city: "Trento", items: [] } })}>
       <div className="pk-top">
         <ParkingRing pct={displayParking.avg} />
         <div className="pk-summary">
@@ -281,6 +364,7 @@ export function ParkingWidget({ delay }: any) {
         </div>
       </div>
       <div className="pk-list widget-scroll" style={{ maxHeight: 96 }}>
+        {displayParking.list.length === 0 && <div className="widget-empty">Parking data temporarily unavailable.</div>}
         {displayParking.list.map((p: any, i: number) => {
           const occ = 1 - p.free / p.total;
           const col = color(p.free, p.total);
@@ -300,13 +384,18 @@ export function ParkingWidget({ delay }: any) {
 }
 
 /* ---------------- ACTIVE AREAS ---------------- */
-export function ActiveAreasWidget({ delay, areas }: any) {
-  const displayAreas = areas || AREAS;
+export function ActiveAreasWidget({ delay, areas, onOpen }: any) {
+  const displayAreas = (areas || []).slice().sort((a: any, b: any) => (b.level || 0) - (a.level || 0));
+  const openSummary = () => {
+    const first = displayAreas[0] || { name: "Aree più attive", level: 0, score: 0, label: "Nessuna area disponibile", color: "var(--text-muted)", events: 0, crowd: 0 };
+    onOpen && onOpen({ type: "area", title: first.name, data: first });
+  };
   return (
-    <Widget title="Aree più attive" accent="var(--magenta)" upd="Live" delay={delay}>
+    <Widget title="Aree più attive" accent="var(--magenta)" upd={displayAreas.length ? "Live" : "Nessuna"} delay={delay} onClick={openSummary}>
       <div className="widget-scroll" style={{ maxHeight: 232 }}>
+        {displayAreas.length === 0 && <div className="widget-empty">Nessuna area monitorata disponibile.</div>}
         {displayAreas.map((a: any, i: number) => (
-          <div className="area-row" key={i}>
+          <div className="area-row clickable-row" key={i} onClick={(event) => { event.stopPropagation(); onOpen && onOpen({ type: "area", title: a.name, data: a }); }}>
             <div className={"area-rank" + (i === 0 ? " top" : "")}>{String(i + 1).padStart(2, "0")}</div>
             <div className="area-body">
               <div className="area-name">{a.name}</div>
@@ -323,13 +412,14 @@ export function ActiveAreasWidget({ delay, areas }: any) {
 }
 
 /* ---------------- EVENTS ---------------- */
-export function EventsWidget({ delay, onFocus, events }: any) {
-  const displayEvents = events || EVENTS;
+export function EventsWidget({ delay, onFocus, events, onWidgetClick }: any) {
+  const displayEvents = events || [];
   return (
-    <Widget title="Prossimi eventi" accent="var(--cyan)" upd={displayEvents.length + " oggi"} delay={delay}>
+    <Widget title="Prossimi eventi" accent="var(--cyan)" upd={displayEvents.length + " oggi"} delay={delay} onClick={onWidgetClick}>
       <div className="widget-scroll" style={{ maxHeight: 300, margin: "0 -10px", padding: "0 10px" }}>
+        {displayEvents.length === 0 && <div className="widget-empty big">Nessun evento disponibile al momento.</div>}
         {displayEvents.map((e: any) => (
-          <div className="ev-row" key={e.id} style={{ "--ec": catColor(e.cat) }} onClick={() => onFocus && onFocus(e)}>
+          <div className="ev-row" key={e.id} style={{ "--ec": catColor(e.cat) }} onClick={(event) => { event.stopPropagation(); onFocus && onFocus(e); }}>
             <div className="ev-thumb" style={{ background: e.img }}><div className="ev-dot"></div></div>
             <div className="ev-body">
               <div className="ev-time">{e.start} – {e.end}</div>

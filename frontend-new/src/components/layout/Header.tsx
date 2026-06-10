@@ -1,7 +1,31 @@
+import { useEffect, useRef, useState } from "react";
+import { logout as apiLogout } from "../../lib/api";
 import { Icon } from "../ui/Icon";
 
 export function Header({ page, setPage, theme, setTheme, user }: any) {
   const role = user?.role || "anonymous";
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!profileOpen) return;
+    const close = (event: MouseEvent) => {
+      if (!profileRef.current?.contains(event.target as Node)) setProfileOpen(false);
+    };
+    window.addEventListener("mousedown", close);
+    return () => window.removeEventListener("mousedown", close);
+  }, [profileOpen]);
+
+  const go = (id: string) => {
+    setProfileOpen(false);
+    setPage(id);
+  };
+
+  const handleLogout = async () => {
+    setProfileOpen(false);
+    await apiLogout();
+    setPage("login");
+  };
 
   let nav = [
     { id: "home", label: "Home", icon: "home" },
@@ -75,8 +99,32 @@ export function Header({ page, setPage, theme, setTheme, user }: any) {
           <span className={"tt-ic" + (theme === "night" ? " on" : "")}><Icon name="moon" size={15} /></span>
           <span className={"tt-ic" + (theme === "day" ? " on" : "")}><Icon name="sun" size={15} /></span>
         </button>
-        <div className="avatar" style={{ cursor: "pointer" }} onClick={() => setPage("profilo")}>
-          {user?.avatar || "MR"}
+        <div className="profile-menu-wrap" ref={profileRef}>
+          <button className="avatar avatar-btn" onClick={() => setProfileOpen((v) => !v)} aria-label="Profilo" aria-expanded={profileOpen}>
+            {user?.avatar || "O"}
+          </button>
+          {profileOpen && (
+            <div className="profile-menu">
+              <div className="profile-menu-head">
+                <div className="profile-menu-av">{user?.avatar || "O"}</div>
+                <div>
+                  <div className="profile-menu-name">{user?.name || "Ospite"}</div>
+                  <div className="profile-menu-email">{role === "anonymous" ? "Accesso ospite" : user?.email}</div>
+                </div>
+              </div>
+              {role === "anonymous" ? (
+                <button className="profile-menu-item primary" onClick={() => go("login")}><Icon name="logIn" size={15} />Accedi</button>
+              ) : (
+                <>
+                  <button className="profile-menu-item" onClick={() => go("profilo")}><Icon name="user" size={15} />Profilo</button>
+                  <button className="profile-menu-item" onClick={() => go("attivita")}><Icon name="activity" size={15} />Le mie attivita</button>
+                  <button className="profile-menu-item" onClick={() => go("profilo")}><Icon name="bookmark" size={15} />Salvati</button>
+                  <button className="profile-menu-item" onClick={() => go("impostazioni")}><Icon name="settings" size={15} />Impostazioni</button>
+                  <button className="profile-menu-item danger" onClick={handleLogout}><Icon name="logOut" size={15} />Logout</button>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

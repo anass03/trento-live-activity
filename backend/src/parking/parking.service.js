@@ -58,6 +58,32 @@ function normalize(item) {
   };
 }
 
+function publicStatusFromOccupancy(pct) {
+  if (pct == null) return 'unknown';
+  if (pct >= 98) return 'full';
+  if (pct >= 85) return 'almost_full';
+  return 'available';
+}
+
+function toPublicItem(parking) {
+  return {
+    id: `parking_trento_${parking.id}`,
+    name: parking.name,
+    address: parking.address || parking.description || null,
+    area: parking.address || parking.description || null,
+    latitude: parking.latitude,
+    longitude: parking.longitude,
+    availableSpaces: parking.free,
+    totalSpaces: parking.capacity,
+    occupancyPercentage: parking.occupancyPct,
+    status: publicStatusFromOccupancy(parking.occupancyPct),
+    lastUpdatedAt: parking.updatedAt,
+    sourceLabel: 'Comune di Trento parking registry',
+    type: parking.type,
+    link: parking.link,
+  };
+}
+
 async function fetchUpstream() {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -102,9 +128,23 @@ async function getParking() {
   // Cars first, then bikes; alphabetical within each group.
   parkings.sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name) : a.type === 'car' ? -1 : 1));
 
-  cache = { at: Date.now(), data: { parkings, fetchedAt: new Date().toISOString() } };
+  const fetchedAt = new Date().toISOString();
+  cache = {
+    at: Date.now(),
+    data: {
+      city: 'Trento',
+      source: {
+        name: 'Comune di Trento parking registry',
+        url: SOURCE_URL,
+        scrapedAt: fetchedAt,
+      },
+      items: parkings.map(toPublicItem),
+      parkings,
+      fetchedAt,
+    }
+  };
   logger.info('parking_refreshed', { count: parkings.length });
   return cache.data;
 }
 
-module.exports = { getParking, _normalize: normalize, _parseGeom: parseGeom };
+module.exports = { getParking, _normalize: normalize, _parseGeom: parseGeom, _toPublicItem: toPublicItem };

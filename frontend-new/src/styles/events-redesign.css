@@ -13,12 +13,13 @@
   flex-direction: column;
   overflow: hidden;
   background: var(--scene-bg);
+  background-attachment: fixed;
   transition: background 550ms ease;
 }
 /* atmospheric bloom layer behind panels (echoes the home vignette) */
 .events-scene::before {
   content: "";
-  position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
   background:
     radial-gradient(680px 520px at 82% 4%, color-mix(in srgb, var(--violet) 16%, transparent), transparent 60%),
     radial-gradient(640px 520px at 4% 88%, color-mix(in srgb, var(--magenta) 12%, transparent), transparent 62%),
@@ -285,7 +286,7 @@
   30% { box-shadow: var(--widget-shadow-hover), 0 0 44px color-mix(in srgb, var(--pc) 60%, transparent), inset 0 1px 0 var(--inset-hi-strong); border-color: color-mix(in srgb, var(--pc) 60%, transparent); }
 }
 
-/* post media (gradient placeholder — consistent with home thumbnails) */
+/* post media (category gradient, consistent with home thumbnails) */
 .post-media { position: relative; overflow: hidden; min-height: 188px; background: var(--pimg); }
 .post-media::after {
   content: ""; position: absolute; inset: 0;

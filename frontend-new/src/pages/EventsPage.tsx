@@ -4,7 +4,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Header } from "../components/layout/Header";
 import { Avatars } from "../components/redesign/Avatars";
-import { CAT_ICON, Widget, useGlow } from "../components/redesign/widgets";
+import { Widget, useGlow } from "../components/redesign/widgets";
+import { CAT_ICON } from "../data/redesignData";
 import { Icon } from "../components/ui/Icon";
 import { catColor, catLabel as tlaCatLabel } from "../data/redesignData";
 import { CommentsSection } from "../components/redesign/CommentsSection";
@@ -330,11 +331,19 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
     loadEventsData();
   }, [filter, search, user?.id]);
 
+  const requireAuth = () => {
+    if (user?.role !== "anonymous" && user?.id) return true;
+    setPage("login");
+    return false;
+  };
+
   const handleLike = (id: string) => {
+    if (!requireAuth()) return;
     setLikes((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
   const handleSave = async (id: string) => {
+    if (!requireAuth()) return;
     const isSaved = !!saves[id];
     setSaves((prev) => ({ ...prev, [id]: !isSaved }));
     try {
@@ -391,6 +400,7 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
             saved={nextEvent ? !!saves[nextEvent.id] : false}
             onJoin={async () => {
               if (!nextEvent) return;
+              if (!requireAuth()) return;
               const isJoined = !!(nextEvent.participantIds?.includes(user?.id || ""));
               try {
                 if (isJoined) {

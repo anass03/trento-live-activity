@@ -6,14 +6,15 @@ import { Header } from "../components/layout/Header";
 import { TrentoMap } from "../components/map/TrentoMap";
 import { ActiveAreasWidget, AlertsWidget, EventsWidget, MapLabels, MarkersLayer, ParkingWidget, WeatherWidget } from "../components/redesign/widgets";
 import { TrentoTweaks } from "../components/redesign/TrentoTweaks";
+import { LoginModal } from "../components/auth/LoginModal";
 import { Icon } from "../components/ui/Icon";
-import { CATEGORIES, MARKERS, EVENTS, AREAS } from "../data/redesignData";
+import { DetailModal } from "../components/ui/DetailModal";
+import { CATEGORIES, MARKERS, catColor } from "../data/redesignData";
 import { ActivityPage } from "../pages/ActivitiesPage";
 import { EventsPage } from "../pages/EventsPage";
 import { SettingsPage } from "../pages/SettingsPage";
 import { ActivityDetailPage } from "../pages/ActivityDetailPage";
 import { EventDetailPage } from "../pages/EventDetailPage";
-import { LoginPage } from "../pages/LoginPage";
 import { RegistrationPage } from "../pages/RegistrationPage";
 import { PasswordResetPage } from "../pages/PasswordResetPage";
 import { ProfilePage } from "../pages/ProfilePage";
@@ -31,8 +32,7 @@ import { AdminModerationPage } from "../pages/AdminModerationPage";
 import { AdminNotificationsPage } from "../pages/AdminNotificationsPage";
 import { PrivacyPage } from "../pages/PrivacyPage";
 import { TermsPage } from "../pages/TermsPage";
-import { PlaceholderPage } from "../pages/PlaceholderPage";
-import { getMe, getToken, setToken, logout as apiLogout, login as apiLogin, UserRole, getHomeMapData } from "../lib/api";
+import { getMe, getToken, setToken, UserRole, getHomeMapData } from "../lib/api";
 import "../styles/revamp-pages.css";
 
 function getSvgCoordinates(lat: number, lng: number, placeName?: string | null): { x: number, y: number } {
@@ -57,6 +57,23 @@ function getSvgCoordinates(lat: number, lng: number, placeName?: string | null):
     x: Math.max(10, Math.min(90, x)),
     y: Math.max(10, Math.min(90, y))
   };
+}
+
+function distanceKm(aLat?: number | null, aLng?: number | null, bLat?: number | null, bLng?: number | null) {
+  if (aLat == null || aLng == null || bLat == null || bLng == null) return Number.POSITIVE_INFINITY;
+  const R = 6371;
+  const dLat = (bLat - aLat) * Math.PI / 180;
+  const dLng = (bLng - aLng) * Math.PI / 180;
+  const s1 = Math.sin(dLat / 2) ** 2;
+  const s2 = Math.cos(aLat * Math.PI / 180) * Math.cos(bLat * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s1 + s2));
+}
+
+function areaLabel(score: number) {
+  if (score >= 0.78) return { label: "Molto attiva", color: "var(--magenta)" };
+  if (score >= 0.55) return { label: "Attiva", color: "var(--orange)" };
+  if (score >= 0.36) return { label: "Moderata", color: "var(--amber)" };
+  return { label: "Tranquilla", color: "var(--teal)" };
 }
 
 function FilterBar({ active, setActive, markers }: any) {
@@ -118,6 +135,7 @@ function HomeScene({ page, setPage, theme, setTheme, user }: any) {
   const [is3d, setIs3d] = useState(false);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [popup, setPopup] = useState<any>(null);
+  const [detail, setDetail] = useState<any>(null);
   const [mapData, setMapData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
@@ -129,7 +147,7 @@ function HomeScene({ page, setPage, theme, setTheme, user }: any) {
       const data = await getHomeMapData();
       setMapData(data);
     } catch (err) {
-      console.error("Errore nel recupero dei dati mappa dal backend:", err);
+      console.warn("Dati mappa temporaneamente non disponibili:", err);
     } finally {
       setLoading(false);
     }
@@ -148,9 +166,9 @@ function HomeScene({ page, setPage, theme, setTheme, user }: any) {
   }, []);
 
   const dynamicMarkers = React.useMemo(() => {
-    if (!mapData || !mapData.markers) return MARKERS;
-    return mapData.markers.map((m: any) => {
-      const { x, y } = getSvgCoordinates(m.latitude ?? 46.067, m.longitude ?? 11.121, m.title);
+    if (!mapData || !mapData.markers) return [];
+    return mapData.markers.filter((m: any) => m.latitude != null && m.longitude != null).map((m: any) => {
+      const { x, y } = getSvgCoordinates(m.latitude, m.longitude, m.title);
       
       let cat = m.category || "cultura";
       if (cat === "poi") cat = "outdoor";
@@ -164,7 +182,7 @@ function HomeScene({ page, setPage, theme, setTheme, user }: any) {
         cat = "cultura";
       }
 
-      let timeStr = "12:00";
+      let timeStr = "Orario da definire";
       if (m.dateTime) {
         try {
           timeStr = new Date(m.dateTime).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
@@ -173,23 +191,28 @@ function HomeScene({ page, setPage, theme, setTheme, user }: any) {
 
       return {
         id: m.id,
+        sourceId: m.sourceId,
+        type: m.type,
         cat,
         x,
         y,
+        latitude: m.latitude,
+        longitude: m.longitude,
         live: m.type === "event" || m.type === "activity",
         title: m.title,
-        place: m.title,
+        place: m.location || m.title,
         time: timeStr,
-        cap: m.total || 50,
-        going: m.free !== undefined && m.total !== undefined ? m.total - m.free : 25,
-        date: m.dateTime ? new Date(m.dateTime).toLocaleDateString("it-IT", { day: "numeric", month: "short" }) : "Oggi",
+        cap: m.total || m.maxPartecipanti || m.capacity || 0,
+        going: m.free !== undefined && m.total !== undefined ? m.total - m.free : (m.participantCount || 0),
+        date: m.dateTime ? new Date(m.dateTime).toLocaleDateString("it-IT", { day: "numeric", month: "short" }) : "Data da definire",
+        description: m.description || null,
         raw: m
       };
     });
   }, [mapData]);
 
   const dynamicEvents = React.useMemo(() => {
-    if (!mapData || !mapData.events) return EVENTS;
+    if (!mapData || !mapData.events) return [];
     return mapData.events.slice(0, 7).map((e: any) => {
       let cat = e.category || "cultura";
       const validCategories = ["musica", "cultura", "sport", "cibo", "outdoor", "famiglia"];
@@ -209,42 +232,56 @@ function HomeScene({ page, setPage, theme, setTheme, user }: any) {
       return {
         id: e.id,
         cat,
-        date: "Oggi",
-        start: e.startTime ? e.startTime.slice(0, 5) : "15:00",
-        end: e.endTime ? e.endTime.slice(0, 5) : "18:00",
+        date: e.dateTime ? new Date(e.dateTime).toLocaleDateString("it-IT", { day: "numeric", month: "short" }) : "Data da definire",
+        start: e.startTime ? e.startTime.slice(0, 5) : "N/D",
+        end: e.endTime ? e.endTime.slice(0, 5) : "N/D",
         going: e.participantCount ?? 0,
-        cap: e.maxPartecipanti ?? 50,
+        cap: e.maxPartecipanti ?? 0,
         title: e.title,
-        place: e.location || "Trento",
-        img: gradients[cat] || gradients.cultura
+        place: e.location || "Luogo da confermare",
+        description: e.description,
+        latitude: e.latitude,
+        longitude: e.longitude,
+        img: gradients[cat] || gradients.cultura,
+        raw: e
       };
     });
   }, [mapData]);
 
   const dynamicAreas = React.useMemo(() => {
-    if (!mapData || !mapData.pois) return AREAS;
-    const colorMap: Record<string, string> = {
-      rosso: "var(--red)",
-      giallo: "var(--amber)",
-      verde: "var(--teal)"
-    };
-    const labelMap: Record<string, string> = {
-      rosso: "Molto attiva",
-      giallo: "Attiva",
-      verde: "Tranquilla"
-    };
+    if (!mapData || !mapData.pois) return [];
     const levelMap: Record<string, number> = {
-      rosso: 0.9,
-      giallo: 0.6,
-      verde: 0.25
+      rosso: 0.68,
+      giallo: 0.44,
+      verde: 0.16
     };
-    return mapData.pois.slice(0, 8).map((p: any) => ({
-      name: p.nome,
-      cat: p.tipo || "outdoor",
-      level: levelMap[p.statoAffollamento] || 0.25,
-      label: labelMap[p.statoAffollamento] || "Tranquilla",
-      color: colorMap[p.statoAffollamento] || "var(--teal)"
-    }));
+    const rows = mapData.pois.map((p: any) => {
+      const lat = p.latitude ?? p.latitudine;
+      const lng = p.longitude ?? p.longitudine;
+      const nearbyEvents = (mapData.events || []).filter((e: any) => distanceKm(lat, lng, e.latitude, e.longitude) <= 0.45);
+      const nearbyActivities = (mapData.activities || []).filter((a: any) => distanceKm(lat, lng, a.latitude, a.longitude) <= 0.45);
+      const eventPressure = nearbyEvents.reduce((acc: number, e: any) => acc + Math.min(0.16, ((e.participantCount || 0) / Math.max(10, e.maxPartecipanti || 40)) * 0.22), 0);
+      const activityPressure = nearbyActivities.reduce((acc: number, a: any) => acc + Math.min(0.12, ((a.participantCount || 0) / Math.max(6, a.maxParticipants || 15)) * 0.18), 0);
+      const status = p.statoAffollamento || p.crowdingStatus || "verde";
+      const level = Math.max(0.05, Math.min(0.98, (levelMap[status] ?? 0.16) + eventPressure + activityPressure));
+      const label = areaLabel(level);
+      return {
+        name: p.nome || p.title,
+        cat: p.tipo || "outdoor",
+        level,
+        label: label.label,
+        color: label.color,
+        status,
+        eventsNearby: nearbyEvents.length,
+        activitiesNearby: nearbyActivities.length,
+        participants: nearbyEvents.reduce((acc: number, e: any) => acc + (e.participantCount || 0), 0)
+          + nearbyActivities.reduce((acc: number, a: any) => acc + (a.participantCount || 0), 0),
+        latitude: lat,
+        longitude: lng,
+      };
+    });
+    const sorted = rows.sort((a: any, b: any) => b.level - a.level);
+    return sorted.slice(0, 8);
   }, [mapData]);
 
   const focusOn = (xPct: number, yPct: number) => {
@@ -262,10 +299,16 @@ function HomeScene({ page, setPage, theme, setTheme, user }: any) {
   };
   
   const openEventPopup = (e: any) => {
-    const m = dynamicMarkers.find((mk: any) => mk.place === e.place) || dynamicMarkers.find((mk: any) => mk.cat === e.cat) || dynamicMarkers[0];
-    focusOn(m.x, m.y);
-    setPopup({ markerId: m.id, cat: e.cat, title: e.title, place: e.place,
-      when: `${e.date}, ${e.start} – ${e.end}`, going: e.going, cap: e.cap });
+    const m = dynamicMarkers.find((mk: any) => mk.sourceId === e.id || mk.id === e.id || mk.id === `event:${e.id}`)
+      || dynamicMarkers.find((mk: any) => mk.place === e.place)
+      || dynamicMarkers.find((mk: any) => mk.cat === e.cat)
+      || dynamicMarkers[0];
+    if (m) {
+      focusOn(m.x, m.y);
+      setPopup({ markerId: m.id, cat: e.cat, title: e.title, place: e.place,
+        when: `${e.date}, ${e.start} – ${e.end}`, going: e.going, cap: e.cap });
+    }
+    setDetail({ type: "event", title: e.title, data: e, accent: catColor(e.cat) });
   };
   
   const closePopup = () => setPopup(null);
@@ -325,13 +368,13 @@ function HomeScene({ page, setPage, theme, setTheme, user }: any) {
       {/* WIDGETS */}
       <div className="layer-widgets">
         <div className="col-left">
-          <WeatherWidget delay={80} />
-          <AlertsWidget delay={180} />
-          <ParkingWidget delay={280} />
+          <WeatherWidget delay={80} onOpen={setDetail} />
+          <AlertsWidget delay={180} onOpen={setDetail} />
+          <ParkingWidget delay={280} onOpen={setDetail} />
         </div>
         <div className="col-right">
-          <ActiveAreasWidget delay={140} areas={dynamicAreas} />
-          <EventsWidget delay={240} onFocus={openEventPopup} events={dynamicEvents} />
+          <ActiveAreasWidget delay={140} areas={dynamicAreas} onOpen={setDetail} />
+          <EventsWidget delay={240} onFocus={openEventPopup} events={dynamicEvents} onWidgetClick={() => setPage("eventi")} />
         </div>
       </div>
 
@@ -341,6 +384,19 @@ function HomeScene({ page, setPage, theme, setTheme, user }: any) {
         <span className="nlabel">N</span>
         <span className="needle"><Icon name="compass" size={26} /></span>
       </div>
+
+      <DetailModal
+        open={!!detail}
+        type={detail?.type}
+        title={detail?.title}
+        accent={detail?.accent}
+        data={detail?.data}
+        onClose={() => setDetail(null)}
+        onAction={(action) => {
+          if (action === "open-events-page") setPage("eventi");
+          if (action === "open-activity-page") setPage("attivita");
+        }}
+      />
 
     </div>
   );
@@ -372,11 +428,14 @@ function mapBackendRole(ruolo?: string): UserRole {
 
 export function App() {
   const [page, setPage] = useState("home");
+  const [loginOpen, setLoginOpen] = useState(false);
   const [themeMode, setThemeModeState] = useState(() => {
-    return localStorage.getItem("tla:themeMode") || "dark";
+    const stored = localStorage.getItem("tla:themeMode") || "light";
+    return stored === "auto" ? "system" : stored;
   });
   const [theme, setThemeState] = useState(() => {
-    const mode = localStorage.getItem("tla:themeMode") || "dark";
+    const stored = localStorage.getItem("tla:themeMode") || "light";
+    const mode = stored === "auto" ? "system" : stored;
     if (mode === "light") return "day";
     if (mode === "dark") return "night";
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "night" : "day";
@@ -481,7 +540,7 @@ export function App() {
   };
 
   useEffect(() => {
-    if (themeMode !== "auto") return;
+    if (themeMode !== "auto" && themeMode !== "system") return;
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     const handler = (e: MediaQueryListEvent) => {
       setThemeState(e.matches ? "night" : "day");
@@ -492,9 +551,18 @@ export function App() {
 
   useEffect(() => { document.documentElement.dataset.theme = theme; }, [theme]);
 
+  const navigate = (nextPage: string) => {
+    if (nextPage === "login") {
+      setLoginOpen(true);
+      return;
+    }
+    setLoginOpen(false);
+    setPage(nextPage);
+  };
+
   const shared = {
     page,
-    setPage,
+    setPage: navigate,
     theme,
     setTheme,
     user,
@@ -520,8 +588,6 @@ export function App() {
         ? <ActivityDetailPage {...shared} />
         : page === "evento-dettaglio"
         ? <EventDetailPage {...shared} />
-        : page === "login"
-        ? <LoginPage {...shared} />
         : page === "registrazione"
         ? <RegistrationPage {...shared} />
         : page === "password-reset"
@@ -554,10 +620,25 @@ export function App() {
         ? <PrivacyPage {...shared} />
         : page === "termini"
         ? <TermsPage {...shared} />
-        : page === "placeholder"
-        ? <PlaceholderPage {...shared} />
         : <HomeScene {...shared} />}
       <TrentoTweaks theme={theme} />
+      <LoginModal
+        open={loginOpen}
+        onClose={() => setLoginOpen(false)}
+        onSuccess={(needs2faSetup) => {
+          setLoginOpen(false);
+          fetchUser();
+          setPage(needs2faSetup ? "setup-2fa" : "home");
+        }}
+        onRegister={() => {
+          setLoginOpen(false);
+          setPage("registrazione");
+        }}
+        onPasswordReset={() => {
+          setLoginOpen(false);
+          setPage("password-reset");
+        }}
+      />
     </React.Fragment>
   );
 }

@@ -86,8 +86,8 @@ export function ProfilePage({ page, setPage, theme, setTheme, user }: any) {
               {user.avatar || "MR"}
             </div>
             <div className="revamp-profile-info">
-              <div className="revamp-profile-name">{user.name || "Marco Rossi"}</div>
-              <div className="revamp-profile-email">{user.email || "marco.rossi@example.com"}</div>
+              <div className="revamp-profile-name">{user.name || "Ospite"}</div>
+              <div className="revamp-profile-email">{user.email || "Accesso ospite"}</div>
               <div className="revamp-profile-badge">
                 <Icon name="shieldCheck" size={10} style={{ color: "var(--cyan)" }} /> Autore Verificato
               </div>

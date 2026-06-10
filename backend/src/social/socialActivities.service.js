@@ -15,17 +15,10 @@ function getDistance(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
-// Simulates weather service to check suitability
 function isSuitableWeather(category, difficulty) {
-  // Let's assume current mock weather is "pioggia" (rainy) or "buono" (sunny)
-  // Rainy weather makes OUTDOOR activities less suitable
-  const mockCurrentWeather = 'sunny'; 
-  if (mockCurrentWeather === 'rainy' && category === 'OUTDOOR') {
-    return false;
-  }
-  if (difficulty === 'HARD' && mockCurrentWeather === 'rainy') {
-    return false;
-  }
+  // Without a weather snapshot on the activity record, keep suitability neutral.
+  // The frontend weather widgets use the real Open-Meteo endpoint.
+  if (!category && !difficulty) return true;
   return true;
 }
 

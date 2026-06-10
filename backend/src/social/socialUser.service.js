@@ -2,9 +2,126 @@ const { User, Activity, Event, SocialParticipation, SavedItem, Review, POI, User
 const { Op } = require('sequelize');
 const { calculateTrustScore } = require('./trust.service');
 
+function displayName(user) {
+  return user.nomeEnte || [user.nome, user.cognome].filter(Boolean).join(' ') || user.email;
+}
+
+function initials(user) {
+  const source = displayName(user) || 'Utente';
+  return source
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('') || 'UT';
+}
+
 async function getUserTrustBreakdown(userId) {
   const breakdown = await calculateTrustScore(userId);
   return breakdown;
+}
+
+async function getMyProfile(userId) {
+  const user = await User.findByPk(userId);
+  if (!user) throw { status: 404, code: 'NOT_FOUND', error: 'User not found' };
+
+  return {
+    id: user.id,
+    name: displayName(user),
+    avatarUrl: user.avatarUrl || null,
+    initials: initials(user),
+    email: user.email,
+    role: user.ruolo,
+  };
+}
+
+function statusFilter(status) {
+  if (!status) return null;
+  const normalized = String(status).toLowerCase();
+  const legacy = {
+    active: 'attiva',
+    published: 'attiva',
+    completed: 'conclusa',
+    cancelled: 'cancellata',
+    draft: 'DRAFT',
+    under_review: 'REPORTED',
+  };
+  const modern = {
+    draft: 'DRAFT',
+    published: 'PUBLISHED',
+    active: 'ACTIVE',
+    completed: 'COMPLETED',
+    cancelled: 'CANCELLED',
+    under_review: 'REPORTED',
+  };
+  return {
+    [Op.or]: [
+      { status: modern[normalized] || normalized.toUpperCase() },
+      { stato: legacy[normalized] || normalized },
+    ],
+  };
+}
+
+function clientStatus(activity) {
+  const raw = activity.status || activity.stato || 'ACTIVE';
+  const map = {
+    DRAFT: 'draft',
+    PUBLISHED: 'published',
+    ACTIVE: 'active',
+    COMPLETED: 'completed',
+    CANCELLED: 'cancelled',
+    REPORTED: 'under_review',
+    REMOVED: 'cancelled',
+    attiva: 'active',
+    conclusa: 'completed',
+    cancellata: 'cancelled',
+  };
+  return map[raw] || String(raw).toLowerCase();
+}
+
+async function getMyActivities(userId, { status, page = 1, limit = 10 } = {}) {
+  const where = {
+    [Op.and]: [
+      { [Op.or]: [{ creatorId: userId }, { authorId: userId }] },
+    ],
+  };
+  const filter = statusFilter(status);
+  if (filter) where[Op.and].push(filter);
+
+  const safePage = Math.max(1, Number(page) || 1);
+  const safeLimit = Math.min(50, Math.max(1, Number(limit) || 10));
+  const { rows, count } = await Activity.findAndCountAll({
+    where,
+    include: [{ model: User, as: 'participants', attributes: ['id'], through: { attributes: [] } }],
+    distinct: true,
+    limit: safeLimit,
+    offset: (safePage - 1) * safeLimit,
+    order: [['updatedAt', 'DESC']],
+  });
+
+  return {
+    items: rows.map((activity) => {
+      const participantCount = Number.isFinite(activity.participantsCount)
+        ? activity.participantsCount
+        : (Array.isArray(activity.participants) ? activity.participants.length : 0);
+      return {
+        id: activity.id,
+        title: activity.title || `Attivita di ${activity.tipo || 'community'}`,
+        status: clientStatus(activity),
+        participantsCount: participantCount,
+        capacity: activity.capacity || activity.maxPartecipanti || null,
+        averageRating: activity.averageRating || 0,
+        reviewCount: activity.reviewCount || 0,
+        verifiedActivity: !!activity.verifiedActivity,
+        lastUpdatedAt: activity.updatedAt,
+      };
+    }),
+    pagination: {
+      page: safePage,
+      limit: safeLimit,
+      total: count,
+    },
+  };
 }
 
 async function manualRecalculateTrust(userId) {
@@ -330,6 +447,8 @@ async function getPersonalizedRecommendations(userId) {
 
 module.exports = {
   getUserTrustBreakdown,
+  getMyProfile,
+  getMyActivities,
   manualRecalculateTrust,
   verifyAuthor,
   suspendAuthor,

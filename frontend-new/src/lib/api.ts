@@ -763,9 +763,111 @@ export interface ParkingSpot {
   link: string | null;
   updatedAt: string | null;
 }
-export interface ParkingResponse { parkings: ParkingSpot[]; fetchedAt: string; }
+export interface ParkingDetailItem {
+  id: string;
+  name: string;
+  address: string | null;
+  area?: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  availableSpaces: number | null;
+  totalSpaces: number;
+  occupancyPercentage: number | null;
+  status: 'available' | 'almost_full' | 'full' | 'unknown';
+  lastUpdatedAt: string | null;
+  sourceLabel: string;
+  type?: 'car' | 'bike';
+  link?: string | null;
+}
+export interface ParkingResponse {
+  city?: string;
+  source?: { name: string; url: string; scrapedAt: string };
+  items?: ParkingDetailItem[];
+  parkings: ParkingSpot[];
+  fetchedAt: string;
+}
 export function getParking(): Promise<ParkingResponse> {
-  return request('/api/parking', { auth: false });
+  return request('/api/parking/trento', { auth: false });
+}
+
+// ============================== Weather and city alerts ==============================
+
+export interface WeatherHour {
+  time: string;
+  temperature: number | null;
+  precipitationProbability: number | null;
+  weatherCode: number | null;
+  condition: string;
+  windSpeed: number | null;
+}
+export interface WeatherDay {
+  date: string;
+  weatherCode: number | null;
+  condition: string;
+  temperatureMax: number | null;
+  temperatureMin: number | null;
+  precipitationProbabilityMax: number | null;
+  sunrise: string | null;
+  sunset: string | null;
+}
+export interface WeatherResponse {
+  city: string;
+  latitude: number;
+  longitude: number;
+  timezone?: string;
+  source: { name: string; url: string; fetchedAt: string };
+  current: {
+    temperature: number | null;
+    apparentTemperature: number | null;
+    humidity: number | null;
+    condition: string;
+    weatherCode: number | null;
+    cloudCover: number | null;
+    precipitation: number | null;
+    rain: number | null;
+    showers: number | null;
+    windSpeed: number | null;
+    windDirection: number | null;
+    windGusts: number | null;
+    isDay: boolean;
+    time: string;
+  };
+  daily: WeatherDay[];
+  hourly: WeatherHour[];
+  unavailable?: boolean;
+  stale?: boolean;
+}
+export function getTrentoWeather(): Promise<WeatherResponse> {
+  return request('/api/weather/trento', { auth: false });
+}
+
+export type AlertSeverity = 'high' | 'medium' | 'low' | 'info';
+export interface CityAlertSummary {
+  id: string;
+  title: string;
+  summary: string;
+  severity: AlertSeverity;
+  category: string;
+  sourceName: string;
+  publishedAt: string;
+  updatedAt: string;
+  hasLocation: boolean;
+}
+export interface CityAlertDetail extends CityAlertSummary {
+  description: string;
+  source: { name: string; url: string };
+  location: { label: string; latitude: number; longitude: number } | null;
+}
+export interface CityAlertsResponse {
+  city: string;
+  source: { name: string; url: string; scrapedAt: string };
+  items: CityAlertSummary[];
+}
+export function getCityAlerts(): Promise<CityAlertsResponse> {
+  return request('/api/city-alerts/trento', { auth: false });
+}
+export function getCityAlertById(id: string): Promise<CityAlertDetail> {
+  return request(`/api/city-alerts/${encodeURIComponent(id)}`, { auth: false });
 }
 
 // ============================== Admin notifications ==============================
@@ -806,8 +908,35 @@ export interface UserSettings {
   largerText: boolean;
 }
 
-export function getSettings() {
-  return request<UserSettings>('/api/me/settings');
+function normalizeSettings(payload: any): UserSettings {
+  if (payload?.appearance || payload?.languageFormat || payload?.notifications) {
+    return {
+      themeMode: payload.appearance?.themeMode ?? 'light',
+      visualEffects: payload.appearance?.visualEffects ?? 'full',
+      language: payload.languageFormat?.language ?? 'it',
+      timeFormat: payload.languageFormat?.timeFormat ?? '24h',
+      distanceUnit: payload.languageFormat?.distanceUnit ?? 'km',
+      emailNotificationsEnabled: !!payload.notifications?.emailEnabled,
+      pushNotificationsEnabled: !!payload.notifications?.pushEnabled,
+      eventNotificationsEnabled: !!payload.notifications?.eventNotifications,
+      activityNotificationsEnabled: !!payload.notifications?.activityNotifications,
+      cityAlertNotificationsEnabled: !!payload.notifications?.cityAlertNotifications,
+      locationMode: payload.privacyLocation?.locationMode ?? 'while_using',
+      participationVisibility: payload.privacyLocation?.participationVisibility ?? 'public',
+      showProfileInParticipants: payload.privacyLocation?.showProfileInParticipants ?? true,
+      interestsJson: payload.preferences?.interests ?? [],
+      showOnlyReliableActivities: !!payload.preferences?.showOnlyReliableActivities,
+      showVerifiedActivities: !!payload.preferences?.showVerifiedActivities,
+      reduceAnimations: !!payload.accessibility?.reduceAnimations,
+      increaseContrast: !!payload.accessibility?.increaseContrast,
+      largerText: !!payload.accessibility?.largerText,
+    };
+  }
+  return payload as UserSettings;
+}
+
+export async function getSettings(): Promise<UserSettings> {
+  return normalizeSettings(await request('/api/me/settings'));
 }
 
 export function updateAppearance(data: { themeMode?: string; visualEffects?: string }) {
@@ -819,7 +948,16 @@ export function updateLanguageFormat(data: { language?: string; timeFormat?: str
 }
 
 export function updateNotifications(data: Partial<Pick<UserSettings, 'emailNotificationsEnabled' | 'pushNotificationsEnabled' | 'eventNotificationsEnabled' | 'activityNotificationsEnabled' | 'cityAlertNotificationsEnabled'>>) {
-  return request<UserSettings>('/api/me/settings/notifications', { method: 'PATCH', body: data });
+  return request('/api/me/settings/notifications', {
+    method: 'PATCH',
+    body: {
+      emailEnabled: data.emailNotificationsEnabled,
+      pushEnabled: data.pushNotificationsEnabled,
+      eventNotifications: data.eventNotificationsEnabled,
+      activityNotifications: data.activityNotificationsEnabled,
+      cityAlertNotifications: data.cityAlertNotificationsEnabled,
+    },
+  });
 }
 
 export function updatePrivacyLocation(data: { locationMode?: string; participationVisibility?: string; showProfileInParticipants?: boolean }) {
@@ -827,7 +965,14 @@ export function updatePrivacyLocation(data: { locationMode?: string; participati
 }
 
 export function updatePreferences(data: { interestsJson?: string[]; showOnlyReliableActivities?: boolean; showVerifiedActivities?: boolean }) {
-  return request<UserSettings>('/api/me/settings/preferences', { method: 'PATCH', body: data });
+  return request('/api/me/settings/preferences', {
+    method: 'PATCH',
+    body: {
+      interests: data.interestsJson,
+      showOnlyReliableActivities: data.showOnlyReliableActivities,
+      showVerifiedActivities: data.showVerifiedActivities,
+    },
+  });
 }
 
 export function updateAccessibility(data: { reduceAnimations?: boolean; increaseContrast?: boolean; largerText?: boolean }) {
@@ -855,4 +1000,36 @@ export interface UserParticipation {
 
 export function getMyParticipations(): Promise<UserParticipation[]> {
   return request<UserParticipation[]>('/api/users/me/participations');
+}
+
+export interface MeProfileSummary {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  initials: string;
+  email: string;
+  role: string;
+}
+export function getMeProfile(): Promise<MeProfileSummary> {
+  return request('/api/me/profile');
+}
+
+export interface MyActivitySummary {
+  id: string;
+  title: string;
+  status: 'draft' | 'published' | 'active' | 'completed' | 'cancelled' | 'under_review';
+  participantsCount: number;
+  capacity: number | null;
+  averageRating: number;
+  reviewCount: number;
+  verifiedActivity: boolean;
+  lastUpdatedAt: string;
+}
+export interface MyActivitiesResponse {
+  items: MyActivitySummary[];
+  pagination: { page: number; limit: number; total: number };
+}
+export function getMyActivities(params?: { status?: string; page?: number; limit?: number }): Promise<MyActivitiesResponse> {
+  const qs = params ? `?${new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString()}` : '';
+  return request(`/api/me/activities${qs}`);
 }

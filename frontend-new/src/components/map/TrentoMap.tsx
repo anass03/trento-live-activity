@@ -1,21 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { catColor, catLabel } from "../../data/redesignData";
+import { CAT_ICON, catColor, catLabel } from "../../data/redesignData";
 
 // CartoDB vector tile style urls (completely free, no API key required)
 const DARK_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 const LIGHT_STYLE = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
 const TRENTO_CENTER: [number, number] = [11.1211, 46.0679];
-
-export const CAT_ICON: Record<string, string> = { 
-  musica: "music", 
-  cultura: "landmark", 
-  sport: "run", 
-  cibo: "food", 
-  outdoor: "bike", 
-  famiglia: "family" 
-};
 
 function getIconSvg(name: string, size = 15): string {
   const paths: Record<string, string> = {

@@ -16,6 +16,8 @@ usersRouter.post('/:userId/suspend-author', authenticate, authorize(...STAFF), c
 usersRouter.get('/:userId/reviews-summary', reviewsCtrl.getUserSummary);
 
 // Me Router
+meRouter.get('/profile', authenticate, ctrl.getProfile);
+meRouter.get('/activities', authenticate, ctrl.getActivities);
 meRouter.get('/participations', authenticate, ctrl.getParticipations);
 meRouter.get('/saved', authenticate, ctrl.getSaved);
 meRouter.get('/upcoming', authenticate, ctrl.getUpcoming);

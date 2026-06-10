@@ -7,6 +7,20 @@ async function getTrust(req, res, next) {
   } catch (e) { next(e); }
 }
 
+async function getProfile(req, res, next) {
+  try {
+    const result = await service.getMyProfile(req.user.id);
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+async function getActivities(req, res, next) {
+  try {
+    const result = await service.getMyActivities(req.user.id, req.query);
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
 async function recalculateTrust(req, res, next) {
   try {
     const result = await service.manualRecalculateTrust(req.params.userId);
@@ -86,6 +100,8 @@ async function getRecommendations(req, res, next) {
 
 module.exports = {
   getTrust,
+  getProfile,
+  getActivities,
   recalculateTrust,
   verify,
   suspend,

@@ -14,6 +14,34 @@ const grads: Record<string, string> = {
   famiglia: "linear-gradient(140deg,#0ea5e9,#075985)",
   nightlife: "linear-gradient(140deg,#6d28d9,#312e81)",
 };
+const catIcons: Record<string, string> = {
+  outdoor: "bike",
+  cultura: "landmark",
+  food: "food",
+  sport: "run",
+  relax: "leaf",
+  social: "users",
+  famiglia: "family",
+  nightlife: "moon",
+};
+const catAliases: Record<string, string> = {
+  culture: "cultura",
+  cultural: "cultura",
+  gastronomia: "food",
+  cucina: "food",
+  wine: "food",
+  sports: "sport",
+  benessere: "relax",
+  wellness: "relax",
+  family: "famiglia",
+  night: "nightlife",
+  natura: "outdoor",
+  trekking: "outdoor",
+};
+const normalizeCat = (value?: string | null) => {
+  const key = String(value || "").trim().toLowerCase();
+  return grads[key] ? key : (catAliases[key] || "outdoor");
+};
 
 export function ActivityDetailPage({ page, setPage, theme, setTheme, user, selectedActivityId }: any) {
   const [activity, setActivity] = useState<ApiActivity | null>(null);
@@ -94,10 +122,17 @@ export function ActivityDetailPage({ page, setPage, theme, setTheme, user, selec
     );
   }
 
-  const cat = activity.category || "outdoor";
-  const limit = activity.maxParticipants || 15;
-  const count = activity.participantCount || 0;
-  const pct = Math.min(100, Math.round((count / limit) * 100));
+  const cat = normalizeCat(activity.category);
+  const limit = Number.isFinite(Number(activity.maxParticipants)) ? Number(activity.maxParticipants) : null;
+  const count = Number(activity.participantCount || 0);
+  const pct = limit ? Math.min(100, Math.round((count / limit) * 100)) : null;
+  const details: any = activity;
+  const rating = details.averageRating ?? details.rating ?? null;
+  const reviewCount = details.reviewCount ?? details.reviewsCount ?? 0;
+  const duration = details.durationMinutes ?? details.duration ?? null;
+  const difficulty = details.difficulty ?? null;
+  const price = details.priceLabel || (details.priceType === "PAID" ? "A pagamento" : details.priceType === "FREE" ? "Gratis" : null);
+  const distance = details.distance != null ? `${details.distance} km` : null;
 
   return (
     <div className="revamp-detail-scene">
@@ -109,40 +144,40 @@ export function ActivityDetailPage({ page, setPage, theme, setTheme, user, selec
               <Icon name="chevronL" size={14} /> Torna alle Attività
             </button>
             <div className="cover-badge">
-              <Icon name="bike" size={12} /> {cat}
+              <Icon name={catIcons[cat] || "activity"} size={12} /> {cat}
             </div>
             <div className="ghost-ic">
-              <Icon name="bike" size={180} />
+              <Icon name={catIcons[cat] || "activity"} size={180} />
             </div>
           </div>
 
           <div className="revamp-detail-body">
             <h1 className="revamp-detail-title">{activity.title}</h1>
             <div className="revamp-detail-rating">
-              <Icon name="star" size={14} /> 4.7{" "}
-              <span>· recensioni verificate</span>
+              <Icon name="star" size={14} /> {rating != null ? rating.toFixed ? rating.toFixed(1) : rating : "N/D"}{" "}
+              <span>- {reviewCount} recensioni</span>
             </div>
             
             <div className="revamp-detail-desc">
-              {activity.description || "Nessuna descrizione."}
+              {activity.description || "Informazioni dettagliate non ancora disponibili."}
             </div>
 
             <div className="revamp-detail-attrs">
               <div className="revamp-detail-attr">
                 <div className="lbl"><Icon name="clock" size={12} /> Durata</div>
-                <div className="val">90 min</div>
+                <div className="val">{duration ? `${duration} min` : "N/D"}</div>
               </div>
               <div className="revamp-detail-attr">
                 <div className="lbl"><Icon name="gauge" size={12} /> Difficoltà</div>
-                <div className="val">Media</div>
+                <div className="val">{difficulty || "N/D"}</div>
               </div>
               <div className="revamp-detail-attr">
                 <div className="lbl"><Icon name="euro" size={12} /> Costo</div>
-                <div className="val" style={{ color: "var(--green)" }}>Gratis</div>
+                <div className="val" style={{ color: price === "Gratis" ? "var(--green)" : undefined }}>{price || "N/D"}</div>
               </div>
               <div className="revamp-detail-attr">
                 <div className="lbl"><Icon name="pin" size={12} /> Distanza</div>
-                <div className="val">1.2 km</div>
+                <div className="val">{distance || "N/D"}</div>
               </div>
             </div>
 
@@ -151,7 +186,7 @@ export function ActivityDetailPage({ page, setPage, theme, setTheme, user, selec
               <div>
                 <div style={{ fontSize: 14, fontWeight: 700 }}>Stato Posti</div>
                 <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
-                  Partecipanti attivi: <b>{count}</b> su <b>{limit}</b> massimi ({pct}% occupato).
+                  Partecipanti attivi: <b>{count}</b>{limit ? <> su <b>{limit}</b> massimi ({pct}% occupato).</> : "."}
                 </div>
               </div>
               <button
@@ -164,23 +199,11 @@ export function ActivityDetailPage({ page, setPage, theme, setTheme, user, selec
             </div>
 
             <div className="revamp-detail-section-title">Valutazioni di Dettaglio</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <div className="rev-line">
-                <span className="rl-lbl">Accuratezza</span>
-                <span className="rl-bar"><i style={{ width: "90%", "--accent": "var(--teal)" } as React.CSSProperties}></i></span>
-                <span className="rl-val">4.5</span>
-              </div>
-              <div className="rev-line">
-                <span className="rl-lbl">Organizzazione</span>
-                <span className="rl-bar"><i style={{ width: "94%", "--accent": "var(--teal)" } as React.CSSProperties}></i></span>
-                <span className="rl-val">4.7</span>
-              </div>
-              <div className="rev-line">
-                <span className="rl-lbl">Sicurezza</span>
-                <span className="rl-bar"><i style={{ width: "98%", "--accent": "var(--teal)" } as React.CSSProperties}></i></span>
-                <span className="rl-val">4.9</span>
-              </div>
-            </div>
+            {reviewCount > 0 ? (
+              <div className="revamp-detail-box">Valutazioni aggregate disponibili nella sezione recensioni.</div>
+            ) : (
+              <div className="widget-empty big">Nessuna valutazione disponibile.</div>
+            )}
 
             <div className="revamp-detail-section-title" style={{ marginTop: 28 }}>Discussione & Commenti</div>
             <div className="revamp-detail-box">

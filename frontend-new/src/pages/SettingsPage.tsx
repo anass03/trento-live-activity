@@ -14,7 +14,6 @@ import {
   updateAccessibility,
   deleteAccount,
   logout as apiLogout,
-  login as apiLogin,
   UserSettings
 } from "../lib/api";
 
@@ -72,7 +71,7 @@ function SetTheme({ value, onChange, disabled }: any) {
   const opts = [
     { id: "light", label: "Chiaro",    cls: "tc-light" },
     { id: "dark",  label: "Scuro",     cls: "tc-dark"  },
-    { id: "auto",  label: "Automatico",cls: "tc-auto"  },
+    { id: "system",label: "Automatico",cls: "tc-auto"  },
   ];
   return (
     <div className="s-theme-cards">
@@ -556,8 +555,8 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
               <div className="s-account-user">
                 <div className="s-account-av">{user?.avatar || "MR"}</div>
                 <div className="s-account-info">
-                  <div className="s-account-name">{user?.name || "Marco Rossi"}</div>
-                  <div className="s-account-email">{user?.email || "marco.rossi@example.com"}</div>
+                  <div className="s-account-name">{user?.name || "Ospite"}</div>
+                  <div className="s-account-email">{user?.email || "Accesso ospite"}</div>
                   <div className="s-account-badge"><Icon name="shieldCheck" size={9} />Account attivo</div>
                 </div>
 
