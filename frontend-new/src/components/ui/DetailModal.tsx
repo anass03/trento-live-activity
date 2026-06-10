@@ -272,7 +272,6 @@ function AreaContent({ data }: any) {
         <Field icon="users" label="Partecipanti stimati" value={data?.participants ?? 0} />
         <Field icon="gauge" label="Stato POI" value={data?.status || data?.label} />
       </div>
-      <p className="dm-text">Le zone tranquille vengono ordinate sotto le aree con attivita reale, cosi una zona poco movimentata non puo guidare la classifica quando sono presenti eventi o affollamento altrove.</p>
     </div>
   );
 }

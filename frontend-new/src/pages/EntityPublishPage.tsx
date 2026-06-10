@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
-import { createEvent, createActivity, getPOIs, POI } from "../lib/api";
+import { createEvent, getPOIs, POI } from "../lib/api";
 
 const PUBLISH_CATEGORIES = [
   { id: "cultura",  label: "Cultura",      icon: "landmark", color: "var(--violet)" },
@@ -12,12 +14,70 @@ const PUBLISH_CATEGORIES = [
   { id: "famiglia", label: "Famiglia",     color: "var(--cyan)",    icon: "family" },
 ];
 
+const DARK_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+const LIGHT_STYLE = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
+const TRENTO_CENTER: [number, number] = [11.1211, 46.0679];
+
+/* Mini-mappa per piazzare il pin dell'evento: un click posiziona/sposta il marker. */
+function PinPickerMap({ theme, pin, onPin }: {
+  theme: "light" | "dark" | "auto";
+  pin: { lat: number; lng: number } | null;
+  onPin: (p: { lat: number; lng: number }) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const markerRef = useRef<maplibregl.Marker | null>(null);
+  const onPinRef = useRef(onPin);
+  onPinRef.current = onPin;
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const map = new maplibregl.Map({
+      container: containerRef.current,
+      style: theme === "dark" ? DARK_STYLE : LIGHT_STYLE,
+      center: TRENTO_CENTER,
+      zoom: 13,
+      attributionControl: false,
+    });
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+    map.on("click", (e) => {
+      onPinRef.current({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+    });
+    mapRef.current = map;
+    return () => { map.remove(); mapRef.current = null; markerRef.current = null; };
+  }, []);
+
+  useEffect(() => {
+    mapRef.current?.setStyle(theme === "dark" ? DARK_STYLE : LIGHT_STYLE);
+  }, [theme]);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+    if (!pin) { markerRef.current?.remove(); markerRef.current = null; return; }
+    if (!markerRef.current) {
+      markerRef.current = new maplibregl.Marker({ color: "#8b5cf6" })
+        .setLngLat([pin.lng, pin.lat])
+        .addTo(mapRef.current);
+    } else {
+      markerRef.current.setLngLat([pin.lng, pin.lat]);
+    }
+  }, [pin]);
+
+  return (
+    <div
+      ref={containerRef}
+      style={{ width: "100%", height: 260, borderRadius: 14, overflow: "hidden", border: "1px solid var(--border-soft)", cursor: "crosshair" }}
+    />
+  );
+}
+
 export function EntityPublishPage({ page, setPage, theme, setTheme, user }: any) {
-  const [publishType, setPublishType] = useState<"event" | "activity">("event");
   const [cat, setCat] = useState("cultura");
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
+  const [locationMode, setLocationMode] = useState<"poi" | "pin">("poi");
   const [poiId, setPoiId] = useState("");
+  const [pin, setPin] = useState<{ lat: number; lng: number } | null>(null);
   const [pois, setPois] = useState<POI[]>([]);
   const [when, setWhen] = useState(new Date().toISOString().substring(0, 10));
   const [startTime, setStartTime] = useState("18:00");
@@ -37,47 +97,39 @@ export function EntityPublishPage({ page, setPage, theme, setTheme, user }: any)
   const handleSubmit = async (e: any) => {
     e.preventDefault();
     setError("");
-    if (!title || !desc || !poiId) {
-      setError("Compila tutti i campi richiesti (compreso il punto di interesse).");
+    if (!title || !desc) {
+      setError("Compila tutti i campi richiesti.");
       return;
     }
-    
+    if (locationMode === "poi" && !poiId) {
+      setError("Seleziona un punto di interesse.");
+      return;
+    }
+    if (locationMode === "pin" && !pin) {
+      setError("Piazza un pin sulla mappa per indicare il luogo dell'evento.");
+      return;
+    }
+
     setLoading(true);
     try {
-      const selectedPoi = pois.find(p => p.id === poiId);
-      const lat = selectedPoi?.latitudine;
-      const lng = selectedPoi?.longitudine;
-
-      if (publishType === "event") {
-        await createEvent({
-          titolo: title,
-          descrizione: desc,
-          categoria: cat,
-          data: when,
-          orarioInizio: startTime,
-          orarioFine: endTime,
-          poiId,
-          latitudine: lat,
-          longitudine: lng,
-          maxPartecipanti: Number(cap),
-        });
-      } else {
-        await createActivity({
-          tipo: cat,
-          data: when,
-          orarioInizio: startTime,
-          orarioFine: endTime,
-          poiId,
-          latitudine: lat,
-          longitudine: lng,
-          maxPartecipanti: Number(cap),
-        });
-      }
+      const selectedPoi = locationMode === "poi" ? pois.find((p) => p.id === poiId) : null;
+      await createEvent({
+        titolo: title,
+        descrizione: desc,
+        categoria: cat,
+        data: when,
+        orarioInizio: startTime,
+        orarioFine: endTime,
+        poiId: locationMode === "poi" ? poiId : undefined,
+        latitudine: locationMode === "pin" ? pin!.lat : selectedPoi?.latitudine,
+        longitudine: locationMode === "pin" ? pin!.lng : selectedPoi?.longitudine,
+        maxPartecipanti: Number(cap),
+      });
 
       setSuccess(true);
       setTimeout(() => {
         setSuccess(false);
-        setPage(publishType === "event" ? "eventi" : "attivita");
+        setPage("eventi");
       }, 1500);
     } catch (err: any) {
       setError(err.message || "Errore durante la pubblicazione.");
@@ -91,38 +143,21 @@ export function EntityPublishPage({ page, setPage, theme, setTheme, user }: any)
       <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
       <div className="revamp-legal-wrap">
         <div className="revamp-legal-card anim-in" style={{ "--accent": "var(--violet)", maxWidth: "680px" } as React.CSSProperties}>
-          <h1>Pubblica Nuovo Contenuto</h1>
-          <p>Seleziona la tipologia di pubblicazione e compila il modulo come Ente Certificato.</p>
-
-          <div style={{ display: "flex", gap: "10px", margin: "20px 0" }}>
-            <button
-              className={`s-rpill ${publishType === "event" ? "on" : ""}`}
-              onClick={() => setPublishType("event")}
-              style={{ flex: 1, padding: "10px 0", justifyContent: "center" }}
-            >
-              <Icon name="calendar" size={15} /> Evento Comunale
-            </button>
-            <button
-              className={`s-rpill ${publishType === "activity" ? "on" : ""}`}
-              onClick={() => setPublishType("activity")}
-              style={{ flex: 1, padding: "10px 0", justifyContent: "center" }}
-            >
-              <Icon name="activity" size={15} /> Attività Spontanea
-            </button>
-          </div>
+          <h1>Pubblica Nuovo Evento</h1>
+          <p>Come Ente Certificato puoi pubblicare eventi comunali: compila il modulo e scegli il luogo sulla mappa o tra i punti di interesse.</p>
 
           {error && (
-            <div className="revamp-status-pill danger" style={{ width: "100%", padding: "10px 0", justifyContent: "center", marginBottom: 20 }}>
+            <div className="revamp-status-pill danger" style={{ width: "100%", padding: "10px 0", justifyContent: "center", margin: "20px 0" }}>
               <Icon name="warn" size={12} /> {error}
             </div>
           )}
 
           {success ? (
-            <div className="revamp-status-pill success" style={{ width: "100%", padding: "16px 0", justifyContent: "center", marginBottom: 20 }}>
-              <Icon name="check" size={14} /> Contenuto pubblicato con successo! Reindirizzamento...
+            <div className="revamp-status-pill success" style={{ width: "100%", padding: "16px 0", justifyContent: "center", margin: "20px 0" }}>
+              <Icon name="check" size={14} /> Evento pubblicato con successo! Reindirizzamento...
             </div>
           ) : (
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} style={{ marginTop: 20 }}>
               <h3 className="revamp-detail-section-title">1. Seleziona una Categoria</h3>
               <div className="s-interests" style={{ marginBottom: 24 }}>
                 {PUBLISH_CATEGORIES.map((item) => (
@@ -144,7 +179,7 @@ export function EntityPublishPage({ page, setPage, theme, setTheme, user }: any)
                 <input
                   type="text"
                   className="revamp-form-input"
-                  placeholder="Es. Mostra fotografica all'aperto o Trekking collinare"
+                  placeholder="Es. Mostra fotografica all'aperto o Concerto in piazza"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   style={{ paddingLeft: 14 }}
@@ -163,16 +198,34 @@ export function EntityPublishPage({ page, setPage, theme, setTheme, user }: any)
                 />
               </div>
 
-              <h3 className="revamp-detail-section-title">3. Luogo & Orari</h3>
-              <div className="revamp-form-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 16 }}>
-                <div className="revamp-form-group" style={{ marginBottom: 0 }}>
+              <h3 className="revamp-detail-section-title">3. Luogo</h3>
+              <div style={{ display: "flex", gap: "10px", marginBottom: 14 }}>
+                <button
+                  type="button"
+                  className={`s-rpill ${locationMode === "poi" ? "on" : ""}`}
+                  onClick={() => setLocationMode("poi")}
+                  style={{ flex: 1, padding: "10px 0", justifyContent: "center" }}
+                >
+                  <Icon name="landmark" size={15} /> Punto di Interesse
+                </button>
+                <button
+                  type="button"
+                  className={`s-rpill ${locationMode === "pin" ? "on" : ""}`}
+                  onClick={() => setLocationMode("pin")}
+                  style={{ flex: 1, padding: "10px 0", justifyContent: "center" }}
+                >
+                  <Icon name="pin" size={15} /> Pin sulla Mappa
+                </button>
+              </div>
+
+              {locationMode === "poi" ? (
+                <div className="revamp-form-group">
                   <label className="revamp-form-label">Punto di Interesse (Luogo)</label>
                   <select
                     className="revamp-select"
                     value={poiId}
                     onChange={(e) => setPoiId(e.target.value)}
-                    style={{ height: "38px", width: "100%", background: "var(--chip-fill)", color: "white", padding: "0 10px" }}
-                    required
+                    style={{ height: "38px", width: "100%", background: "var(--chip-fill)", color: "var(--text-primary)", padding: "0 10px" }}
                   >
                     <option value="">Seleziona un POI...</option>
                     {pois.map((p) => (
@@ -180,6 +233,22 @@ export function EntityPublishPage({ page, setPage, theme, setTheme, user }: any)
                     ))}
                   </select>
                 </div>
+              ) : (
+                <div className="revamp-form-group">
+                  <label className="revamp-form-label">
+                    Clicca sulla mappa per piazzare il pin
+                    {pin && (
+                      <span style={{ marginLeft: 8, color: "var(--text-muted)", fontWeight: 400 }}>
+                        ({pin.lat.toFixed(5)}, {pin.lng.toFixed(5)})
+                      </span>
+                    )}
+                  </label>
+                  <PinPickerMap theme={theme} pin={pin} onPin={setPin} />
+                </div>
+              )}
+
+              <h3 className="revamp-detail-section-title" style={{ marginTop: 24 }}>4. Data & Orari</h3>
+              <div className="revamp-form-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 16 }}>
                 <div className="revamp-form-group" style={{ marginBottom: 0 }}>
                   <label className="revamp-form-label">Data</label>
                   <input
@@ -191,9 +260,21 @@ export function EntityPublishPage({ page, setPage, theme, setTheme, user }: any)
                     required
                   />
                 </div>
+                <div className="revamp-form-group" style={{ marginBottom: 0 }}>
+                  <label className="revamp-form-label">Capacità Max Posti</label>
+                  <input
+                    type="number"
+                    className="revamp-form-input"
+                    placeholder="50"
+                    value={cap}
+                    onChange={(e) => setCap(e.target.value)}
+                    style={{ paddingLeft: 14 }}
+                    required
+                  />
+                </div>
               </div>
 
-              <div className="revamp-form-grid" style={{ gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 24 }}>
+              <div className="revamp-form-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 24 }}>
                 <div className="revamp-form-group" style={{ marginBottom: 0 }}>
                   <label className="revamp-form-label">Ora Inizio</label>
                   <input
@@ -216,22 +297,10 @@ export function EntityPublishPage({ page, setPage, theme, setTheme, user }: any)
                     required
                   />
                 </div>
-                <div className="revamp-form-group" style={{ marginBottom: 0 }}>
-                  <label className="revamp-form-label">Capacità Max Posti</label>
-                  <input
-                    type="number"
-                    className="revamp-form-input"
-                    placeholder="50"
-                    value={cap}
-                    onChange={(e) => setCap(e.target.value)}
-                    style={{ paddingLeft: 14 }}
-                    required
-                  />
-                </div>
               </div>
 
               <button type="submit" className="revamp-form-btn" style={{ "--accent": "var(--violet)" } as React.CSSProperties} disabled={loading}>
-                {loading ? "Pubblicazione..." : "Pubblica Contenuto"}{" "}
+                {loading ? "Pubblicazione..." : "Pubblica Evento"}{" "}
                 {!loading && <Icon name="sparkle" size={16} />}
               </button>
             </form>

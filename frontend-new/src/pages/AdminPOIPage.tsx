@@ -9,9 +9,10 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
-  
-  // New POI form state
-  const [newPoi, setNewPoi] = useState({
+  // id del POI in modifica; null = il form crea un nuovo POI
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const EMPTY_POI = {
     nome: "",
     tipo: "",
     latitudine: 46.067,
@@ -19,7 +20,8 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
     capacitaMax: 100,
     statoAffollamento: "verde" as "verde" | "giallo" | "rosso",
     descrizione: "",
-  });
+  };
+  const [newPoi, setNewPoi] = useState(EMPTY_POI);
 
   const loadPois = async () => {
     setLoading(true);
@@ -65,30 +67,51 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
     }
   };
 
-  const handleCreate = async (e: any) => {
+  const handleSave = async (e: any) => {
     e.preventDefault();
     if (!newPoi.nome || !newPoi.tipo) {
       setErrorMsg("Nome e tipologia sono obbligatori.");
       return;
     }
+    if (!Number.isFinite(newPoi.latitudine) || !Number.isFinite(newPoi.longitudine)) {
+      setErrorMsg("Latitudine e longitudine devono essere numeri validi.");
+      return;
+    }
+    if (!Number.isFinite(newPoi.capacitaMax) || newPoi.capacitaMax <= 0) {
+      setErrorMsg("La capacità massima deve essere maggiore di zero.");
+      return;
+    }
     setErrorMsg("");
     try {
-      const created = await createPOI(newPoi);
-      setPois((prev) => [created, ...prev]);
+      if (editingId) {
+        const updated = await updatePOI(editingId, newPoi);
+        setPois((prev) => prev.map((p) => (p.id === editingId ? updated : p)));
+      } else {
+        const created = await createPOI(newPoi);
+        setPois((prev) => [created, ...prev]);
+      }
       setShowAddForm(false);
-      setNewPoi({
-        nome: "",
-        tipo: "",
-        latitudine: 46.067,
-        longitudine: 11.121,
-        capacitaMax: 100,
-        statoAffollamento: "verde",
-        descrizione: "",
-      });
+      setEditingId(null);
+      setNewPoi(EMPTY_POI);
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || "Impossibile creare il Punto di Interesse.");
+      setErrorMsg(err.message || "Impossibile salvare il Punto di Interesse.");
     }
+  };
+
+  const handleEdit = (p: POI) => {
+    setEditingId(p.id);
+    setNewPoi({
+      nome: p.nome,
+      tipo: p.tipo || "",
+      latitudine: p.latitudine,
+      longitudine: p.longitudine,
+      capacitaMax: p.capacitaMax,
+      statoAffollamento: (p.statoAffollamento as any) || "verde",
+      descrizione: p.descrizione || "",
+    });
+    setShowAddForm(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const filteredPois = pois.filter((p) =>
@@ -108,7 +131,10 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
           <button 
             className="revamp-action-btn" 
             style={{ height: 40, "--accent": "var(--teal)" } as any}
-            onClick={() => setShowAddForm(!showAddForm)}
+            onClick={() => {
+              if (showAddForm) { setEditingId(null); setNewPoi(EMPTY_POI); }
+              setShowAddForm(!showAddForm);
+            }}
           >
             <Icon name={showAddForm ? "x" : "plus"} size={14} />
             {showAddForm ? "Annulla" : "Nuovo POI"}
@@ -123,8 +149,8 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
 
         {showAddForm && (
           <div className="revamp-chart-card anim-in" style={{ "--accent": "var(--teal)", marginBottom: 20 }}>
-            <h3>Aggiungi Nuovo Punto di Interesse</h3>
-            <form onSubmit={handleCreate} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 15 }}>
+            <h3>{editingId ? "Modifica Punto di Interesse" : "Aggiungi Nuovo Punto di Interesse"}</h3>
+            <form onSubmit={handleSave} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 15 }}>
               <div className="revamp-form-group">
                 <label className="revamp-form-label">Nome POI</label>
                 <input
@@ -203,7 +229,7 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
 
               <div style={{ gridColumn: "span 2", display: "flex", justifyContent: "flex-end" }}>
                 <button type="submit" className="revamp-form-btn" style={{ "--accent": "var(--teal)", width: "auto", padding: "0 20px" }}>
-                  Salva POI
+                  {editingId ? "Salva Modifiche" : "Salva POI"}
                 </button>
               </div>
             </form>
@@ -222,7 +248,7 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
         </div>
 
         <div className="revamp-chart-card anim-in" style={{ "--accent": "var(--teal)" }}>
-          <div style={{ display: "flex", justifyContent: "between", alignItems: "center", marginBottom: 15 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 15 }}>
             <h3 style={{ margin: 0 }}>Database POI Monitorati</h3>
             {loading && <Icon name="refresh" size={16} className="spin" style={{ color: "var(--text-muted)" }} />}
           </div>
@@ -260,6 +286,9 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
                       <td style={{ display: "flex", gap: 8 }}>
                         <button className="revamp-action-btn" onClick={() => handleToggleDensity(p.id, p.statoAffollamento)}>
                           <Icon name="sparkle" size={12} /> Cambia Affollamento
+                        </button>
+                        <button className="revamp-action-btn" onClick={() => handleEdit(p)}>
+                          <Icon name="edit" size={12} /> Modifica
                         </button>
                         <button className="revamp-action-btn danger" onClick={() => handleDelete(p.id)}>
                           <Icon name="x" size={12} /> Elimina

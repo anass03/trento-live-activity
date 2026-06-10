@@ -157,8 +157,7 @@
       "area": "Area",
       "nearbyEvents": "Eventi vicini",
       "estParticipants": "Partecipanti stimati",
-      "poiStatus": "Stato POI",
-      "rankNote": "Le zone tranquille vengono ordinate sotto le aree con attività reale, così una zona poco movimentata non può guidare la classifica quando sono presenti eventi o affollamento altrove."
+      "poiStatus": "Stato POI"
     },
     "event": {
       "place": "Luogo",

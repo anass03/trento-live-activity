@@ -157,8 +157,7 @@
       "area": "Area",
       "nearbyEvents": "Nearby events",
       "estParticipants": "Estimated participants",
-      "poiStatus": "POI status",
-      "rankNote": "Quiet zones are ranked below areas with real activity, so a calm spot cannot top the list when there are events or crowding elsewhere."
+      "poiStatus": "POI status"
     },
     "event": {
       "place": "Location",

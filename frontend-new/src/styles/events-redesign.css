@@ -72,6 +72,11 @@
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
   transition: scrollbar-color 220ms ease;
+  /* dentro le colonne scrollabili l'ombra deve restare nei 20px laterali /
+     24px inferiori riservati dal trucco padding+margin negativo: la 56px-blur
+     di default viene troncata di netto al bordo e sborda sulle colonne vicine */
+  --widget-shadow: var(--widget-shadow-contained);
+  --widget-shadow-hover: var(--widget-shadow-contained-hover);
 }
 .ev-col:hover { scrollbar-color: var(--scrollthumb) transparent; }
 /* keep children at natural height so the column scrolls instead of
