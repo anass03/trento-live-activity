@@ -1,178 +1,309 @@
-/* ===========================================================
-   Trento Live Activity — custom stylized city map (SVG art)
-   Custom stylized city map
-   =========================================================== */
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
+import { catColor, catLabel } from "../../data/redesignData";
 
-function mulberry32(a) {
-  return function () {
-    a |= 0; a = (a + 0x6D2B79F5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+// CartoDB vector tile style urls (completely free, no API key required)
+const DARK_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+const LIGHT_STYLE = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
+const TRENTO_CENTER: [number, number] = [11.1211, 46.0679];
+
+export const CAT_ICON: Record<string, string> = { 
+  musica: "music", 
+  cultura: "landmark", 
+  sport: "run", 
+  cibo: "food", 
+  outdoor: "bike", 
+  famiglia: "family" 
+};
+
+function getIconSvg(name: string, size = 15): string {
+  const paths: Record<string, string> = {
+    grid: `<rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" />`,
+    landmark: `<path d="M3 21h18" /><path d="M5 21V10l7-5 7 5v11" /><path d="M9 21v-6h6v6" />`,
+    music: `<circle cx="6" cy="18" r="2.5" /><circle cx="17" cy="16" r="2.5" /><path d="M8.5 18V6l11-2v10" />`,
+    run: `<circle cx="13" cy="4.5" r="1.8" /><path d="M5 21l3-5 3.5-2 1-4 3 3 3 1" /><path d="M8 11l3-2 3 1" />`,
+    food: `<path d="M5 3v7a2 2 0 0 0 2 2v9" /><path d="M9 3v9" /><path d="M5 3v4" /><path d="M9 3v4" /><path d="M18 3c-1.5 0-3 2-3 5s1 4 1 4v9" /><path d="M18 3v18" />`,
+    bike: `<circle cx="6" cy="17" r="3.2" /><circle cx="18" cy="17" r="3.2" /><path d="M6 17l4-7h5l-3 7" /><path d="M10 10l-1.5-3H6" /><circle cx="15" cy="5" r="1" />`,
+    family: `<circle cx="9" cy="6" r="2.4" /><circle cx="16" cy="7" r="2" /><path d="M5 21v-4a4 4 0 0 1 8 0v4" /><path d="M14 21v-3a3.5 3.5 0 0 1 6 0v3" />`,
+    x: `<path d="M6 6l12 12" /><path d="M18 6L6 18" />`,
+    pin: `<path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11z" /><circle cx="12" cy="10" r="2.5" />`,
+    clock: `<circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" />`,
+    ticket: `<path d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2 2 2 0 0 0 0 4 2 2 0 0 1-2 2H6a2 2 0 0 1-2-2 2 2 0 0 0 0-4z" /><path d="M14 6v12" />`
   };
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${paths[name] || paths.grid}</svg>`;
 }
 
-export const TrentoMap = React.memo(function TrentoMap() {
-  const W = 1440, H = 900;
+interface TrentoMapProps {
+  theme: "light" | "dark" | "auto";
+  markers: any[];
+  activeFilter: string;
+  onMarkerClick: (marker: any) => void;
+  selectedMarkerId?: string | null;
+  zoom: number;
+  setZoom: (z: number) => void;
+  is3d: boolean;
+  onLocateRef?: React.MutableRefObject<(() => void) | null>;
+  onResetRef?: React.MutableRefObject<(() => void) | null>;
+}
 
-  // ---- river (Adige): wavy vertical band on the west ----
-  const river =
-    "M 120,-20 C 220,140 150,300 230,440 C 300,560 200,720 270,920 " +
-    "L 430,920 C 360,720 460,560 390,440 C 320,300 400,150 300,-20 Z";
-  const riverCenter =
-    "M 215,-20 C 305,150 235,300 315,440 C 385,560 285,720 355,920";
+export const TrentoMap = React.memo(function TrentoMap({
+  theme,
+  markers,
+  activeFilter,
+  onMarkerClick,
+  selectedMarkerId,
+  zoom,
+  setZoom,
+  is3d,
+  onLocateRef,
+  onResetRef
+}: TrentoMapProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const mapInstance = useRef<maplibregl.Map | null>(null);
+  const mapMarkers = useRef<maplibregl.Marker[]>([]);
+  const [styleLoaded, setStyleLoaded] = useState(false);
 
-  // ---- procedural streets + blocks (city = east of river) ----
-  const rng = mulberry32(73);
-  const avenueX = [400, 492, 585, 678, 772, 866, 962, 1060, 1162, 1268, 1376];
-  const crossY  = [60, 145, 232, 320, 408, 496, 584, 672, 760, 848];
+  // Initialize Map
+  useEffect(() => {
+    if (!containerRef.current) return;
 
-  const avenues = avenueX.map((x, i) => {
-    const w1 = (rng() - 0.5) * 28, w2 = (rng() - 0.5) * 34, w3 = (rng() - 0.5) * 24;
-    return `M ${x + w1},-10 C ${x + w2},230 ${x + w3},460 ${x + w1 * 0.6},700 S ${x + w2 * 0.5},940 ${x + w3 * 0.4},940`;
-  });
-  const crossings = crossY.map((y) => {
-    const startX = 350 + rng() * 30;
-    const w1 = (rng() - 0.5) * 26, w2 = (rng() - 0.5) * 30;
-    return `M ${startX},${y} C 640,${y + w1} 940,${y + w2} 1440,${y + w1 * 0.5}`;
-  });
+    const initialStyle = theme === "dark" ? DARK_STYLE : LIGHT_STYLE;
 
-  // blocks between grid cells, brighter toward historic center (~705,450)
-  const cx = 705, cy = 450, maxD = 720;
-  const blocks: any[] = [];
-  for (let i = 0; i < avenueX.length - 1; i++) {
-    for (let j = 0; j < crossY.length - 1; j++) {
-      const x0 = avenueX[i], x1 = avenueX[i + 1];
-      const y0 = crossY[j], y1 = crossY[j + 1];
-      const padX = 7 + rng() * 6, padY = 7 + rng() * 6;
-      const bx = x0 + padX, by = y0 + padY;
-      const bw = x1 - x0 - padX * 2, bh = y1 - y0 - padY * 2;
-      const mx = bx + bw / 2, my = by + bh / 2;
-      const d = Math.hypot(mx - cx, my - cy);
-      const heat = Math.max(0, 1 - d / maxD);
-      const op = 0.04 + heat * 0.10 + rng() * 0.02;
-      const warm = heat > 0.45;
-      blocks.push({ key: `b${i}-${j}`, bx, by, bw, bh, op, warm, r: 3 + rng() * 3 });
+    const map = new maplibregl.Map({
+      container: containerRef.current,
+      style: initialStyle,
+      center: TRENTO_CENTER,
+      zoom: 14.2,
+      minZoom: 11,
+      maxZoom: 19,
+      pitch: is3d ? 60 : 0,
+      bearing: is3d ? -20 : 0,
+      attributionControl: false,
+    });
+
+    map.on("load", () => {
+      setStyleLoaded(true);
+    });
+
+    map.on("styledata", () => {
+      setStyleLoaded(true);
+    });
+
+    // Handle zoom callbacks to synchronize state
+    map.on("zoom", () => {
+      const currentZoom = parseFloat(map.getZoom().toFixed(2));
+      // Avoid circular updates by checking diff
+      setZoom(currentZoom);
+    });
+
+    mapInstance.current = map;
+
+    return () => {
+      map.remove();
+      mapInstance.current = null;
+    };
+  }, []);
+
+  // Update theme dynamically
+  useEffect(() => {
+    const map = mapInstance.current;
+    if (!map) return;
+    const styleUrl = theme === "dark" ? DARK_STYLE : LIGHT_STYLE;
+    setStyleLoaded(false);
+    map.setStyle(styleUrl);
+  }, [theme]);
+
+  // Handle camera changes based on zoom prop
+  useEffect(() => {
+    const map = mapInstance.current;
+    if (!map) return;
+    const currentZoom = parseFloat(map.getZoom().toFixed(2));
+    if (Math.abs(currentZoom - zoom) > 0.05) {
+      map.zoomTo(zoom);
     }
-  }
+  }, [zoom]);
 
-  // main illuminated roads (drawn glowing on top)
-  const mainRoads = [
-    "M 360,235 C 700,200 1050,210 1440,180",                 // east-west arterial
-    "M 705,40 C 690,260 715,520 700,900",                    // central spine (Via Belenzani axis)
-    "M 430,470 C 700,440 980,470 1300,430",                  // cross arterial
-    "M 980,60 C 1010,360 980,640 1040,900",                  // ring east
-  ];
+  // Handle 3D pitch/bearing toggle
+  useEffect(() => {
+    const map = mapInstance.current;
+    if (!map) return;
+    map.easeTo({
+      pitch: is3d ? 60 : 0,
+      bearing: is3d ? -20 : 0,
+      duration: 850
+    });
+  }, [is3d]);
 
-  // parks (organic green areas)
-  const parks = [
-    { cx: 392, cy: 545, rx: 92, ry: 70, rot: -18 },   // Parco delle Albere
-    { cx: 918, cy: 232, rx: 86, ry: 64, rot: 12 },    // Castello gardens
-    { cx: 600, cy: 792, rx: 120, ry: 60, rot: 0 },    // Gocciadoro south
-    { cx: 482, cy: 648, rx: 54, ry: 42, rot: 8 },     // small green
-  ];
+  // Set reference functions for Locate and Reset
+  useEffect(() => {
+    if (onLocateRef) {
+      onLocateRef.current = () => {
+        const map = mapInstance.current;
+        if (!map) return;
+        map.flyTo({
+          center: TRENTO_CENTER,
+          zoom: 15.5,
+          pitch: 60,
+          bearing: -20,
+          duration: 1200
+        });
+      };
+    }
+    if (onResetRef) {
+      onResetRef.current = () => {
+        const map = mapInstance.current;
+        if (!map) return;
+        map.flyTo({
+          center: TRENTO_CENTER,
+          zoom: 14.2,
+          pitch: 0,
+          bearing: 0,
+          duration: 1200
+        });
+      };
+    }
+  }, [onLocateRef, onResetRef]);
 
-  // heatmap activity blobs
-  const heatBlobs = [
-    { x: 705, y: 450, r: 240, c: "rgba(236,72,153,0.18)" },   // Piazza Duomo
-    { x: 648, y: 396, r: 180, c: "rgba(251,191,36,0.13)" },   // Belenzani / Manci
-    { x: 907, y: 279, r: 170, c: "rgba(167,139,250,0.13)" },  // Castello
-    { x: 475, y: 603, r: 160, c: "rgba(45,212,191,0.11)" },   // Albere
-    { x: 763, y: 576, r: 150, c: "rgba(56,189,248,0.10)" },   // Fiera
-  ];
+  // Fly to selected marker coordinates dynamically
+  useEffect(() => {
+    const map = mapInstance.current;
+    if (!map || !selectedMarkerId || !styleLoaded) return;
+    const marker = markers.find((m) => m.id === selectedMarkerId);
+    if (marker) {
+      map.flyTo({
+        center: [marker.longitude ?? 11.121, marker.latitude ?? 46.067],
+        zoom: Math.max(map.getZoom(), 15.5),
+        duration: 1000
+      });
+    }
+  }, [selectedMarkerId, markers, styleLoaded]);
+
+  // Render HTML markers dynamically on the MapLibre canvas
+  useEffect(() => {
+    const map = mapInstance.current;
+    if (!map || !styleLoaded) return;
+
+    // Clear previous markers
+    mapMarkers.current.forEach((m) => m.remove());
+    mapMarkers.current = [];
+
+    // Filter and add markers
+    markers.forEach((m) => {
+      const dim = activeFilter !== "all" && activeFilter !== m.cat;
+      const selected = selectedMarkerId === m.id;
+      
+      const el = document.createElement("div");
+      el.className = `marker ${m.live ? "live" : ""} ${dim ? "dimmed" : ""} ${selected ? "selected" : ""}`;
+      el.style.setProperty("--mc", catColor(m.cat));
+      el.style.pointerEvents = "auto";
+      
+      const dot = document.createElement("div");
+      dot.className = "marker-dot";
+      
+      const iconName = CAT_ICON[m.cat] || "grid";
+      dot.innerHTML = getIconSvg(iconName, 17);
+      el.appendChild(dot);
+
+      // Add popup tooltip content only if NOT selected
+      if (!selected) {
+        const tip = document.createElement("div");
+        tip.className = "marker-tip";
+        tip.style.setProperty("--mc", catColor(m.cat));
+        tip.innerHTML = `
+          <div class="tip-cat">${catLabel(m.cat)}</div>
+          <div class="tip-title">${m.title}</div>
+          <div class="tip-meta">
+            <span>${m.time}</span> · <span>${m.place}</span>
+          </div>
+        `;
+        el.appendChild(tip);
+      } else {
+        // Detailed Event Popup (React component HTML equivalent)
+        const popupDiv = document.createElement("div");
+        const placeBelow = (m.latitude ?? 46.067) > 46.07;
+        popupDiv.className = `event-popup ${placeBelow ? "below" : ""}`;
+        popupDiv.style.setProperty("--ec", catColor(m.cat));
+        
+        const going = m.going ?? 25;
+        const cap = m.cap ?? 50;
+        const pct = Math.min(100, Math.round((going / cap) * 100));
+        
+        popupDiv.innerHTML = `
+          <div class="ep-head">
+            <div class="ep-cat">
+              <span class="ep-cat-ic">${getIconSvg(CAT_ICON[m.cat] || "grid", 12)}</span>
+              ${catLabel(m.cat)}
+            </div>
+            <div class="ep-title">${m.title}</div>
+            <button class="ep-close" aria-label="Chiudi">${getIconSvg("x", 13)}</button>
+          </div>
+          <div class="ep-body">
+            <div class="ep-field">
+              <span class="ep-fic">${getIconSvg("pin", 14)}</span>
+              <div class="ep-ftext">
+                <div class="ep-flbl">Luogo</div>
+                <div class="ep-fval">${m.place}</div>
+              </div>
+            </div>
+            <div class="ep-field">
+              <span class="ep-fic">${getIconSvg("clock", 14)}</span>
+              <div class="ep-ftext">
+                <div class="ep-flbl">Quando</div>
+                <div class="ep-fval">${m.date}, ${m.time}</div>
+              </div>
+            </div>
+            <div class="ep-part">
+              <div class="ep-part-l">
+                <div class="ep-flbl">Partecipanti</div>
+                <div class="ep-part-bar"><i style="width: ${pct}%"></i></div>
+              </div>
+              <div class="ep-part-n"><b>${going}</b> / ${cap}</div>
+            </div>
+            <button class="ep-cta">${getIconSvg("ticket", 15)} Partecipa</button>
+          </div>
+        `;
+
+        popupDiv.addEventListener("click", (e) => {
+          e.stopPropagation();
+        });
+
+        const closeBtn = popupDiv.querySelector(".ep-close");
+        if (closeBtn) {
+          closeBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            onMarkerClick(null);
+          });
+        }
+
+        const ctaBtn = popupDiv.querySelector(".ep-cta");
+        if (ctaBtn) {
+          ctaBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            alert(`Grazie per esserti registrato all'evento: ${m.title}`);
+          });
+        }
+
+        el.appendChild(popupDiv);
+      }
+
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        onMarkerClick(m);
+      });
+
+      const maplibreMarker = new maplibregl.Marker({ element: el })
+        .setLngLat([m.longitude ?? 11.121, m.latitude ?? 46.067])
+        .addTo(map);
+
+      mapMarkers.current.push(maplibreMarker);
+    });
+  }, [markers, activeFilter, selectedMarkerId, styleLoaded]);
 
   return (
-    <svg className="map-svg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-      <defs>
-        <linearGradient id="mapBg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" style={{ stopColor: "var(--map-bg0)" }} />
-          <stop offset="55%" style={{ stopColor: "var(--map-bg1)" }} />
-          <stop offset="100%" style={{ stopColor: "var(--map-bg2)" }} />
-        </linearGradient>
-        <linearGradient id="riverGrad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" style={{ stopColor: "var(--map-river0)" }} />
-          <stop offset="50%" style={{ stopColor: "var(--map-river1)" }} />
-          <stop offset="100%" style={{ stopColor: "var(--map-river2)" }} />
-        </linearGradient>
-        <radialGradient id="parkGrad" cx="42%" cy="38%" r="65%">
-          <stop offset="0%" style={{ stopColor: "var(--map-park0)" }} />
-          <stop offset="70%" style={{ stopColor: "var(--map-park1)" }} />
-          <stop offset="100%" style={{ stopColor: "var(--map-park2)" }} />
-        </radialGradient>
-        <filter id="roadGlow" x="-30%" y="-30%" width="160%" height="160%">
-          <feGaussianBlur stdDeviation="3.2" result="b" />
-          <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
-        <filter id="blobBlur" x="-60%" y="-60%" width="220%" height="220%">
-          <feGaussianBlur stdDeviation="42" />
-        </filter>
-        <filter id="parkBlur" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="10" />
-        </filter>
-      </defs>
-
-      {/* base */}
-      <rect x="0" y="0" width={W} height={H} fill="url(#mapBg)" />
-
-      {/* heatmap activity zones */}
-      <g filter="url(#blobBlur)" style={{ opacity: "var(--map-heat)" }}>
-        {heatBlobs.map((b, i) => (
-          <circle key={i} cx={b.x} cy={b.y} r={b.r} fill={b.c} />
-        ))}
-      </g>
-
-      {/* parks */}
-      <g filter="url(#parkBlur)">
-        {parks.map((p, i) => (
-          <ellipse key={i} cx={p.cx} cy={p.cy} rx={p.rx} ry={p.ry}
-            fill="url(#parkGrad)" transform={`rotate(${p.rot} ${p.cx} ${p.cy})`} />
-        ))}
-      </g>
-      {/* park crisp rim */}
-      {parks.map((p, i) => (
-        <ellipse key={"pr" + i} cx={p.cx} cy={p.cy} rx={p.rx} ry={p.ry}
-          fill="none" style={{ stroke: "var(--map-park-rim)" }} strokeWidth="1.2"
-          transform={`rotate(${p.rot} ${p.cx} ${p.cy})`} />
-      ))}
-
-      {/* river */}
-      <path d={river} fill="url(#riverGrad)" />
-      <path d={river} fill="none" style={{ stroke: "var(--map-river-stroke)" }} strokeWidth="1.4" />
-      <path d={riverCenter} fill="none" style={{ stroke: "var(--map-river-reflect)" }} strokeWidth="2.2"
-        strokeLinecap="round" filter="url(#roadGlow)" opacity="0.5" />
-
-      {/* city blocks */}
-      <g>
-        {blocks.map((b) => (
-          <rect key={b.key} x={b.bx} y={b.by} width={b.bw} height={b.bh} rx={b.r}
-            style={{ fill: b.warm ? "var(--map-block-warm)" : "var(--map-block)", stroke: "var(--map-block-stroke)" }}
-            fillOpacity={b.op} strokeWidth="1" />
-        ))}
-      </g>
-
-      {/* minor streets */}
-      <g style={{ stroke: "var(--map-street)" }} strokeWidth="1.4" fill="none" strokeLinecap="round">
-        {avenues.map((d, i) => <path key={"av" + i} d={d} />)}
-        {crossings.map((d, i) => <path key={"cr" + i} d={d} />)}
-      </g>
-
-      {/* main illuminated roads */}
-      <g fill="none" strokeLinecap="round" filter="url(#roadGlow)">
-        {mainRoads.map((d, i) => (
-          <React.Fragment key={"mr" + i}>
-            <path d={d} style={{ stroke: "var(--map-road-soft)" }} strokeWidth="7" />
-            <path d={d} style={{ stroke: "var(--map-road-bright)" }} strokeWidth="2" />
-          </React.Fragment>
-        ))}
-      </g>
-
-      {/* subtle node lights at major intersections */}
-      <g>
-        {[[705, 450], [648, 396], [907, 279], [475, 603], [763, 576], [1040, 432]].map((n, i) => (
-          <circle key={"n" + i} cx={n[0]} cy={n[1]} r="2.4" style={{ fill: "var(--map-node)" }} filter="url(#roadGlow)" />
-        ))}
-      </g>
-    </svg>
+    <div 
+      ref={containerRef} 
+      style={{ width: "100%", height: "100%", position: "absolute", inset: 0, borderRadius: "inherit" }} 
+    />
   );
 });

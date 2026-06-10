@@ -84,9 +84,9 @@ function MapControls({ zoom, setZoom, is3d, setIs3d, onLocate, onReset }: any) {
       <button className={"mc-btn" + (is3d ? " on" : "")} onClick={() => setIs3d(!is3d)}><Icon name="cube" size={17} />3D</button>
       <button className="mc-btn" onClick={onLocate}><Icon name="locate" size={17} />Posizione</button>
       <div className="mc-div"></div>
-      <button className="mc-btn" onClick={() => setZoom((z) => Math.max(1, +(z - 0.25).toFixed(2)))}><Icon name="minus" size={17} /></button>
-      <div className="mc-btn" style={{ fontFamily: "var(--mono)", fontSize: 12, minWidth: 50, pointerEvents: "none" }}>{Math.round(zoom * 100)}%</div>
-      <button className="mc-btn" onClick={() => setZoom((z) => Math.min(2.5, +(z + 0.25).toFixed(2)))}><Icon name="plus" size={17} /></button>
+      <button className="mc-btn" onClick={() => setZoom((z: number) => Math.max(11, +(z - 0.5).toFixed(2)))}><Icon name="minus" size={17} /></button>
+      <div className="mc-btn" style={{ fontFamily: "var(--mono)", fontSize: 12, minWidth: 50, pointerEvents: "none" }}>{Math.round(zoom * 10)}%</div>
+      <button className="mc-btn" onClick={() => setZoom((z: number) => Math.min(19, +(z + 0.5).toFixed(2)))}><Icon name="plus" size={17} /></button>
       <div className="mc-div"></div>
       <button className="mc-btn" onClick={onReset}><Icon name="layers" size={17} />Reset</button>
     </div>
@@ -112,7 +112,9 @@ function Clock() {
 
 function HomeScene({ page, setPage, theme, setTheme, user }: any) {
   const [active, setActive] = useState("all");
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(14.2);
+  const locateRef = React.useRef<(() => void) | null>(null);
+  const resetRef = React.useRef<(() => void) | null>(null);
   const [is3d, setIs3d] = useState(false);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [popup, setPopup] = useState<any>(null);
@@ -267,20 +269,23 @@ function HomeScene({ page, setPage, theme, setTheme, user }: any) {
   };
   
   const closePopup = () => setPopup(null);
-  const reset = () => { setPan({ x: 0, y: 0 }); setZoom(1); setIs3d(false); setActive("all"); setPopup(null); };
-  const locate = () => focusOn(49, 50);
+  const reset = () => {
+    if (resetRef.current) resetRef.current();
+    setPan({ x: 0, y: 0 });
+    setZoom(14.2);
+    setIs3d(false);
+    setActive("all");
+    setPopup(null);
+  };
+  const locate = () => {
+    if (locateRef.current) locateRef.current();
+  };
 
   const innerStyle: React.CSSProperties = {
     position: "absolute", inset: 0,
-    transform: `scale(${zoom}) translate(${pan.x}%, ${pan.y}%)`,
-    transformOrigin: "center center",
-    transition: "transform 850ms cubic-bezier(.2,.8,.3,1)",
   };
   const tiltStyle: React.CSSProperties = {
     position: "absolute", inset: 0,
-    transform: is3d ? "perspective(1500px) rotateX(34deg) scale(1.08)" : "perspective(1500px) rotateX(0deg)",
-    transformOrigin: "center 56%",
-    transition: "transform 850ms cubic-bezier(.2,.8,.3,1)",
   };
 
   return (
@@ -290,10 +295,19 @@ function HomeScene({ page, setPage, theme, setTheme, user }: any) {
         <div className="map-wrap" onClick={closePopup}>
           <div className="map-inner" style={innerStyle}>
             <div className="map-tilt" style={tiltStyle}>
-              <TrentoMap />
-              <MapLabels />
+              <TrentoMap
+                theme={theme}
+                markers={dynamicMarkers}
+                activeFilter={active}
+                onMarkerClick={(m) => m ? openMarkerPopup(m) : closePopup()}
+                selectedMarkerId={popup?.markerId}
+                zoom={zoom}
+                setZoom={setZoom}
+                is3d={is3d}
+                onLocateRef={locateRef}
+                onResetRef={resetRef}
+              />
             </div>
-            <MarkersLayer active={active} onFocus={openMarkerPopup} popup={popup} onClosePopup={closePopup} markers={dynamicMarkers} />
           </div>
         </div>
         <div className="map-grade"></div>
