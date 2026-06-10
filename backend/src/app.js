@@ -14,6 +14,10 @@ const notificationsRoutes = require('./notifications/notifications.routes');
 const aiRoutes = require('./ai/ai.routes');
 const parkingRoutes = require('./parking/parking.routes');
 const serviceRequestRoutes = require('./service-requests/service-request.routes');
+const socialEventsRoutes = require('./social/socialEvents.routes');
+const socialActivitiesRoutes = require('./social/socialActivities.routes');
+const commentsRoutes = require('./social/comments.routes');
+const { usersRouter: socialUsersRoutes, meRouter: socialMeRoutes } = require('./social/socialUser.routes');
 const errorHandler = require('./middleware/errorHandler');
 const requestLogger = require('./middleware/requestLogger');
 
@@ -72,8 +76,13 @@ app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 // raggiungibili bypassando un eventuale reverse proxy che filtra solo /api/*.
 app.use('/api/auth', authRoutes);
 app.use('/api/activities', activityRoutes);
+app.use('/api/activities', socialActivitiesRoutes);
 app.use('/api/events', eventRoutes);
+app.use('/api/events', socialEventsRoutes);
+app.use('/api/comments', commentsRoutes);
 app.use('/api/map', mapRoutes);
+app.use('/api/users', socialUsersRoutes);
+app.use('/api/users/me', socialMeRoutes);
 app.use('/api/users/me/favorites', favoritesRoutes);
 app.use('/api/moderation', moderationRoutes);
 app.use('/api/dashboard', dashboardRoutes);

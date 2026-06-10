@@ -122,5 +122,6 @@ module.exports = (sequelize) => {
       }
     }
   });
+};
 
 module.exports.ACTIVITY_TYPES = ACTIVITY_TYPES;

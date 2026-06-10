@@ -509,7 +509,12 @@ function ActDrawer({ id, saved, onSave, onClose }: any) {
 }
 
 /* ===================== PAGE ===================== */
-export function ActivityPage({ page, setPage, theme, setTheme, user }: any) {
+import { getActivities, ApiActivity, addFavorite, removeFavorite, getFavorites } from "../lib/api";
+
+export function ActivityPage({ page, setPage, theme, setTheme, user, setSelectedActivityId }: any) {
+  const [backendActivities, setBackendActivities] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const [s, setS] = useState({
     search: "", category: "all", difficulty: null, duration: null, author: null,
     practical: { free: false, now: false, trust: false, verified: false },
@@ -519,10 +524,85 @@ export function ActivityPage({ page, setPage, theme, setTheme, user }: any) {
   const [saves, setSaves] = useState<Record<string, boolean>>({});
   const [detail, setDetail] = useState(null);
   const set = (patch) => setS((prev) => ({ ...prev, ...patch }));
-  const onSave = (id) => setSaves((m) => ({ ...m, [id]: !m[id] }));
+
+  const loadActivities = async () => {
+    try {
+      const raw = await getActivities();
+      const mapped = raw.map((a: any) => {
+        const authorKey = a.creator?.ruolo === 'EnteCertificato' ? 'o' : 'g';
+        return {
+          id: a.id,
+          cat: a.category?.toLowerCase() || 'outdoor',
+          subtype: a.subtype || 'Attività',
+          title: a.title,
+          dur: a.duration || 90,
+          diff: a.difficulty || 'medium',
+          price: a.price || 'free',
+          priceLabel: a.priceLabel || 'Gratis',
+          loc: a.location || 'Trento',
+          dist: a.distance || 1.2,
+          rating: a.rating || 4.7,
+          reviews: a.reviewsCount || 12,
+          author: authorKey,
+          going: a.participantCount || 0,
+          cap: a.maxParticipants || 15,
+          avatars: [0, 1, 2],
+          status: {
+            recommended: true,
+            suitableNow: true,
+            verified: a.creator?.ruolo === 'EnteCertificato',
+            rising: a.participantCount > 5
+          },
+          desc: a.description || 'Nessuna descrizione.',
+          rev: {
+            accuracy: 4.8,
+            organization: 4.7,
+            safety: 4.9
+          }
+        };
+      });
+      setBackendActivities(mapped);
+
+      if (user?.id) {
+        const favs = await getFavorites();
+        const savesMap: Record<string, boolean> = {};
+        favs.forEach((f) => {
+          if (f.markerType === "activity") savesMap[f.markerId] = true;
+        });
+        setSaves(savesMap);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadActivities();
+  }, [user?.id]);
+
+  const onSave = async (id: string) => {
+    const isSaved = !!saves[id];
+    setSaves((m) => ({ ...m, [id]: !isSaved }));
+    try {
+      if (isSaved) {
+        await removeFavorite("activity", id);
+      } else {
+        await addFavorite("activity", id);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleOpenDetail = (id: string) => {
+    setSelectedActivityId(id);
+    setPage("attivita-dettaglio");
+  };
 
   const list = useMemo(() => {
-    let r = ACT_LIST.slice();
+    let r = backendActivities.slice();
     // tab
     if (tab === "recommended") r = r.filter((a) => a.status.recommended);
     else if (tab === "verified") r = r.filter((a) => a.status.verified || ACT_AUTHORS[a.author].trust === "verified");
@@ -552,7 +632,18 @@ export function ActivityPage({ page, setPage, theme, setTheme, user }: any) {
     if (sort === "participants") r.sort((a, b) => b.going - a.going);
     if (sort === "price") r.sort((a, b) => (a.price === b.price ? 0 : a.price === "free" ? -1 : 1));
     return r;
-  }, [s, tab, sort, saves]);
+  }, [backendActivities, s, tab, sort, saves]);
+
+  if (loading) {
+    return (
+      <div className="activity-scene">
+        <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
+        <div style={{ color: "var(--text-muted)", fontSize: 15, padding: "100px 0", textAlign: "center" }}>
+          Caricamento attività...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="activity-scene">
@@ -567,14 +658,14 @@ export function ActivityPage({ page, setPage, theme, setTheme, user }: any) {
           {list.length === 0
             ? <div style={{ color: "var(--text-muted)", fontSize: 14, padding: "40px 8px", textAlign: "center" }}>Nessuna attività con questi filtri. Prova a rimuoverne qualcuno.</div>
             : <div className="act-grid">
-                {list.map((a) => <ActCard key={a.id} a={a} saved={!!saves[a.id]} onSave={onSave} onOpen={() => setPage("attivita-dettaglio")} />)}
+                {list.map((a) => <ActCard key={a.id} a={a} saved={!!saves[a.id]} onSave={onSave} onOpen={() => handleOpenDetail(a.id)} />)}
               </div>}
         </div>
 
         <div className="ev-col right">
-          <ActNextWidget saved={!!saves.a3} onSave={onSave} onOpen={() => setPage("attivita-dettaglio")} />
+          <ActNextWidget saved={!!saves.a3} onSave={onSave} onOpen={() => handleOpenDetail("a3")} />
           <TrustedAuthors authorFilter={s.author} onPick={(id) => set({ author: id })} />
-          <PerfectNow onOpen={() => setPage("attivita-dettaglio")} />
+          <PerfectNow onOpen={handleOpenDetail} />
           <WeatherStrip />
         </div>
       </div>

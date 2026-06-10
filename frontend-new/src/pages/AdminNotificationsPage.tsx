@@ -1,22 +1,54 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
+import { getPushStats, sendAdminBroadcast, PushStats, PushAudience } from "../lib/api";
 
 export function AdminNotificationsPage({ page, setPage, theme, setTheme, user }: any) {
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
-  const [type, setType] = useState("info");
+  const [audience, setAudience] = useState<PushAudience>("all");
+  const [stats, setStats] = useState<PushStats | null>(null);
+  const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
-  const handleSend = (e: any) => {
+  const loadStats = async () => {
+    try {
+      const data = await getPushStats();
+      setStats(data);
+    } catch (err) {
+      console.error("Errore nel caricamento delle statistiche notifiche:", err);
+    }
+  };
+
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  const handleSend = async (e: any) => {
     e.preventDefault();
     if (!title || !desc) return;
-    setSuccess(true);
-    setTimeout(() => {
-      setSuccess(false);
+    setLoading(true);
+    setErrorMsg("");
+    try {
+      await sendAdminBroadcast({
+        title,
+        body: desc,
+        audience,
+      });
+      setSuccess(true);
       setTitle("");
       setDesc("");
-    }, 1500);
+      loadStats(); // reload stats
+      setTimeout(() => {
+        setSuccess(false);
+      }, 2500);
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(err.message || "Errore durante l'invio del broadcast.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -25,6 +57,31 @@ export function AdminNotificationsPage({ page, setPage, theme, setTheme, user }:
       <div className="revamp-admin-layout">
         <h1>Invio Notifiche di Broadcast</h1>
         <p>Invia avvisi e notifiche di sistema in tempo reale a tutti gli utenti dell'applicazione</p>
+
+        {errorMsg && (
+          <div className="revamp-status-pill error" style={{ margin: "20px auto 0", maxWidth: 640, padding: "12px", width: "100%", justifyContent: "center" }}>
+            <Icon name="alert" size={14} /> {errorMsg}
+          </div>
+        )}
+
+        {stats && (
+          <div className="revamp-dashboard-grid" style={{ maxWidth: 640, margin: "20px auto 0", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 15 }}>
+            <div className="revamp-stat-card" style={{ "--accent": "var(--cyan)" } as any}>
+              <Icon name="bell" size={24} style={{ color: "var(--cyan)" }} />
+              <div>
+                <h2>{stats.totalTokens}</h2>
+                <p>Token Dispositivi Registrati</p>
+              </div>
+            </div>
+            <div className="revamp-stat-card" style={{ "--accent": "var(--emerald)" } as any}>
+              <Icon name="spid" size={24} style={{ color: "var(--emerald)" }} />
+              <div>
+                <h2>{stats.usersReachable}</h2>
+                <p>Utenti Raggiungibili</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="revamp-legal-card anim-in" style={{ "--accent": "var(--cyan)", maxWidth: 640, margin: "20px auto 0" }}>
           <h2>Compila Messaggio Broadcast</h2>
@@ -35,31 +92,39 @@ export function AdminNotificationsPage({ page, setPage, theme, setTheme, user }:
           ) : (
             <form onSubmit={handleSend} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div className="revamp-form-group">
-                <label className="revamp-form-label">Livello Notifica</label>
-                <div style={{ display: "flex", gap: 10 }}>
+                <label className="revamp-form-label">Destinatari (Audience)</label>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <button
                     type="button"
-                    className={"s-rpill" + (type === "info" ? " on" : "")}
+                    className={"s-rpill" + (audience === "all" ? " on" : "")}
                     style={{ "--accent": "var(--cyan)" }}
-                    onClick={() => setType("info")}
+                    onClick={() => setAudience("all")}
                   >
-                    <Icon name="cloud" size={14} /> Informativa
+                    Tutti gli Utenti
                   </button>
                   <button
                     type="button"
-                    className={"s-rpill" + (type === "warning" ? " on" : "")}
-                    style={{ "--accent": "var(--amber)" }}
-                    onClick={() => setType("warning")}
+                    className={"s-rpill" + (audience === "cittadini" ? " on" : "")}
+                    style={{ "--accent": "var(--cyan)" }}
+                    onClick={() => setAudience("cittadini")}
                   >
-                    <Icon name="calendar" size={14} /> Avviso Medio
+                    Cittadini
                   </button>
                   <button
                     type="button"
-                    className={"s-rpill" + (type === "critical" ? " on" : "")}
-                    style={{ "--accent": "var(--red)" }}
-                    onClick={() => setType("critical")}
+                    className={"s-rpill" + (audience === "enti" ? " on" : "")}
+                    style={{ "--accent": "var(--cyan)" }}
+                    onClick={() => setAudience("enti")}
                   >
-                    <Icon name="cone" size={14} /> Urgente
+                    Enti Certificati
+                  </button>
+                  <button
+                    type="button"
+                    className={"s-rpill" + (audience === "comunali" ? " on" : "")}
+                    style={{ "--accent": "var(--cyan)" }}
+                    onClick={() => setAudience("comunali")}
+                  >
+                    Admins Comunali
                   </button>
                 </div>
               </div>
@@ -88,8 +153,9 @@ export function AdminNotificationsPage({ page, setPage, theme, setTheme, user }:
                 />
               </div>
 
-              <button type="submit" className="revamp-form-btn" style={{ "--accent": "var(--cyan)" }}>
-                Invia Notifica <Icon name="bell" size={16} />
+              <button type="submit" className="revamp-form-btn" style={{ "--accent": "var(--cyan)" }} disabled={loading}>
+                {loading ? "Invio in corso..." : "Invia Notifica"}
+                <Icon name={loading ? "refresh" : "bell"} size={16} className={loading ? "spin" : ""} />
               </button>
             </form>
           )}

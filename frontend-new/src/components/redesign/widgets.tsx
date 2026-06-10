@@ -1,15 +1,16 @@
 /* ===========================================================
    Trento Live Activity — widgets, markers, labels
    =========================================================== */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { ALERTS, AREAS, EVENTS, MARKERS, PARKING, PLACES, WEATHER, catColor, catLabel } from "../../data/redesignData";
 import { Icon, WxIcon } from "../ui/Icon";
+import { getParking } from "../../lib/api";
 
 export const CAT_ICON: Record<string, string> = { musica: "music", cultura: "landmark", sport: "run", cibo: "food", outdoor: "bike", famiglia: "family" };
 
 /* mouse-follow radial glow */
 export function useGlow() {
-  const onMove = (e) => {
+  const onMove = (e: any) => {
     const r = e.currentTarget.getBoundingClientRect();
     e.currentTarget.style.setProperty("--mx", `${e.clientX - r.left}px`);
     e.currentTarget.style.setProperty("--my", `${e.clientY - r.top}px`);
@@ -59,12 +60,12 @@ export function MapLabels() {
 }
 
 /* ---------------- EVENT POPUP ---------------- */
-function EventPopup({ data, color, placeBelow, onClose }) {
+function EventPopup({ data, color, placeBelow, onClose }: any) {
   const pct = Math.min(100, Math.round((data.going / data.cap) * 100));
   return (
     <div className={"event-popup" + (placeBelow ? " below" : "")} style={{ "--ec": color }} onClick={(e) => e.stopPropagation()}>
       <div className="ep-head">
-        <div className="ep-cat"><span className="ep-cat-ic"><Icon name={CAT_ICON[data.cat]} size={12} /></span>{catLabel(data.cat)}</div>
+        <div className="ep-cat"><span className="ep-cat-ic"><Icon name={CAT_ICON[data.cat] || "grid"} size={12} /></span>{catLabel(data.cat)}</div>
         <div className="ep-title">{data.title}</div>
         <button className="ep-close" onClick={onClose} aria-label="Chiudi"><Icon name="x" size={13} /></button>
       </div>
@@ -91,10 +92,11 @@ function EventPopup({ data, color, placeBelow, onClose }) {
 }
 
 /* ---------------- MARKERS ---------------- */
-export function MarkersLayer({ active, onFocus, popup, onClosePopup }: any) {
+export function MarkersLayer({ active, onFocus, popup, onClosePopup, markers }: any) {
+  const displayMarkers = markers || MARKERS;
   return (
     <div className="markers-layer">
-      {MARKERS.map((m) => {
+      {displayMarkers.map((m: any) => {
         const dim = active !== "all" && active !== m.cat;
         const selected = popup && popup.markerId === m.id;
         const softdim = popup && !selected && !dim;
@@ -104,7 +106,7 @@ export function MarkersLayer({ active, onFocus, popup, onClosePopup }: any) {
             className={"marker" + (m.live ? " live" : "") + (dim ? " dimmed" : "") + (softdim ? " softdim" : "") + (selected ? " selected" : "")}
             style={{ left: m.x + "%", top: m.y + "%", "--mc": color }}
             onClick={(e) => { e.stopPropagation(); onFocus && onFocus(m); }}>
-            <div className="marker-dot"><Icon name={CAT_ICON[m.cat]} size={17} /></div>
+            <div className="marker-dot"><Icon name={CAT_ICON[m.cat] || "grid"} size={17} /></div>
             {!selected && (
               <div className="marker-tip" style={{ "--mc": color }}>
                 <div className="tip-cat">{catLabel(m.cat)}</div>
@@ -118,7 +120,7 @@ export function MarkersLayer({ active, onFocus, popup, onClosePopup }: any) {
             )}
             {selected && (
               <EventPopup data={popup} color={color} placeBelow={m.y < 40}
-                onClose={(e) => { e.stopPropagation(); onClosePopup && onClosePopup(); }} />
+                onClose={(e: any) => { e.stopPropagation(); onClosePopup && onClosePopup(); }} />
             )}
           </div>
         );
@@ -157,7 +159,7 @@ export function WeatherWidget({ delay }: any) {
 
 /* ---------------- ALERTS ---------------- */
 export function AlertsWidget({ delay }: any) {
-  const ledClass = { red: "red", amber: "amber", blue: "blue", green: "green" };
+  const ledClass: any = { red: "red", amber: "amber", blue: "blue", green: "green" };
   return (
     <Widget title="Avvisi città" accent="var(--amber)" upd={ALERTS.length + " attivi"} delay={delay}>
       <div className="widget-scroll" style={{ maxHeight: 150 }}>
@@ -183,7 +185,7 @@ export function AlertsWidget({ delay }: any) {
 }
 
 /* ---------------- PARKING ---------------- */
-function ParkingRing({ pct }) {
+function ParkingRing({ pct }: any) {
   const R = 37, C = 2 * Math.PI * R;
   const off = C * (1 - pct / 100);
   return (
@@ -200,32 +202,92 @@ function ParkingRing({ pct }) {
           transform="rotate(-90 42 42)"
           style={{ filter: "drop-shadow(0 0 7px rgba(45,212,191,0.45))", transition: "stroke-dashoffset 900ms cubic-bezier(.2,.8,.3,1)" }} />
       </svg>
-      <div className="pct"><b>{pct}%</b><div className="pctlbl">Occupato</div></div>
+      <div className="pct" style={{
+        position: "absolute",
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        textAlign: "center",
+        width: "100%",
+        lineHeight: "1.1"
+      }}>
+        <b style={{ fontSize: "17px", fontWeight: 700, letterSpacing: "-0.03em" }}>{pct}%</b>
+        <div className="pctlbl" style={{
+          fontFamily: "var(--mono)",
+          fontSize: "7.2px",
+          letterSpacing: "0.08em",
+          color: "var(--text-faint)",
+          textTransform: "uppercase",
+          marginTop: "1px"
+        }}>Occupato</div>
+      </div>
     </div>
   );
 }
+
 export function ParkingWidget({ delay }: any) {
-  const color = (free, total) => {
+  const [parking, setParking] = useState<any>(null);
+
+  useEffect(() => {
+    let active = true;
+    const loadParking = async () => {
+      try {
+        const res = await getParking();
+        if (active && res && res.parkings) {
+          const list = res.parkings.map((p) => ({
+            name: p.name,
+            free: p.free ?? 0,
+            total: p.capacity,
+            occupied: p.occupied ?? (p.capacity - (p.free ?? 0)),
+            status: p.status
+          }));
+          const totalCapacity = list.reduce((acc, p) => acc + p.total, 0);
+          const totalFree = list.reduce((acc, p) => acc + p.free, 0);
+          const totalOccupied = totalCapacity - totalFree;
+          const avg = totalCapacity > 0 ? Math.round((totalOccupied / totalCapacity) * 100) : 0;
+          
+          setParking({ avg, list });
+        }
+      } catch (err) {
+        console.error("Errore nel caricamento dei parcheggi:", err);
+      }
+    };
+    loadParking();
+    const interval = setInterval(loadParking, 30000); // refresh every 30s
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  const displayParking = parking || PARKING;
+
+  const color = (free: number, total: number) => {
     const occ = 1 - free / total;
     return occ > 0.8 ? "var(--red)" : occ > 0.55 ? "var(--amber)" : "var(--green)";
   };
+
   return (
     <Widget title="Parcheggi" accent="var(--teal)" upd="Aggiornato ora" delay={delay}>
       <div className="pk-top">
-        <ParkingRing pct={PARKING.avg} />
+        <ParkingRing pct={displayParking.avg} />
         <div className="pk-summary">
           <div className="big">Occupazione media</div>
-          <div className="sub">{PARKING.list.length} aree monitorate in tempo reale nel centro di Trento.</div>
+          <div className="sub">{displayParking.list.length} aree monitorate in tempo reale nel centro di Trento.</div>
         </div>
       </div>
       <div className="pk-list widget-scroll" style={{ maxHeight: 96 }}>
-        {PARKING.list.map((p, i) => {
+        {displayParking.list.map((p: any, i: number) => {
           const occ = 1 - p.free / p.total;
           const col = color(p.free, p.total);
           return (
             <div className="pk-item" key={i}>
               <div className="pk-name">
-                <span className="led" style={{ "--led-color": col }}></span>{p.name}
+                <span className="led" style={{ "--led-color": col } as any}></span>{p.name}
               </div>
               <div className="pk-bar"><i style={{ width: (occ * 100) + "%", background: col, boxShadow: `0 0 8px ${col}` }}></i></div>
               <div className="pk-count"><b>{p.free}</b> / {p.total}</div>
@@ -238,11 +300,12 @@ export function ParkingWidget({ delay }: any) {
 }
 
 /* ---------------- ACTIVE AREAS ---------------- */
-export function ActiveAreasWidget({ delay }: any) {
+export function ActiveAreasWidget({ delay, areas }: any) {
+  const displayAreas = areas || AREAS;
   return (
     <Widget title="Aree più attive" accent="var(--magenta)" upd="Live" delay={delay}>
       <div className="widget-scroll" style={{ maxHeight: 232 }}>
-        {AREAS.map((a, i) => (
+        {displayAreas.map((a: any, i: number) => (
           <div className="area-row" key={i}>
             <div className={"area-rank" + (i === 0 ? " top" : "")}>{String(i + 1).padStart(2, "0")}</div>
             <div className="area-body">
@@ -260,11 +323,12 @@ export function ActiveAreasWidget({ delay }: any) {
 }
 
 /* ---------------- EVENTS ---------------- */
-export function EventsWidget({ delay, onFocus }: any) {
+export function EventsWidget({ delay, onFocus, events }: any) {
+  const displayEvents = events || EVENTS;
   return (
-    <Widget title="Prossimi eventi" accent="var(--cyan)" upd={EVENTS.length + " oggi"} delay={delay}>
+    <Widget title="Prossimi eventi" accent="var(--cyan)" upd={displayEvents.length + " oggi"} delay={delay}>
       <div className="widget-scroll" style={{ maxHeight: 300, margin: "0 -10px", padding: "0 10px" }}>
-        {EVENTS.map((e) => (
+        {displayEvents.map((e: any) => (
           <div className="ev-row" key={e.id} style={{ "--ec": catColor(e.cat) }} onClick={() => onFocus && onFocus(e)}>
             <div className="ev-thumb" style={{ background: e.img }}><div className="ev-dot"></div></div>
             <div className="ev-body">

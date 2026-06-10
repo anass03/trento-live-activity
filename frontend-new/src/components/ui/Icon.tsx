@@ -8,14 +8,15 @@ type IconProps = {
   name: string;
   size?: number;
   style?: CSSProperties;
+  className?: string;
 };
 
-export const Icon = ({ name, size, style }: IconProps) => {
+export const Icon = ({ name, size, style, className }: IconProps) => {
   const s = size || 18;
   const common: any = {
     width: s, height: s, viewBox: "0 0 24 24", fill: "none",
     stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round",
-    strokeLinejoin: "round", style,
+    strokeLinejoin: "round", style, className,
   };
   const P: Record<string, JSX.Element> = {
     grid:     <><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></>,

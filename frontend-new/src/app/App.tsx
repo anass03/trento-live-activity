@@ -7,7 +7,7 @@ import { TrentoMap } from "../components/map/TrentoMap";
 import { ActiveAreasWidget, AlertsWidget, EventsWidget, MapLabels, MarkersLayer, ParkingWidget, WeatherWidget } from "../components/redesign/widgets";
 import { TrentoTweaks } from "../components/redesign/TrentoTweaks";
 import { Icon } from "../components/ui/Icon";
-import { CATEGORIES, MARKERS } from "../data/redesignData";
+import { CATEGORIES, MARKERS, EVENTS, AREAS } from "../data/redesignData";
 import { ActivityPage } from "../pages/ActivitiesPage";
 import { EventsPage } from "../pages/EventsPage";
 import { SettingsPage } from "../pages/SettingsPage";
@@ -32,11 +32,36 @@ import { AdminNotificationsPage } from "../pages/AdminNotificationsPage";
 import { PrivacyPage } from "../pages/PrivacyPage";
 import { TermsPage } from "../pages/TermsPage";
 import { PlaceholderPage } from "../pages/PlaceholderPage";
-
+import { getMe, getToken, setToken, logout as apiLogout, login as apiLogin, UserRole, getHomeMapData } from "../lib/api";
 import "../styles/revamp-pages.css";
 
-function FilterBar({ active, setActive }: any) {
-  const count = (id) => (id === "all" ? MARKERS.length : MARKERS.filter((m) => m.cat === id).length);
+function getSvgCoordinates(lat: number, lng: number, placeName?: string | null): { x: number, y: number } {
+  const name = (placeName || "").toLowerCase();
+  if (name.includes("duomo")) return { x: 49, y: 53 };
+  if (name.includes("buonconsiglio") || name.includes("castello")) return { x: 63, y: 28 };
+  if (name.includes("muse")) return { x: 33, y: 70 };
+  if (name.includes("belenzani")) return { x: 45, y: 41 };
+  if (name.includes("albere")) return { x: 28, y: 57 };
+  if (name.includes("doss")) return { x: 73, y: 21 };
+  if (name.includes("fiera")) return { x: 55, y: 58 };
+  if (name.includes("manci")) return { x: 52, y: 40 };
+  if (name.includes("sociale")) return { x: 58, y: 47 };
+  if (name.includes("gocciadoro")) return { x: 41, y: 72 };
+  if (name.includes("biblioteca")) return { x: 50, y: 34 };
+  if (name.includes("gallerie")) return { x: 44, y: 55 };
+  if (name.includes("roccabruna")) return { x: 60, y: 56 };
+
+  const x = 2419.35 * lng - 26852.1;
+  const y = -5121.951 * lat + 236002.75;
+  return {
+    x: Math.max(10, Math.min(90, x)),
+    y: Math.max(10, Math.min(90, y))
+  };
+}
+
+function FilterBar({ active, setActive, markers }: any) {
+  const displayMarkers = markers || MARKERS;
+  const count = (id: string) => (id === "all" ? displayMarkers.length : displayMarkers.filter((m: any) => m.cat === id).length);
   return (
     <div className="filterbar">
       {CATEGORIES.map((c) => (
@@ -90,33 +115,157 @@ function HomeScene({ page, setPage, theme, setTheme, user }: any) {
   const [zoom, setZoom] = useState(1);
   const [is3d, setIs3d] = useState(false);
   const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [popup, setPopup] = useState(null);
+  const [popup, setPopup] = useState<any>(null);
+  const [mapData, setMapData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => { document.documentElement.style.setProperty("--zoom", String(zoom)); }, [zoom]);
+  
+  const loadMapData = async () => {
+    setLoading(true);
+    try {
+      const data = await getHomeMapData();
+      setMapData(data);
+    } catch (err) {
+      console.error("Errore nel recupero dei dati mappa dal backend:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") setPopup(null); };
+    loadMapData();
+    const interval = setInterval(loadMapData, 45000); // Poll every 45s
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: any) => { if (e.key === "Escape") setPopup(null); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const focusOn = (xPct, yPct) => {
+  const dynamicMarkers = React.useMemo(() => {
+    if (!mapData || !mapData.markers) return MARKERS;
+    return mapData.markers.map((m: any) => {
+      const { x, y } = getSvgCoordinates(m.latitude ?? 46.067, m.longitude ?? 11.121, m.title);
+      
+      let cat = m.category || "cultura";
+      if (cat === "poi") cat = "outdoor";
+      if (cat === "parking") cat = "outdoor";
+      if (cat === "ciclismo" || cat === "verde" || cat === "sport") cat = "sport";
+      if (cat === "teatro" || cat === "cinema" || cat === "museo") cat = "cultura";
+      if (cat === "biblioteca" || cat === "studio" || cat === "aula_studio") cat = "cultura";
+      
+      const validCategories = ["musica", "cultura", "sport", "cibo", "outdoor", "famiglia"];
+      if (!validCategories.includes(cat)) {
+        cat = "cultura";
+      }
+
+      let timeStr = "12:00";
+      if (m.dateTime) {
+        try {
+          timeStr = new Date(m.dateTime).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+        } catch (e) {}
+      }
+
+      return {
+        id: m.id,
+        cat,
+        x,
+        y,
+        live: m.type === "event" || m.type === "activity",
+        title: m.title,
+        place: m.title,
+        time: timeStr,
+        cap: m.total || 50,
+        going: m.free !== undefined && m.total !== undefined ? m.total - m.free : 25,
+        date: m.dateTime ? new Date(m.dateTime).toLocaleDateString("it-IT", { day: "numeric", month: "short" }) : "Oggi",
+        raw: m
+      };
+    });
+  }, [mapData]);
+
+  const dynamicEvents = React.useMemo(() => {
+    if (!mapData || !mapData.events) return EVENTS;
+    return mapData.events.slice(0, 7).map((e: any) => {
+      let cat = e.category || "cultura";
+      const validCategories = ["musica", "cultura", "sport", "cibo", "outdoor", "famiglia"];
+      if (!validCategories.includes(cat)) {
+        cat = "cultura";
+      }
+      
+      const gradients: Record<string, string> = {
+        cultura: "linear-gradient(135deg,#7c3aed,#4c1d95)",
+        musica: "linear-gradient(135deg,#db2777,#831843)",
+        cibo: "linear-gradient(135deg,#d97706,#7c2d12)",
+        sport: "linear-gradient(135deg,#059669,#064e3b)",
+        outdoor: "linear-gradient(135deg,#0d9488,#134e4a)",
+        famiglia: "linear-gradient(135deg,#0ea5e9,#075985)"
+      };
+
+      return {
+        id: e.id,
+        cat,
+        date: "Oggi",
+        start: e.startTime ? e.startTime.slice(0, 5) : "15:00",
+        end: e.endTime ? e.endTime.slice(0, 5) : "18:00",
+        going: e.participantCount ?? 0,
+        cap: e.maxPartecipanti ?? 50,
+        title: e.title,
+        place: e.location || "Trento",
+        img: gradients[cat] || gradients.cultura
+      };
+    });
+  }, [mapData]);
+
+  const dynamicAreas = React.useMemo(() => {
+    if (!mapData || !mapData.pois) return AREAS;
+    const colorMap: Record<string, string> = {
+      rosso: "var(--red)",
+      giallo: "var(--amber)",
+      verde: "var(--teal)"
+    };
+    const labelMap: Record<string, string> = {
+      rosso: "Molto attiva",
+      giallo: "Attiva",
+      verde: "Tranquilla"
+    };
+    const levelMap: Record<string, number> = {
+      rosso: 0.9,
+      giallo: 0.6,
+      verde: 0.25
+    };
+    return mapData.pois.slice(0, 8).map((p: any) => ({
+      name: p.nome,
+      cat: p.tipo || "outdoor",
+      level: levelMap[p.statoAffollamento] || 0.25,
+      label: labelMap[p.statoAffollamento] || "Tranquilla",
+      color: colorMap[p.statoAffollamento] || "var(--teal)"
+    }));
+  }, [mapData]);
+
+  const focusOn = (xPct: number, yPct: number) => {
     // pan so the point moves toward center; clamp gently
     const px = Math.max(-22, Math.min(22, (50 - xPct) * 0.7));
     const py = Math.max(-16, Math.min(16, (50 - yPct) * 0.7));
     setPan({ x: px, y: py });
     setZoom((z) => Math.max(z, 1.35));
   };
-  const openMarkerPopup = (m) => {
+  
+  const openMarkerPopup = (m: any) => {
     focusOn(m.x, m.y);
     setPopup({ markerId: m.id, cat: m.cat, title: m.title, place: m.place,
       when: `${m.date}, ${m.time}`, going: m.going, cap: m.cap });
   };
-  const openEventPopup = (e) => {
-    const m = MARKERS.find((mk) => mk.place === e.place) || MARKERS.find((mk) => mk.cat === e.cat) || MARKERS[0];
+  
+  const openEventPopup = (e: any) => {
+    const m = dynamicMarkers.find((mk: any) => mk.place === e.place) || dynamicMarkers.find((mk: any) => mk.cat === e.cat) || dynamicMarkers[0];
     focusOn(m.x, m.y);
     setPopup({ markerId: m.id, cat: e.cat, title: e.title, place: e.place,
       when: `${e.date}, ${e.start} – ${e.end}`, going: e.going, cap: e.cap });
   };
+  
   const closePopup = () => setPopup(null);
   const reset = () => { setPan({ x: 0, y: 0 }); setZoom(1); setIs3d(false); setActive("all"); setPopup(null); };
   const locate = () => focusOn(49, 50);
@@ -144,7 +293,7 @@ function HomeScene({ page, setPage, theme, setTheme, user }: any) {
               <TrentoMap />
               <MapLabels />
             </div>
-            <MarkersLayer active={active} onFocus={openMarkerPopup} popup={popup} onClosePopup={closePopup} />
+            <MarkersLayer active={active} onFocus={openMarkerPopup} popup={popup} onClosePopup={closePopup} markers={dynamicMarkers} />
           </div>
         </div>
         <div className="map-grade"></div>
@@ -156,7 +305,7 @@ function HomeScene({ page, setPage, theme, setTheme, user }: any) {
       <div className="layer-header"><Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} /></div>
 
       {/* FILTER BAR */}
-      <FilterBar active={active} setActive={setActive} />
+      <FilterBar active={active} setActive={setActive} markers={dynamicMarkers} />
       <Clock />
 
       {/* WIDGETS */}
@@ -167,8 +316,8 @@ function HomeScene({ page, setPage, theme, setTheme, user }: any) {
           <ParkingWidget delay={280} />
         </div>
         <div className="col-right">
-          <ActiveAreasWidget delay={140} />
-          <EventsWidget delay={240} onFocus={openEventPopup} />
+          <ActiveAreasWidget delay={140} areas={dynamicAreas} />
+          <EventsWidget delay={240} onFocus={openEventPopup} events={dynamicEvents} />
         </div>
       </div>
 
@@ -184,6 +333,34 @@ function HomeScene({ page, setPage, theme, setTheme, user }: any) {
 }
 
 function RoleSimulationWidget({ user, setUser, setPage }: any) {
+  const [loading, setLoading] = useState(false);
+  const handleSimulate = async (newRole: string) => {
+    setLoading(true);
+    try {
+      if (newRole === "anonymous") {
+        await apiLogout();
+        setPage("home");
+      } else {
+        let email = "";
+        if (newRole === "registered_user") email = "cittadino@example.com";
+        else if (newRole === "certified_entity") email = "ente@example.com";
+        else if (newRole === "municipal_admin") email = "comune@example.com";
+        else if (newRole === "system_admin") email = "admin@example.com";
+
+        await apiLogin(email, "password123");
+        
+        if (newRole === "municipal_admin") setPage("comune-dashboard");
+        else if (newRole === "system_admin") setPage("admin-users");
+        else if (newRole === "certified_entity") setPage("ente-pubblica");
+        else setPage("home");
+      }
+    } catch (err) {
+      console.error("Failed to simulate role:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="revamp-role-widget anim-in" style={{
       position: "fixed",
@@ -202,26 +379,13 @@ function RoleSimulationWidget({ user, setUser, setPage }: any) {
       gap: "10px",
     }}>
       <span style={{ fontFamily: "var(--mono)", fontSize: "9.5px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-muted)" }}>
-        Simula Ruolo:
+        {loading ? "Caricamento..." : "Simula Ruolo:"}
       </span>
       <select
         className="revamp-select"
         value={user?.role || "anonymous"}
-        onChange={(e) => {
-          const newRole = e.target.value;
-          const avatarChar = newRole === "anonymous" ? "O" : newRole === "certified_entity" ? "E" : newRole === "municipal_admin" ? "C" : newRole === "system_admin" ? "A" : "U";
-          const nameStr = newRole === "anonymous" ? "Ospite" : newRole === "certified_entity" ? "Ente Certificato" : newRole === "municipal_admin" ? "Comune Admin" : newRole === "system_admin" ? "System Admin" : "Marco Rossi";
-          setUser({
-            ...user,
-            role: newRole,
-            avatar: avatarChar,
-            name: nameStr,
-          });
-          if (newRole === "municipal_admin") setPage("comune-dashboard");
-          else if (newRole === "system_admin") setPage("admin-users");
-          else if (newRole === "certified_entity") setPage("ente-pubblica");
-          else setPage("home");
-        }}
+        disabled={loading}
+        onChange={(e) => handleSimulate(e.target.value)}
         style={{
           height: "28px",
           border: "none",
@@ -244,6 +408,17 @@ function RoleSimulationWidget({ user, setUser, setPage }: any) {
   );
 }
 
+function mapBackendRole(ruolo?: string): UserRole {
+  if (!ruolo) return "anonymous";
+  switch (ruolo) {
+    case "AmministratoreDiSistema": return "system_admin";
+    case "EnteCertificato": return "certified_entity";
+    case "AmministratoreComunale": return "municipal_admin";
+    case "UtenteRegistrato": return "registered_user";
+    default: return "anonymous";
+  }
+}
+
 export function App() {
   const [page, setPage] = useState("home");
   const [themeMode, setThemeModeState] = useState(() => {
@@ -256,12 +431,54 @@ export function App() {
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "night" : "day";
   });
   const [user, setUser] = useState({
-    id: "g1",
+    id: null as string | null,
     name: "Ospite",
     email: "ospite@example.com",
-    role: "anonymous", // Can be switched dynamically via Settings/simulated switcher
+    role: "anonymous" as UserRole,
     avatar: "O",
   });
+
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
+
+  const fetchUser = async () => {
+    const token = getToken();
+    if (!token) {
+      setUser({
+        id: null,
+        name: "Ospite",
+        email: "ospite@example.com",
+        role: "anonymous",
+        avatar: "O",
+      });
+      return;
+    }
+    try {
+      const data: any = await getMe();
+      const role = mapBackendRole(data.ruolo);
+      const name = data.nomeEnte || (data.nome && data.cognome ? `${data.nome} ${data.cognome}` : (data.email?.split("@")[0] || "Utente"));
+      const avatar = data.nomeEnte ? data.nomeEnte.substring(0, 2).toUpperCase() : (data.nome ? data.nome[0].toUpperCase() : "U");
+      
+      setUser({
+        id: data.id,
+        name,
+        email: data.email,
+        role,
+        avatar,
+      });
+    } catch (err) {
+      console.error("Error loading user profile:", err);
+      setToken(null);
+    }
+  };
+
+  useEffect(() => {
+    fetchUser();
+    window.addEventListener("tla:user-updated", fetchUser);
+    return () => {
+      window.removeEventListener("tla:user-updated", fetchUser);
+    };
+  }, []);
 
   const setTheme = (newTheme: string) => {
     setThemeState(newTheme);
@@ -294,7 +511,20 @@ export function App() {
 
   useEffect(() => { document.documentElement.dataset.theme = theme; }, [theme]);
 
-  const shared = { page, setPage, theme, setTheme, user, setUser, themeMode, setThemeMode };
+  const shared = {
+    page,
+    setPage,
+    theme,
+    setTheme,
+    user,
+    setUser,
+    themeMode,
+    setThemeMode,
+    selectedEventId,
+    setSelectedEventId,
+    selectedActivityId,
+    setSelectedActivityId
+  };
   return (
     <React.Fragment>
       {page === "eventi"

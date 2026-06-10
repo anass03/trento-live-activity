@@ -1,34 +1,51 @@
 import { useState } from "react";
 import { Icon } from "../components/ui/Icon";
+import { login } from "../lib/api";
 
-export function LoginPage({ page, setPage, user, setUser }: any) {
+export function LoginPage({ page, setPage }: any) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [otpToken, setOtpToken] = useState("");
+  const [showOtp, setShowOtp] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: any) => {
+  const handleLogin = async (e: any) => {
     e.preventDefault();
     if (!email || !password) {
       setError("Inserisci sia l'email che la password.");
       return;
     }
-    // Simulate successful login
-    setUser({
-      ...user,
-      id: "u1",
-      name: email.split("@")[0],
-      email: email,
-      role: "registered_user", // default role on normal login
-      avatar: email[0].toUpperCase(),
-    });
-    setPage("home");
+    if (showOtp && !otpToken) {
+      setError("Inserisci il codice 2FA.");
+      return;
+    }
+    setError("");
+    setLoading(true);
+    try {
+      const res = await login(email, password, showOtp ? otpToken : undefined);
+      if (res.needs2faSetup) {
+        setPage("setup-2fa");
+      } else {
+        setPage("home");
+      }
+    } catch (err: any) {
+      if (err.code === "2FA_REQUIRED") {
+        setShowOtp(true);
+        setError("Inserisci il codice di verifica 2FA.");
+      } else {
+        setError(err.message || "Errore durante l'accesso.");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="revamp-auth-scene">
-      <div className="revamp-form-card anim-in" style={{ "--accent": "var(--cyan)" }}>
+      <div className="revamp-form-card anim-in" style={{ "--accent": "var(--cyan)" } as React.CSSProperties}>
         <div className="revamp-form-head">
-          <div className="revamp-form-logo" style={{ "--accent": "var(--cyan)" }}>
+          <div className="revamp-form-logo" style={{ "--accent": "var(--cyan)" } as React.CSSProperties}>
             <svg viewBox="0 0 24 24" fill="none">
               <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" stroke="var(--cyan)" strokeWidth="2" strokeLinecap="round" />
               <path d="M10 17l5-5-5-5" stroke="var(--cyan)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -55,6 +72,7 @@ export function LoginPage({ page, setPage, user, setUser }: any) {
                 className="revamp-form-input"
                 placeholder="nome@esempio.com"
                 value={email}
+                disabled={loading || showOtp}
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
@@ -69,10 +87,28 @@ export function LoginPage({ page, setPage, user, setUser }: any) {
                 className="revamp-form-input"
                 placeholder="••••••••"
                 value={password}
+                disabled={loading || showOtp}
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
           </div>
+
+          {showOtp && (
+            <div className="revamp-form-group anim-in">
+              <label className="revamp-form-label">Codice 2FA (o Codice di Recupero)</label>
+              <div className="revamp-form-input-wrap" style={{ borderColor: "var(--cyan)" }}>
+                <Icon name="shieldCheck" size={16} />
+                <input
+                  type="text"
+                  className="revamp-form-input"
+                  placeholder="000000"
+                  value={otpToken}
+                  disabled={loading}
+                  onChange={(e) => setOtpToken(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
 
           <div className="revamp-form-row">
             <label className="revamp-checkbox-label">
@@ -83,8 +119,9 @@ export function LoginPage({ page, setPage, user, setUser }: any) {
             </button>
           </div>
 
-          <button type="submit" className="revamp-form-btn" style={{ "--accent": "var(--cyan)" }}>
-            Accedi <Icon name="arrow" size={16} style={{ transform: "rotate(-45deg)" }} />
+          <button type="submit" className="revamp-form-btn" style={{ "--accent": "var(--cyan)" } as React.CSSProperties} disabled={loading}>
+            {loading ? "Caricamento..." : "Accedi"}{" "}
+            {!loading && <Icon name="arrow" size={16} style={{ transform: "rotate(-45deg)" }} />}
           </button>
         </form>
 
