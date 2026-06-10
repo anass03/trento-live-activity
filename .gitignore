@@ -28,3 +28,8 @@ Thumbs.db
 .claude/
 skills-lock.json
 .agents
+
+#Skill mirrors / local tooling state (not source)
+.cursor/skills/impeccable/
+.gemini/skills/impeccable/
+.impeccable/
