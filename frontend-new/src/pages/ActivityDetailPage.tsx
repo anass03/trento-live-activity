@@ -1,7 +1,7 @@
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
 
-export function ActivityDetailPage({ page, setPage, theme, setTheme }: any) {
+export function ActivityDetailPage({ page, setPage, theme, setTheme, user }: any) {
   // Mock detailed activity (equivalent to Sardagna trip)
   const a = {
     id: "a1",
@@ -30,7 +30,7 @@ export function ActivityDetailPage({ page, setPage, theme, setTheme }: any) {
 
   return (
     <div className="revamp-detail-scene">
-      <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} />
+      <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
       <div className="revamp-detail-wrap">
         <div className="revamp-detail-card anim-in" style={{ "--accent": "var(--teal)" }}>
           <div className="revamp-detail-cover" style={{ "--dcg": grads[a.cat] || grads.outdoor }}>

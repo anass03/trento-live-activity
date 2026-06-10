@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
 
-export function AdminModerationPage({ page, setPage, theme, setTheme }: any) {
+export function AdminModerationPage({ page, setPage, theme, setTheme, user }: any) {
   const [reports, setReports] = useState([
     { id: "1", type: "Attività", title: "Cena sociale multiculturale", author: "Sara V.", reason: "Contenuto inopportuno segnalato dagli utenti", status: "In attesa" },
     { id: "2", type: "Evento", title: "DJ Set al Muse — Night Vibes", author: "Muse", reason: "Superamento limiti acustici e affollamento", status: "In attesa" },
@@ -21,7 +21,7 @@ export function AdminModerationPage({ page, setPage, theme, setTheme }: any) {
 
   return (
     <div className="revamp-legal-scene">
-      <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} />
+      <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
       <div className="revamp-admin-layout">
         <h1>Moderazione Contenuti Segnalati</h1>
         <p>Prendi provvedimenti in merito a violazioni o segnalazioni inserite dalla community</p>

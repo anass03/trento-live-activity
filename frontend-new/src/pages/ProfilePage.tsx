@@ -19,7 +19,7 @@ export function ProfilePage({ page, setPage, theme, setTheme, user }: any) {
 
   return (
     <div className="revamp-legal-scene">
-      <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} />
+      <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
       <div className="revamp-profile-wrap">
         <div className="revamp-profile-card anim-in" style={{ "--accent": "var(--cyan)", animationDelay: "60ms" }}>
           <div className="revamp-profile-flex">

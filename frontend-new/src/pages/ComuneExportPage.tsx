@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
 
-export function ComuneExportPage({ page, setPage, theme, setTheme }: any) {
+export function ComuneExportPage({ page, setPage, theme, setTheme, user }: any) {
   const [format, setFormat] = useState("pdf");
   const [startDate, setStartDate] = useState("2026-05-01");
   const [success, setSuccess] = useState(false);
@@ -23,7 +23,7 @@ export function ComuneExportPage({ page, setPage, theme, setTheme }: any) {
 
   return (
     <div className="revamp-legal-scene">
-      <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} />
+      <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
       <div className="revamp-comune-layout">
         <div className="revamp-comune-head">
           <div>

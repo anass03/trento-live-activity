@@ -177,7 +177,7 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser }: 
   return (
     <div className="settings-scene">
       <div className="events-header">
-        <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} />
+        <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
       </div>
 
       <div className="settings-wrap">

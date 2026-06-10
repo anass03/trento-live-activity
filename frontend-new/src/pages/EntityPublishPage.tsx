@@ -11,7 +11,7 @@ const PUBLISH_CATEGORIES = [
   { id: "famiglia", label: "Famiglia",     color: "var(--cyan)",    icon: "family" },
 ];
 
-export function EntityPublishPage({ page, setPage, theme, setTheme }: any) {
+export function EntityPublishPage({ page, setPage, theme, setTheme, user }: any) {
   const [cat, setCat] = useState("cultura");
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
@@ -32,7 +32,7 @@ export function EntityPublishPage({ page, setPage, theme, setTheme }: any) {
 
   return (
     <div className="revamp-legal-scene">
-      <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} />
+      <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
       <div className="revamp-legal-wrap">
         <div className="revamp-legal-card anim-in" style={{ "--accent": "var(--violet)" }}>
           <h1>Pubblica un Nuovo Evento / Attività</h1>

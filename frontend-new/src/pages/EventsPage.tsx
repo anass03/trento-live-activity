@@ -400,7 +400,7 @@ function EventModal({ id, liked, saved, onLike, onSave, onClose }: any) {
 }
 
 /* ===================== PAGE ===================== */
-export function EventsPage({ page, setPage, theme, setTheme }: any) {
+export function EventsPage({ page, setPage, theme, setTheme, user }: any) {
   const [filter, setFilter] = useState("all");
   const [likes, setLikes] = useState<Record<string, boolean>>({});
   const [saves, setSaves] = useState<Record<string, boolean>>({});
@@ -433,7 +433,7 @@ export function EventsPage({ page, setPage, theme, setTheme }: any) {
   return (
     <div className="events-scene">
       <div className="events-header">
-        <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} />
+        <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
       </div>
 
       <div className="events-layout">

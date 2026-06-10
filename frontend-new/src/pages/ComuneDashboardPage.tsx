@@ -1,7 +1,7 @@
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
 
-export function ComuneDashboardPage({ page, setPage, theme, setTheme }: any) {
+export function ComuneDashboardPage({ page, setPage, theme, setTheme, user }: any) {
   const kpis = [
     { label: "Attività Attive", val: "158", icon: "activity", color: "var(--cyan)" },
     { label: "Eventi Certificati", val: "42", icon: "calendar", color: "var(--violet)" },
@@ -18,7 +18,7 @@ export function ComuneDashboardPage({ page, setPage, theme, setTheme }: any) {
 
   return (
     <div className="revamp-legal-scene">
-      <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} />
+      <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
       <div className="revamp-comune-layout">
         <div className="revamp-comune-head">
           <div>

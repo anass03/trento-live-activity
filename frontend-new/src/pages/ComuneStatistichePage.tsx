@@ -4,7 +4,7 @@ import { Icon } from "../components/ui/Icon";
 
 type Tab = "overview" | "trends" | "supply";
 
-export function ComuneStatistichePage({ page, setPage, theme, setTheme }: any) {
+export function ComuneStatistichePage({ page, setPage, theme, setTheme, user }: any) {
   const [activeTab, setActiveTab] = useState<Tab>("overview");
 
   // Simulated sparkline data (14 days)
@@ -37,7 +37,7 @@ export function ComuneStatistichePage({ page, setPage, theme, setTheme }: any) {
 
   return (
     <div className="revamp-legal-scene">
-      <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} />
+      <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
       <div className="revamp-comune-layout">
         <div className="revamp-comune-head">
           <div>

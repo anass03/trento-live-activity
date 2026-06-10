@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
 
-export function AdminEntitiesPage({ page, setPage, theme, setTheme }: any) {
+export function AdminEntitiesPage({ page, setPage, theme, setTheme, user }: any) {
   const [requests, setRequests] = useState([
     { id: "REQ-01", name: "Associazione Outdoor Trento", type: "Associazione Sportiva", doc: "Statuto_AO_Trento.pdf", status: "In attesa" },
     { id: "REQ-02", name: "Cantine Rotaliane Srl", type: "Ente Gastronomico", doc: "Visura_Camerale_Rotaliane.pdf", status: "In attesa" },
@@ -21,7 +21,7 @@ export function AdminEntitiesPage({ page, setPage, theme, setTheme }: any) {
 
   return (
     <div className="revamp-legal-scene">
-      <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} />
+      <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
       <div className="revamp-admin-layout">
         <h1>Richieste Verifiche Enti</h1>
         <p>Valuta e approva le richieste per i privilegi di inserimento attività ed eventi certificati</p>

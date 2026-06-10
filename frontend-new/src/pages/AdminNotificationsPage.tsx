@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
 
-export function AdminNotificationsPage({ page, setPage, theme, setTheme }: any) {
+export function AdminNotificationsPage({ page, setPage, theme, setTheme, user }: any) {
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
   const [type, setType] = useState("info");
@@ -21,7 +21,7 @@ export function AdminNotificationsPage({ page, setPage, theme, setTheme }: any) 
 
   return (
     <div className="revamp-legal-scene">
-      <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} />
+      <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
       <div className="revamp-admin-layout">
         <h1>Invio Notifiche di Broadcast</h1>
         <p>Invia avvisi e notifiche di sistema in tempo reale a tutti gli utenti dell'applicazione</p>

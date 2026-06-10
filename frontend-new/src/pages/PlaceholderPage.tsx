@@ -1,10 +1,10 @@
 import { Icon } from "../components/ui/Icon";
 import { Header } from "../components/layout/Header";
 
-export function PlaceholderPage({ page, setPage, theme, setTheme }: any) {
+export function PlaceholderPage({ page, setPage, theme, setTheme, user }: any) {
   return (
     <div className="revamp-legal-scene">
-      <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} />
+      <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
       <div className="revamp-legal-wrap" style={{ display: "grid", placeItems: "center", minHeight: "60vh" }}>
         <div className="revamp-form-card" style={{ textAlign: "center" }}>
           <div className="revamp-form-logo" style={{ "--accent": "var(--cyan)" }}>

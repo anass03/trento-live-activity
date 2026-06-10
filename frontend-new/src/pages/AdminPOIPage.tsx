@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
 
-export function AdminPOIPage({ page, setPage, theme, setTheme }: any) {
+export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
   const [search, setSearch] = useState("");
   const [pois, setPois] = useState([
     { id: "1", name: "Piazza Duomo", type: "Piazza Storica", density: "rosso", label: "Alto affollamento" },
@@ -30,7 +30,7 @@ export function AdminPOIPage({ page, setPage, theme, setTheme }: any) {
 
   return (
     <div className="revamp-legal-scene">
-      <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} />
+      <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
       <div className="revamp-admin-layout">
         <h1>Gestione Punti di Interesse (POI)</h1>
         <p>Aggiungi, modifica e imposta i flussi di affollamento simulati per la mappa interattiva</p>
