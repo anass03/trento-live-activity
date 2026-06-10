@@ -9,7 +9,7 @@ import { CAT_ICON } from "../data/redesignData";
 import { Icon } from "../components/ui/Icon";
 import { catColor, catLabel as tlaCatLabel } from "../data/redesignData";
 import { CommentsSection } from "../components/redesign/CommentsSection";
-import { getEvents, joinEvent, leaveEvent, addFavorite, removeFavorite, getFavorites, ApiEvent } from "../lib/api";
+import { getEvents, joinEvent, leaveEvent, addFavorite, removeFavorite, getFavorites, ApiEvent, ApiError } from "../lib/api";
 
 /* ---- gradient "media" per category (matches home thumbnails) ---- */
 const EV_GRAD: Record<string, string> = {
@@ -33,29 +33,63 @@ const EV_FILTERS = [
 const fmt = (n?: number) => (n || 0).toLocaleString("it-IT");
 
 /* ===================== MINI CALENDAR ===================== */
-function MiniCalendar() {
+const sameDay = (a: Date, b: Date) =>
+  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+// Best-effort parse of an event's date from whatever the API returned.
+function parseEventDate(e: any): Date | null {
+  for (const v of [e?.dateTime, e?.startTime, e?.createdAt]) {
+    if (!v) continue;
+    const d = new Date(v);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  return null;
+}
+
+function MiniCalendar({ events = [] }: any) {
   const onMove = useGlow();
-  const [sel, setSel] = useState(16);
-  const days = [13, 14, 15, 16, 17, 18, 19];
+  const today = React.useMemo(() => new Date(), []);
+  const [weekOffset, setWeekOffset] = useState(0);
   const dows = ["L", "M", "M", "G", "V", "S", "D"];
-  const hasEvent: Record<number, boolean> = { 16: true, 17: true, 18: true };
+
+  // Monday-anchored week, shifted by weekOffset.
+  const weekDays = React.useMemo(() => {
+    const mondayIdx = (today.getDay() + 6) % 7;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - mondayIdx + weekOffset * 7);
+    monday.setHours(0, 0, 0, 0);
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      return d;
+    });
+  }, [today, weekOffset]);
+
+  // Real event dots: which days in this week actually have events.
+  const eventDays = React.useMemo(() => {
+    const days = (events || []).map(parseEventDate).filter(Boolean) as Date[];
+    return weekDays.map((wd) => days.some((d) => sameDay(d, wd)));
+  }, [events, weekDays]);
+
+  const monthLabel = weekDays[0].toLocaleDateString("it-IT", { month: "long", year: "numeric" });
+
   return (
     <div className="widget anim-in" style={{ "--accent": "var(--violet)", animationDelay: "60ms" } as React.CSSProperties} onMouseMove={onMove}>
       <div className="widget-inner">
         <div className="cal-head">
-          <div className="cal-month">Maggio 2026</div>
+          <div className="cal-month">{monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}</div>
           <div className="cal-nav">
-            <button aria-label="Settimana precedente" onClick={() => setSel((d) => Math.max(13, d - 1))}><Icon name="chevronL" size={14} /></button>
-            <button aria-label="Settimana successiva" onClick={() => setSel((d) => Math.min(19, d + 1))}><Icon name="chevron" size={14} /></button>
+            <button aria-label="Settimana precedente" onClick={() => setWeekOffset((w) => w - 1)}><Icon name="chevronL" size={14} /></button>
+            <button aria-label="Settimana successiva" onClick={() => setWeekOffset((w) => w + 1)}><Icon name="chevron" size={14} /></button>
           </div>
         </div>
         <div className="cal-grid">
           {dows.map((d, i) => <div className="cal-dow" key={"d" + i}>{d}</div>)}
-          {days.map((d) => (
-            <button key={d} className={"cal-day" + (d === sel ? " sel" : "")} onClick={() => setSel(d)}>
-              {d}
-              {hasEvent[d] && <span className="dot"></span>}
-            </button>
+          {weekDays.map((d, i) => (
+            <div key={d.toISOString()} className={"cal-day" + (sameDay(d, today) ? " sel" : "")} aria-current={sameDay(d, today) ? "date" : undefined}>
+              {d.getDate()}
+              {eventDays[i] && <span className="dot"></span>}
+            </div>
           ))}
         </div>
       </div>
@@ -81,59 +115,43 @@ function QuickFilters({ active, setActive, counts }: any) {
   );
 }
 
-/* ===================== TRENDING TONIGHT ===================== */
-function TrendingTonight({ list, onPick }: any) {
+/* ===================== MOST PARTICIPATED ===================== */
+function MostParticipated({ list, onPick }: any) {
+  const top = [...list]
+    .sort((a: any, b: any) => (b.participantCount || 0) - (a.participantCount || 0))
+    .slice(0, 3);
   return (
-    <Widget title="Trending tonight" accent="var(--magenta)" upd="Live" delay={220}>
-      {list.slice(0, 3).map((t: any, i: number) => (
+    <Widget title="Più partecipati" accent="var(--magenta)" delay={220}>
+      {top.map((t: any, i: number) => (
         <button className="trend-row" key={t.id} onClick={() => onPick(t.id)}>
           <span className="trend-rank">{i + 1}</span>
           <span className="trend-body">
             <span className="trend-title">{t.title}</span>
             <span className="trend-loc">{t.location || "Trento"}</span>
           </span>
-          <span className="trend-count"><Icon name="flame" size={13} />{fmt(t.participantCount)}</span>
+          <span className="trend-count"><Icon name="users" size={13} />{fmt(t.participantCount)}</span>
         </button>
       ))}
-      {list.length === 0 && (
-        <div style={{ color: "var(--text-muted)", fontSize: 12, padding: "10px 0", textAlign: "center" }}>
-          Nessun evento trending oggi
+      {top.length === 0 && (
+        <div style={{ color: "var(--text-secondary)", fontSize: 12, padding: "10px 0", textAlign: "center" }}>
+          Nessun evento con partecipanti
         </div>
       )}
     </Widget>
   );
 }
 
-/* ===================== LIVE NOW ===================== */
-function LiveNow({ count }: any) {
-  const bars = [0.5, 0.85, 0.35, 1, 0.6, 0.9, 0.45];
-  return (
-    <Widget title="Live ora a Trento" accent="var(--green)" upd="In diretta" delay={300}>
-      <div className="live-now">
-        <div className="live-num">
-          <b>{count}</b>
-          <span>Eventi totali</span>
-        </div>
-        <div className="eq" aria-hidden="true">
-          {bars.map((b, i) => <i key={i} style={{ animationDelay: `${i * 0.13}s`, animationDuration: `${1.1 + b * 0.7}s` } as React.CSSProperties}></i>)}
-        </div>
-      </div>
-    </Widget>
-  );
-}
-
-/* ===================== COMPOSER / DISCOVERY ===================== */
-function Composer({ user, search, setSearch }: any) {
+/* ===================== SEARCH BAR ===================== */
+function Composer({ search, setSearch }: any) {
   return (
     <div className="composer">
-      <div className="avatar">{user?.avatar || "MR"}</div>
       <div className="composer-field" style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
         <Icon name="search" size={17} />
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Cerca o scopri eventi per stasera…"
+          placeholder="Cerca eventi a Trento…"
           style={{ background: "none", border: "none", color: "white", outline: "none", width: "100%", fontSize: 14 }}
         />
       </div>
@@ -146,7 +164,10 @@ function PostCard({ e, liked, saved, onLike, onSave, onOpen, flash }: any) {
   const onMove = useGlow();
   const color = catColor(e.category);
   const catLabel = tlaCatLabel(e.category);
+  // The list API doesn't return a like total yet, so only show a count once it's real.
+  const hasLikeCount = typeof e.likes === "number";
   const likes = (e.likes || 0) + (liked ? 1 : 0);
+  const hasCommentCount = typeof e.commentsCount === "number";
   const stop = (fn: any) => (ev: any) => { ev.stopPropagation(); fn(); };
   return (
     <div className={"post" + (flash ? " flash" : "")} data-post={e.id}
@@ -173,11 +194,11 @@ function PostCard({ e, liked, saved, onLike, onSave, onOpen, flash }: any) {
           <Avatars ids={[0, 1, 2]} extra={Math.max(0, (e.participantCount || 0) - 3)} />
           <span className="attend-count"><b>{fmt(e.participantCount)}</b> partecipanti</span>
           <div className="post-actions">
-            <button className={"act-btn" + (liked ? " on" : "")} onClick={stop(() => onLike(e.id))} aria-label="Mi interessa">
-              <Icon name="heart" size={17} />{fmt(likes)}
+            <button className={"act-btn" + (liked ? " on" : "")} onClick={stop(() => onLike(e.id))} aria-label="Mi interessa" aria-pressed={liked}>
+              <Icon name="heart" size={17} />{hasLikeCount ? fmt(likes) : null}
             </button>
             <button className="act-btn" onClick={stop(() => onOpen(e.id))} aria-label="Commenti">
-              <Icon name="comment" size={17} />{e.commentsCount || 0}
+              <Icon name="comment" size={17} />{hasCommentCount ? e.commentsCount : null}
             </button>
             <button className="act-btn icon-only" onClick={stop(() => {})} aria-label="Condividi"><Icon name="share" size={17} /></button>
             <button className={"act-btn save icon-only" + (saved ? " on" : "")} onClick={stop(() => onSave(e.id))} aria-label="Salva"><Icon name="bookmark" size={17} /></button>
@@ -194,8 +215,10 @@ const Feed = React.forwardRef<any, any>(function Feed({ events, user, search, se
     <div className="ev-col feed" ref={ref}>
       <Composer user={user} search={search} setSearch={setSearch} />
       {events.length === 0 && (
-        <div style={{ color: "var(--text-muted)", fontSize: 14, padding: "40px 8px", textAlign: "center" }}>
-          Nessun evento stasera.
+        <div className="feed-state empty">
+          <Icon name="calendar" size={20} />
+          <div className="feed-state-title">{search ? "Nessun risultato" : "Nessun evento disponibile"}</div>
+          <div className="feed-state-msg">{search ? "Prova con un altro termine di ricerca." : "Non ci sono ancora eventi pubblicati. Torna più tardi."}</div>
         </div>
       )}
       {events.map((e: any) => (
@@ -254,8 +277,8 @@ function NextActivity({ event, joined, saved, onJoin, onSave }: any) {
         <div className="np-n"><b>{event.participantCount || 0}</b> {event.maxPartecipanti ? `/ ${event.maxPartecipanti}` : ""}</div>
       </div>
       <div className="next-cta-row">
-        <button className={"next-cta" + (joined ? " joined" : "")} onClick={onJoin}>
-          <Icon name="ticket" size={17} />{joined ? "Partecipi!" : "Partecipa all'evento"}
+        <button className={"next-cta" + (joined ? " joined" : "")} onClick={onJoin} aria-pressed={joined}>
+          <Icon name={joined ? "check" : "ticket"} size={17} />{joined ? "Partecipi · annulla" : "Partecipa all'evento"}
         </button>
         <button className={"next-save" + (saved ? " on" : "")} onClick={onSave} aria-label="Salva evento"><Icon name="bookmark" size={19} /></button>
       </div>
@@ -296,6 +319,7 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
   const [search, setSearch] = useState("");
   const [events, setEvents] = useState<ApiEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [likes, setLikes] = useState<Record<string, boolean>>({});
   const [saves, setSaves] = useState<Record<string, boolean>>({});
@@ -304,6 +328,7 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
 
   // Load events
   const loadEventsData = async () => {
+    setError(null);
     try {
       const data = await getEvents({
         q: search || undefined,
@@ -320,8 +345,8 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
         });
         setSaves(savesMap);
       }
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      setError(err instanceof ApiError ? err.message : "Impossibile caricare gli eventi. Riprova.");
     } finally {
       setLoading(false);
     }
@@ -353,6 +378,8 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
         await addFavorite("event", id);
       }
     } catch (err) {
+      // Roll back the optimistic toggle so the UI never claims a save that failed.
+      setSaves((prev) => ({ ...prev, [id]: isSaved }));
       console.error(err);
     }
   };
@@ -373,6 +400,31 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
 
   const nextEvent = events.length > 0 ? events[0] : null;
 
+  if (loading) {
+    return (
+      <div className="events-scene">
+        <div className="events-header"><Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} /></div>
+        <div style={{ color: "var(--text-secondary)", fontSize: 15, padding: "100px 0", textAlign: "center" }}>
+          Caricamento eventi...
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="events-scene">
+        <div className="events-header"><Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} /></div>
+        <div className="feed-state error" role="alert">
+          <Icon name="warn" size={20} />
+          <div className="feed-state-title">Qualcosa è andato storto</div>
+          <div className="feed-state-msg">{error}</div>
+          <button className="feed-state-retry" onClick={() => { setLoading(true); loadEventsData(); }}>Riprova</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="events-scene">
       <div className="events-header">
@@ -382,10 +434,9 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
       <div className="events-layout">
         {/* LEFT */}
         <div className="ev-col left">
-          <MiniCalendar />
+          <MiniCalendar events={events} />
           <QuickFilters active={filter} setActive={setFilter} counts={categoryCounts} />
-          <TrendingTonight list={events} onPick={handleOpenDetail} />
-          <LiveNow count={events.length} />
+          <MostParticipated list={events} onPick={handleOpenDetail} />
         </div>
 
         {/* CENTER */}

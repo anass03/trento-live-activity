@@ -124,7 +124,7 @@ export function EventDetailPage({ page, setPage, theme, setTheme, user, selected
                 </>
               ) : (
                 <>
-                  <span className="led live green"></span> Live ora a Trento
+                  <span className="led live green"></span> Evento a Trento
                 </>
               )}
             </div>
@@ -144,29 +144,33 @@ export function EventDetailPage({ page, setPage, theme, setTheme, user, selected
               </div>
             </div>
 
-            <div className="revamp-detail-section-title">Partecipazione & Biglietti</div>
+            <div className="revamp-detail-section-title">Partecipazione</div>
             <div className="revamp-detail-box">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>Flusso di Affluenza</div>
-                  <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 3 }}>
-                    Ci sono <b>{count}</b> persone registrate. Limite massimo: <b>{limit}</b>.
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>Posti occupati</div>
+                  <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginTop: 3 }}>
+                    <b>{count}</b> di <b>{limit}</b> posti occupati
                   </div>
                 </div>
                 <div style={{ fontFamily: "var(--mono)", fontSize: 16, fontWeight: 700, color: "var(--magenta)" }}>
                   {pct}%
                 </div>
               </div>
-              <div className="np-bar" style={{ height: 6, marginBottom: 20 }}>
+              <div className="np-bar" style={{ height: 6, marginBottom: 16 }}>
                 <i style={{ width: pct + "%", background: "var(--magenta)", boxShadow: "0 0 8px var(--magenta)" }}></i>
               </div>
+              {isJoined && (
+                <span className="revamp-status-pill success" style={{ marginBottom: 14 }}>
+                  <Icon name="check" size={11} /> Partecipi a questo evento
+                </span>
+              )}
               <button
                 className={"revamp-form-btn" + (isJoined ? " joined" : "")}
                 style={{ "--accent": "var(--magenta)" } as React.CSSProperties}
                 onClick={handleJoinToggle}
               >
-                {isJoined ? "Annulla Partecipazione" : "Ottieni Biglietto Ingresso"}{" "}
-                <Icon name="ticket" size={16} />
+                {isJoined ? "Annulla partecipazione" : "Partecipa all'evento"}
               </button>
             </div>
 

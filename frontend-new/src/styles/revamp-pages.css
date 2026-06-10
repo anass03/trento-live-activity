@@ -124,6 +124,19 @@
   box-shadow: 0 12px 28px color-mix(in srgb, var(--accent) calc(46% * var(--glow)), transparent);
 }
 .revamp-form-btn svg { width: 16px; height: 16px; }
+/* Joined / participating: a confirmed, secondary state distinct from the primary join CTA. */
+.revamp-form-btn.joined,
+:root[data-theme="night"] .revamp-form-btn.joined {
+  background: color-mix(in srgb, var(--green) 16%, transparent);
+  color: var(--green);
+  border: 1px solid color-mix(in srgb, var(--green) 45%, transparent);
+  box-shadow: none;
+}
+.revamp-form-btn.joined:hover {
+  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--green) 24%, transparent);
+  box-shadow: none;
+}
 
 .revamp-form-foot {
   text-align: center; margin-top: 20px; font-size: 13px; color: var(--text-muted);

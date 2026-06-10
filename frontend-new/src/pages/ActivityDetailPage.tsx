@@ -181,20 +181,27 @@ export function ActivityDetailPage({ page, setPage, theme, setTheme, user, selec
               </div>
             </div>
 
-            <div className="revamp-detail-section-title">Prenotazioni & Affollamento</div>
-            <div className="revamp-detail-box" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div className="revamp-detail-section-title">Partecipazione</div>
+            <div className="revamp-detail-box" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 700 }}>Stato Posti</div>
-                <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
-                  Partecipanti attivi: <b>{count}</b>{limit ? <> su <b>{limit}</b> massimi ({pct}% occupato).</> : "."}
+                <div style={{ fontSize: 14, fontWeight: 700 }}>Posti</div>
+                <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginTop: 4 }}>
+                  {limit
+                    ? <><b>{count}</b> di <b>{limit}</b> posti occupati{pct != null ? ` · ${pct}%` : ""}</>
+                    : <><b>{count}</b> {count === 1 ? "partecipante" : "partecipanti"}</>}
                 </div>
+                {isJoined && (
+                  <span className="revamp-status-pill success" style={{ marginTop: 10 }}>
+                    <Icon name="check" size={11} /> Partecipi a questa attività
+                  </span>
+                )}
               </div>
               <button
                 className={"revamp-form-btn" + (isJoined ? " joined" : "")}
                 style={{ width: "auto", padding: "0 20px", "--accent": "var(--teal)" } as React.CSSProperties}
                 onClick={handleJoinToggle}
               >
-                {isJoined ? "Annulla Prenotazione" : "Prenota Attività"}
+                {isJoined ? "Annulla partecipazione" : "Partecipa all'attività"}
               </button>
             </div>
 
