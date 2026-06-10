@@ -5,6 +5,7 @@ const { sendNewEventToInterested: sendNewEventEmail } = require('../notification
 const { serializeEvent } = require('../data/presenters');
 const { buildIcs } = require('./ics');
 const { reverseGeocode } = require('../lib/geocode');
+const { EVENT_CATEGORIES } = require('../data/models/Event');
 
 async function createEvent(entityId, { titolo, descrizione, categoria, latitudine, longitudine, poiId, data, orarioInizio, orarioFine, maxPartecipanti }) {
   const entity = await User.findByPk(entityId);
@@ -58,7 +59,8 @@ async function createEvent(entityId, { titolo, descrizione, categoria, latitudin
 
 async function listEvents({ categoria, q, page = 1, limit = 20 }) {
   const where = {};
-  if (categoria) where.categoria = categoria;
+  // Un valore fuori enum manderebbe in errore Postgres (500): filtra solo se valido.
+  if (categoria && EVENT_CATEGORIES.includes(categoria)) where.categoria = categoria;
   // RF15: textual search on titolo / descrizione
   if (q) {
     where[Op.or] = [

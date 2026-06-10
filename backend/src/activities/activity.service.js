@@ -2,6 +2,7 @@ const { Op } = require('sequelize');
 const { Activity, Participation, User, POI } = require('../data/models');
 const { serializeActivity } = require('../data/presenters');
 const { reverseGeocode } = require('../lib/geocode');
+const { ACTIVITY_TYPES } = require('../data/models/Activity');
 const {
   sendActivityJoinConfirmation,
   sendActivityNewParticipant,
@@ -126,6 +127,8 @@ async function createActivity(creatorId, { tipo, data, orarioInizio, orarioFine,
 
 async function listActivities({ tipo, q, userInterests, page = 1, limit = 20 }) {
   const where = { stato: 'attiva' };
+  // Un valore fuori enum manderebbe in errore Postgres (500): filtra solo se valido.
+  if (tipo && !ACTIVITY_TYPES.includes(tipo)) tipo = undefined;
   if (tipo) where.tipo = tipo;
   // RF9 / RF14: personalise by user interests if provided and no explicit filter
   if (!tipo && Array.isArray(userInterests) && userInterests.length) {

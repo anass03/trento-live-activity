@@ -49,6 +49,16 @@ function parseEventDate(e: any): Date | null {
   return null;
 }
 
+// "2026-06-17T16:30:00" → "mer 17 giu, 16:30" (segue la lingua corrente).
+function formatEventWhen(e: any, lang?: string): string | null {
+  const d = parseEventDate(e);
+  if (!d) return null;
+  const locale = lang?.startsWith("en") ? "en-GB" : "it-IT";
+  const date = d.toLocaleDateString(locale, { weekday: "short", day: "numeric", month: "short" });
+  const time = d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
+  return `${date}, ${time}`;
+}
+
 function MiniCalendar({ events = [] }: any) {
   const { t } = useTranslation();
   const onMove = useGlow();
@@ -168,7 +178,7 @@ function Composer({ search, setSearch }: any) {
 
 /* ===================== EVENT POST CARD ===================== */
 function PostCard({ e, liked, saved, onLike, onSave, onOpen, flash }: any) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const onMove = useGlow();
   const color = catColor(e.category);
   const catLabel = tlaCatLabel(e.category);
@@ -196,7 +206,7 @@ function PostCard({ e, liked, saved, onLike, onSave, onOpen, flash }: any) {
         <div className="post-desc">{e.description}</div>
         <div className="post-meta">
           <span className="pm"><Icon name="pin" size={14} />{e.location || "Trento"}</span>
-          <span className="pm"><Icon name="clock" size={14} />{e.dateTime || e.createdAt || t("events.today")}</span>
+          <span className="pm"><Icon name="clock" size={14} />{formatEventWhen(e, i18n.language) || t("events.today")}</span>
         </div>
         <div className="post-foot">
           <Avatars ids={[0, 1, 2]} extra={Math.max(0, (e.participantCount || 0) - 3)} />
@@ -248,7 +258,7 @@ const Feed = React.forwardRef<any, any>(function Feed({ events, user, search, se
 
 /* ===================== NEXT ACTIVITY ===================== */
 function NextActivity({ event, joined, saved, onJoin, onSave }: any) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   if (!event) {
     return (
       <Widget title={t("events.next")} accent="var(--cyan)" upd={t("events.none")} delay={120}>
@@ -276,7 +286,7 @@ function NextActivity({ event, joined, saved, onJoin, onSave }: any) {
         </div>
         <div className="next-field">
           <span className="nf-ic"><Icon name="clock" size={14} /></span>
-          <div><div className="nf-lbl">{t("events.when")}</div><div className="nf-val">{event.dateTime || t("events.today")}</div></div>
+          <div><div className="nf-lbl">{t("events.when")}</div><div className="nf-val">{formatEventWhen(event, i18n.language) || t("events.today")}</div></div>
         </div>
       </div>
       <div className="next-part">

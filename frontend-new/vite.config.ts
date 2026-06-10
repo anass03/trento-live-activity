@@ -6,7 +6,8 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "http://localhost:3000",
+        // Sovrascrivibile per puntare a un backend su porta diversa nei test.
+        target: process.env.VITE_API_PROXY || "http://localhost:3000",
         changeOrigin: true,
       },
     },

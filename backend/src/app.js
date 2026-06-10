@@ -41,9 +41,14 @@ const allowedOrigins = new Set([
   ...configuredOrigins,
 ]);
 
+// In sviluppo Vite può ripiegare su una porta diversa da 5173 se occupata:
+// qualsiasi origin localhost/127.0.0.1 è considerato fidato fuori produzione.
+const isLocalOrigin = (origin) => /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || allowedOrigins.has('*') || allowedOrigins.has(origin)) {
+    if (!origin || allowedOrigins.has('*') || allowedOrigins.has(origin)
+      || (process.env.NODE_ENV !== 'production' && isLocalOrigin(origin))) {
       callback(null, true);
       return;
     }
@@ -101,3 +106,4 @@ app.use('/api/me', socialMeRoutes);
 app.use(errorHandler);
 
 module.exports = app;
+

@@ -20,6 +20,9 @@ const ACT_CAT = {
   social:   { label: "Social",       icon: "users",    color: "var(--magenta)" },
   famiglia: { label: "Famiglia",     icon: "family",   color: "var(--cyan)" },
   nightlife:{ label: "Nightlife",    icon: "moon",     color: "var(--violet)" },
+  musica:   { label: "Musica",       icon: "music",    color: "var(--magenta)" },
+  arte:     { label: "Arte",         icon: "sparkle",  color: "var(--orange)" },
+  studio:   { label: "Studio",       icon: "bookmark", color: "var(--cyan)" },
 };
 const ACT_GRAD = {
   outdoor: "linear-gradient(140deg,#0d9488,#134e4a)",
@@ -30,6 +33,9 @@ const ACT_GRAD = {
   social:  "linear-gradient(140deg,#db2777,#831843)",
   famiglia:"linear-gradient(140deg,#0ea5e9,#075985)",
   nightlife:"linear-gradient(140deg,#6d28d9,#312e81)",
+  musica:  "linear-gradient(140deg,#db2777,#6d28d9)",
+  arte:    "linear-gradient(140deg,#ea580c,#9a3412)",
+  studio:  "linear-gradient(140deg,#2563eb,#1e3a8a)",
 };
 const ACT_DIFF: Record<string, { label: string; color: string }> = {
   easy:   { label: "Facile",    color: "var(--green)" },
@@ -90,6 +96,12 @@ const ACT_CAT_ALIASES: Record<string, keyof typeof ACT_CAT> = {
   outdoor: "outdoor",
   natura: "outdoor",
   trekking: "outdoor",
+  musica: "musica",
+  music: "musica",
+  arte: "arte",
+  art: "arte",
+  studio: "studio",
+  study: "studio",
 };
 
 const normalizeActivityCat = (value?: string | null): keyof typeof ACT_CAT => {

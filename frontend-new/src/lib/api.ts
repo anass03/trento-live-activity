@@ -221,6 +221,18 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   return (opts.raw ? response : payload) as T;
 }
 
+// Serializza solo i parametri valorizzati: URLSearchParams trasformerebbe
+// undefined/null nelle stringhe letterali "undefined"/"null".
+function toQuery(params?: object): string {
+  if (!params) return '';
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') search.set(key, String(value));
+  }
+  const qs = search.toString();
+  return qs ? `?${qs}` : '';
+}
+
 function arrayFromPayload<T>(payload: unknown, key: string): T[] {
   if (Array.isArray(payload)) return payload as T[];
   if (payload && typeof payload === 'object') {
@@ -233,8 +245,7 @@ function arrayFromPayload<T>(payload: unknown, key: string): T[] {
 // ============================== Public data ==============================
 
 export async function getEvents(params?: { q?: string; categoria?: string; page?: number; limit?: number }): Promise<ApiEvent[]> {
-  const qs = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : '';
-  const payload = await request<EventsResponse | ApiEvent[]>(`/api/events${qs}`);
+  const payload = await request<EventsResponse | ApiEvent[]>(`/api/events${toQuery(params)}`);
   return arrayFromPayload<ApiEvent>(payload, 'events');
 }
 export function getEventById(id: string): Promise<ApiEvent> {
@@ -247,8 +258,7 @@ export function leaveEvent(id: string): Promise<{ eventId: string; joined: false
   return request(`/api/events/${encodeURIComponent(id)}/participate`, { method: 'DELETE' });
 }
 export async function getActivities(params?: { q?: string; tipo?: string; page?: number; limit?: number; mine?: 'interests' }): Promise<ApiActivity[]> {
-  const qs = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : '';
-  const payload = await request<ActivitiesResponse | ApiActivity[]>(`/api/activities${qs}`);
+  const payload = await request<ActivitiesResponse | ApiActivity[]>(`/api/activities${toQuery(params)}`);
   return arrayFromPayload<ApiActivity>(payload, 'activities');
 }
 export function getActivityById(id: string): Promise<ApiActivity> {
@@ -577,13 +587,11 @@ export function deleteEvent(eventId: string): Promise<void> {
 // ============================== Dashboard (municipal admin) ==============================
 
 export function getDashboardStats(params?: DashboardFilters | Record<string, string | number>): Promise<DashboardStats & { filters?: unknown }> {
-  const qs = params ? `?${new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])).toString()}` : '';
-  return request(`/api/dashboard/stats${qs}`);
+  return request(`/api/dashboard/stats${toQuery(params)}`);
 }
 export function getDashboardExportUrl(format: 'csv' | 'pdf', params?: Record<string, string | number>): string {
-  const allParams = { ...(params || {}), format };
-  const qs = new URLSearchParams(Object.entries(allParams).map(([k, v]) => [k, String(v)])).toString();
-  return `${API_BASE_URL}/api/dashboard/stats/export?${qs}`;
+  const qs = toQuery({ ...(params || {}), format });
+  return `${API_BASE_URL}/api/dashboard/stats/export${qs}`;
 }
 export interface DashboardFilters {
   tipo?: string;

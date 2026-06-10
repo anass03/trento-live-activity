@@ -32,3 +32,5 @@ module.exports = (sequelize) => {
     timestamps: true,
   });
 };
+
+module.exports.EVENT_CATEGORIES = EVENT_CATEGORIES;

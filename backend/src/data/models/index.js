@@ -16,6 +16,13 @@ const EventParticipation = require('./EventParticipation')(sequelize);
 const Favorite = require('./Favorite')(sequelize);
 const RevokedToken = require('./RevokedToken')(sequelize);
 const ServiceRequest = require('./ServiceRequest')(sequelize);
+const Comment = require('./Comment')(sequelize);
+const Reaction = require('./Reaction')(sequelize);
+const Review = require('./Review')(sequelize);
+const SavedItem = require('./SavedItem')(sequelize);
+const SocialParticipation = require('./SocialParticipation')(sequelize);
+const SocialReport = require('./SocialReport')(sequelize);
+const UserSettings = require('./UserSettings')(sequelize);
 
 // User <-> Activity (creator)
 Activity.belongsTo(User, { foreignKey: 'creatorId', as: 'creator' });
@@ -76,8 +83,34 @@ User.hasMany(Favorite, { foreignKey: 'userId', as: 'favorites' });
 ServiceRequest.belongsTo(User, { foreignKey: 'userId', onDelete: 'SET NULL' });
 User.hasMany(ServiceRequest, { foreignKey: 'userId', as: 'serviceRequests' });
 
+// ── Social layer (commenti, reazioni, salvataggi, recensioni, segnalazioni) ──
+Comment.belongsTo(User, { foreignKey: 'userId', as: 'user', onDelete: 'CASCADE' });
+User.hasMany(Comment, { foreignKey: 'userId', as: 'comments' });
+Comment.belongsTo(Event, { foreignKey: 'eventId', onDelete: 'CASCADE' });
+Event.hasMany(Comment, { foreignKey: 'eventId', as: 'comments' });
+
+Reaction.belongsTo(User, { foreignKey: 'userId', as: 'user', onDelete: 'CASCADE' });
+User.hasMany(Reaction, { foreignKey: 'userId', as: 'reactions' });
+
+SavedItem.belongsTo(User, { foreignKey: 'userId', as: 'user', onDelete: 'CASCADE' });
+User.hasMany(SavedItem, { foreignKey: 'userId', as: 'savedItems' });
+
+SocialParticipation.belongsTo(User, { foreignKey: 'userId', as: 'user', onDelete: 'CASCADE' });
+User.hasMany(SocialParticipation, { foreignKey: 'userId', as: 'socialParticipations' });
+
+Review.belongsTo(User, { foreignKey: 'reviewerId', as: 'reviewer', onDelete: 'CASCADE' });
+User.hasMany(Review, { foreignKey: 'reviewerId', as: 'writtenReviews' });
+
+SocialReport.belongsTo(User, { foreignKey: 'reporterId', as: 'reporter', onDelete: 'CASCADE' });
+User.hasMany(SocialReport, { foreignKey: 'reporterId', as: 'socialReports' });
+
+// Preferenze utente 1:1 (tema, lingua, notifiche…)
+UserSettings.belongsTo(User, { foreignKey: 'userId', onDelete: 'CASCADE' });
+User.hasOne(UserSettings, { foreignKey: 'userId', as: 'settings' });
+
 module.exports = {
   sequelize, User, Activity, Event, Participation, POI, Report, DeviceToken, Consent,
   CittadinoProfile, EnteProfile, AmministratoreComunaleProfile, AmministratoreSistemaProfile,
   EventParticipation, Favorite, RevokedToken, ServiceRequest,
+  Comment, Reaction, Review, SavedItem, SocialParticipation, SocialReport, UserSettings,
 };

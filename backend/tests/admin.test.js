@@ -25,7 +25,11 @@ jest.mock('../src/data/models', () => ({
 // user create a separate express app with an overridden authenticate mock.
 jest.mock('../src/middleware/auth', () => ({
   authenticate: (req, _res, next) => {
-    req.user = { id: 'admin-1', ruolo: 'AmministratoreDiSistema', superAdmin: true, jti: 'jti-1' };
+    // Preserve a req.user injected upstream (the non-super-admin app installs
+    // its own identity middleware before the routes) — only default otherwise.
+    if (!req.user) {
+      req.user = { id: 'admin-1', ruolo: 'AmministratoreDiSistema', superAdmin: true, jti: 'jti-1' };
+    }
     next();
   },
   authorize: () => (_req, _res, next) => next(),

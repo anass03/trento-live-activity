@@ -50,6 +50,13 @@ module.exports = (sequelize) => {
     lastLat: { type: DataTypes.FLOAT, allowNull: true },
     lastLng: { type: DataTypes.FLOAT, allowNull: true },
     lastLocationAt: { type: DataTypes.DATE, allowNull: true },
+    // Profilo social (commenti, recensioni, trust dell'autore)
+    avatarUrl: { type: DataTypes.STRING, allowNull: true },
+    verifiedProfile: { type: DataTypes.BOOLEAN, defaultValue: false },
+    authorTrustScore: { type: DataTypes.FLOAT, defaultValue: 0 },
+    // STRING (non ENUM): i livelli (NEW/GROWING/RELIABLE/…) sono calcolati da
+    // trust.service e devono restare estendibili senza ALTER TYPE.
+    authorTrustLevel: { type: DataTypes.STRING(20), defaultValue: 'NEW' },
   }, {
     tableName: 'users',
     timestamps: true,
