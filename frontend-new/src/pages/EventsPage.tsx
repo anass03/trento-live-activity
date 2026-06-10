@@ -441,19 +441,19 @@ export function EventsPage({ page, setPage, theme, setTheme }: any) {
         <div className="ev-col left">
           <MiniCalendar />
           <QuickFilters active={filter} setActive={setFilter} />
-          <TrendingTonight onPick={pickTrending} />
+          <TrendingTonight onPick={() => setPage("evento-dettaglio")} />
           <LiveNow />
         </div>
 
         {/* CENTER */}
         <Feed ref={feedRef} filter={filter} likes={likes} saves={saves}
-          onLike={onLike} onSave={onSave} onOpen={setDetail} flashId={flashId} />
+          onLike={onLike} onSave={onSave} onOpen={() => setPage("evento-dettaglio")} flashId={flashId} />
 
         {/* RIGHT */}
         <div className="ev-col right">
           <NextActivity joined={nextJoined} saved={nextSaved}
             onJoin={() => setNextJoined((v) => !v)} onSave={() => setNextSaved((v) => !v)} />
-          <CityGrid onOpen={setDetail} />
+          <CityGrid onOpen={() => setPage("evento-dettaglio")} />
         </div>
       </div>
 

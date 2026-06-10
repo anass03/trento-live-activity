@@ -123,7 +123,7 @@ function DeleteModal({ onCancel, onConfirm }: any) {
 }
 
 /* ===================== PAGE ===================== */
-export function SettingsPage({ page, setPage, theme, setTheme }: any) {
+export function SettingsPage({ page, setPage, theme, setTheme, user, setUser }: any) {
   /* appearance */
   const themeToMode = (t) => (t === "day" ? "light" : "dark");
   const [themeMode, setThemeModeState] = useState(themeToMode(theme));
@@ -295,18 +295,36 @@ export function SettingsPage({ page, setPage, theme, setTheme }: any) {
             </div>
             <div className="s-account-body">
               <div className="s-account-user">
-                <div className="s-account-av">MR</div>
+                <div className="s-account-av">{user?.avatar || "MR"}</div>
                 <div className="s-account-info">
-                  <div className="s-account-name">Marco Rossi</div>
-                  <div className="s-account-email">marco.rossi@example.com</div>
+                  <div className="s-account-name">{user?.name || "Marco Rossi"}</div>
+                  <div className="s-account-email">{user?.email || "marco.rossi@example.com"}</div>
                   <div className="s-account-badge"><Icon name="shieldCheck" size={9} />Account verificato</div>
+                </div>
+                {/* Simulated role selector for testing the revamped pages */}
+                <div style={{ marginLeft: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
+                  <label className="s-sublabel" style={{ fontSize: 9, marginBottom: 0 }}>Simula Ruolo</label>
+                  <select
+                    className="revamp-select"
+                    value={user?.role || "registered_user"}
+                    onChange={(e) => setUser({ ...user, role: e.target.value })}
+                  >
+                    <option value="anonymous">Ospite (Anonimo)</option>
+                    <option value="registered_user">Utente Registrato</option>
+                    <option value="certified_entity">Ente Certificato</option>
+                    <option value="municipal_admin">Admin Comunale</option>
+                    <option value="system_admin">Admin di Sistema</option>
+                  </select>
                 </div>
               </div>
               <div className="s-account-actions">
-                <button className="s-acc-btn accent"><Icon name="users" size={17} />Vai al profilo</button>
-                <button className="s-acc-btn"><Icon name="settings" size={17} />Privacy policy</button>
-                <button className="s-acc-btn"><Icon name="ticket" size={17} />Termini di servizio</button>
-                <button className="s-acc-btn" style={{ marginLeft: "auto" }}><Icon name="x" size={17} />Logout</button>
+                <button className="s-acc-btn accent" onClick={() => setPage("profilo")}><Icon name="users" size={17} />Vai al profilo</button>
+                <button className="s-acc-btn" onClick={() => setPage("privacy")}><Icon name="settings" size={17} />Privacy policy</button>
+                <button className="s-acc-btn" onClick={() => setPage("termini")}><Icon name="ticket" size={17} />Termini di servizio</button>
+                <button className="s-acc-btn" style={{ marginLeft: "auto" }} onClick={() => {
+                  setUser({ id: "g1", name: "Ospite", email: "ospite@example.com", role: "anonymous", avatar: "O" });
+                  setPage("login");
+                }}><Icon name="x" size={17} />Logout</button>
                 <button className="s-acc-btn danger" onClick={() => setDeleting(true)}><Icon name="warn" size={17} />Elimina account</button>
               </div>
             </div>

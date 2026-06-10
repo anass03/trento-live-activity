@@ -1,16 +1,45 @@
 import { Icon } from "../ui/Icon";
 
-export function Header({ page, setPage, theme, setTheme }: any) {
-  const nav = [
+export function Header({ page, setPage, theme, setTheme, user }: any) {
+  const role = user?.role || "anonymous";
+
+  let nav = [
     { id: "home", label: "Home", icon: "home" },
     { id: "eventi", label: "Eventi", icon: "calendar" },
     { id: "attivita", label: "Attività", icon: "activity" },
     { id: "impostazioni", label: "Impostazioni", icon: "settings" },
   ];
 
+  if (role === "municipal_admin") {
+    nav = [
+      { id: "home", label: "Mappa", icon: "home" },
+      { id: "comune-dashboard", label: "Pannello Comune", icon: "grid" },
+      { id: "comune-statistiche", label: "Statistiche", icon: "trending" },
+      { id: "comune-export", label: "Export", icon: "share" },
+      { id: "impostazioni", label: "Impostazioni", icon: "settings" },
+    ];
+  } else if (role === "system_admin") {
+    nav = [
+      { id: "home", label: "Mappa", icon: "home" },
+      { id: "admin-users", label: "Utenti", icon: "users" },
+      { id: "admin-poi", label: "POI", icon: "pin" },
+      { id: "admin-enti-richieste", label: "Enti", icon: "shieldCheck" },
+      { id: "admin-moderazione", label: "Moderazione", icon: "warn" },
+      { id: "admin-notifications", label: "Notifiche", icon: "bell" },
+      { id: "impostazioni", label: "Impostazioni", icon: "settings" },
+    ];
+  } else if (role === "certified_entity") {
+    nav = [
+      { id: "home", label: "Mappa", icon: "home" },
+      { id: "eventi", label: "Eventi", icon: "calendar" },
+      { id: "ente-pubblica", label: "Pubblica", icon: "sparkle" },
+      { id: "impostazioni", label: "Impostazioni", icon: "settings" },
+    ];
+  }
+
   return (
     <div className="header">
-      <div className="brand">
+      <div className="brand" style={{ cursor: "pointer" }} onClick={() => setPage("home")}>
         <div className="brand-logo">
           <svg viewBox="0 0 24 24" fill="none">
             <path d="M5 21V11l4-3 4 3v10" stroke="#7dd3fc" strokeWidth="1.7" strokeLinejoin="round" />
@@ -40,13 +69,15 @@ export function Header({ page, setPage, theme, setTheme }: any) {
           <input placeholder="Cerca luoghi, eventi…" />
           <kbd>⌘K</kbd>
         </div>
-        <button className="icon-btn"><Icon name="bell" size={18} /><span className="badge"></span></button>
+        <button className="icon-btn" onClick={() => setPage(role === "system_admin" ? "admin-notifications" : "home")}><Icon name="bell" size={18} /><span className="badge"></span></button>
         <button className="theme-toggle" onClick={() => setTheme(theme === "day" ? "night" : "day")} aria-label="Cambia tema" title="Giorno / Notte">
           <span className="tt-thumb"></span>
           <span className={"tt-ic" + (theme === "night" ? " on" : "")}><Icon name="moon" size={15} /></span>
           <span className={"tt-ic" + (theme === "day" ? " on" : "")}><Icon name="sun" size={15} /></span>
         </button>
-        <div className="avatar">MR</div>
+        <div className="avatar" style={{ cursor: "pointer" }} onClick={() => setPage("profilo")}>
+          {user?.avatar || "MR"}
+        </div>
       </div>
     </div>
   );

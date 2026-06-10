@@ -509,7 +509,7 @@ function ActDrawer({ id, saved, onSave, onClose }: any) {
 }
 
 /* ===================== PAGE ===================== */
-export function ActivityPage({ page, setPage, theme, setTheme }: any) {
+export function ActivityPage({ page, setPage, theme, setTheme, user }: any) {
   const [s, setS] = useState({
     search: "", category: "all", difficulty: null, duration: null, author: null,
     practical: { free: false, now: false, trust: false, verified: false },
@@ -556,7 +556,7 @@ export function ActivityPage({ page, setPage, theme, setTheme }: any) {
 
   return (
     <div className="activity-scene">
-      <div className="events-header"><Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} /></div>
+      <div className="events-header"><Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} /></div>
       <div className="activity-layout">
         <div className="ev-col left"><ActFilters s={s} set={set} /></div>
 
@@ -567,14 +567,14 @@ export function ActivityPage({ page, setPage, theme, setTheme }: any) {
           {list.length === 0
             ? <div style={{ color: "var(--text-muted)", fontSize: 14, padding: "40px 8px", textAlign: "center" }}>Nessuna attività con questi filtri. Prova a rimuoverne qualcuno.</div>
             : <div className="act-grid">
-                {list.map((a) => <ActCard key={a.id} a={a} saved={!!saves[a.id]} onSave={onSave} onOpen={setDetail} />)}
+                {list.map((a) => <ActCard key={a.id} a={a} saved={!!saves[a.id]} onSave={onSave} onOpen={() => setPage("attivita-dettaglio")} />)}
               </div>}
         </div>
 
         <div className="ev-col right">
-          <ActNextWidget saved={!!saves.a3} onSave={onSave} onOpen={setDetail} />
+          <ActNextWidget saved={!!saves.a3} onSave={onSave} onOpen={() => setPage("attivita-dettaglio")} />
           <TrustedAuthors authorFilter={s.author} onPick={(id) => set({ author: id })} />
-          <PerfectNow onOpen={setDetail} />
+          <PerfectNow onOpen={() => setPage("attivita-dettaglio")} />
           <WeatherStrip />
         </div>
       </div>
