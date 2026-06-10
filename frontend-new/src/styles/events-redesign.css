@@ -61,7 +61,8 @@
   gap: 16px;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 2px;
+  padding: 12px 20px 24px;
+  margin: -12px -20px -24px;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
   transition: scrollbar-color 220ms ease;
@@ -77,7 +78,7 @@
 .ev-col::-webkit-scrollbar-thumb:hover { background: var(--scrollthumb-hover); }
 
 /* the feed column wants a little more breathing room + bottom fade */
-.ev-col.feed { gap: 0; padding-right: 8px; }
+.ev-col.feed { gap: 0; padding-right: 20px; }
 
 @media (max-width: 1480px) {
   .events-layout { grid-template-columns: 300px minmax(0, 1fr) 392px; gap: 18px; padding: 20px 24px 24px; }
@@ -89,7 +90,7 @@
 @media (max-width: 940px) {
   .events-scene { overflow-y: auto; }
   .events-layout { grid-template-columns: 1fr; height: auto; }
-  .ev-col { overflow: visible; }
+  .ev-col { overflow: visible; padding: 2px; margin: 0; }
 }
 
 /* =========================================================
@@ -297,8 +298,14 @@
   transform: rotate(-8deg);
 }
 .post-media .pm-ghost svg { width: 116px; height: 116px; }
+.post-media .pm-badges {
+  position: absolute; top: 12px; left: 12px; right: 12px; z-index: 2;
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 8px; flex-wrap: wrap; pointer-events: none;
+}
+.post-media .pm-badges > * { pointer-events: auto; }
 .post-media .pm-tag {
-  position: absolute; top: 12px; left: 12px; z-index: 2;
+  position: relative; z-index: 1;
   display: inline-flex; align-items: center; gap: 6px;
   font-family: var(--mono); font-size: 9.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
   padding: 5px 9px; border-radius: 8px; color: #fff;
@@ -306,7 +313,7 @@
 }
 .post-media .pm-tag svg { width: 12px; height: 12px; }
 .post-media .pm-feat {
-  position: absolute; top: 12px; right: 12px; z-index: 2;
+  position: relative; z-index: 1;
   display: inline-flex; align-items: center; gap: 6px;
   font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
   padding: 5px 9px; border-radius: 8px; color: #fff;
@@ -315,7 +322,7 @@
 }
 .post-media .pm-feat svg { width: 11px; height: 11px; }
 .post-media .pm-live {
-  position: absolute; top: 12px; left: 12px; z-index: 2;
+  position: relative; z-index: 1;
   display: inline-flex; align-items: center; gap: 7px;
   font-family: var(--mono); font-size: 9.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
   padding: 5px 10px 5px 8px; border-radius: 8px; color: #fff;

@@ -1,5 +1,6 @@
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
+import { CommentsSection } from "../components/redesign/CommentsSection";
 
 export function EventDetailPage({ page, setPage, theme, setTheme, user }: any) {
   // Mock event detail
@@ -76,6 +77,11 @@ export function EventDetailPage({ page, setPage, theme, setTheme, user }: any) {
               <button className="revamp-form-btn" style={{ "--accent": "var(--magenta)" }}>
                 Ottieni Biglietto Ingresso <Icon name="ticket" size={16} />
               </button>
+            </div>
+
+            <div className="revamp-detail-section-title" style={{ marginTop: 28 }}>Discussione & Commenti</div>
+            <div className="revamp-detail-box">
+              <CommentsSection accent="var(--magenta)" user={user} />
             </div>
 
           </div>

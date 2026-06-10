@@ -1,5 +1,6 @@
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
+import { CommentsSection } from "../components/redesign/CommentsSection";
 
 export function ActivityDetailPage({ page, setPage, theme, setTheme, user }: any) {
   // Mock detailed activity (equivalent to Sardagna trip)
@@ -105,6 +106,11 @@ export function ActivityDetailPage({ page, setPage, theme, setTheme, user }: any
                 <span className="rl-bar"><i style={{ width: (a.safety / 5 * 100) + "%", "--accent": "var(--teal)" }}></i></span>
                 <span className="rl-val">{a.safety.toFixed(1)}</span>
               </div>
+            </div>
+
+            <div className="revamp-detail-section-title" style={{ marginTop: 28 }}>Discussione & Commenti</div>
+            <div className="revamp-detail-box">
+              <CommentsSection accent="var(--teal)" user={user} />
             </div>
 
           </div>

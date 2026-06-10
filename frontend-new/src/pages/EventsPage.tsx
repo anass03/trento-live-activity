@@ -7,6 +7,7 @@ import { Avatars } from "../components/redesign/Avatars";
 import { CAT_ICON, Widget, useGlow } from "../components/redesign/widgets";
 import { Icon } from "../components/ui/Icon";
 import { catColor, catLabel as tlaCatLabel } from "../data/redesignData";
+import { CommentsSection } from "../components/redesign/CommentsSection";
 
 
 /* ---- gradient "media" per category (matches home thumbnails) ---- */
@@ -220,10 +221,12 @@ function PostCard({ e, liked, saved, onLike, onSave, onOpen, flash }: any) {
       style={{ "--pc": color, "--pimg": EV_GRAD[e.cat], "--mx": "50%", "--my": "0%" }}
       onMouseMove={onMove} onClick={() => onOpen(e.id)}>
       <div className="post-media">
-        {e.live
-          ? <span className="pm-live"><span className="led live green"></span>Live ora</span>
-          : <span className="pm-tag"><Icon name={CAT_ICON[e.cat]} size={12} />{catLabel}</span>}
-        {e.featured && <span className="pm-feat"><Icon name="star" size={11} />In evidenza</span>}
+        <div className="pm-badges">
+          {e.live
+            ? <span className="pm-live"><span className="led live green"></span>Live ora</span>
+            : <span className="pm-tag"><Icon name={CAT_ICON[e.cat]} size={12} />{catLabel}</span>}
+          {e.featured && <span className="pm-feat"><Icon name="star" size={11} />In evidenza</span>}
+        </div>
         <span className="pm-ghost"><Icon name={CAT_ICON[e.cat]} size={116} /></span>
       </div>
       <div className="post-content">
@@ -361,7 +364,7 @@ function CityGrid({ onOpen }: any) {
 }
 
 /* ===================== DETAIL MODAL ===================== */
-function EventModal({ id, liked, saved, onLike, onSave, onClose }: any) {
+function EventModal({ id, liked, saved, onLike, onSave, onClose, user }: any) {
   const e = EV_BY_ID[id];
   useEffect(() => {
     const onKey = (ev) => { if (ev.key === "Escape") onClose(); };
@@ -392,6 +395,11 @@ function EventModal({ id, liked, saved, onLike, onSave, onClose }: any) {
             <button className="next-cta" onClick={() => {}}><Icon name="ticket" size={17} />Partecipa</button>
             <button className={"next-save" + (saved ? " on" : "")} onClick={() => onSave(id)} aria-label="Salva"><Icon name="bookmark" size={19} /></button>
             <button className={"next-save" + (liked ? " on" : "")} onClick={() => onLike(id)} aria-label="Mi interessa"><Icon name="heart" size={19} /></button>
+          </div>
+
+          <div className="revamp-detail-section-title" style={{ marginTop: 24 }}>Discussione & Commenti</div>
+          <div className="revamp-detail-box">
+            <CommentsSection accent={color} user={user} />
           </div>
         </div>
       </div>
@@ -459,7 +467,7 @@ export function EventsPage({ page, setPage, theme, setTheme, user }: any) {
 
       {detail && (
         <EventModal id={detail} liked={!!likes[detail]} saved={!!saves[detail]}
-          onLike={onLike} onSave={onSave} onClose={() => setDetail(null)} />
+          onLike={onLike} onSave={onSave} onClose={() => setDetail(null)} user={user} />
       )}
     </div>
   );

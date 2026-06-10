@@ -123,10 +123,8 @@ function DeleteModal({ onCancel, onConfirm }: any) {
 }
 
 /* ===================== PAGE ===================== */
-export function SettingsPage({ page, setPage, theme, setTheme, user, setUser }: any) {
+export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, themeMode, setThemeMode }: any) {
   /* appearance */
-  const themeToMode = (t) => (t === "day" ? "light" : "dark");
-  const [themeMode, setThemeModeState] = useState(themeToMode(theme));
   const [visualEffects, setVisualEffects] = useState("full");
 
   /* language & format */
@@ -158,10 +156,7 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser }: 
 
   /* sync theme mode → real theme */
   const applyThemeMode = (mode) => {
-    setThemeModeState(mode);
-    if (mode === "light") setTheme("day");
-    else if (mode === "dark") setTheme("night");
-    else setTheme(window.matchMedia("(prefers-color-scheme: dark)").matches ? "night" : "day");
+    setThemeMode(mode);
   };
 
   /* sync visual effects → glow */

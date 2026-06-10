@@ -246,7 +246,15 @@ function RoleSimulationWidget({ user, setUser, setPage }: any) {
 
 export function App() {
   const [page, setPage] = useState("home");
-  const [theme, setTheme] = useState("night");
+  const [themeMode, setThemeModeState] = useState(() => {
+    return localStorage.getItem("tla:themeMode") || "dark";
+  });
+  const [theme, setThemeState] = useState(() => {
+    const mode = localStorage.getItem("tla:themeMode") || "dark";
+    if (mode === "light") return "day";
+    if (mode === "dark") return "night";
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "night" : "day";
+  });
   const [user, setUser] = useState({
     id: "g1",
     name: "Ospite",
@@ -255,9 +263,38 @@ export function App() {
     avatar: "O",
   });
 
+  const setTheme = (newTheme: string) => {
+    setThemeState(newTheme);
+    const mode = newTheme === "day" ? "light" : "dark";
+    setThemeModeState(mode);
+    localStorage.setItem("tla:themeMode", mode);
+  };
+
+  const setThemeMode = (mode: string) => {
+    setThemeModeState(mode);
+    localStorage.setItem("tla:themeMode", mode);
+    if (mode === "light") {
+      setThemeState("day");
+    } else if (mode === "dark") {
+      setThemeState("night");
+    } else {
+      setThemeState(window.matchMedia("(prefers-color-scheme: dark)").matches ? "night" : "day");
+    }
+  };
+
+  useEffect(() => {
+    if (themeMode !== "auto") return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const handler = (e: MediaQueryListEvent) => {
+      setThemeState(e.matches ? "night" : "day");
+    };
+    media.addEventListener("change", handler);
+    return () => media.removeEventListener("change", handler);
+  }, [themeMode]);
+
   useEffect(() => { document.documentElement.dataset.theme = theme; }, [theme]);
 
-  const shared = { page, setPage, theme, setTheme, user, setUser };
+  const shared = { page, setPage, theme, setTheme, user, setUser, themeMode, setThemeMode };
   return (
     <React.Fragment>
       {page === "eventi"
