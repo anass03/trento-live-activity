@@ -3,6 +3,8 @@ node_modules/
 __pycache__/
 *.pyc
 .venv/
+frontend-new/node_modules/
+frontend-new/dist/
 
 #Environment
 .env
@@ -26,3 +28,8 @@ Thumbs.db
 .claude/
 skills-lock.json
 .agents
+
+#Skill mirrors / local tooling state (not source)
+.cursor/skills/impeccable/
+.gemini/skills/impeccable/
+.impeccable/
