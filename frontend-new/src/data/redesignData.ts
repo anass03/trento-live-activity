@@ -39,8 +39,6 @@ export const catLabel = (id: string) => {
     return key ? i18n.t(key) : "";
 };
 
-export const MARKERS: any[] = [];
-
   // Map place labels
 export const PLACES: any[] = [
     { name: "TRENTO",                       x: 50, y: 9,  major: true },
@@ -52,9 +50,3 @@ export const PLACES: any[] = [
     { name: "Doss Trento",                  x: 73, y: 21 },
     { name: "Fiume Adige",                  x: 15, y: 50, river: true },
 ];
-
-export const WEATHER = null;
-export const ALERTS: any[] = [];
-export const PARKING = { avg: 0, list: [] };
-export const AREAS: any[] = [];
-export const EVENTS: any[] = [];

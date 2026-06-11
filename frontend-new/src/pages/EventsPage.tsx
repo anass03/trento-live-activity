@@ -7,33 +7,32 @@ import i18n from "../lib/i18n";
 import { Header } from "../components/layout/Header";
 import { Avatars } from "../components/redesign/Avatars";
 import { Widget, useGlow } from "../components/redesign/widgets";
-import { CAT_ICON } from "../data/redesignData";
 import { Icon } from "../components/ui/Icon";
-import { catColor, catLabel as tlaCatLabel } from "../data/redesignData";
-import { CommentsSection } from "../components/redesign/CommentsSection";
 import { getEvents, joinEvent, leaveEvent, addFavorite, removeFavorite, getFavorites, ApiEvent, ApiError } from "../lib/api";
 
-/* ---- gradient "media" per category (matches home thumbnails) ---- */
-const EV_GRAD: Record<string, string> = {
-  musica:   "linear-gradient(140deg,#db2777,#831843)",
-  cultura:  "linear-gradient(140deg,#7c3aed,#4c1d95)",
-  cibo:     "linear-gradient(140deg,#d97706,#7c2d12)",
-  outdoor:  "linear-gradient(140deg,#0d9488,#134e4a)",
-  sport:    "linear-gradient(140deg,#059669,#064e3b)",
-  famiglia: "linear-gradient(140deg,#0ea5e9,#075985)",
+/* ---- category meta aligned with the backend enum
+   (EVENT_CATEGORIES = sport|cultura|musica|arte|gastronomia|altro) ---- */
+const EV_META: Record<string, { color: string; icon: string; grad: string }> = {
+  musica:      { color: "var(--magenta)", icon: "music",    grad: "linear-gradient(140deg,#db2777,#831843)" },
+  cultura:     { color: "var(--violet)",  icon: "landmark", grad: "linear-gradient(140deg,#7c3aed,#4c1d95)" },
+  sport:       { color: "var(--green)",   icon: "run",      grad: "linear-gradient(140deg,#059669,#064e3b)" },
+  arte:        { color: "var(--amber)",   icon: "sparkle",  grad: "linear-gradient(140deg,#d97706,#7c2d12)" },
+  gastronomia: { color: "var(--orange)",  icon: "food",     grad: "linear-gradient(140deg,#ea580c,#9a3412)" },
+  altro:       { color: "var(--cyan)",    icon: "compass",  grad: "linear-gradient(140deg,#0ea5e9,#075985)" },
 };
+const evMeta = (cat?: string) => EV_META[cat || ""] || EV_META.altro;
 
 const EV_FILTERS = [
-  { id: "all",      label: "events.filters.all",      color: "var(--cyan)",    icon: "grid" },
-  { id: "musica",   label: "events.filters.musica",   color: "var(--magenta)", icon: "music" },
-  { id: "cultura",  label: "events.filters.cultura",  color: "var(--violet)",  icon: "landmark" },
-  { id: "cibo",     label: "events.filters.cibo",     color: "var(--amber)",   icon: "food" },
-  { id: "outdoor",  label: "events.filters.outdoor",  color: "var(--teal)",    icon: "bike" },
-  { id: "famiglia", label: "events.filters.famiglia", color: "var(--cyan)",    icon: "family" },
+  { id: "all", label: "events.filters.all", color: "var(--cyan)", icon: "grid" },
+  ...Object.keys(EV_META).map((id) => ({
+    id, label: `events.filters.${id}`, color: EV_META[id].color, icon: EV_META[id].icon,
+  })),
 ];
 
 const uiLocale = () => (i18n.language?.startsWith("en") ? "en-GB" : "it-IT");
 const fmt = (n?: number) => (n || 0).toLocaleString(uiLocale());
+// "16:30:00" → "16:30"
+const shortTime = (v?: string | null) => (v ? String(v).slice(0, 5) : "");
 
 /* ===================== MINI CALENDAR ===================== */
 const sameDay = (a: Date, b: Date) =>
@@ -59,7 +58,7 @@ function formatEventWhen(e: any, lang?: string): string | null {
   return `${date}, ${time}`;
 }
 
-function MiniCalendar({ events = [] }: any) {
+function MiniCalendar({ events = [], selected, onSelect }: any) {
   const { t } = useTranslation();
   const onMove = useGlow();
   const today = React.useMemo(() => new Date(), []);
@@ -99,12 +98,20 @@ function MiniCalendar({ events = [] }: any) {
         </div>
         <div className="cal-grid">
           {dows.map((d, i) => <div className="cal-dow" key={"d" + i}>{d}</div>)}
-          {weekDays.map((d, i) => (
-            <div key={d.toISOString()} className={"cal-day" + (sameDay(d, today) ? " sel" : "")} aria-current={sameDay(d, today) ? "date" : undefined}>
-              {d.getDate()}
-              {eventDays[i] && <span className="dot"></span>}
-            </div>
-          ))}
+          {weekDays.map((d, i) => {
+            const isSel = selected ? sameDay(d, selected) : sameDay(d, today);
+            return (
+              <button key={d.toISOString()} type="button"
+                className={"cal-day" + (isSel ? " sel" : "")}
+                aria-current={sameDay(d, today) ? "date" : undefined}
+                aria-pressed={selected ? sameDay(d, selected) : false}
+                title={t(selected && sameDay(d, selected) ? "events.calendar.clearDay" : "events.calendar.pickDay")}
+                onClick={() => onSelect?.(selected && sameDay(d, selected) ? null : d)}>
+                {d.getDate()}
+                {eventDays[i] && <span className="dot"></span>}
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>
@@ -119,7 +126,7 @@ function QuickFilters({ active, setActive, counts }: any) {
       <div className="qf-list">
         {EV_FILTERS.map((f) => (
           <button key={f.id} className={"qf-item" + (active === f.id ? " active" : "")}
-            style={{ "--qc": f.color } as React.CSSProperties} onClick={() => setActive(f.id)}>
+            style={{ "--qc": f.color } as React.CSSProperties} onClick={() => setActive(f.id)} aria-pressed={active === f.id}>
             <span className="qf-ic"><Icon name={f.icon} size={16} /></span>
             <span className="qf-label">{t(f.label)}</span>
             <span className="qf-count">{counts[f.id] || 0}</span>
@@ -134,18 +141,19 @@ function QuickFilters({ active, setActive, counts }: any) {
 function MostParticipated({ list, onPick }: any) {
   const { t } = useTranslation();
   const top = [...list]
+    .filter((e: any) => (e.participantCount || 0) > 0)
     .sort((a: any, b: any) => (b.participantCount || 0) - (a.participantCount || 0))
     .slice(0, 3);
   return (
     <Widget title={t("events.mostParticipated")} accent="var(--magenta)" delay={220}>
-      {top.map((t: any, i: number) => (
-        <button className="trend-row" key={t.id} onClick={() => onPick(t.id)}>
+      {top.map((e: any, i: number) => (
+        <button className="trend-row" key={e.id} onClick={() => onPick(e.id)}>
           <span className="trend-rank">{i + 1}</span>
           <span className="trend-body">
-            <span className="trend-title">{t.title}</span>
-            <span className="trend-loc">{t.location || "Trento"}</span>
+            <span className="trend-title">{e.title}</span>
+            <span className="trend-loc">{e.location || "Trento"}</span>
           </span>
-          <span className="trend-count"><Icon name="users" size={13} />{fmt(t.participantCount)}</span>
+          <span className="trend-count"><Icon name="users" size={13} />{fmt(e.participantCount)}</span>
         </button>
       ))}
       {top.length === 0 && (
@@ -169,7 +177,7 @@ function Composer({ search, setSearch }: any) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder={t("events.searchPlaceholder")}
-          style={{ background: "none", border: "none", color: "white", outline: "none", width: "100%", fontSize: 14 }}
+          style={{ background: "none", border: "none", color: "var(--text-primary)", outline: "none", width: "100%", fontSize: 14 }}
         />
       </div>
     </div>
@@ -177,31 +185,32 @@ function Composer({ search, setSearch }: any) {
 }
 
 /* ===================== EVENT POST CARD ===================== */
-function PostCard({ e, liked, saved, onLike, onSave, onOpen, flash }: any) {
+function PostCard({ e, liked, saved, shared, onLike, onSave, onShare, onOpen, flash }: any) {
   const { t, i18n } = useTranslation();
   const onMove = useGlow();
-  const color = catColor(e.category);
-  const catLabel = tlaCatLabel(e.category);
+  const meta = evMeta(e.category);
+  const catLabel = t(`events.filters.${e.category}`, { defaultValue: e.category });
   // The list API doesn't return a like total yet, so only show a count once it's real.
   const hasLikeCount = typeof e.likes === "number";
   const likes = (e.likes || 0) + (liked ? 1 : 0);
   const hasCommentCount = typeof e.commentsCount === "number";
+  const count = e.participantCount || 0;
   const stop = (fn: any) => (ev: any) => { ev.stopPropagation(); fn(); };
   return (
     <div className={"post" + (flash ? " flash" : "")} data-post={e.id}
-      style={{ "--pc": color, "--pimg": EV_GRAD[e.category] || EV_GRAD.musica, "--mx": "50%", "--my": "0%" } as React.CSSProperties}
+      style={{ "--pc": meta.color, "--pimg": meta.grad, "--mx": "50%", "--my": "0%" } as React.CSSProperties}
       onMouseMove={onMove} onClick={() => onOpen(e.id)}>
       <div className="post-media">
         <div className="pm-badges">
           {e.isCertified
             ? <span className="pm-live" style={{ background: "var(--teal)" }}><Icon name="shieldCheck" size={11} />{t("events.certified")}</span>
-            : <span className="pm-tag"><Icon name={CAT_ICON[e.category] || "activity"} size={12} />{catLabel}</span>}
-          {e.participantCount && e.participantCount > 20 && <span className="pm-feat"><Icon name="flame" size={11} />{t("events.popular")}</span>}
+            : <span className="pm-tag"><Icon name={meta.icon} size={12} />{catLabel}</span>}
+          {count > 20 && <span className="pm-feat"><Icon name="flame" size={11} />{t("events.popular")}</span>}
         </div>
-        <span className="pm-ghost"><Icon name={CAT_ICON[e.category] || "activity"} size={116} /></span>
+        <span className="pm-ghost"><Icon name={meta.icon} size={116} /></span>
       </div>
       <div className="post-content">
-        <div className="post-cat"><span className="pc-ic" style={{ color }}><Icon name={CAT_ICON[e.category] || "activity"} size={12} /></span>{catLabel}</div>
+        <div className="post-cat"><span className="pc-ic" style={{ color: meta.color }}><Icon name={meta.icon} size={12} /></span>{catLabel}</div>
         <div className="post-title">{e.title}</div>
         <div className="post-desc">{e.description}</div>
         <div className="post-meta">
@@ -209,8 +218,12 @@ function PostCard({ e, liked, saved, onLike, onSave, onOpen, flash }: any) {
           <span className="pm"><Icon name="clock" size={14} />{formatEventWhen(e, i18n.language) || t("events.today")}</span>
         </div>
         <div className="post-foot">
-          <Avatars ids={[0, 1, 2]} extra={Math.max(0, (e.participantCount || 0) - 3)} />
-          <span className="attend-count"><b>{fmt(e.participantCount)}</b> {t("events.participantsWord", { count: e.participantCount || 0 })}</span>
+          {count > 0 && (
+            <Avatars ids={[0, 1, 2].slice(0, Math.min(3, count))} extra={Math.max(0, count - 3)} />
+          )}
+          <span className="attend-count" style={count > 0 ? undefined : { marginLeft: 0 }}>
+            <b>{fmt(count)}</b> {t("events.participantsWord", { count })}
+          </span>
           <div className="post-actions">
             <button className={"act-btn" + (liked ? " on" : "")} onClick={stop(() => onLike(e.id))} aria-label={t("events.ariaLike")} aria-pressed={liked}>
               <Icon name="heart" size={17} />{hasLikeCount ? fmt(likes) : null}
@@ -218,7 +231,10 @@ function PostCard({ e, liked, saved, onLike, onSave, onOpen, flash }: any) {
             <button className="act-btn" onClick={stop(() => onOpen(e.id))} aria-label={t("events.ariaComments")}>
               <Icon name="comment" size={17} />{hasCommentCount ? e.commentsCount : null}
             </button>
-            <button className="act-btn icon-only" onClick={stop(() => {})} aria-label={t("events.ariaShare")}><Icon name="share" size={17} /></button>
+            <button className={"act-btn icon-only" + (shared ? " on-share" : "")} onClick={stop(() => onShare(e))}
+              aria-label={shared ? t("events.shareCopied") : t("events.ariaShare")} title={shared ? t("events.shareCopied") : undefined}>
+              <Icon name={shared ? "check" : "share"} size={17} />
+            </button>
             <button className={"act-btn save icon-only" + (saved ? " on" : "")} onClick={stop(() => onSave(e.id))} aria-label={t("events.ariaSave")}><Icon name="bookmark" size={17} /></button>
           </div>
         </div>
@@ -228,27 +244,29 @@ function PostCard({ e, liked, saved, onLike, onSave, onOpen, flash }: any) {
 }
 
 /* ===================== FEED ===================== */
-const Feed = React.forwardRef<any, any>(function Feed({ events, user, search, setSearch, likes, saves, onLike, onSave, onOpen, flashId }, ref) {
+const Feed = React.forwardRef<any, any>(function Feed({ events, user, search, setSearch, hasFilter, likes, saves, sharedId, onLike, onSave, onShare, onOpen, flashId }, ref) {
   const { t } = useTranslation();
+  const emptyTitle = search ? t("events.emptyNoResultsTitle") : hasFilter ? t("events.emptyNoCategoryTitle") : t("events.emptyNoEventsTitle");
+  const emptyMsg = search ? t("events.emptyNoResultsMsg") : hasFilter ? t("events.emptyNoCategoryMsg") : t("events.emptyNoEventsMsg");
   return (
     <div className="ev-col feed" ref={ref}>
       <Composer user={user} search={search} setSearch={setSearch} />
       {events.length === 0 && (
         <div className="feed-state empty">
           <Icon name="calendar" size={20} />
-          <div className="feed-state-title">{search ? t("events.emptyNoResultsTitle") : t("events.emptyNoEventsTitle")}</div>
-          <div className="feed-state-msg">{search ? t("events.emptyNoResultsMsg") : t("events.emptyNoEventsMsg")}</div>
+          <div className="feed-state-title">{emptyTitle}</div>
+          <div className="feed-state-msg">{emptyMsg}</div>
         </div>
       )}
       {events.map((e: any) => (
         <div className="feed-row" key={e.id}>
           <div className="tl">
-            <span className={"tl-node" + (e.isCertified ? " live" : "")} style={{ "--tc": catColor(e.category) } as React.CSSProperties}></span>
-            <span className={"tl-label" + (e.isCertified ? " live" : "")}>{e.startTime || t("events.live")}</span>
+            <span className={"tl-node" + (e.isCertified ? " live" : "")} style={{ "--tc": evMeta(e.category).color } as React.CSSProperties}></span>
+            <span className={"tl-label" + (e.isCertified ? " live" : "")}>{shortTime(e.startTime) || t("events.live")}</span>
           </div>
           <div className="feed-body">
-            <PostCard e={e} liked={!!likes[e.id]} saved={!!saves[e.id]}
-              onLike={onLike} onSave={onSave} onOpen={onOpen} flash={flashId === e.id} />
+            <PostCard e={e} liked={!!likes[e.id]} saved={!!saves[e.id]} shared={sharedId === e.id}
+              onLike={onLike} onSave={onSave} onShare={onShare} onOpen={onOpen} flash={flashId === e.id} />
           </div>
         </div>
       ))}
@@ -257,7 +275,7 @@ const Feed = React.forwardRef<any, any>(function Feed({ events, user, search, se
 });
 
 /* ===================== NEXT ACTIVITY ===================== */
-function NextActivity({ event, joined, saved, onJoin, onSave }: any) {
+function NextActivity({ event, joined, saved, busy, joinError, onJoin, onSave }: any) {
   const { t, i18n } = useTranslation();
   if (!event) {
     return (
@@ -268,15 +286,19 @@ function NextActivity({ event, joined, saved, onJoin, onSave }: any) {
       </Widget>
     );
   }
+  const meta = evMeta(event.category);
   const pct = Math.round(((event.participantCount || 0) / (event.maxPartecipanti || 100)) * 100);
+  // NB: don't pass accent="var(--accent)" — the Widget sets `--accent: <value>`
+  // inline, and a self-referential var() makes the property invalid for the
+  // whole subtree (the join CTA gradient disappears). Use a concrete token.
   return (
-    <Widget title={t("events.next")} accent="var(--accent)" upd={t("events.upcoming")} delay={120}>
-      <div className="next-media" style={{ "--nimg": EV_GRAD[event.category] || EV_GRAD.musica } as React.CSSProperties}>
+    <Widget title={t("events.next")} accent="var(--cyan)" upd={t("events.upcoming")} delay={120}>
+      <div className="next-media" style={{ "--nimg": meta.grad } as React.CSSProperties}>
         <span className="nm-count">
           <span className="led live green"></span>
           <span><span className="lbl">{t("events.upcomingBadge")}</span></span>
         </span>
-        <span className="nm-ghost"><Icon name={CAT_ICON[event.category] || "activity"} size={96} /></span>
+        <span className="nm-ghost"><Icon name={meta.icon} size={96} /></span>
       </div>
       <div className="next-title">{event.title}</div>
       <div className="next-fields">
@@ -297,33 +319,36 @@ function NextActivity({ event, joined, saved, onJoin, onSave }: any) {
         <div className="np-n"><b>{event.participantCount || 0}</b> {event.maxPartecipanti ? `/ ${event.maxPartecipanti}` : ""}</div>
       </div>
       <div className="next-cta-row">
-        <button className={"next-cta" + (joined ? " joined" : "")} onClick={onJoin} aria-pressed={joined}>
-          <Icon name={joined ? "check" : "ticket"} size={17} />{joined ? t("events.joinedCta") : t("events.joinCta")}
+        <button className={"next-cta" + (joined ? " joined" : "")} onClick={onJoin} aria-pressed={joined} disabled={busy} aria-busy={busy}>
+          <Icon name={joined ? "check" : "ticket"} size={17} />
+          {busy ? t("events.joining") : joined ? t("events.joinedCta") : t("events.joinCta")}
         </button>
         <button className={"next-save" + (saved ? " on" : "")} onClick={onSave} aria-label={t("events.ariaSaveEvent")}><Icon name="bookmark" size={19} /></button>
       </div>
+      {joinError && <div className="next-join-error" role="alert"><Icon name="warn" size={13} />{joinError}</div>}
     </Widget>
   );
 }
 
 /* ===================== CITY EVENTS GRID ===================== */
 function CityGrid({ list, onOpen }: any) {
+  const { t } = useTranslation();
   return (
-    <Widget title="Eventi in città" accent="var(--teal)" upd={list.length + " totali"} delay={220}
+    <Widget title={t("events.cityGrid")} accent="var(--teal)" upd={t("events.cityGridTotal", { count: list.length })} delay={220}
       style={{ display: "flex", flexDirection: "column", minHeight: 0, flex: "1 1 auto" }}>
       <div className="city-grid">
         {list.map((e: any) => {
-          const color = catColor(e.category);
+          const meta = evMeta(e.category);
           return (
-            <button className="mini" key={e.id} style={{ "--mc": color, "--mimg": EV_GRAD[e.category] || EV_GRAD.musica } as React.CSSProperties} onClick={() => onOpen(e.id)}>
+            <button className="mini" key={e.id} style={{ "--mc": meta.color, "--mimg": meta.grad } as React.CSSProperties} onClick={() => onOpen(e.id)}>
               <div className="mini-media">
                 <span className="mled" style={{ animation: e.isCertified ? "ledPulse 2.6s ease-in-out infinite" : "none" }}></span>
-                <span className="pm-ghost" style={{ right: -8, bottom: -10 }}><Icon name={CAT_ICON[e.category] || "activity"} size={52} /></span>
+                <span className="pm-ghost" style={{ right: -8, bottom: -10 }}><Icon name={meta.icon} size={52} /></span>
               </div>
               <div className="mini-body">
-                <div className="mini-time">{e.startTime || "Live"}</div>
+                <div className="mini-time">{shortTime(e.startTime) || t("events.live")}</div>
                 <div className="mini-title">{e.title}</div>
-                <div className="mini-cat"><Icon name={CAT_ICON[e.category] || "activity"} size={11} />{tlaCatLabel(e.category)}</div>
+                <div className="mini-cat"><Icon name={meta.icon} size={11} />{t(`events.filters.${e.category}`, { defaultValue: e.category })}</div>
               </div>
             </button>
           );
@@ -335,28 +360,33 @@ function CityGrid({ list, onOpen }: any) {
 
 /* ===================== PAGE ===================== */
 export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEventId }: any) {
+  const { t } = useTranslation();
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [selDate, setSelDate] = useState<Date | null>(null);
   const [events, setEvents] = useState<ApiEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [likes, setLikes] = useState<Record<string, boolean>>({});
   const [saves, setSaves] = useState<Record<string, boolean>>({});
+  const [sharedId, setSharedId] = useState<string | null>(null);
+  const [joinBusy, setJoinBusy] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
 
   const feedRef = useRef<any>(null);
+  const shareTimer = useRef<any>(null);
+  useEffect(() => () => clearTimeout(shareTimer.current), []);
 
-  // Load events
+  // Load all events once; category + search are applied client-side so the
+  // sidebar counters stay correct and typing doesn't refetch on every key.
   const loadEventsData = async () => {
     setError(null);
     try {
-      const data = await getEvents({
-        q: search || undefined,
-        categoria: filter === "all" ? undefined : filter
-      });
+      const data = await getEvents({ limit: 100 });
       setEvents(data);
     } catch (err: any) {
-      setError(err instanceof ApiError ? err.message : "Impossibile caricare gli eventi. Riprova.");
+      setError(err instanceof ApiError ? err.message : t("events.loadError"));
       setLoading(false);
       return;
     }
@@ -380,7 +410,22 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
 
   useEffect(() => {
     loadEventsData();
-  }, [filter, search, user?.id]);
+  }, [user?.id]);
+
+  /* ---- client-side filtering (category + calendar day + free-text) ---- */
+  const filtered = React.useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return events.filter((e) => {
+      if (filter !== "all" && e.category !== filter) return false;
+      if (selDate) {
+        const d = parseEventDate(e);
+        if (!d || !sameDay(d, selDate)) return false;
+      }
+      if (!q) return true;
+      return [e.title, e.description, e.location]
+        .some((v) => (v || "").toLowerCase().includes(q));
+    });
+  }, [events, filter, selDate, search]);
 
   const requireAuth = () => {
     if (user?.role !== "anonymous" && user?.id) return true;
@@ -410,12 +455,60 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
     }
   };
 
+  const handleShare = async (e: ApiEvent) => {
+    const text = `${e.title} — ${e.location || "Trento"}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: e.title, text, url: window.location.href });
+      } else {
+        await navigator.clipboard.writeText(`${text}\n${window.location.href}`);
+      }
+      setSharedId(e.id);
+      clearTimeout(shareTimer.current);
+      shareTimer.current = setTimeout(() => setSharedId(null), 1800);
+    } catch (err) {
+      // User dismissed the share sheet or clipboard was denied: nothing to report.
+    }
+  };
+
   const handleOpenDetail = (id: string) => {
     setSelectedEventId(id);
     setPage("evento-dettaglio");
   };
 
-  // Pre-calculate filter category counts
+  // Update one event in place (no full reload) after join/leave.
+  const patchEvent = (id: string, patch: Partial<ApiEvent>) =>
+    setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)));
+
+  const handleJoinToggle = async (ev: ApiEvent) => {
+    if (!requireAuth()) return;
+    if (joinBusy) return;
+    setJoinBusy(true);
+    setJoinError(null);
+    const isJoined = !!ev.participantIds?.includes(user?.id || "");
+    try {
+      if (isJoined) {
+        const res = await leaveEvent(ev.id);
+        patchEvent(ev.id, {
+          participantCount: res.participantCount,
+          participantIds: (ev.participantIds || []).filter((pid) => pid !== user?.id),
+        });
+      } else {
+        const res = await joinEvent(ev.id);
+        patchEvent(ev.id, {
+          participantCount: res.participantCount,
+          participantIds: [...(ev.participantIds || []), user?.id],
+        });
+      }
+    } catch (err: any) {
+      setJoinError(err instanceof ApiError ? err.message : t("events.joinError"));
+    } finally {
+      setJoinBusy(false);
+    }
+  };
+
+  // Sidebar filter counters are computed on ALL events, not the filtered list,
+  // so picking a category doesn't zero out the other counters.
   const categoryCounts = React.useMemo(() => {
     const counts: Record<string, number> = { all: events.length };
     events.forEach((e) => {
@@ -424,14 +517,22 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
     return counts;
   }, [events]);
 
-  const nextEvent = events.length > 0 ? events[0] : null;
+  // "Next event": the soonest upcoming one (fall back to the first listed).
+  const nextEvent = React.useMemo(() => {
+    const now = Date.now();
+    const upcoming = events
+      .map((e) => ({ e, d: parseEventDate(e) }))
+      .filter((x) => x.d && x.d.getTime() >= now)
+      .sort((a, b) => a.d!.getTime() - b.d!.getTime());
+    return upcoming[0]?.e || events[0] || null;
+  }, [events]);
 
   if (loading) {
     return (
       <div className="events-scene">
         <div className="events-header"><Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} /></div>
         <div style={{ color: "var(--text-secondary)", fontSize: 15, padding: "100px 0", textAlign: "center" }}>
-          Caricamento eventi...
+          {t("events.loading")}
         </div>
       </div>
     );
@@ -443,9 +544,9 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
         <div className="events-header"><Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} /></div>
         <div className="feed-state error" role="alert">
           <Icon name="warn" size={20} />
-          <div className="feed-state-title">Qualcosa è andato storto</div>
+          <div className="feed-state-title">{t("events.errorTitle")}</div>
           <div className="feed-state-msg">{error}</div>
-          <button className="feed-state-retry" onClick={() => { setLoading(true); loadEventsData(); }}>Riprova</button>
+          <button className="feed-state-retry" onClick={() => { setLoading(true); loadEventsData(); }}>{t("events.retry")}</button>
         </div>
       </div>
     );
@@ -460,14 +561,15 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
       <div className="events-layout">
         {/* LEFT */}
         <div className="ev-col left">
-          <MiniCalendar events={events} />
+          <MiniCalendar events={events} selected={selDate} onSelect={setSelDate} />
           <QuickFilters active={filter} setActive={setFilter} counts={categoryCounts} />
           <MostParticipated list={events} onPick={handleOpenDetail} />
         </div>
 
         {/* CENTER */}
-        <Feed ref={feedRef} events={events} user={user} search={search} setSearch={setSearch}
-          likes={likes} saves={saves} onLike={handleLike} onSave={handleSave} onOpen={handleOpenDetail} flashId={null} />
+        <Feed ref={feedRef} events={filtered} user={user} search={search} setSearch={setSearch} hasFilter={filter !== "all" || !!selDate}
+          likes={likes} saves={saves} sharedId={sharedId} onLike={handleLike} onSave={handleSave} onShare={handleShare}
+          onOpen={handleOpenDetail} flashId={null} />
 
         {/* RIGHT */}
         <div className="ev-col right">
@@ -475,24 +577,12 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
             event={nextEvent}
             joined={nextEvent ? !!(nextEvent.participantIds?.includes(user?.id || "")) : false}
             saved={nextEvent ? !!saves[nextEvent.id] : false}
-            onJoin={async () => {
-              if (!nextEvent) return;
-              if (!requireAuth()) return;
-              const isJoined = !!(nextEvent.participantIds?.includes(user?.id || ""));
-              try {
-                if (isJoined) {
-                  await leaveEvent(nextEvent.id);
-                } else {
-                  await joinEvent(nextEvent.id);
-                }
-                loadEventsData();
-              } catch (err) {
-                console.error(err);
-              }
-            }}
+            busy={joinBusy}
+            joinError={joinError}
+            onJoin={() => nextEvent && handleJoinToggle(nextEvent)}
             onSave={() => nextEvent && handleSave(nextEvent.id)}
           />
-          <CityGrid list={events.slice(1)} onOpen={handleOpenDetail} />
+          <CityGrid list={events.filter((e) => e.id !== nextEvent?.id)} onOpen={handleOpenDetail} />
         </div>
       </div>
     </div>

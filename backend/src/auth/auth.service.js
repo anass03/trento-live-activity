@@ -341,6 +341,11 @@ async function getMe(userId) {
 
 async function updateProfile(userId, { nome, cognome, interessi }) {
   const { CittadinoProfile: _CittadinoProfile } = require('../data/models');
+  // interessi finisce in una colonna ARRAY: un valore non-array farebbe
+  // fallire la query Postgres con un 500 invece di un 400.
+  if (interessi !== undefined && interessi !== null && !Array.isArray(interessi)) {
+    throw { status: 400, code: 'INVALID_INTERESTS', error: 'interessi deve essere un array' };
+  }
   const user = await User.findByPk(userId);
   if (!user) throw { status: 404, code: 'NOT_FOUND', error: 'User not found' };
 
@@ -405,8 +410,11 @@ async function completeOnboarding(userId, { interessi, dataNascita } = {}) {
 }
 
 async function updateLocation(userId, { lat, lng }) {
-  if (typeof lat !== 'number' || typeof lng !== 'number') {
-    throw { status: 400, code: 'INVALID_LOCATION', error: 'lat and lng must be numbers' };
+  // Number.isFinite esclude NaN/Infinity (typeof NaN === 'number' passerebbe).
+  // Range check: lat in [-90, 90], lng in [-180, 180].
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) ||
+      lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    throw { status: 400, code: 'INVALID_LOCATION', error: 'lat and lng must be valid coordinates' };
   }
   const user = await User.findByPk(userId);
   if (!user) throw { status: 404, code: 'NOT_FOUND', error: 'User not found' };
@@ -536,6 +544,9 @@ async function regenerateRecoveryCodes(userId) {
 }
 
 async function forgotPassword(email) {
+  // Senza guardia, `where: { email: undefined }` fa esplodere Sequelize → 500.
+  // Rispondiamo "ok" silenzioso come per le email sconosciute (anti-enumeration).
+  if (!email || typeof email !== 'string') return;
   const user = await User.findOne({ where: { email } });
   // Anti-enumeration: ritorniamo sempre "ok" senza distinguere i casi sotto,
   // così un attaccante non scopre quali email esistono o di che tipo sono.
@@ -673,7 +684,9 @@ async function registerEntity({ password, nomeEnte, pec, email, consents }) {
   };
 }
 async function verifyEmail(token) {
-  if (!token) throw { status: 400, code: 'MISSING_TOKEN', error: 'Token mancante' };
+  // typeof check: con `?token=a&token=b` Express passa un array e
+  // crypto.update() lancerebbe un TypeError → 500 invece di 400.
+  if (!token || typeof token !== 'string') throw { status: 400, code: 'MISSING_TOKEN', error: 'Token mancante' };
   // #H4: il client passa il token in chiaro; in DB cerchiamo il SHA-256.
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
   const user = await User.findOne({ where: { emailVerificationToken: tokenHash } });

@@ -366,7 +366,8 @@ function MyActivitiesWidget({ user, setPage, onOpen }: any) {
       {!loading && items.length === 0 && (
         <div className="widget-empty big">
           <span>Nessuna attività pubblicata.</span>
-          <button className="link-btn inline" onClick={() => setPage("attivita")}><Icon name="plus" size={14} />Crea la prima attività</button>
+          {/* Activity creation is POI-first: it starts from a map pin on the home page. */}
+          <button className="link-btn inline" onClick={() => setPage("home")}><Icon name="plus" size={14} />Crea la prima attività</button>
         </div>
       )}
       {!loading && items.map((item) => (

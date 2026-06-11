@@ -13,7 +13,7 @@ import { Icon } from "../components/ui/Icon";
 import { DetailModal } from "../components/ui/DetailModal";
 import { Toaster, showToast } from "../components/ui/Toaster";
 import { onForegroundMessage } from "../lib/firebase";
-import { CATEGORIES, MARKERS, catColor } from "../data/redesignData";
+import { CATEGORIES, catColor } from "../data/redesignData";
 import { ActivityPage } from "../pages/ActivitiesPage";
 import { EventsPage } from "../pages/EventsPage";
 import { SettingsPage } from "../pages/SettingsPage";
@@ -86,7 +86,8 @@ const dateLocale = (lang?: string) => (lang?.startsWith("en") ? "en-GB" : "it-IT
 
 function FilterBar({ active, setActive, markers }: any) {
   const { t } = useTranslation();
-  const displayMarkers = markers || MARKERS;
+  // Conteggi basati SOLO sui marker reali dall'API: nessun fallback finto.
+  const displayMarkers = markers || [];
   const count = (id: string) => (id === "all" ? displayMarkers.length : displayMarkers.filter((m: any) => m.cat === id).length);
   return (
     <div className="filterbar">
@@ -474,12 +475,13 @@ export function App() {
     if (mode === "dark") return "night";
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "night" : "day";
   });
+  // Guests carry no fake identity: pages render their own i18n guest labels.
   const [user, setUser] = useState({
     id: null as string | null,
-    name: "Ospite",
-    email: "ospite@example.com",
+    name: "",
+    email: "",
     role: "anonymous" as UserRole,
-    avatar: "O",
+    avatar: "",
   });
 
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -490,10 +492,10 @@ export function App() {
     if (!token) {
       setUser({
         id: null,
-        name: "Ospite",
-        email: "ospite@example.com",
+        name: "",
+        email: "",
         role: "anonymous",
-        avatar: "O",
+        avatar: "",
       });
       return;
     }
@@ -586,13 +588,22 @@ export function App() {
   useEffect(() => { document.documentElement.dataset.theme = theme; }, [theme]);
 
   const navigate = (nextPage: string) => {
-    if (nextPage === "login") {
+    // The profile page only makes sense with an account: guests get the login modal.
+    if (nextPage === "login" || (nextPage === "profilo" && user.role === "anonymous")) {
       setLoginOpen(true);
       return;
     }
     setLoginOpen(false);
     setPage(nextPage);
   };
+
+  // Safety net for state changes that land a guest on the profile page (e.g. logout).
+  useEffect(() => {
+    if (page === "profilo" && user.role === "anonymous") {
+      setPage("home");
+      setLoginOpen(true);
+    }
+  }, [page, user.role]);
 
   const shared = {
     page,

@@ -17,14 +17,19 @@ export function ComuneStatistichePage({ page, setPage, theme, setTheme, user }: 
       .finally(() => setLoading(false));
   }, []);
 
-  const sparklineData = stats?.activitiesByDay?.map((d: any) => Number(d.count)) || [12, 18, 15, 22, 28, 20, 24, 30, 35, 42, 38, 45, 55, 48];
+  const sparklineData = (stats?.activitiesByDay?.length > 0) 
+    ? stats.activitiesByDay.map((d: any) => Number(d.count)) 
+    : [12, 18, 15, 22, 28, 20, 24, 30, 35, 42, 38, 45, 55, 48];
+  
   const W = 600;
-  const H = 90;
-  const PAD = 10;
+  const H = 140;
+  const PAD_X = 35;
+  const PAD_Y = 25;
   const maxVal = Math.max(...sparklineData, 1);
   const pts = sparklineData.map((v, i) => {
-    const x = PAD + (i / (sparklineData.length - 1)) * (W - PAD * 2);
-    const y = H - PAD - (v / maxVal) * (H - PAD * 2);
+    const fraction = sparklineData.length > 1 ? i / (sparklineData.length - 1) : 0.5;
+    const x = PAD_X + fraction * (W - PAD_X - 15);
+    const y = H - PAD_Y - (v / maxVal) * (H - PAD_Y * 2);
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(" ");
 
@@ -116,12 +121,24 @@ export function ComuneStatistichePage({ page, setPage, theme, setTheme, user }: 
             <div className="revamp-chart-card anim-in" style={{ "--accent": "var(--cyan)", animationDelay: "60ms" } as React.CSSProperties}>
               <h3>Attività Create per Giorno (Ultimi 14 giorni) <span>Attive</span></h3>
               <div className="revamp-chart-body">
-                <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: H }}>
+                <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: H, overflow: "visible" }}>
+                  {/* Y Axis Grid Lines & Labels */}
+                  {[0, Math.round(maxVal / 2), maxVal].map((gridVal, i) => {
+                    const y = H - PAD_Y - (gridVal / maxVal) * (H - PAD_Y * 2);
+                    return (
+                      <g key={`grid-${i}`}>
+                        <line x1={PAD_X} y1={y} x2={W - 15} y2={y} stroke="var(--border-soft-2)" strokeDasharray="4 4" />
+                        <text x={PAD_X - 10} y={y + 4} fill="var(--text-secondary)" fontSize="11" textAnchor="end" fontWeight="500">{gridVal}</text>
+                      </g>
+                    );
+                  })}
+
                   <polyline points={pts} fill="none" stroke="var(--cyan)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                   {sparklineData.map((v, i) => {
-                    const x = PAD + (i / (sparklineData.length - 1)) * (W - PAD * 2);
-                    const y = H - PAD - (v / maxVal) * (H - PAD * 2);
-                    return <circle key={i} cx={x} cy={y} r="4" fill="var(--cyan)" />;
+                    const fraction = sparklineData.length > 1 ? i / (sparklineData.length - 1) : 0.5;
+                    const x = PAD_X + fraction * (W - PAD_X - 15);
+                    const y = H - PAD_Y - (v / maxVal) * (H - PAD_Y * 2);
+                    return <circle key={`c-${i}`} cx={x} cy={y} r="4" fill="var(--cyan)" />;
                   })}
                 </svg>
               </div>

@@ -31,6 +31,9 @@
     "profileAria": "Profile",
     "guest": "Guest",
     "guestAccess": "Guest access",
+    "guestTitle": "You're not signed in",
+    "guestSubtitle": "Log in to save and join activities",
+    "register": "Sign up",
     "login": "Log in",
     "profile": "Profile",
     "myActivities": "My activities",
@@ -187,6 +190,13 @@
     "cibo": "Food & Drink",
     "outdoor": "Outdoor",
     "famiglia": "Family"
+  },
+  "activities": {
+    "joinCta": "Join this activity",
+    "leaveCta": "Cancel participation",
+    "joinPending": "One moment…",
+    "joinError": "Something went wrong. Please retry.",
+    "joinedPill": "You're taking part in this activity"
   },
   "toast": {
     "closeAria": "Dismiss notification",

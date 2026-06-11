@@ -229,6 +229,15 @@ describe('Auth Service — password reset (RF8)', () => {
     expect(sendPasswordReset).not.toHaveBeenCalled();
   });
 
+  test('TC-AUTH-11b: silently succeeds when email is missing or not a string (no 500)', async () => {
+    // Regression: `where: { email: undefined }` faceva esplodere Sequelize → 500.
+    await expect(authService.forgotPassword(undefined)).resolves.toBeUndefined();
+    await expect(authService.forgotPassword(null)).resolves.toBeUndefined();
+    await expect(authService.forgotPassword({ foo: 'bar' })).resolves.toBeUndefined();
+    expect(User.findOne).not.toHaveBeenCalled();
+    expect(sendPasswordReset).not.toHaveBeenCalled();
+  });
+
   test('TC-AUTH-12: resets password with valid token', async () => {
     const crypto = require('crypto');
     const rawToken = 'validrawtoken123';
@@ -265,5 +274,58 @@ describe('Auth Service — password reset (RF8)', () => {
   test('TC-AUTH-14: rejects weak password on reset', async () => {
     await expect(authService.resetPassword('anytoken', 'short'))
       .rejects.toMatchObject({ code: 'WEAK_PASSWORD' });
+  });
+});
+
+describe('Auth Service — verifyEmail input validation', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('TC-AUTH-15: rejects missing token with 400', async () => {
+    await expect(authService.verifyEmail(undefined))
+      .rejects.toMatchObject({ status: 400, code: 'MISSING_TOKEN' });
+  });
+
+  test('TC-AUTH-16: rejects non-string token (e.g. ?token=a&token=b → array) with 400, not 500', async () => {
+    // Regression: crypto.update(array) lanciava un TypeError → 500.
+    await expect(authService.verifyEmail(['tok-a', 'tok-b']))
+      .rejects.toMatchObject({ status: 400, code: 'MISSING_TOKEN' });
+    expect(User.findOne).not.toHaveBeenCalled();
+  });
+});
+
+describe('Auth Service — updateLocation validation', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('TC-AUTH-17: rejects NaN coordinates (typeof NaN === "number")', async () => {
+    await expect(authService.updateLocation('uuid-1', { lat: NaN, lng: 11.12 }))
+      .rejects.toMatchObject({ status: 400, code: 'INVALID_LOCATION' });
+    expect(User.findByPk).not.toHaveBeenCalled();
+  });
+
+  test('TC-AUTH-18: rejects Infinity and out-of-range coordinates', async () => {
+    await expect(authService.updateLocation('uuid-1', { lat: Infinity, lng: 11.12 }))
+      .rejects.toMatchObject({ status: 400, code: 'INVALID_LOCATION' });
+    await expect(authService.updateLocation('uuid-1', { lat: 91, lng: 11.12 }))
+      .rejects.toMatchObject({ status: 400, code: 'INVALID_LOCATION' });
+    await expect(authService.updateLocation('uuid-1', { lat: 46.07, lng: -181 }))
+      .rejects.toMatchObject({ status: 400, code: 'INVALID_LOCATION' });
+  });
+});
+
+describe('Auth Service — updateProfile validation', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('TC-AUTH-19: rejects non-array interessi with 400 (column ARRAY → avrebbe dato 500)', async () => {
+    await expect(authService.updateProfile('uuid-1', { nome: 'Mario', interessi: 'sport' }))
+      .rejects.toMatchObject({ status: 400, code: 'INVALID_INTERESTS' });
+    expect(User.findByPk).not.toHaveBeenCalled();
+  });
+
+  test('TC-AUTH-20: accepts array interessi', async () => {
+    const update = jest.fn().mockResolvedValue(undefined);
+    User.findByPk.mockResolvedValue(makeFakeUser({ update }));
+    const result = await authService.updateProfile('uuid-1', { nome: 'Mario', cognome: 'Rossi', interessi: ['sport'] });
+    expect(update).toHaveBeenCalledWith({ nome: 'Mario', cognome: 'Rossi', interessi: ['sport'] });
+    expect(result.passwordHash).toBeUndefined();
   });
 });

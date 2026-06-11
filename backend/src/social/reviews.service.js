@@ -150,16 +150,25 @@ async function reportReview(userId, reviewId, { reason, description }) {
   const review = await Review.findByPk(reviewId);
   if (!review) throw { status: 404, code: 'NOT_FOUND', error: 'Review not found' };
 
-  await review.increment('reportedCount', { by: 1 });
+  // Create abuse report first: the unique index (reporterId, targetType, targetId)
+  // rejects duplicates, and reportedCount must be incremented only on success.
+  let report;
+  try {
+    report = await SocialReport.create({
+      reporterId: userId,
+      targetType: 'REVIEW',
+      targetId: reviewId,
+      reason: reason || 'INAPPROPRIATE',
+      description
+    });
+  } catch (e) {
+    if (e.name === 'SequelizeUniqueConstraintError') {
+      throw { status: 409, code: 'ALREADY_REPORTED', error: 'You have already reported this review' };
+    }
+    throw e;
+  }
 
-  // Create abuse report
-  const report = await SocialReport.create({
-    reporterId: userId,
-    targetType: 'REVIEW',
-    targetId: reviewId,
-    reason: reason || 'INAPPROPRIATE',
-    description
-  });
+  await review.increment('reportedCount', { by: 1 });
 
   return report;
 }

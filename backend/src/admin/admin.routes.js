@@ -36,6 +36,9 @@ router.patch('/entities/:id/approve', authenticate, authorize('AmministratoreDiS
         const entity = await User.findOne({ where: { id: req.params.id, ruolo: 'EnteCertificato' } });
         if (!entity) return res.status(404).json({ error: 'Entity not found', code: 'NOT FOUND' });
         await entity.update({ approvato: true });
+        // Il flag vive anche su EnteProfile: login/getMe e la tab admin "enti"
+        // leggono enteProfile.approvato, quindi va aggiornato insieme allo User.
+        await EnteProfile.update({ approvato: true }, { where: { userId: entity.id } });
         logger.audit('entity.approve', { actorId: req.user?.id, entityId: entity.id, nomeEnte: entity.nomeEnte });
         sendEntityApproved(entity.email, entity.nomeEnte).catch(() => {});
         res.json({ message: 'Entity approved' });

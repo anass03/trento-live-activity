@@ -110,6 +110,10 @@
       "deleting": "Removing...",
       "confirm": "Delete account",
       "error": "Error while deleting the account."
+    },
+    "legalModal": {
+      "kicker": "Legal document",
+      "close": "Close"
     }
   },
   "profile": {

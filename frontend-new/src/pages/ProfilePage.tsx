@@ -79,6 +79,9 @@ export function ProfilePage({ page, setPage, theme, setTheme, user }: any) {
   };
 
   const interestsList = userProfile?.profile?.interessi || [];
+  // Real author rating only: no hardcoded placeholder when the backend has no value.
+  const rawRating = userProfile?.averageAuthorRating ?? userProfile?.profile?.averageAuthorRating;
+  const authorRating = typeof rawRating === "number" ? rawRating : (rawRating != null && !Number.isNaN(Number(rawRating)) ? Number(rawRating) : null);
 
   return (
     <div className="revamp-legal-scene">
@@ -103,7 +106,7 @@ export function ProfilePage({ page, setPage, theme, setTheme, user }: any) {
               </div>
               <div style={{ width: 1, background: "var(--border-soft-2)" }}></div>
               <div className="revamp-profile-stat">
-                <b>4.8</b>
+                <b>{typeof authorRating === "number" ? authorRating.toFixed(1) : "—"}</b>
                 <span>{t("profile.rating")}</span>
               </div>
               <div style={{ width: 1, background: "var(--border-soft-2)" }}></div>

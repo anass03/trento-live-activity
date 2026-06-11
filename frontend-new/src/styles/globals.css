@@ -629,6 +629,11 @@ button { font-family: inherit; cursor: pointer; }
   background: linear-gradient(150deg, #2563eb, #7c3aed);
   color: #fff; font-weight: 800; font-size: 13px;
 }
+.profile-menu-av.guest {
+  background: var(--chip-fill, rgba(255,255,255,0.08));
+  border: 1px dashed var(--border-soft);
+  color: var(--text-muted);
+}
 .profile-menu-name { font-size: 13.5px; font-weight: 800; }
 .profile-menu-email { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .profile-menu-item {

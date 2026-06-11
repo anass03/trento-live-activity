@@ -2,7 +2,7 @@
    Trento Live Activity — widgets, markers, labels
    =========================================================== */
 import { useEffect, useState } from "react";
-import { CAT_ICON, MARKERS, PLACES, catColor, catLabel } from "../../data/redesignData";
+import { CAT_ICON, PLACES, catColor, catLabel } from "../../data/redesignData";
 import { Icon, WxIcon } from "../ui/Icon";
 import { getCityAlerts, getParking, getTrentoWeather } from "../../lib/api";
 
@@ -99,7 +99,8 @@ function EventPopup({ data, color, placeBelow, onClose }: any) {
 
 /* ---------------- MARKERS ---------------- */
 export function MarkersLayer({ active, onFocus, popup, onClosePopup, markers }: any) {
-  const displayMarkers = markers || MARKERS;
+  // Solo marker reali: senza dati API non si mostra nulla (niente placeholder).
+  const displayMarkers = markers || [];
   return (
     <div className="markers-layer">
       {displayMarkers.map((m: any) => {

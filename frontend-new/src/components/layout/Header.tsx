@@ -103,21 +103,31 @@ export function Header({ page, setPage, theme, setTheme, user }: any) {
         </button>
         <div className="profile-menu-wrap" ref={profileRef}>
           <button className="avatar avatar-btn" onClick={() => setProfileOpen((v) => !v)} aria-label={t("header.profileAria")} aria-expanded={profileOpen}>
-            {user?.avatar || "O"}
+            {role === "anonymous" ? <Icon name="user" size={17} /> : (user?.avatar || "O")}
           </button>
           {profileOpen && (
             <div className="profile-menu">
-              <div className="profile-menu-head">
-                <div className="profile-menu-av">{user?.avatar || "O"}</div>
-                <div>
-                  <div className="profile-menu-name">{role === "anonymous" ? t("header.guest") : (user?.name || t("header.guest"))}</div>
-                  <div className="profile-menu-email">{role === "anonymous" ? t("header.guestAccess") : user?.email}</div>
-                </div>
-              </div>
               {role === "anonymous" ? (
-                <button className="profile-menu-item primary" onClick={() => go("login")}><Icon name="logIn" size={15} />{t("header.login")}</button>
+                <>
+                  <div className="profile-menu-head">
+                    <div className="profile-menu-av guest"><Icon name="user" size={17} /></div>
+                    <div>
+                      <div className="profile-menu-name">{t("header.guestTitle")}</div>
+                      <div className="profile-menu-email">{t("header.guestSubtitle")}</div>
+                    </div>
+                  </div>
+                  <button className="profile-menu-item primary" onClick={() => go("login")}><Icon name="logIn" size={15} />{t("header.login")}</button>
+                  <button className="profile-menu-item" onClick={() => go("registrazione")}><Icon name="user" size={15} />{t("header.register")}</button>
+                </>
               ) : (
                 <>
+                  <div className="profile-menu-head">
+                    <div className="profile-menu-av">{user?.avatar || "O"}</div>
+                    <div>
+                      <div className="profile-menu-name">{user?.name || t("header.guest")}</div>
+                      <div className="profile-menu-email">{user?.email}</div>
+                    </div>
+                  </div>
                   <button className="profile-menu-item" onClick={() => go("profilo")}><Icon name="user" size={15} />{t("header.profile")}</button>
                   <button className="profile-menu-item" onClick={() => go("attivita")}><Icon name="activity" size={15} />{t("header.myActivities")}</button>
                   <button className="profile-menu-item" onClick={() => go("profilo")}><Icon name="bookmark" size={15} />{t("header.saved")}</button>

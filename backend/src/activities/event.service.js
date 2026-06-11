@@ -7,6 +7,24 @@ const { buildIcs } = require('./ics');
 const { reverseGeocode } = require('../lib/geocode');
 const { EVENT_CATEGORIES } = require('../data/models/Event');
 
+// Confronto a mezzanotte locale (come isDatePast in activity.service): usare la
+// data UTC (toISOString) permetteva di iscriversi a eventi già passati tra le
+// 00:00 e le 02:00 ora locale.
+function isDatePast(data) {
+  return new Date(data) < new Date(new Date().toDateString());
+}
+
+// Pagina/limite sempre numerici e sensati: Number('abc') = NaN dal controller
+// produrrebbe un OFFSET NaN in SQL (500).
+function sanitizePagination(page, limit, defaultLimit = 20) {
+  page = Number(page);
+  limit = Number(limit);
+  if (!Number.isFinite(page) || page < 1) page = 1;
+  if (!Number.isFinite(limit) || limit < 1) limit = defaultLimit;
+  if (limit > 100) limit = 100;
+  return { page: Math.floor(page), limit: Math.floor(limit) };
+}
+
 async function createEvent(entityId, { titolo, descrizione, categoria, latitudine, longitudine, poiId, data, orarioInizio, orarioFine, maxPartecipanti }) {
   const entity = await User.findByPk(entityId);
   if (!entity) throw { status: 404, code: 'NOT_FOUND', error: 'User not found' };
@@ -17,9 +35,20 @@ async function createEvent(entityId, { titolo, descrizione, categoria, latitudin
   }
 
   // OCL C17: title non-empty, <= 100 chars (also enforced at model level)
-  if (!titolo || titolo.length === 0 || titolo.length > 100) {
+  if (!titolo || typeof titolo !== 'string' || titolo.length === 0 || titolo.length > 100) {
     throw { status: 400, code: 'INVALID_TITLE', error: 'Title must be between 1 and 100 characters' };
   }
+
+  // Una categoria fuori enum farebbe esplodere l'INSERT su Postgres → 500.
+  if (!EVENT_CATEGORIES.includes(categoria)) {
+    throw { status: 400, code: 'INVALID_CATEGORIA', error: `categoria must be one of: ${EVENT_CATEGORIES.join(', ')}` };
+  }
+
+  // Coercizione esplicita: "abc" o valori negativi non devono diventare un cap.
+  maxPartecipanti = Number(maxPartecipanti);
+  maxPartecipanti = Number.isFinite(maxPartecipanti) && maxPartecipanti > 0
+    ? Math.floor(maxPartecipanti)
+    : null;
 
   // Resolve coordinates from the linked POI when caller didn't pass explicit coords.
   if ((latitudine == null || longitudine == null) && poiId) {
@@ -34,7 +63,7 @@ async function createEvent(entityId, { titolo, descrizione, categoria, latitudin
   const event = await Event.create({
     titolo, descrizione, categoria, badgeVerifica: true,
     entityId, latitudine, longitudine, poiId, data, orarioInizio, orarioFine,
-    maxPartecipanti: maxPartecipanti && maxPartecipanti > 0 ? maxPartecipanti : null,
+    maxPartecipanti,
   });
 
   // Geocode coordinates and store for instant display on frontend (fire-and-forget).
@@ -57,7 +86,8 @@ async function createEvent(entityId, { titolo, descrizione, categoria, latitudin
   return event;
 }
 
-async function listEvents({ categoria, q, page = 1, limit = 20 }) {
+async function listEvents({ categoria, q, page, limit }) {
+  ({ page, limit } = sanitizePagination(page, limit));
   const where = {};
   // Un valore fuori enum manderebbe in errore Postgres (500): filtra solo se valido.
   if (categoria && EVENT_CATEGORIES.includes(categoria)) where.categoria = categoria;
@@ -103,8 +133,31 @@ async function updateEvent(entityId, eventId, updates) {
   if (event.entityId !== entityId) {
     throw { status: 403, code: 'FORBIDDEN', error: 'Only the publishing entity can modify this event' };
   }
-  if (updates.titolo !== undefined && (updates.titolo.length === 0 || updates.titolo.length > 100)) {
+  // typeof check: prima `updates.titolo.length` su titolo:null lanciava un
+  // TypeError non gestito → 500 invece di un 400 chiaro.
+  if (updates.titolo !== undefined && (typeof updates.titolo !== 'string' || updates.titolo.length === 0 || updates.titolo.length > 100)) {
     throw { status: 400, code: 'INVALID_TITLE', error: 'Title must be between 1 and 100 characters' };
+  }
+  if (updates.categoria !== undefined && !EVENT_CATEGORIES.includes(updates.categoria)) {
+    throw { status: 400, code: 'INVALID_CATEGORIA', error: `categoria must be one of: ${EVENT_CATEGORIES.join(', ')}` };
+  }
+  // maxPartecipanti: null/'' rimuove il limite; altrimenti deve essere un intero
+  // positivo e non inferiore agli iscritti attuali (altrimenti il conteggio
+  // mostrato al frontend diventa incoerente: 12/10).
+  if (updates.maxPartecipanti !== undefined) {
+    if (updates.maxPartecipanti === null || updates.maxPartecipanti === '') {
+      updates.maxPartecipanti = null;
+    } else {
+      const max = Number(updates.maxPartecipanti);
+      if (!Number.isFinite(max) || max < 1) {
+        throw { status: 400, code: 'INVALID_MAX_PARTECIPANTI', error: 'maxPartecipanti must be a positive integer' };
+      }
+      const current = await EventParticipation.count({ where: { eventId } });
+      if (current > max) {
+        throw { status: 400, code: 'MAX_BELOW_PARTICIPANTS', error: `maxPartecipanti cannot be lower than current participants (${current})` };
+      }
+      updates.maxPartecipanti = Math.floor(max);
+    }
   }
   // Mass-assignment guard: senza whitelist un ente potrebbe passare entityId
   // (riassegnare l'evento a un altro ente), badgeVerifica:false, id, ecc.
@@ -150,7 +203,8 @@ async function getEventStats(entityId, eventId) {
 }
 
 // Helper: certified entity lists their own published events
-async function listEntityEvents(entityId, { page = 1, limit = 20 } = {}) {
+async function listEntityEvents(entityId, { page, limit } = {}) {
+  ({ page, limit } = sanitizePagination(page, limit));
   const { rows, count } = await Event.findAndCountAll({
     where: { entityId },
     include: [{ model: POI, as: 'poi', attributes: ['id', 'nome'] }],
@@ -169,7 +223,7 @@ async function listEntityEvents(entityId, { page = 1, limit = 20 } = {}) {
 async function joinEvent(userId, eventId) {
   const event = await Event.findByPk(eventId);
   if (!event) throw { status: 404, code: 'NOT_FOUND', error: 'Event not found' };
-  if (event.data && new Date(event.data) < new Date(new Date().toISOString().slice(0, 10))) {
+  if (event.data && isDatePast(event.data)) {
     throw { status: 400, code: 'EVENT_PAST', error: 'Non puoi partecipare a un evento passato' };
   }
   const existing = await EventParticipation.findOne({ where: { userId, eventId } });
@@ -182,8 +236,25 @@ async function joinEvent(userId, eventId) {
       throw { status: 409, code: 'EVENT_FULL', error: 'Posti esauriti per questo evento' };
     }
   }
-  await EventParticipation.create({ userId, eventId });
+  // L'indice UNIQUE su (userId, eventId) è la rete di sicurezza contro la doppia
+  // iscrizione concorrente: senza questo catch la violazione diventava un 500.
+  let created;
+  try {
+    created = await EventParticipation.create({ userId, eventId });
+  } catch (e) {
+    if (e.name === 'SequelizeUniqueConstraintError') {
+      throw { status: 409, code: 'ALREADY_PARTICIPATING', error: 'Sei già iscritto a questo evento' };
+    }
+    throw e;
+  }
   const participantCount = await EventParticipation.count({ where: { eventId } });
+  // Guardia anti-race sulla capienza: se due utenti diversi superano insieme il
+  // check `count >= max`, il riconteggio post-insert rileva lo sforamento e
+  // l'ultimo arrivato viene rimosso (compensazione) invece di sforare il limite.
+  if (event.maxPartecipanti && participantCount > event.maxPartecipanti) {
+    if (created && typeof created.destroy === 'function') await created.destroy();
+    throw { status: 409, code: 'EVENT_FULL', error: 'Posti esauriti per questo evento' };
+  }
   return { eventId, joined: true, participantCount, maxPartecipanti: event.maxPartecipanti };
 }
 

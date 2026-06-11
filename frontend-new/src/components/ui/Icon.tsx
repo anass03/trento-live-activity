@@ -83,6 +83,7 @@ export const Icon = ({ name, size, style, className }: IconProps) => {
     sparkle:  <><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z" /></>,
     mountain: <><path d="M3 19l6-10 4 6 2-3.2L21 19z" /><path d="M9 9l2.3 3.4" /></>,
     edit:     <><path d="M4 20l4.5-1L20 7.5a2.1 2.1 0 0 0-3-3L5.5 16z" /><path d="M14.5 6.5l3 3" /></>,
+    refresh:  <><path d="M20 12a8 8 0 1 1-2.3-5.6" /><path d="M20 3v4h-4" /></>,
   };
   return <svg {...common}>{P[name] || null}</svg>;
 };

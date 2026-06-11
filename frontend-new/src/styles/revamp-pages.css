@@ -318,6 +318,11 @@
 .revamp-status-pill.danger  { background: rgba(248,113,113,0.12); color: var(--red); border: 1px solid rgba(248,113,113,0.24); }
 .revamp-status-pill.info    { background: rgba(56,189,248,0.12); color: var(--cyan); border: 1px solid rgba(56,189,248,0.24); }
 
+/* Spinner for async actions (e.g. export generation) */
+@keyframes revamp-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.revamp-spin { animation: revamp-spin 0.9s linear infinite; }
+
+
 /* ---- Administrative management layouts ---- */
 .revamp-admin-layout {
   flex: 1; max-width: 1440px; width: 100%; margin: 0 auto; padding: 24px 30px 48px;

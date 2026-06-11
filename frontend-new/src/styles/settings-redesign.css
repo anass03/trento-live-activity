@@ -25,6 +25,9 @@
   opacity: calc(0.35 + var(--glow) * 0.3);
 }
 .settings-scene > * { position: relative; z-index: 1; }
+/* The header's profile dropdown must paint above the settings cards below it
+   (same stacking trap as .activity-scene / .events-scene). */
+.settings-scene > .events-header { z-index: 30; }
 
 /* entrance: forwards-fill guard */
 .settings-scene .anim-in { animation-fill-mode: forwards; }
@@ -281,3 +284,27 @@
 .a11y-high-contrast { --border-soft: rgba(255,255,255,0.28); --border-soft-2: rgba(255,255,255,0.18); --text-secondary: rgba(226,232,240,0.95); --text-muted: rgba(203,213,225,0.88); }
 :root[data-theme="day"].a11y-high-contrast { --border-soft: rgba(47,111,78,0.36); --text-secondary: rgba(20,37,27,0.95); --text-muted: rgba(20,37,27,0.85); }
 .a11y-larger-text { font-size: 106.25%; }
+
+/* =========================================================
+   LEGAL MODAL (Privacy / Termini da Impostazioni)
+   Variante grande della detail-modal condivisa: stessa scrim
+   e card, corpo tipografico leggibile in entrambi i temi.
+   ========================================================= */
+.legal-modal {
+  width: min(860px, 100%);
+  max-height: min(820px, calc(100vh - 32px));
+}
+.legal-modal-body { padding: 24px 30px 32px; }
+.legal-modal-body p {
+  font-size: 15px; color: var(--text-secondary);
+  line-height: 1.65; margin: 0 0 16px;
+}
+.legal-modal-body h2 {
+  font-size: 17px; font-weight: 700;
+  margin: 22px 0 10px; color: var(--accent);
+}
+.legal-modal-body ul {
+  padding-left: 20px; margin: 0 0 16px;
+  color: var(--text-secondary);
+}
+.legal-modal-body li { margin-bottom: 8px; line-height: 1.55; }

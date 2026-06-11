@@ -7,12 +7,26 @@
       "cultura": "Culture",
       "cibo": "Food & Drink",
       "outdoor": "Outdoor",
-      "famiglia": "Family"
+      "famiglia": "Family",
+      "sport": "Sport",
+      "arte": "Art",
+      "gastronomia": "Food & drink",
+      "altro": "Other"
     },
     "calendar": {
-      "dows": ["M", "T", "W", "T", "F", "S", "S"],
+      "dows": [
+        "M",
+        "T",
+        "W",
+        "T",
+        "F",
+        "S",
+        "S"
+      ],
       "prevWeek": "Previous week",
-      "nextWeek": "Next week"
+      "nextWeek": "Next week",
+      "pickDay": "Filter by this day",
+      "clearDay": "Clear date filter"
     },
     "mostParticipated": "Most attended",
     "noneWithParticipants": "No events with participants",
@@ -59,7 +73,12 @@
     "seatsTaken": "Places taken",
     "seatsOf": "<b>{{count}}</b> of <b>{{limit}}</b> places taken",
     "youParticipate": "You are attending this event",
-    "cancelJoin": "Cancel participation"
+    "cancelJoin": "Cancel participation",
+    "shareCopied": "Copied!",
+    "joinError": "Something went wrong. Please try again.",
+    "joining": "Please wait…",
+    "emptyNoCategoryTitle": "No events in this category",
+    "emptyNoCategoryMsg": "Try another category or clear the filters."
   },
   "activities": {
     "cats": {

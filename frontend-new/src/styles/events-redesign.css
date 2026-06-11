@@ -124,6 +124,8 @@
   color: var(--text-secondary); font-size: 13px; font-weight: 600;
   display: grid; place-items: center; position: relative;
   transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+  /* days are <button>s (clickable date filter): neutralize UA styles */
+  font-family: inherit; padding: 0; margin: 0; cursor: pointer;
 }
 .cal-day:hover { background: var(--hover-fill); color: var(--text-primary); }
 .cal-day .dot {
@@ -175,6 +177,9 @@
   display: flex; align-items: center; gap: 12px;
   width: 100%; padding: 9px 8px; margin: 0 -8px; border-radius: 12px;
   background: transparent; border: none; text-align: left;
+  /* buttons don't inherit color: without this the title falls back to the
+     UA default (black) — invisible on the dark night theme */
+  color: var(--text-primary);
   transition: background 160ms ease;
 }
 .trend-row:hover { background: var(--hover-fill); }
@@ -443,6 +448,17 @@
 .next-save.on { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
 .next-save.on svg { fill: var(--accent); }
 .next-save svg { width: 19px; height: 19px; }
+/* inline join/leave error under the CTA (role=alert) */
+.next-join-error {
+  display: flex; align-items: center; gap: 7px;
+  margin-top: 10px; padding: 9px 12px; border-radius: 10px;
+  font-size: 12.5px; font-weight: 600; line-height: 1.35;
+  color: var(--red, #ef4444);
+  background: color-mix(in srgb, var(--red, #ef4444) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--red, #ef4444) 34%, transparent);
+}
+.next-join-error svg { width: 13px; height: 13px; flex: none; }
+.next-cta[disabled] { opacity: 0.65; cursor: progress; transform: none; }
 
 /* =========================================================
    RIGHT: CITY EVENTS GRID
@@ -458,6 +474,8 @@
 .mini {
   position: relative; border-radius: var(--radius-md); overflow: hidden; text-align: left;
   border: 1px solid var(--border-soft); background: var(--glass-2);
+  /* explicit color: button text must not fall back to UA black on dark glass */
+  color: var(--text-primary);
   transition: transform 160ms ease, border-color 160ms ease;
 }
 .mini:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--mc, var(--accent)) 40%, transparent); }
@@ -525,3 +543,19 @@
 .modal-field .mf-val { font-size: 14px; font-weight: 700; margin-top: 5px; }
 .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
 .modal-actions .next-cta { height: 46px; }
+
+/* =========================================================
+   DAY-THEME CONTRAST FIXES
+   White text that sits on translucent category tints reads fine on the
+   night glass, but lands on near-white panels in daylight.
+   ========================================================= */
+:root[data-theme="day"] .qf-item.active .qf-count {
+  color: color-mix(in srgb, var(--qc) 60%, #14251b);
+}
+:root[data-theme="day"] .next-cta.joined {
+  color: #14543a;
+}
+/* mini-card time accents are lightened for night; darken them in daylight */
+:root[data-theme="day"] .mini-time {
+  color: color-mix(in srgb, var(--mc) 70%, #14251b);
+}

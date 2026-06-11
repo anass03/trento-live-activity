@@ -218,6 +218,15 @@ describe('User Settings API Endpoints', () => {
     expect(res.body.code).toBe('VALIDATION_ERROR');
   });
 
+  test('PATCH /api/me/settings/preferences rejects non-string interests with 400 (not 500)', async () => {
+    const res = await request(app)
+      .patch('/api/me/settings/preferences')
+      .send({ interests: ['music', 42] });
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('VALIDATION_ERROR');
+  });
+
   test('PATCH /api/me/settings updates multiple sections at once', async () => {
     const res = await request(app)
       .patch('/api/me/settings')

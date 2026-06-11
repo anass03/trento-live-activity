@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getCityAlertById } from "../../lib/api";
 import { Icon, WxIcon } from "./Icon";
+import { MiniMap } from "../map/MiniMap";
 
 type DetailModalProps = {
   open: boolean;
@@ -33,8 +34,10 @@ function Field({ icon, label, value }: any) {
   );
 }
 
-function MiniMap({ location }: { location?: any }) {
-  if (!location?.latitude || !location?.longitude) {
+// Posizione nel popup: micro-mappa reale (maplibre) se ci sono coordinate,
+// altrimenti l'empty-state — mai una mappa finta.
+function LocationMap({ location, markerColor }: { location?: any; markerColor?: string }) {
+  if (location?.latitude == null || location?.longitude == null) {
     return (
       <div className="dm-location-empty">
         <Icon name="pin" size={18} />
@@ -43,11 +46,12 @@ function MiniMap({ location }: { location?: any }) {
     );
   }
   return (
-    <div className="dm-mini-map">
-      <span className="dm-map-grid"></span>
-      <span className="dm-map-pin" style={{ left: "52%", top: "46%" }}><Icon name="pin" size={16} /></span>
-      <span className="dm-map-label">{location.label || `${location.latitude}, ${location.longitude}`}</span>
-    </div>
+    <MiniMap
+      latitude={location.latitude}
+      longitude={location.longitude}
+      label={location.label || location.name || location.address || null}
+      markerColor={markerColor}
+    />
   );
 }
 
@@ -104,7 +108,7 @@ function ParkingContent({ data }: any) {
         })}
       </div>
       <div className="dm-detail">
-        <MiniMap location={selected} />
+        <LocationMap location={selected} markerColor="#2dd4bf" />
         <div className="dm-occ" style={{ ["--occ" as any]: selColor }}>
           <div className="dm-occ-top">
             <span className="dm-occ-status">{parkingStatusLabel(selected, selOcc)}</span>
@@ -236,7 +240,7 @@ function AlertsContent({ data, onAction }: any) {
         ))}
       </div>
       <div className="dm-detail">
-        <MiniMap location={selected?.location} />
+        <LocationMap location={selected?.location} markerColor="#fbbf24" />
         <div className="dm-section-title">{selected?.title}</div>
         <p className="dm-text">{selected?.description || selected?.summary || "Dettaglio in caricamento..."}</p>
         <div className="dm-fields-grid">

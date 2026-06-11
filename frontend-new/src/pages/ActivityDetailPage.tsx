@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
 import { CommentsSection } from "../components/redesign/CommentsSection";
@@ -44,10 +45,13 @@ const normalizeCat = (value?: string | null) => {
 };
 
 export function ActivityDetailPage({ page, setPage, theme, setTheme, user, selectedActivityId }: any) {
+  const { t } = useTranslation();
   const [activity, setActivity] = useState<ApiActivity | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isJoined, setIsJoined] = useState(false);
+  const [joinPending, setJoinPending] = useState(false);
+  const [joinError, setJoinError] = useState("");
 
   const fetchActivityDetail = async () => {
     if (!selectedActivityId) {
@@ -75,11 +79,13 @@ export function ActivityDetailPage({ page, setPage, theme, setTheme, user, selec
   }, [selectedActivityId, user?.id]);
 
   const handleJoinToggle = async () => {
-    if (!activity) return;
-    if (user?.role === "anonymous") {
+    if (!activity || joinPending) return;
+    if (!user?.id || user?.role === "anonymous") {
       setPage("login");
       return;
     }
+    setJoinPending(true);
+    setJoinError("");
     try {
       if (isJoined) {
         await leaveActivity(activity.id);
@@ -90,8 +96,12 @@ export function ActivityDetailPage({ page, setPage, theme, setTheme, user, selec
       }
       const updated = await getActivityById(activity.id);
       setActivity(updated);
+      if (updated.participantIds) setIsJoined(updated.participantIds.includes(user.id));
     } catch (err: any) {
       console.error(err);
+      setJoinError(err?.message || t("activities.joinError"));
+    } finally {
+      setJoinPending(false);
     }
   };
 
@@ -192,16 +202,22 @@ export function ActivityDetailPage({ page, setPage, theme, setTheme, user, selec
                 </div>
                 {isJoined && (
                   <span className="revamp-status-pill success" style={{ marginTop: 10 }}>
-                    <Icon name="check" size={11} /> Partecipi a questa attività
+                    <Icon name="check" size={11} /> {t("activities.joinedPill")}
                   </span>
+                )}
+                {joinError && (
+                  <div className="revamp-status-pill danger" role="alert" style={{ marginTop: 10 }}>
+                    <Icon name="warn" size={11} /> {joinError}
+                  </div>
                 )}
               </div>
               <button
                 className={"revamp-form-btn" + (isJoined ? " joined" : "")}
-                style={{ width: "auto", padding: "0 20px", "--accent": "var(--teal)" } as React.CSSProperties}
+                style={{ width: "auto", padding: "0 20px", "--accent": "var(--teal)", opacity: joinPending ? 0.6 : 1 } as React.CSSProperties}
                 onClick={handleJoinToggle}
+                disabled={joinPending}
               >
-                {isJoined ? "Annulla partecipazione" : "Partecipa all'attività"}
+                {joinPending ? t("activities.joinPending") : isJoined ? t("activities.leaveCta") : t("activities.joinCta")}
               </button>
             </div>
 

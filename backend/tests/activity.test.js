@@ -131,3 +131,131 @@ describe('Activity Service — updateActivity', () => {
     expect(activity.update).toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Robustezza del flusso di partecipazione (capienza, race, leave, coerenza)
+// ---------------------------------------------------------------------------
+
+const { User } = require('../src/data/models');
+
+describe('Activity Service — joinActivity (robustness)', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('TC-ACT-11: successful join returns serialized activity with participantCount', async () => {
+    const joinTarget = makeActivity({
+      maxPartecipanti: 10,
+      participants: [{ id: CREATOR_ID }],
+      creator: { id: CREATOR_ID, email: 'c@x.it' },
+    });
+    const detail = makeActivity({
+      tipo: 'sport',
+      participants: [{ id: CREATOR_ID }, { id: OTHER_USER_ID }],
+      creator: { id: CREATOR_ID, nome: 'A', cognome: 'B' },
+    });
+    Activity.findByPk
+      .mockResolvedValueOnce(joinTarget)  // joinActivity lookup
+      .mockResolvedValueOnce(detail);     // getActivity at the end
+    Participation.findOne.mockResolvedValue(null);
+    Participation.count
+      .mockResolvedValueOnce(1)   // pre-insert capacity check
+      .mockResolvedValueOnce(2);  // post-insert race guard
+    Participation.create.mockResolvedValue({ id: 'p-1' });
+    User.findByPk.mockResolvedValue(undefined);
+
+    const result = await activityService.joinActivity(OTHER_USER_ID, ACTIVITY_ID);
+
+    expect(Participation.create).toHaveBeenCalledWith({ userId: OTHER_USER_ID, activityId: ACTIVITY_ID });
+    expect(result.participantCount).toBe(2);
+    expect(result.participantIds).toEqual([CREATOR_ID, OTHER_USER_ID]);
+  });
+
+  test('TC-ACT-12: capacity race is compensated (insert rolled back, ACTIVITY_FULL)', async () => {
+    Activity.findByPk.mockResolvedValue(makeActivity({ maxPartecipanti: 10, participants: [], creator: null }));
+    Participation.findOne.mockResolvedValue(null);
+    Participation.count
+      .mockResolvedValueOnce(9)    // pre-check passes (race window)
+      .mockResolvedValueOnce(11);  // post-insert recount detects overflow
+    const created = { id: 'p-1', destroy: jest.fn().mockResolvedValue(undefined) };
+    Participation.create.mockResolvedValue(created);
+
+    await expect(activityService.joinActivity(OTHER_USER_ID, ACTIVITY_ID))
+      .rejects.toMatchObject({ status: 400, code: 'ACTIVITY_FULL' });
+    expect(created.destroy).toHaveBeenCalled();
+  });
+
+  test('TC-ACT-13: rejects join when already participating (pre-check, 409)', async () => {
+    Activity.findByPk.mockResolvedValue(makeActivity({ maxPartecipanti: 10 }));
+    Participation.findOne.mockResolvedValue({ id: 'p-existing' });
+
+    await expect(activityService.joinActivity(OTHER_USER_ID, ACTIVITY_ID))
+      .rejects.toMatchObject({ status: 409, code: 'ALREADY_JOINED' });
+    expect(Participation.create).not.toHaveBeenCalled();
+  });
+
+  test('TC-ACT-14: rejects join on past activity', async () => {
+    Activity.findByPk.mockResolvedValue(makeActivity({ data: PAST_DATE }));
+    await expect(activityService.joinActivity(OTHER_USER_ID, ACTIVITY_ID))
+      .rejects.toMatchObject({ status: 400, code: 'ACTIVITY_STARTED' });
+  });
+});
+
+describe('Activity Service — leaveActivity', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('TC-ACT-15: participant leaves successfully (participation destroyed)', async () => {
+    const participation = { destroy: jest.fn().mockResolvedValue(undefined) };
+    Participation.findOne.mockResolvedValue(participation);
+    Activity.findByPk.mockResolvedValue(makeActivity({ creatorId: CREATOR_ID, tipo: 'sport' }));
+    User.findByPk.mockResolvedValue(undefined);
+
+    await activityService.leaveActivity(OTHER_USER_ID, ACTIVITY_ID);
+    expect(participation.destroy).toHaveBeenCalled();
+  });
+
+  test('TC-ACT-16: 404 when not participating', async () => {
+    Participation.findOne.mockResolvedValue(null);
+    await expect(activityService.leaveActivity(OTHER_USER_ID, ACTIVITY_ID))
+      .rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' });
+  });
+
+  test('TC-ACT-17: creator cannot leave (must cancel instead)', async () => {
+    Participation.findOne.mockResolvedValue({ destroy: jest.fn() });
+    Activity.findByPk.mockResolvedValue(makeActivity({ creatorId: CREATOR_ID }));
+    await expect(activityService.leaveActivity(CREATOR_ID, ACTIVITY_ID))
+      .rejects.toMatchObject({ status: 400, code: 'CREATOR_CANNOT_LEAVE' });
+  });
+
+  test('TC-ACT-18: orphan participation (activity gone) is cleaned up, no 500', async () => {
+    const participation = { destroy: jest.fn().mockResolvedValue(undefined) };
+    Participation.findOne.mockResolvedValue(participation);
+    Activity.findByPk.mockResolvedValue(null);
+
+    await expect(activityService.leaveActivity(OTHER_USER_ID, ACTIVITY_ID)).resolves.toBeUndefined();
+    expect(participation.destroy).toHaveBeenCalled();
+  });
+});
+
+describe('Activity Service — updateActivity capacity coherence', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('TC-ACT-19: rejects non-numeric maxPartecipanti (no NaN to Postgres)', async () => {
+    Activity.findByPk.mockResolvedValue(makeActivity({ creatorId: CREATOR_ID }));
+    await expect(activityService.updateActivity(CREATOR_ID, ACTIVITY_ID, { maxPartecipanti: 'abc' }))
+      .rejects.toMatchObject({ status: 400, code: 'INVALID_MAX_PARTECIPANTI' });
+  });
+
+  test('TC-ACT-20: rejects maxPartecipanti below current participant count', async () => {
+    Activity.findByPk.mockResolvedValue(makeActivity({ creatorId: CREATOR_ID }));
+    Participation.count.mockResolvedValue(8);
+    await expect(activityService.updateActivity(CREATOR_ID, ACTIVITY_ID, { maxPartecipanti: 5 }))
+      .rejects.toMatchObject({ status: 400, code: 'MAX_BELOW_PARTICIPANTS' });
+  });
+
+  test('TC-ACT-21: accepts a valid maxPartecipanti >= current participants', async () => {
+    const activity = makeActivity({ creatorId: CREATOR_ID });
+    Activity.findByPk.mockResolvedValue(activity);
+    Participation.count.mockResolvedValue(3);
+    await activityService.updateActivity(CREATOR_ID, ACTIVITY_ID, { maxPartecipanti: '12' });
+    expect(activity.update).toHaveBeenCalledWith(expect.objectContaining({ maxPartecipanti: 12 }));
+  });
+});

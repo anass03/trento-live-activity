@@ -82,8 +82,8 @@ export function ComuneExportPage({ page, setPage, theme, setTheme, user }: any) 
         </div>
 
         {errorMsg && (
-          <div className="revamp-status-pill error" style={{ margin: "0 0 20px 0", padding: "12px", width: "100%", justifyContent: "center" }}>
-            <Icon name="alert" size={14} /> {errorMsg}
+          <div className="revamp-status-pill danger" style={{ margin: "0 0 20px 0", padding: "12px", width: "100%", justifyContent: "center" }}>
+            <Icon name="warn" size={14} /> {errorMsg}
           </div>
         )}
 
@@ -122,7 +122,7 @@ export function ComuneExportPage({ page, setPage, theme, setTheme, user }: any) 
                 </div>
 
                 <button type="submit" className="revamp-form-btn" style={{ "--accent": "var(--violet)" }} disabled={loading}>
-                  <Icon name={loading ? "refresh" : "share"} size={16} className={loading ? "spin" : ""} />
+                  <Icon name={loading ? "refresh" : "share"} size={16} className={loading ? "revamp-spin" : ""} />
                   {loading ? "Generazione..." : "Genera e Scarica"}
                 </button>
               </form>
@@ -159,7 +159,7 @@ export function ComuneExportPage({ page, setPage, theme, setTheme, user }: any) 
                       <td>
                         <button
                           className="revamp-action-btn success"
-                          onClick={() => triggerDownload(exp.format, "2026-05-01")}
+                          onClick={() => triggerDownload(exp.format, startDate)}
                         >
                           <Icon name="arrow" size={12} style={{ transform: "rotate(135deg)" }} /> Download
                         </button>

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
+import { LegalModal } from "../components/ui/LegalModal";
 import {
   getSettings,
   updateAppearance,
@@ -223,6 +224,8 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
 
   /* account */
   const [deleting, setDeleting] = useState(false);
+  /* legal docs shown in a modal instead of navigating away */
+  const [legalDoc, setLegalDoc] = useState<"privacy" | "terms" | null>(null);
 
   // Load settings on mount
   useEffect(() => {
@@ -474,7 +477,7 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
     } catch {
       // ignore
     } finally {
-      setUser({ id: null, name: "Ospite", email: "ospite@example.com", role: "anonymous", avatar: "O" });
+      setUser({ id: null, name: "", email: "", role: "anonymous", avatar: "" });
       setPage("login");
     }
   };
@@ -482,7 +485,7 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
   const handleConfirmDelete = async (password: string) => {
     await deleteAccount({ currentPassword: password });
     setDeleting(false);
-    setUser({ id: null, name: "Ospite", email: "ospite@example.com", role: "anonymous", avatar: "O" });
+    setUser({ id: null, name: "", email: "", role: "anonymous", avatar: "" });
     setPage("login");
   };
 
@@ -649,21 +652,32 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
             </div>
             <div className="s-account-body">
               <div className="s-account-user">
-                <div className="s-account-av">{user?.avatar || "MR"}</div>
+                <div className="s-account-av">{user?.role === "anonymous" ? <Icon name="user" size={18} /> : (user?.avatar || "U")}</div>
                 <div className="s-account-info">
-                  <div className="s-account-name">{user?.name || t("settings.guestName")}</div>
-                  <div className="s-account-email">{user?.email || t("settings.guestEmail")}</div>
-                  <div className="s-account-badge"><Icon name="shieldCheck" size={9} />{t("settings.account.activeBadge")}</div>
+                  <div className="s-account-name">{user?.role === "anonymous" ? t("settings.guestName") : user?.name}</div>
+                  <div className="s-account-email">{user?.role === "anonymous" ? t("settings.guestEmail") : user?.email}</div>
+                  {user?.role !== "anonymous" && (
+                    <div className="s-account-badge"><Icon name="shieldCheck" size={9} />{t("settings.account.activeBadge")}</div>
+                  )}
                 </div>
 
               </div>
               <div className="s-account-actions">
-                <button className="s-acc-btn accent" onClick={() => setPage("profilo")}><Icon name="users" size={17} />{t("settings.account.goToProfile")}</button>
-                <button className="s-acc-btn" onClick={() => setPage("privacy")}><Icon name="settings" size={17} />{t("settings.account.privacyPolicy")}</button>
-                <button className="s-acc-btn" onClick={() => setPage("termini")}><Icon name="ticket" size={17} />{t("settings.account.terms")}</button>
-                <button className="s-acc-btn" style={{ marginLeft: "auto" }} onClick={handleLogout}><Icon name="x" size={17} />{t("settings.account.logout")}</button>
+                {user?.role === "anonymous" ? (
+                  <>
+                    <button className="s-acc-btn accent" onClick={() => setPage("login")}><Icon name="logIn" size={17} />{t("header.login")}</button>
+                    <button className="s-acc-btn" onClick={() => setPage("registrazione")}><Icon name="user" size={17} />{t("header.register")}</button>
+                  </>
+                ) : (
+                  <button className="s-acc-btn accent" onClick={() => setPage("profilo")}><Icon name="users" size={17} />{t("settings.account.goToProfile")}</button>
+                )}
+                <button className="s-acc-btn" onClick={() => setLegalDoc("privacy")}><Icon name="settings" size={17} />{t("settings.account.privacyPolicy")}</button>
+                <button className="s-acc-btn" onClick={() => setLegalDoc("terms")}><Icon name="ticket" size={17} />{t("settings.account.terms")}</button>
                 {user?.role !== "anonymous" && (
-                  <button className="s-acc-btn danger" onClick={() => setDeleting(true)}><Icon name="warn" size={17} />{t("settings.account.delete")}</button>
+                  <>
+                    <button className="s-acc-btn" style={{ marginLeft: "auto" }} onClick={handleLogout}><Icon name="x" size={17} />{t("settings.account.logout")}</button>
+                    <button className="s-acc-btn danger" onClick={() => setDeleting(true)}><Icon name="warn" size={17} />{t("settings.account.delete")}</button>
+                  </>
                 )}
               </div>
             </div>
@@ -674,6 +688,10 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
 
       {deleting && (
         <DeleteModal onCancel={() => setDeleting(false)} onConfirm={handleConfirmDelete} />
+      )}
+
+      {legalDoc && (
+        <LegalModal doc={legalDoc} onClose={() => setLegalDoc(null)} />
       )}
     </div>
   );

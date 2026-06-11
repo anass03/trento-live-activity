@@ -7,12 +7,26 @@
       "cultura": "Cultura",
       "cibo": "Food & Drink",
       "outdoor": "Outdoor",
-      "famiglia": "Famiglia"
+      "famiglia": "Famiglia",
+      "sport": "Sport",
+      "arte": "Arte",
+      "gastronomia": "Gastronomia",
+      "altro": "Altro"
     },
     "calendar": {
-      "dows": ["L", "M", "M", "G", "V", "S", "D"],
+      "dows": [
+        "L",
+        "M",
+        "M",
+        "G",
+        "V",
+        "S",
+        "D"
+      ],
       "prevWeek": "Settimana precedente",
-      "nextWeek": "Settimana successiva"
+      "nextWeek": "Settimana successiva",
+      "pickDay": "Filtra per questo giorno",
+      "clearDay": "Rimuovi filtro data"
     },
     "mostParticipated": "Più partecipati",
     "noneWithParticipants": "Nessun evento con partecipanti",
@@ -59,7 +73,12 @@
     "seatsTaken": "Posti occupati",
     "seatsOf": "<b>{{count}}</b> di <b>{{limit}}</b> posti occupati",
     "youParticipate": "Partecipi a questo evento",
-    "cancelJoin": "Annulla partecipazione"
+    "cancelJoin": "Annulla partecipazione",
+    "shareCopied": "Copiato!",
+    "joinError": "Operazione non riuscita. Riprova.",
+    "joining": "Attendi…",
+    "emptyNoCategoryTitle": "Nessun evento in questa categoria",
+    "emptyNoCategoryMsg": "Prova a scegliere un'altra categoria o togli i filtri."
   },
   "activities": {
     "cats": {

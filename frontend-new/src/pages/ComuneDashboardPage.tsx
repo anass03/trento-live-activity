@@ -60,6 +60,20 @@ export function ComuneDashboardPage({ page, setPage, theme, setTheme, user }: an
     loadData();
   }, []);
 
+  // Azioni rapide filtrate sui permessi reali del backend:
+  // - POI CRUD (/api/map/poi)            → authorize('AmministratoreDiSistema')
+  // - Richieste enti (/api/admin/entities) → authorize('AmministratoreDiSistema')
+  // - Moderazione eventi (/api/moderation/reports) → authorize('AmministratoreDiSistema')
+  // - Statistiche / export (/api/dashboard/*)      → authorize('AmministratoreComunale')
+  const role = user?.role;
+  const quickActions = [
+    { id: "comune-statistiche", label: "Statistiche Territoriali", icon: "trending", accent: "var(--cyan)", roles: ["municipal_admin"] },
+    { id: "comune-export", label: "Esporta Dati Territoriali", icon: "share", accent: "var(--violet)", roles: ["municipal_admin"] },
+    { id: "admin-poi", label: "Gestione POI", icon: "pin", accent: "var(--cyan)", roles: ["system_admin"] },
+    { id: "admin-enti-richieste", label: "Richieste Enti", icon: "shieldCheck", accent: "var(--violet)", roles: ["system_admin"] },
+    { id: "admin-moderazione", label: "Moderazione Contenuti", icon: "warn", accent: "var(--magenta)", roles: ["system_admin"] },
+  ].filter((a) => a.roles.includes(role));
+
   const kpis = [
     { label: "Attività Attive", val: stats?.totalActivities ?? 0, icon: "activity", color: "var(--cyan)" },
     { label: "Eventi Certificati", val: stats?.totalEvents ?? 0, icon: "calendar", color: "var(--violet)" },
@@ -145,15 +159,16 @@ export function ComuneDashboardPage({ page, setPage, theme, setTheme, user }: an
           <div className="revamp-chart-card anim-in" style={{ "--accent": "var(--violet)", animationDelay: "300ms" } as React.CSSProperties}>
             <h3>Azioni Rapide</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, justifyContent: "center" }}>
-              <button className="revamp-form-btn" style={{ "--accent": "var(--cyan)" } as React.CSSProperties} onClick={() => setPage("admin-poi")}>
-                <Icon name="pin" size={16} /> Gestione POI
-              </button>
-              <button className="revamp-form-btn" style={{ "--accent": "var(--violet)" } as React.CSSProperties} onClick={() => setPage("admin-enti-richieste")}>
-                <Icon name="shieldCheck" size={16} /> Richieste Enti
-              </button>
-              <button className="revamp-form-btn" style={{ "--accent": "var(--magenta)" } as React.CSSProperties} onClick={() => setPage("admin-moderazione")}>
-                <Icon name="warn" size={16} /> Moderazione Contenuti
-              </button>
+              {quickActions.map((a) => (
+                <button key={a.id} className="revamp-form-btn" style={{ "--accent": a.accent } as React.CSSProperties} onClick={() => setPage(a.id)}>
+                  <Icon name={a.icon} size={16} /> {a.label}
+                </button>
+              ))}
+              {quickActions.length === 0 && (
+                <span style={{ color: "var(--text-muted)", fontSize: 13, textAlign: "center" }}>
+                  Nessuna azione disponibile per il tuo ruolo
+                </span>
+              )}
             </div>
           </div>
         </div>

@@ -30,6 +30,14 @@
   transition: opacity 550ms ease;
 }
 .activity-scene > * { position: relative; z-index: 1; }
+/* The rule above ties (same specificity) with `.events-header { z-index: 30 }`
+   in events-redesign.css, and this stylesheet loads later — so on this page
+   the header wrapper fell back to z-index 1 and the right-column widgets
+   ("Prossima attività"), later in the DOM, painted over the profile dropdown.
+   Re-lift the header here with a more specific selector. Scoped to
+   .activity-scene so the home/events stacking is untouched
+   (see events-redesign.css:45 for the original fix). */
+.activity-scene > .events-header { z-index: 30; }
 /* same pending-animation guard as the events page */
 .activity-scene .anim-in { animation-fill-mode: forwards; }
 

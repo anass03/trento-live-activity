@@ -147,7 +147,7 @@ async function updateSection(userId, section, payload) {
       }
       const validInterests = ['music', 'culture', 'outdoor', 'food', 'sport', 'family', 'nightlife', 'relax', 'social', 'art', 'study', 'technology', 'volunteer', 'volontariato', 'arte', 'natura', 'musica', 'cultura', 'gastronomia', 'studio', 'tecnologia'];
       for (const item of payload.interests) {
-        if (!validInterests.includes(item.toLowerCase())) {
+        if (typeof item !== 'string' || !validInterests.includes(item.toLowerCase())) {
           throw { status: 400, code: 'VALIDATION_ERROR', message: `Invalid interest: ${item}` };
         }
       }

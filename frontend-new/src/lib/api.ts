@@ -632,7 +632,15 @@ export async function downloadDashboardExport(format: 'csv' | 'pdf', params?: Da
   const headers: Record<string, string> = {};
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`${API_BASE_URL}/api/dashboard/stats/export?${qs}`, { headers });
-  if (!res.ok) throw new Error(`Export fallito (${res.status})`);
+  if (!res.ok) {
+    // Backend errors are JSON ({ error, code }) — surface the real message.
+    let message = `Export fallito (${res.status})`;
+    try {
+      const body = await res.json();
+      if (body?.error) message = body.error;
+    } catch { /* non-JSON error body — keep generic message */ }
+    throw new Error(message);
+  }
   return res.blob();
 }
 
