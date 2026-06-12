@@ -199,6 +199,7 @@
   },
   "mapKind": {
     "all": "Everything",
+    "poi": "POI",
     "event": "Events",
     "activity": "Activities"
   },

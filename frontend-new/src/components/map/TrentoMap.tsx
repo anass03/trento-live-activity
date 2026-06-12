@@ -47,8 +47,9 @@ const CROWD_KEY: Record<string, string> = {
 interface TrentoMapProps {
   theme: "light" | "dark" | "auto";
   markers: any[];
-  activeFilter: string;
-  /* "all" | "event" | "activity": secondo asse di filtro, ortogonale alle categorie */
+  /* categorie attive (multiselect); array vuoto = mostra tutto */
+  activeCategories: string[];
+  /* "all" | "poi" | "event" | "activity" */
   kindFilter?: string;
   onMarkerClick: (marker: any) => void;
   selectedMarkerId?: string | null;
@@ -68,7 +69,7 @@ interface TrentoMapProps {
 export const TrentoMap = React.memo(function TrentoMap({
   theme,
   markers,
-  activeFilter,
+  activeCategories,
   kindFilter = "all",
   onMarkerClick,
   selectedMarkerId,
@@ -229,18 +230,18 @@ export const TrentoMap = React.memo(function TrentoMap({
     // Filter and add markers
     markers.forEach((m) => {
       const isPoi = m.type === "poi";
-      const catOut = activeFilter !== "all" && activeFilter !== m.cat;
-      // Filtro Eventi/Attività: con "activity" i POI restano visibili perché
-      // sono i luoghi dove un cittadino può creare un'attività.
-      const kindOut = kindFilter === "event" ? m.type !== "event"
-        : kindFilter === "activity" ? (m.type !== "activity" && !isPoi)
-        : false;
       const selected = selectedMarkerId === m.id;
 
-      // Fuori filtro = fuori mappa: attenuarli soltanto lasciava la mappa
-      // affollata e i filtri sembravano non fare nulla. Il marker selezionato
-      // resta visibile per non far sparire il popup aperto sotto il mouse.
-      if ((catOut || kindOut) && !selected) return;
+      // Kind filter: exact match — "activity" shows only activities, "poi" only POI, etc.
+      const kindOut = kindFilter !== "all" && m.type !== kindFilter;
+
+      // Category filter: applies to all marker types.
+      // An empty activeCategories array means "show all".
+      const catOut = activeCategories.length > 0 && !activeCategories.includes(m.cat);
+
+      // Out-of-filter markers are removed entirely. The selected marker is always
+      // kept so an open popup doesn't vanish when the user changes filters.
+      if ((kindOut || catOut) && !selected) return;
 
       const crowd = m.raw?.crowdingStatus || "green";
       const color = isPoi ? CROWD_COLOR[crowd] : catColor(m.cat);
@@ -396,7 +397,7 @@ export const TrentoMap = React.memo(function TrentoMap({
 
       mapMarkers.current.push(maplibreMarker);
     });
-  }, [markers, activeFilter, kindFilter, selectedMarkerId, styleLoaded, canCreateActivity, t]);
+  }, [markers, activeCategories, kindFilter, selectedMarkerId, styleLoaded, canCreateActivity, t]);
 
   return (
     <div 

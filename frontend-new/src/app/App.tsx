@@ -13,7 +13,7 @@ import { Icon } from "../components/ui/Icon";
 import { DetailModal } from "../components/ui/DetailModal";
 import { Toaster, showToast } from "../components/ui/Toaster";
 import { onForegroundMessage } from "../lib/firebase";
-import { CATEGORIES, catColor } from "../data/redesignData";
+import { C, CATEGORIES, catColor } from "../data/redesignData";
 import { ActivityPage } from "../pages/ActivitiesPage";
 import { EventsPage } from "../pages/EventsPage";
 import { SettingsPage } from "../pages/SettingsPage";
@@ -84,18 +84,47 @@ function areaLabel(score: number) {
 // Locale per date/orari formattati: segue la lingua corrente di i18n.
 const dateLocale = (lang?: string) => (lang?.startsWith("en") ? "en-GB" : "it-IT");
 
-function FilterBar({ active, setActive, markers }: any) {
+// Category multiselect filter bar.
+// activeCategories: Set of selected categories; empty Set = "All" (show everything).
+// Clicking "All" clears the set. Clicking a category toggles it. If the last
+// category is deselected the set reverts to empty (= All).
+function FilterBar({ activeCategories, toggleCategory, markers, kind }: {
+  activeCategories: Set<string>;
+  toggleCategory: (id: string) => void;
+  markers: any[];
+  kind: string;
+}) {
   const { t } = useTranslation();
-  // Conteggi basati SOLO sui marker reali dall'API: nessun fallback finto.
-  const displayMarkers = markers || [];
-  const count = (id: string) => (id === "all" ? displayMarkers.length : displayMarkers.filter((m: any) => m.cat === id).length);
+  // Category pills: exclude "all" and "poi" (poi is handled by KindBar)
+  const contentCats = CATEGORIES.filter((c) => c.id !== "all" && c.id !== "poi");
+  const allSelected = activeCategories.size === 0;
+
+  // Count non-POI markers per category, respecting current kind filter
+  const baseMarkers = (markers || []).filter((m: any) => m.type !== "poi");
+  const count = (id: string) => baseMarkers.filter((m: any) => m.cat === id).length;
+  const totalCount = baseMarkers.length;
+
+  // When kind is "poi", categories don't apply — hide the bar
+  if (kind === "poi") return null;
+
   return (
     <div className="filterbar">
-      {CATEGORIES.map((c) => (
-        <button key={c.id}
-          className={"filter-pill" + (active === c.id ? " active" : "")}
-          style={{ "--fc": c.color }}
-          onClick={() => setActive(c.id)}>
+      <button
+        className={"filter-pill" + (allSelected ? " active" : "")}
+        style={{ "--fc": C.cyan } as React.CSSProperties}
+        onClick={() => toggleCategory("all")}
+      >
+        <Icon name="grid" size={16} />
+        {t("categories.all")}
+        <span className="cnt">{totalCount}</span>
+      </button>
+      {contentCats.map((c) => (
+        <button
+          key={c.id}
+          className={"filter-pill" + (activeCategories.has(c.id) ? " active" : "")}
+          style={{ "--fc": c.color } as React.CSSProperties}
+          onClick={() => toggleCategory(c.id)}
+        >
           <Icon name={c.icon} size={16} />
           {t(c.labelKey)}
           <span className="cnt">{count(c.id)}</span>
@@ -105,22 +134,25 @@ function FilterBar({ active, setActive, markers }: any) {
   );
 }
 
-// Secondo asse di filtro della mappa: Tutto / Eventi (enti certificati) /
-// Attività (create dai cittadini nei POI). Ortogonale alle categorie.
-function KindBar({ kind, setKind }: any) {
+// Kind filter: single-select type of map content.
+// "all" | "poi" | "event" | "activity"
+function KindBar({ kind, setKind }: { kind: string; setKind: (k: string) => void }) {
   const { t } = useTranslation();
   const kinds = [
-    { id: "all", icon: "grid", color: "var(--cyan, #38bdf8)" },
-    { id: "event", icon: "calendar", color: "#a78bfa" },
+    { id: "all",      icon: "grid",     color: C.cyan    },
+    { id: "poi",      icon: "pin",      color: "#f87171" },
+    { id: "event",    icon: "calendar", color: "#a78bfa" },
     { id: "activity", icon: "activity", color: "#34d399" },
   ];
   return (
     <div className="filterbar kindbar">
       {kinds.map((k) => (
-        <button key={k.id}
+        <button
+          key={k.id}
           className={"filter-pill" + (kind === k.id ? " active" : "")}
           style={{ "--fc": k.color } as React.CSSProperties}
-          onClick={() => setKind(k.id)}>
+          onClick={() => setKind(k.id)}
+        >
           <Icon name={k.icon} size={15} />
           {t(`mapKind.${k.id}`)}
         </button>
@@ -167,8 +199,8 @@ function Clock() {
 
 function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, setSelectedActivityId }: any) {
   const { t, i18n } = useTranslation();
-  const [active, setActive] = useState("all");
-  const [kind, setKind] = useState<"all" | "event" | "activity">("all");
+  const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set());
+  const [kind, setKind] = useState<"all" | "poi" | "event" | "activity">("all");
   const [zoom, setZoom] = useState(14.2);
   const locateRef = React.useRef<(() => void) | null>(null);
   const resetRef = React.useRef<(() => void) | null>(null);
@@ -182,7 +214,24 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
   const [createPoi, setCreatePoi] = useState<{ id: string; title: string } | null>(null);
 
   useEffect(() => { document.documentElement.style.setProperty("--zoom", String(zoom)); }, [zoom]);
-  
+
+  const toggleCategory = (id: string) => {
+    if (id === "all") {
+      setActiveCategories(new Set()); // empty = show all
+      return;
+    }
+    setActiveCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      // If nothing is selected, revert to "all"
+      return next.size === 0 ? new Set() : next;
+    });
+  };
+
   const loadMapData = async () => {
     setLoading(true);
     try {
@@ -253,12 +302,10 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
     });
   }, [mapData, t, i18n.language]);
 
-  // Marker visibili secondo il filtro Eventi/Attività: con "Attività" i POI
-  // restano visibili perché sono i luoghi dove le attività nascono.
+  // Markers filtered by kind — used for category counts in FilterBar.
   const kindMarkers = React.useMemo(() => {
     if (kind === "all") return dynamicMarkers;
-    if (kind === "event") return dynamicMarkers.filter((m: any) => m.type === "event");
-    return dynamicMarkers.filter((m: any) => m.type === "activity" || m.type === "poi");
+    return dynamicMarkers.filter((m: any) => m.type === kind);
   }, [dynamicMarkers, kind]);
 
   const dynamicEvents = React.useMemo(() => {
@@ -366,7 +413,7 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
     setPan({ x: 0, y: 0 });
     setZoom(14.2);
     setIs3d(false);
-    setActive("all");
+    setActiveCategories(new Set());
     setKind("all");
     setPopup(null);
   };
@@ -391,7 +438,7 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
               <TrentoMap
                 theme={theme}
                 markers={dynamicMarkers}
-                activeFilter={active}
+                activeCategories={Array.from(activeCategories)}
                 kindFilter={kind}
                 onMarkerClick={(m) => m ? openMarkerPopup(m) : closePopup()}
                 selectedMarkerId={popup?.markerId}
@@ -434,9 +481,9 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
         />
       </div>
 
-      {/* FILTER BAR */}
-      <FilterBar active={active} setActive={setActive} markers={kindMarkers} />
+      {/* FILTER BARS */}
       <KindBar kind={kind} setKind={setKind} />
+      <FilterBar activeCategories={activeCategories} toggleCategory={toggleCategory} markers={kindMarkers} kind={kind} />
       <Clock />
 
       {/* WIDGETS */}
