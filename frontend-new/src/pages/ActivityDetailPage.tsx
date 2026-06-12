@@ -212,14 +212,17 @@ export function ActivityDetailPage({ page, setPage, theme, setTheme, user, selec
                   </div>
                 )}
               </div>
-              <button
-                className={"revamp-form-btn" + (isJoined ? " joined" : "")}
-                style={{ width: "auto", padding: "0 20px", "--accent": "var(--teal)", opacity: joinPending ? 0.6 : 1 } as React.CSSProperties}
-                onClick={handleJoinToggle}
-                disabled={joinPending}
-              >
-                {joinPending ? t("activities.joinPending") : isJoined ? t("activities.leaveCta") : t("activities.joinCta")}
-              </button>
+              {/* Solo i cittadini partecipano (il backend nega agli altri ruoli) */}
+              {(user?.role === "registered_user" || user?.role === "anonymous") && (
+                <button
+                  className={"revamp-form-btn" + (isJoined ? " joined" : "")}
+                  style={{ width: "auto", padding: "0 20px", "--accent": "var(--teal)", opacity: joinPending ? 0.6 : 1 } as React.CSSProperties}
+                  onClick={handleJoinToggle}
+                  disabled={joinPending}
+                >
+                  {joinPending ? t("activities.joinPending") : isJoined ? t("activities.leaveCta") : t("activities.joinCta")}
+                </button>
+              )}
               <div style={{ flexBasis: "100%" }}>
                 <ContentActions
                   kind="activity"

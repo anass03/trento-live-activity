@@ -560,16 +560,24 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
                 <Icon name="bell" size={15} />{t("settings.notif.sendTest")}
               </button>
             )}
-            <div className="s-div"></div>
-            <div className="s-sublabel">{t("settings.notif.categories")}</div>
-            <SetRow label={t("settings.notif.events")} sub={t("settings.notif.eventsSub")} on={notif.events} onChange={(val) => handleNotifications("events", val)} disabled={savingSection === "notif"} />
-            <SetRow label={t("settings.notif.activities")} sub={t("settings.notif.activitiesSub")} on={notif.activities} onChange={(val) => handleNotifications("activities", val)} disabled={savingSection === "notif"} />
-            <SetRow label={t("settings.notif.cityAlerts")} sub={t("settings.notif.cityAlertsSub")} on={notif.cityAlerts} onChange={(val) => handleNotifications("cityAlerts", val)} disabled={savingSection === "notif"} />
+            {/* Le categorie (nuovi eventi/attività/allerte) riguardano i
+                cittadini: gli admin ricevono le notifiche di servizio
+                (segnalazioni) a prescindere da questi interruttori. */}
+            {user?.role === "registered_user" && (
+              <>
+                <div className="s-div"></div>
+                <div className="s-sublabel">{t("settings.notif.categories")}</div>
+                <SetRow label={t("settings.notif.events")} sub={t("settings.notif.eventsSub")} on={notif.events} onChange={(val) => handleNotifications("events", val)} disabled={savingSection === "notif"} />
+                <SetRow label={t("settings.notif.activities")} sub={t("settings.notif.activitiesSub")} on={notif.activities} onChange={(val) => handleNotifications("activities", val)} disabled={savingSection === "notif"} />
+                <SetRow label={t("settings.notif.cityAlerts")} sub={t("settings.notif.cityAlertsSub")} on={notif.cityAlerts} onChange={(val) => handleNotifications("cityAlerts", val)} disabled={savingSection === "notif"} />
+              </>
+            )}
           </SetCard>
           )}
 
-          {/* 4 — Privacy e posizione (solo con account) */}
-          {user?.role !== "anonymous" && (
+          {/* 4 — Privacy e posizione: visibilità partecipazioni e posizione
+              sono concetti da cittadino, non da admin/ente */}
+          {user?.role === "registered_user" && (
           <SetCard num={4} title={t("settings.privacy.title")} desc={t("settings.privacy.desc")} icon="pin" color="var(--teal)">
             <div>
               <div className="s-sublabel" style={{ marginBottom: 8 }}>{t("settings.privacy.useLocation")}</div>
@@ -593,9 +601,9 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
           </SetCard>
           )}
 
-          {/* 5 — Preferenze (solo con account). Gli interessi vivono nel
+          {/* 5 — Preferenze (solo cittadini). Gli interessi vivono nel
               profilo: qui solo il rimando, niente doppioni da tenere in sync. */}
-          {user?.role !== "anonymous" && (
+          {user?.role === "registered_user" && (
           <SetCard num={5} title={t("settings.pref.title")} desc={t("settings.pref.desc")} icon="sparkle" color="var(--violet)">
             <div>
               <div className="s-sublabel" style={{ marginBottom: 8 }}>{t("settings.pref.interests")}</div>

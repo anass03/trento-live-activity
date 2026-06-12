@@ -275,7 +275,7 @@ const Feed = React.forwardRef<any, any>(function Feed({ events, user, search, se
 });
 
 /* ===================== NEXT ACTIVITY ===================== */
-function NextActivity({ event, joined, saved, busy, joinError, onJoin, onSave }: any) {
+function NextActivity({ event, joined, saved, busy, joinError, onJoin, onSave, canJoin = true }: any) {
   const { t, i18n } = useTranslation();
   if (!event) {
     return (
@@ -319,10 +319,12 @@ function NextActivity({ event, joined, saved, busy, joinError, onJoin, onSave }:
         <div className="np-n"><b>{event.participantCount || 0}</b> {event.maxPartecipanti ? `/ ${event.maxPartecipanti}` : ""}</div>
       </div>
       <div className="next-cta-row">
-        <button className={"next-cta" + (joined ? " joined" : "")} onClick={onJoin} aria-pressed={joined} disabled={busy} aria-busy={busy}>
-          <Icon name={joined ? "check" : "ticket"} size={17} />
-          {busy ? t("events.joining") : joined ? t("events.joinedCta") : t("events.joinCta")}
-        </button>
+        {canJoin && (
+          <button className={"next-cta" + (joined ? " joined" : "")} onClick={onJoin} aria-pressed={joined} disabled={busy} aria-busy={busy}>
+            <Icon name={joined ? "check" : "ticket"} size={17} />
+            {busy ? t("events.joining") : joined ? t("events.joinedCta") : t("events.joinCta")}
+          </button>
+        )}
         <button className={"next-save" + (saved ? " on" : "")} onClick={onSave} aria-label={t("events.ariaSaveEvent")}><Icon name="bookmark" size={19} /></button>
       </div>
       {joinError && <div className="next-join-error" role="alert"><Icon name="warn" size={13} />{joinError}</div>}
@@ -575,6 +577,7 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
         <div className="ev-col right">
           <NextActivity
             event={nextEvent}
+            canJoin={user?.role === "registered_user" || user?.role === "anonymous"}
             joined={nextEvent ? !!(nextEvent.participantIds?.includes(user?.id || "")) : false}
             saved={nextEvent ? !!saves[nextEvent.id] : false}
             busy={joinBusy}

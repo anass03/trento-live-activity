@@ -38,7 +38,10 @@ const getCatIcon = (cat?: string) => {
 
 export function ProfilePage({ page, setPage, theme, setTheme, user }: any) {
   const { t, i18n } = useTranslation();
-  const [activeTab, setActiveTab] = useState("attivita");
+  // Partecipazioni e interessi sono concetti da cittadino: enti e admin
+  // vedono solo le informazioni account (+ sicurezza per gli admin di sistema).
+  const isCitizen = user?.role === "registered_user";
+  const [activeTab, setActiveTab] = useState(isCitizen ? "attivita" : "info");
   const [participations, setParticipations] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -48,8 +51,10 @@ export function ProfilePage({ page, setPage, theme, setTheme, user }: any) {
   const fetchParticipations = async () => {
     setLoading(true);
     try {
-      const parts = await getMyParticipations();
-      setParticipations(parts);
+      if (isCitizen) {
+        const parts = await getMyParticipations();
+        setParticipations(parts);
+      }
       const profile = await getMe();
       setUserProfile(profile);
     } catch (err) {
@@ -64,6 +69,12 @@ export function ProfilePage({ page, setPage, theme, setTheme, user }: any) {
       fetchParticipations();
     }
   }, [user?.id]);
+
+  // Se il ruolo cambia (es. re-login con un account diverso) il tab attivo
+  // non deve restare su una vista da cittadino.
+  useEffect(() => {
+    if (!isCitizen && activeTab !== "info") setActiveTab("info");
+  }, [isCitizen]);
 
   const [newCodes, setNewCodes] = useState<string[]>([]);
   const [regenPending, setRegenPending] = useState(false);
@@ -116,39 +127,45 @@ export function ProfilePage({ page, setPage, theme, setTheme, user }: any) {
                 <Icon name="shieldCheck" size={10} style={{ color: "var(--cyan)" }} /> {t("profile.verifiedAuthor")}
               </div>
             </div>
-            <div className="revamp-profile-stats">
-              <div className="revamp-profile-stat">
-                <b>{participations.length}</b>
-                <span>{t("profile.participations")}</span>
+            {isCitizen && (
+              <div className="revamp-profile-stats">
+                <div className="revamp-profile-stat">
+                  <b>{participations.length}</b>
+                  <span>{t("profile.participations")}</span>
+                </div>
+                <div style={{ width: 1, background: "var(--border-soft-2)" }}></div>
+                <div className="revamp-profile-stat">
+                  <b>{typeof authorRating === "number" ? authorRating.toFixed(1) : "—"}</b>
+                  <span>{t("profile.rating")}</span>
+                </div>
+                <div style={{ width: 1, background: "var(--border-soft-2)" }}></div>
+                <div className="revamp-profile-stat">
+                  <b>{user?.role === "certified_entity" ? t("profile.yes") : t("profile.no")}</b>
+                  <span>{t("profile.certifiedEntity")}</span>
+                </div>
               </div>
-              <div style={{ width: 1, background: "var(--border-soft-2)" }}></div>
-              <div className="revamp-profile-stat">
-                <b>{typeof authorRating === "number" ? authorRating.toFixed(1) : "—"}</b>
-                <span>{t("profile.rating")}</span>
-              </div>
-              <div style={{ width: 1, background: "var(--border-soft-2)" }}></div>
-              <div className="revamp-profile-stat">
-                <b>{user?.role === "certified_entity" ? t("profile.yes") : t("profile.no")}</b>
-                <span>{t("profile.certifiedEntity")}</span>
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
         <div className="revamp-profile-card anim-in" style={{ "--accent": "var(--violet)", animationDelay: "120ms" } as React.CSSProperties}>
           <div className="revamp-profile-nav">
-            <button
-              className={"revamp-profile-tab" + (activeTab === "attivita" ? " active" : "")}
-              onClick={() => setActiveTab("attivita")}
-            >
-              {t("profile.tabBookings")}
-            </button>
-            <button
-              className={"revamp-profile-tab" + (activeTab === "interessi" ? " active" : "")}
-              onClick={() => setActiveTab("interessi")}
-            >
-              {t("profile.tabInterests")}
-            </button>
+            {isCitizen && (
+              <>
+                <button
+                  className={"revamp-profile-tab" + (activeTab === "attivita" ? " active" : "")}
+                  onClick={() => setActiveTab("attivita")}
+                >
+                  {t("profile.tabBookings")}
+                </button>
+                <button
+                  className={"revamp-profile-tab" + (activeTab === "interessi" ? " active" : "")}
+                  onClick={() => setActiveTab("interessi")}
+                >
+                  {t("profile.tabInterests")}
+                </button>
+              </>
+            )}
             <button
               className={"revamp-profile-tab" + (activeTab === "info" ? " active" : "")}
               onClick={() => setActiveTab("info")}
