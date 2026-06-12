@@ -478,7 +478,7 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
       // ignore
     } finally {
       setUser({ id: null, name: "", email: "", role: "anonymous", avatar: "" });
-      setPage("login");
+      setPage("home");
     }
   };
 
@@ -486,7 +486,7 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
     await deleteAccount({ currentPassword: password });
     setDeleting(false);
     setUser({ id: null, name: "", email: "", role: "anonymous", avatar: "" });
-    setPage("login");
+    setPage("home");
   };
 
 

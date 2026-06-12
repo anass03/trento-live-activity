@@ -52,6 +52,16 @@ function AppleIcon() {
   );
 }
 
+function SpidIcon() {
+  // Stilizzazione del logo SPID (omino con freccia) in monocromo.
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <circle cx="12" cy="7" r="3.4" />
+      <path d="M12 12.2c-4 0-7.2 2.6-7.2 5.8v1.4h9.4v-3.1l-1.6 1.6-1.3-1.3 3.9-3.9c-.97-.32-2.06-.5-3.2-.5zm4.6 1.5l3.9 3.9-1.3 1.3-1.6-1.6v2.1h-1.9v-2.1l-1.6 1.6-1.3-1.3 3.8-3.9z" />
+    </svg>
+  );
+}
+
 /* Bottone Google interno: useGoogleLogin richiede di stare dentro al provider,
    quindi lo separiamo per poter condizionare il render del provider solo
    quando GOOGLE_CLIENT_ID è configurato. Flusso "implicit" → access_token,
@@ -115,13 +125,25 @@ export function SocialLoginButtons({ onError, onLoggedIn, busy }: {
 
       <button
         type="button"
-        style={{ ...socialBtnDisabledStyle, marginBottom: 0 }}
+        style={socialBtnDisabledStyle}
         disabled
         title={t("auth.social.appleComingSoon")}
       >
         <AppleIcon /> {t("auth.social.apple")}
         <span style={{ fontSize: 11, fontWeight: 500, color: "var(--text-faint)" }}>
           · {t("auth.social.appleComingSoon")}
+        </span>
+      </button>
+
+      <button
+        type="button"
+        style={{ ...socialBtnDisabledStyle, marginBottom: 0 }}
+        disabled
+        title={t("auth.social.spidComingSoon")}
+      >
+        <SpidIcon /> {t("auth.social.spid")}
+        <span style={{ fontSize: 11, fontWeight: 500, color: "var(--text-faint)" }}>
+          · {t("auth.social.spidComingSoon")}
         </span>
       </button>
     </div>

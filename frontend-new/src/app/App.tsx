@@ -105,6 +105,30 @@ function FilterBar({ active, setActive, markers }: any) {
   );
 }
 
+// Secondo asse di filtro della mappa: Tutto / Eventi (enti certificati) /
+// Attività (create dai cittadini nei POI). Ortogonale alle categorie.
+function KindBar({ kind, setKind }: any) {
+  const { t } = useTranslation();
+  const kinds = [
+    { id: "all", icon: "grid", color: "var(--cyan, #38bdf8)" },
+    { id: "event", icon: "calendar", color: "#a78bfa" },
+    { id: "activity", icon: "activity", color: "#34d399" },
+  ];
+  return (
+    <div className="filterbar kindbar">
+      {kinds.map((k) => (
+        <button key={k.id}
+          className={"filter-pill" + (kind === k.id ? " active" : "")}
+          style={{ "--fc": k.color } as React.CSSProperties}
+          onClick={() => setKind(k.id)}>
+          <Icon name={k.icon} size={15} />
+          {t(`mapKind.${k.id}`)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function MapControls({ zoom, setZoom, is3d, setIs3d, onLocate, onReset }: any) {
   const { t } = useTranslation();
   return (
@@ -141,9 +165,10 @@ function Clock() {
   );
 }
 
-function HomeScene({ page, setPage, theme, setTheme, user }: any) {
+function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, setSelectedActivityId }: any) {
   const { t, i18n } = useTranslation();
   const [active, setActive] = useState("all");
+  const [kind, setKind] = useState<"all" | "event" | "activity">("all");
   const [zoom, setZoom] = useState(14.2);
   const locateRef = React.useRef<(() => void) | null>(null);
   const resetRef = React.useRef<(() => void) | null>(null);
@@ -232,6 +257,14 @@ function HomeScene({ page, setPage, theme, setTheme, user }: any) {
       };
     });
   }, [mapData]);
+
+  // Marker visibili secondo il filtro Eventi/Attività: con "Attività" i POI
+  // restano visibili perché sono i luoghi dove le attività nascono.
+  const kindMarkers = React.useMemo(() => {
+    if (kind === "all") return dynamicMarkers;
+    if (kind === "event") return dynamicMarkers.filter((m: any) => m.type === "event");
+    return dynamicMarkers.filter((m: any) => m.type === "activity" || m.type === "poi");
+  }, [dynamicMarkers, kind]);
 
   const dynamicEvents = React.useMemo(() => {
     if (!mapData || !mapData.events) return [];
@@ -340,6 +373,7 @@ function HomeScene({ page, setPage, theme, setTheme, user }: any) {
     setZoom(14.2);
     setIs3d(false);
     setActive("all");
+    setKind("all");
     setPopup(null);
   };
   const locate = () => {
@@ -364,6 +398,7 @@ function HomeScene({ page, setPage, theme, setTheme, user }: any) {
                 theme={theme}
                 markers={dynamicMarkers}
                 activeFilter={active}
+                kindFilter={kind}
                 onMarkerClick={(m) => m ? openMarkerPopup(m) : closePopup()}
                 selectedMarkerId={popup?.markerId}
                 zoom={zoom}
@@ -375,6 +410,17 @@ function HomeScene({ page, setPage, theme, setTheme, user }: any) {
                 onCreatePoi={(m) => {
                   setPopup(null);
                   setCreatePoi({ id: m.sourceId || m.id, title: m.title });
+                }}
+                onOpenDetail={(m) => {
+                  setPopup(null);
+                  const targetId = m.sourceId || m.id;
+                  if (m.type === "activity") {
+                    setSelectedActivityId(targetId);
+                    setPage("attivita-dettaglio");
+                  } else {
+                    setSelectedEventId(targetId);
+                    setPage("evento-dettaglio");
+                  }
                 }}
               />
             </div>
@@ -389,7 +435,8 @@ function HomeScene({ page, setPage, theme, setTheme, user }: any) {
       <div className="layer-header"><Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} /></div>
 
       {/* FILTER BAR */}
-      <FilterBar active={active} setActive={setActive} markers={dynamicMarkers} />
+      <FilterBar active={active} setActive={setActive} markers={kindMarkers} />
+      <KindBar kind={kind} setKind={setKind} />
       <Clock />
 
       {/* WIDGETS */}
@@ -502,12 +549,20 @@ export function App() {
 
     // Decode the token locally to see if it needs 2FA setup (admin first login)
     const decoded = decodeJwt(token);
+
+    // An expired token must never produce a logged-in UI: drop it and stay guest.
+    if (decoded?.exp && decoded.exp * 1000 < Date.now()) {
+      setToken(null);
+      setUser({ id: null, name: "", email: "", role: "anonymous", avatar: "" });
+      return;
+    }
+
     if (decoded && decoded.needs2faSetup) {
       const role = mapBackendRole(decoded.ruolo);
       setUser({
         id: decoded.id,
         name: "Amministratore (Setup 2FA)",
-        email: "admin@example.com",
+        email: "",
         role,
         avatar: "A",
       });
@@ -532,14 +587,16 @@ export function App() {
     } catch (err: any) {
       console.error("Error loading user profile:", err);
       if (err.code !== "2FA_SETUP_REQUIRED") {
+        // Invalid/expired token: clear it and fall back to a real guest state.
         setToken(null);
+        setUser({ id: null, name: "", email: "", role: "anonymous", avatar: "" });
       } else if (decoded) {
         // Fallback for 2fa setup state if getMe returns 2FA_SETUP_REQUIRED
         const role = mapBackendRole(decoded.ruolo);
         setUser({
           id: decoded.id,
           name: "Amministratore (Setup 2FA)",
-          email: "admin@example.com",
+          email: "",
           role,
           avatar: "A",
         });

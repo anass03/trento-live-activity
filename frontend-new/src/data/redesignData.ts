@@ -22,6 +22,7 @@ export const CATEGORIES: any[] = [
     { id: "cibo",     labelKey: "categories.cibo",     color: C.amber,   icon: "food" },
     { id: "outdoor",  labelKey: "categories.outdoor",  color: C.teal,    icon: "bike" },
     { id: "famiglia", labelKey: "categories.famiglia", color: C.cyan,    icon: "family" },
+    { id: "poi",      labelKey: "categories.poi",      color: C.orange,  icon: "pin" },
 ];
 export const CAT_ICON: Record<string, string> = {
     musica: "music",

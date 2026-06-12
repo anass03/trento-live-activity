@@ -4,6 +4,7 @@ import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
 import { CommentsSection } from "../components/redesign/CommentsSection";
 import { getActivityById, joinActivity, leaveActivity, ApiActivity } from "../lib/api";
+import { ContentActions } from "../components/ui/ContentActions";
 
 const grads: Record<string, string> = {
   outdoor: "linear-gradient(140deg,#0d9488,#134e4a)",
@@ -219,6 +220,18 @@ export function ActivityDetailPage({ page, setPage, theme, setTheme, user, selec
               >
                 {joinPending ? t("activities.joinPending") : isJoined ? t("activities.leaveCta") : t("activities.joinCta")}
               </button>
+              <div style={{ flexBasis: "100%" }}>
+                <ContentActions
+                  kind="activity"
+                  id={activity.id}
+                  title={activity.title || "Attività a Trento"}
+                  startIso={(activity as any).dateTime || null}
+                  location={(activity as any).location || (activity as any).indirizzo || null}
+                  accent="var(--teal)"
+                  userRole={user?.role}
+                  onRequireLogin={() => setPage("login")}
+                />
+              </div>
             </div>
 
             <div className="revamp-detail-section-title">Valutazioni di Dettaglio</div>

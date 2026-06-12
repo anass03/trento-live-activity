@@ -12,7 +12,8 @@ export function AdminModerationPage({ page, setPage, theme, setTheme, user }: an
     setLoading(true);
     setErrorMsg("");
     try {
-      const data = await getReports("in_attesa");
+      // Stato backend: 'aperta' | 'in lavorazione' | 'risolta'
+      const data = await getReports("aperta");
       setReports(data.reports || []);
     } catch (err: any) {
       console.error(err);
@@ -61,7 +62,8 @@ export function AdminModerationPage({ page, setPage, theme, setTheme, user }: an
               <thead>
                 <tr>
                   <th>Tipo Segnalazione</th>
-                  <th>Titolo Contenuto</th>
+                  <th>Contenuto</th>
+                  <th>Titolo</th>
                   <th>Motivazione</th>
                   <th>Data Segnalazione</th>
                   <th>Azioni</th>
@@ -70,7 +72,7 @@ export function AdminModerationPage({ page, setPage, theme, setTheme, user }: an
               <tbody>
                 {reports.length === 0 && !loading ? (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: "center", color: "var(--text-muted)", padding: 20 }}>
+                    <td colSpan={6} style={{ textAlign: "center", color: "var(--text-muted)", padding: 20 }}>
                       Nessuna segnalazione in attesa
                     </td>
                   </tr>
@@ -80,11 +82,16 @@ export function AdminModerationPage({ page, setPage, theme, setTheme, user }: an
                       <td>
                         <span className="revamp-status-pill info">{r.tipo}</span>
                       </td>
-                      <td><b>{r.event?.titolo || "Evento Eliminato"}</b></td>
+                      <td>
+                        <span className={"revamp-status-pill " + (r.activityId ? "success" : "warning")}>
+                          {r.activityId ? "Attività" : "Evento"}
+                        </span>
+                      </td>
+                      <td><b>{r.event?.titolo || r.activity?.title || (r.activity?.tipo ? `Attività di ${r.activity.tipo}` : "Contenuto eliminato")}</b></td>
                       <td>{r.descrizione || "Nessun dettaglio specificato"}</td>
                       <td>{r.createdAt ? new Date(r.createdAt).toLocaleDateString("it-IT") : "—"}</td>
                       <td>
-                        {r.stato === "in_attesa" ? (
+                        {r.stato === "aperta" ? (
                           <div className="revamp-admin-row-actions">
                             <button className="revamp-action-btn danger" onClick={() => handleAction(r.id, true)}>
                               <Icon name="x" size={12} /> Rimuovi
