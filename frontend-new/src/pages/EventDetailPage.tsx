@@ -167,13 +167,18 @@ export function EventDetailPage({ page, setPage, theme, setTheme, user, selected
                   <Icon name="check" size={11} /> {t("events.youParticipate")}
                 </span>
               )}
-              <button
-                className={"revamp-form-btn" + (isJoined ? " joined" : "")}
-                style={{ "--accent": "var(--magenta)" } as React.CSSProperties}
-                onClick={handleJoinToggle}
-              >
-                {isJoined ? t("events.cancelJoin") : t("events.joinCta")}
-              </button>
+              {/* Partecipare è un'azione da cittadino: enti e admin non hanno
+                  il permesso lato backend, quindi niente bottone. I guest lo
+                  vedono e vengono mandati al login. */}
+              {(user?.role === "registered_user" || user?.role === "anonymous") && (
+                <button
+                  className={"revamp-form-btn" + (isJoined ? " joined" : "")}
+                  style={{ "--accent": "var(--magenta)" } as React.CSSProperties}
+                  onClick={handleJoinToggle}
+                >
+                  {isJoined ? t("events.cancelJoin") : t("events.joinCta")}
+                </button>
+              )}
               <ContentActions
                 kind="event"
                 id={event.id}

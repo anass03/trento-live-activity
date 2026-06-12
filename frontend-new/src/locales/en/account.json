@@ -73,7 +73,9 @@
       "parking": "Parking shown",
       "parkingBoth": "Cars and bikes",
       "parkingCar": "Cars only",
-      "parkingBike": "Bikes only"
+      "parkingBike": "Bikes only",
+      "manageInProfile": "Interests are managed from your profile, together with your participations.",
+      "goToProfile": "Go to profile"
     },
     "interests": {
       "outdoor": "Outdoor",
@@ -165,6 +167,13 @@
     "downloadGenerated": "Generated on",
     "downloadKeepSafe": "Keep these in a safe place. Each code is single-use.",
     "acknowledgeLabel": "I have saved the codes in a safe place",
-    "backToSettings": "Back to Settings"
+    "backToSettings": "Back to Settings",
+    "savedContinue": "I saved my codes — continue",
+    "securityTitle": "Account security",
+    "changeAuthenticator": "Change authenticator app",
+    "changeAuthenticatorSub": "Generates a new QR: the current app will stop working until you verify the new one.",
+    "regenCodes": "Regenerate recovery codes",
+    "regenCodesSub": "Old codes are invalidated. Save the new ones right away.",
+    "regenDone": "New codes generated. Save them now: they won't be shown again."
   }
 }

@@ -102,7 +102,16 @@
       "capacityError": "Maximum capacity must be greater than zero.",
       "saveError": "Unable to save the Point of Interest.",
       "editFormTitle": "Edit Point of Interest",
-      "saveChanges": "Save Changes"
+      "saveChanges": "Save Changes",
+      "address": "Address",
+      "addressPlaceholder": "E.g. Piazza Duomo 1, Trento",
+      "findCoords": "Find coordinates",
+      "findCoordsPending": "Searching…",
+      "findCoordsError": "Address not found. Retry or enter coordinates manually.",
+      "colAddress": "Address",
+      "allTypes": "All types",
+      "colCapacity": "Capacity",
+      "noAddress": "—"
     },
     "entities": {
       "title": "Entity Verification Requests",
@@ -136,7 +145,17 @@
       "noDetails": "No details provided",
       "remove": "Remove",
       "keep": "Keep",
-      "resolved": "Resolved ({{stato}})"
+      "resolved": "Resolved ({{stato}})",
+      "tabAperta": "Open",
+      "tabLavorazione": "In progress",
+      "tabRisolta": "Resolved",
+      "takeCharge": "Take charge",
+      "confirmRemove": "Permanently remove the reported content? All reporters and the author will be notified.",
+      "reporterNote": "Reported by a community member",
+      "stateOpen": "Open",
+      "stateProgress": "In progress",
+      "stateClosed": "Resolved",
+      "refresh": "Refresh"
     },
     "notifications": {
       "title": "Broadcast Notifications",

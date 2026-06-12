@@ -73,7 +73,9 @@
       "parking": "Parcheggi mostrati",
       "parkingBoth": "Auto e bici",
       "parkingCar": "Solo auto",
-      "parkingBike": "Solo bici"
+      "parkingBike": "Solo bici",
+      "manageInProfile": "Gli interessi si gestiscono dal tuo profilo, insieme alle tue partecipazioni.",
+      "goToProfile": "Vai al profilo"
     },
     "interests": {
       "outdoor": "Outdoor",
@@ -165,6 +167,13 @@
     "downloadGenerated": "Generati il",
     "downloadKeepSafe": "Conservali in un luogo sicuro. Ogni codice è monouso.",
     "acknowledgeLabel": "Ho salvato i codici in un luogo sicuro",
-    "backToSettings": "Torna alle Impostazioni"
+    "backToSettings": "Torna alle Impostazioni",
+    "savedContinue": "Ho salvato i codici — continua",
+    "securityTitle": "Sicurezza account",
+    "changeAuthenticator": "Cambia app authenticator",
+    "changeAuthenticatorSub": "Genera un nuovo QR: l'app attuale smetterà di funzionare e dovrai verificare quella nuova.",
+    "regenCodes": "Rigenera codici di recupero",
+    "regenCodesSub": "I vecchi codici vengono invalidati. Salva subito i nuovi.",
+    "regenDone": "Nuovi codici generati. Salvali ora: non verranno mostrati di nuovo."
   }
 }

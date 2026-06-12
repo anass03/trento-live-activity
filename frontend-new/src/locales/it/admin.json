@@ -102,7 +102,16 @@
       "capacityError": "La capacità massima deve essere maggiore di zero.",
       "saveError": "Impossibile salvare il Punto di Interesse.",
       "editFormTitle": "Modifica Punto di Interesse",
-      "saveChanges": "Salva Modifiche"
+      "saveChanges": "Salva Modifiche",
+      "address": "Indirizzo",
+      "addressPlaceholder": "Es. Piazza Duomo 1, Trento",
+      "findCoords": "Trova coordinate",
+      "findCoordsPending": "Cerco…",
+      "findCoordsError": "Indirizzo non trovato. Riprova o inserisci le coordinate a mano.",
+      "colAddress": "Indirizzo",
+      "allTypes": "Tutti i tipi",
+      "colCapacity": "Capienza",
+      "noAddress": "—"
     },
     "entities": {
       "title": "Richieste Verifiche Enti",
@@ -136,7 +145,17 @@
       "noDetails": "Nessun dettaglio specificato",
       "remove": "Rimuovi",
       "keep": "Mantieni",
-      "resolved": "Risolto ({{stato}})"
+      "resolved": "Risolto ({{stato}})",
+      "tabAperta": "Aperte",
+      "tabLavorazione": "In lavorazione",
+      "tabRisolta": "Risolte",
+      "takeCharge": "Prendi in carico",
+      "confirmRemove": "Rimuovere definitivamente il contenuto segnalato? Tutti i segnalanti e l'autore verranno notificati.",
+      "reporterNote": "Segnalato da un utente della community",
+      "stateOpen": "Aperta",
+      "stateProgress": "In lavorazione",
+      "stateClosed": "Risolta",
+      "refresh": "Aggiorna"
     },
     "notifications": {
       "title": "Invio Notifiche di Broadcast",

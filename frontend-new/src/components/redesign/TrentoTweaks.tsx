@@ -108,7 +108,9 @@ export function TrentoTweaks({ theme }) {
       root.style.setProperty("--glass-1", `rgba(18,32,56,${(0.45 + 0.5 * f).toFixed(3)})`);
       root.style.setProperty("--glass-2", `rgba(9,18,35,${(0.34 + 0.54 * f).toFixed(3)})`);
     }
-    root.style.setProperty("--panel-blur", `${(26 - 15 * f).toFixed(1)}px`);
+    // Cap basso: i backdrop-filter sono il collo di bottiglia su GPU integrate
+    // (ogni px di blur in più costa quadratico sul repaint dei pannelli).
+    root.style.setProperty("--panel-blur", `${(11 - 6 * f).toFixed(1)}px`);
   }, [t, theme]);
 
   return (

@@ -30,7 +30,9 @@ export function LoginPage({ page, setPage }: any) {
       if (res.needs2faSetup) {
         setPage("setup-2fa");
       } else {
-        setPage("home");
+        // Cittadino senza onboarding completato → prima gli interessi.
+        const needsOnboarding = await needsOnboardingAfterOauth();
+        setPage(needsOnboarding ? "onboarding" : "home");
       }
     } catch (err: any) {
       if (err.code === "2FA_REQUIRED") {

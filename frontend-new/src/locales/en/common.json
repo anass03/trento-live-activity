@@ -39,7 +39,8 @@
     "myActivities": "My activities",
     "saved": "Saved",
     "settings": "Settings",
-    "logout": "Logout"
+    "logout": "Logout",
+    "searchNoResults": "No results"
   },
   "home": {
     "locate": "Locate",
@@ -190,7 +191,11 @@
     "cibo": "Food & Drink",
     "outdoor": "Outdoor",
     "famiglia": "Family",
-    "poi": "POI"
+    "poi": "POI",
+    "arte": "Art",
+    "gastronomia": "Food & Drink",
+    "studio": "Study",
+    "altro": "Other"
   },
   "mapKind": {
     "all": "Everything",

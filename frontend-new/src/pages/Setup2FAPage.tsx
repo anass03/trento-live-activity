@@ -146,9 +146,9 @@ export function Setup2FAPage({ page, setPage, theme, setTheme, user }: any) {
                 className="revamp-form-btn"
                 style={{ "--accent": "var(--amber)" } as React.CSSProperties}
                 disabled={recoveryCodes.length > 0 && !acknowledged}
-                onClick={() => setPage("impostazioni")}
+                onClick={() => setPage("home")}
               >
-                {t("twofa.backToSettings")}
+                {recoveryCodes.length > 0 ? t("twofa.savedContinue") : t("twofa.backToSettings")}
               </button>
             </div>
           ) : (
@@ -159,19 +159,21 @@ export function Setup2FAPage({ page, setPage, theme, setTheme, user }: any) {
                 </div>
               )}
 
-              <div style={{ display: "flex", gap: 14, alignItems: "center", marginBottom: 20 }}>
+              {/* QR grande e centrato: deve essere scansionabile al volo dal telefono */}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, marginBottom: 20 }}>
                 <div style={{
-                  width: 90, height: 90, borderRadius: 12, background: "#fff", display: "grid", placeItems: "center", border: "1px solid var(--border-soft)", overflow: "hidden"
+                  width: 216, height: 216, borderRadius: 14, background: "#fff",
+                  display: "grid", placeItems: "center", border: "1px solid var(--border-soft)", padding: 8
                 }}>
                   {qrUrl ? (
-                    <img src={qrUrl} alt="QR Code 2FA" style={{ width: "80px", height: "80px" }} />
+                    <img src={qrUrl} alt="QR Code 2FA" style={{ width: 200, height: 200, display: "block" }} />
                   ) : (
-                    <Icon name="grid" size={44} style={{ color: "#000" }} />
+                    <Icon name="grid" size={60} style={{ color: "#000" }} />
                   )}
                 </div>
-                <div style={{ flex: 1, fontSize: 12.5, color: "var(--text-secondary)" }}>
+                <div style={{ fontSize: 12.5, color: "var(--text-secondary)", textAlign: "center" }}>
                   {t("twofa.step1")}<br />
-                  {secret && <>{t("twofa.manualCode")} <code style={{ color: "var(--amber)", fontSize: "11px", fontWeight: "bold" }}>{secret}</code><br /></>}
+                  {secret && <>{t("twofa.manualCode")} <code style={{ color: "var(--amber)", fontSize: "11px", fontWeight: "bold", wordBreak: "break-all" }}>{secret}</code><br /></>}
                   {t("twofa.step2")}
                 </div>
               </div>

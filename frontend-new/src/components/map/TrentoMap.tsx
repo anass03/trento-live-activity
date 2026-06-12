@@ -25,7 +25,10 @@ function getIconSvg(name: string, size = 15): string {
     x: `<path d="M6 6l12 12" /><path d="M18 6L6 18" />`,
     pin: `<path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11z" /><circle cx="12" cy="10" r="2.5" />`,
     clock: `<circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" />`,
-    ticket: `<path d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2 2 2 0 0 0 0 4 2 2 0 0 1-2 2H6a2 2 0 0 1-2-2 2 2 0 0 0 0-4z" /><path d="M14 6v12" />`
+    ticket: `<path d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2 2 2 0 0 0 0 4 2 2 0 0 1-2 2H6a2 2 0 0 1-2-2 2 2 0 0 0 0-4z" /><path d="M14 6v12" />`,
+    sparkle: `<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" /><path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z" />`,
+    bookmark: `<path d="M6 4h12v17l-6-4.5L6 21z" />`,
+    layers: `<path d="M12 3l9 5-9 5-9-5z" /><path d="M3 13l9 5 9-5" />`
   };
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${paths[name] || paths.grid}</svg>`;
 }
@@ -226,14 +229,19 @@ export const TrentoMap = React.memo(function TrentoMap({
     // Filter and add markers
     markers.forEach((m) => {
       const isPoi = m.type === "poi";
-      const catDim = activeFilter !== "all" && activeFilter !== m.cat;
-      // Filtro Eventi/Attività: con "activity" i POI restano accesi perché
+      const catOut = activeFilter !== "all" && activeFilter !== m.cat;
+      // Filtro Eventi/Attività: con "activity" i POI restano visibili perché
       // sono i luoghi dove un cittadino può creare un'attività.
-      const kindDim = kindFilter === "event" ? m.type !== "event"
+      const kindOut = kindFilter === "event" ? m.type !== "event"
         : kindFilter === "activity" ? (m.type !== "activity" && !isPoi)
         : false;
-      const dim = catDim || kindDim;
       const selected = selectedMarkerId === m.id;
+
+      // Fuori filtro = fuori mappa: attenuarli soltanto lasciava la mappa
+      // affollata e i filtri sembravano non fare nulla. Il marker selezionato
+      // resta visibile per non far sparire il popup aperto sotto il mouse.
+      if ((catOut || kindOut) && !selected) return;
+
       const crowd = m.raw?.crowdingStatus || "green";
       const color = isPoi ? CROWD_COLOR[crowd] : catColor(m.cat);
       const crowdLabel = t(CROWD_KEY[crowd] || CROWD_KEY.green);
@@ -241,7 +249,7 @@ export const TrentoMap = React.memo(function TrentoMap({
       // L'elemento esterno è posizionato da maplibre via transform inline:
       // niente transform in CSS qui, le animazioni vivono sul .tla-pin interno.
       const el = document.createElement("div");
-      el.className = `tla-marker${isPoi ? " poi" : ""}${m.live ? " live" : ""}${dim ? " dimmed" : ""}${selected ? " selected" : ""}`;
+      el.className = `tla-marker${isPoi ? " poi" : ""}${m.live ? " live" : ""}${selected ? " selected" : ""}`;
       el.style.setProperty("--mc", color);
       if (selected) el.style.zIndex = "30";
 
@@ -388,7 +396,7 @@ export const TrentoMap = React.memo(function TrentoMap({
 
       mapMarkers.current.push(maplibreMarker);
     });
-  }, [markers, activeFilter, selectedMarkerId, styleLoaded, canCreateActivity, t]);
+  }, [markers, activeFilter, kindFilter, selectedMarkerId, styleLoaded, canCreateActivity, t]);
 
   return (
     <div 

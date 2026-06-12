@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
-import { getPOIs, createPOI, updatePOI, deletePOI, POI } from "../lib/api";
+import { getPOIs, createPOI, updatePOI, deletePOI, geocodeForward, POI } from "../lib/api";
 
 export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
   const { t } = useTranslation();
@@ -22,8 +22,31 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
     capacitaMax: 100,
     statoAffollamento: "verde" as "verde" | "giallo" | "rosso",
     descrizione: "",
+    indirizzo: "",
   };
   const [newPoi, setNewPoi] = useState(EMPTY_POI);
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [geoPending, setGeoPending] = useState(false);
+
+  // Indirizzo → coordinate via backend (Google/Nominatim): l'admin lavora
+  // con le vie, le coordinate restano un dettaglio regolabile.
+  const handleFindCoords = async () => {
+    if (!newPoi.indirizzo || newPoi.indirizzo.trim().length < 3) return;
+    setGeoPending(true);
+    setErrorMsg("");
+    try {
+      const { result } = await geocodeForward(newPoi.indirizzo.includes("Trento") ? newPoi.indirizzo : `${newPoi.indirizzo}, Trento`);
+      if (!result) {
+        setErrorMsg(t("admin.poi.findCoordsError"));
+      } else {
+        setNewPoi((p) => ({ ...p, latitudine: result.lat, longitudine: result.lng, indirizzo: result.formatted || p.indirizzo }));
+      }
+    } catch {
+      setErrorMsg(t("admin.poi.findCoordsError"));
+    } finally {
+      setGeoPending(false);
+    }
+  };
 
   const loadPois = async () => {
     setLoading(true);
@@ -111,14 +134,21 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
       capacitaMax: p.capacitaMax,
       statoAffollamento: (p.statoAffollamento as any) || "verde",
       descrizione: p.descrizione || "",
+      indirizzo: p.indirizzo || "",
     });
     setShowAddForm(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  // Suddivisione per tipo: i chip sono derivati dai dati reali.
+  const poiTypes = Array.from(new Set(pois.map((p) => (p.tipo || "").toLowerCase()).filter(Boolean))).sort();
+  const typeCount = (tp: string) => pois.filter((p) => (p.tipo || "").toLowerCase() === tp).length;
+
   const filteredPois = pois.filter((p) =>
-    p.nome.toLowerCase().includes(search.toLowerCase()) ||
-    (p.tipo || "").toLowerCase().includes(search.toLowerCase())
+    (typeFilter === "all" || (p.tipo || "").toLowerCase() === typeFilter) &&
+    (p.nome.toLowerCase().includes(search.toLowerCase()) ||
+      (p.tipo || "").toLowerCase().includes(search.toLowerCase()) ||
+      (p.indirizzo || "").toLowerCase().includes(search.toLowerCase()))
   );
 
   return (
@@ -171,6 +201,22 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
                   value={newPoi.tipo}
                   onChange={(e) => setNewPoi({ ...newPoi, tipo: e.target.value })}
                 />
+              </div>
+
+              <div className="revamp-form-group" style={{ gridColumn: "span 2" }}>
+                <label className="revamp-form-label">{t("admin.poi.address")}</label>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input
+                    className="revamp-form-input"
+                    style={{ flex: 1 }}
+                    placeholder={t("admin.poi.addressPlaceholder")}
+                    value={newPoi.indirizzo}
+                    onChange={(e) => setNewPoi({ ...newPoi, indirizzo: e.target.value })}
+                  />
+                  <button type="button" className="revamp-action-btn" disabled={geoPending} onClick={handleFindCoords}>
+                    <Icon name="locate" size={13} /> {geoPending ? t("admin.poi.findCoordsPending") : t("admin.poi.findCoords")}
+                  </button>
+                </div>
               </div>
 
               <div className="revamp-form-group">
@@ -238,6 +284,27 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
           </div>
         )}
 
+        {/* Suddivisione per tipo */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+          <button
+            className={"revamp-action-btn" + (typeFilter === "all" ? " success" : "")}
+            onClick={() => setTypeFilter("all")}
+          >
+            <Icon name="grid" size={12} /> {t("admin.poi.allTypes")}
+            <span style={{ fontFamily: "var(--mono)", fontSize: 11, opacity: 0.75 }}>({pois.length})</span>
+          </button>
+          {poiTypes.map((tp) => (
+            <button
+              key={tp}
+              className={"revamp-action-btn" + (typeFilter === tp ? " success" : "")}
+              onClick={() => setTypeFilter(tp)}
+            >
+              {t(`poiTypes.${tp}` as any, { defaultValue: tp })}
+              <span style={{ fontFamily: "var(--mono)", fontSize: 11, opacity: 0.75 }}>({typeCount(tp)})</span>
+            </button>
+          ))}
+        </div>
+
         <div className="revamp-filter-card" style={{ marginBottom: 20 }}>
           <div className="act-search" style={{ background: "var(--surface-1)" }}>
             <Icon name="search" size={16} />
@@ -261,14 +328,15 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
                   <th>{t("admin.poi.colName")}</th>
                   <th>{t("admin.poi.colType")}</th>
                   <th>{t("admin.poi.colCrowding")}</th>
-                  <th>{t("admin.poi.colPosition")}</th>
+                  <th>{t("admin.poi.colCapacity")}</th>
+                  <th>{t("admin.poi.colAddress")}</th>
                   <th>{t("admin.poi.colActions")}</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredPois.length === 0 && !loading ? (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: "center", color: "var(--text-muted)", padding: 20 }}>
+                    <td colSpan={7} style={{ textAlign: "center", color: "var(--text-muted)", padding: 20 }}>
                       {t("admin.poi.empty")}
                     </td>
                   </tr>
@@ -282,8 +350,11 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
                           {p.statoAffollamento === "rosso" ? t("admin.poi.crowdingHigh") : p.statoAffollamento === "giallo" ? t("admin.poi.crowdingMedium") : t("admin.poi.crowdingLow")}
                         </span>
                       </td>
-                      <td style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                        {p.latitudine.toFixed(4)}, {p.longitudine.toFixed(4)}
+                      <td style={{ fontFamily: "var(--mono)", fontSize: 12 }}>{p.capacitaMax ?? "—"}</td>
+                      <td style={{ fontSize: 12, maxWidth: 220 }}>
+                        {p.indirizzo
+                          ? <span>{p.indirizzo}</span>
+                          : <span style={{ color: "var(--text-muted)", fontSize: 11 }}>{p.latitudine.toFixed(4)}, {p.longitudine.toFixed(4)}</span>}
                       </td>
                       <td style={{ display: "flex", gap: 8 }}>
                         <button className="revamp-action-btn" onClick={() => handleToggleDensity(p.id, p.statoAffollamento)}>

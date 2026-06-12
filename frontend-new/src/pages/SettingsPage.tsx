@@ -96,28 +96,6 @@ function SetTheme({ value, onChange, disabled }: any) {
   );
 }
 
-/* ===================== INTEREST CHIPS ===================== */
-const SET_INTERESTS = [
-  { id: "outdoor",  icon: "bike",     color: "var(--teal)" },
-  { id: "cultura",  icon: "landmark", color: "var(--violet)" },
-  { id: "musica",   icon: "music",    color: "var(--magenta)" },
-  { id: "food",     icon: "food",     color: "var(--amber)" },
-  { id: "sport",    icon: "run",      color: "var(--green)" },
-];
-function SetInterests({ value, onChange, disabled }: any) {
-  const { t } = useTranslation();
-  const toggle = (id) => onChange(value.includes(id) ? value.filter((x) => x !== id) : [...value, id]);
-  return (
-    <div className="s-interests">
-      {SET_INTERESTS.map((i) => (
-        <button key={i.id} disabled={disabled} className={"s-int-chip" + (value.includes(i.id) ? " on" : "")} style={{ "--ic": i.color } as React.CSSProperties} onClick={() => toggle(i.id)}>
-          <Icon name={i.icon} size={14} />{t(`settings.interests.${i.id}`)}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 /* ===================== DELETE MODAL ===================== */
 function DeleteModal({ onCancel, onConfirm }: any) {
   const { t } = useTranslation();
@@ -566,7 +544,8 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
             </div>
           </SetCard>
 
-          {/* 3 — Notifiche */}
+          {/* 3 — Notifiche (solo con account: sono preferenze server-side) */}
+          {user?.role !== "anonymous" && (
           <SetCard num={3} title={t("settings.notif.title")} desc={t("settings.notif.desc")} icon="bell" color="var(--magenta)">
             <div className="s-sublabel">{t("settings.notif.channels")}</div>
             <SetRow label={t("settings.notif.email")} sub={t("settings.notif.emailSub")} on={notif.email} onChange={(val) => handleNotifications("email", val)} disabled={savingSection === "notif"} />
@@ -581,14 +560,24 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
                 <Icon name="bell" size={15} />{t("settings.notif.sendTest")}
               </button>
             )}
-            <div className="s-div"></div>
-            <div className="s-sublabel">{t("settings.notif.categories")}</div>
-            <SetRow label={t("settings.notif.events")} sub={t("settings.notif.eventsSub")} on={notif.events} onChange={(val) => handleNotifications("events", val)} disabled={savingSection === "notif"} />
-            <SetRow label={t("settings.notif.activities")} sub={t("settings.notif.activitiesSub")} on={notif.activities} onChange={(val) => handleNotifications("activities", val)} disabled={savingSection === "notif"} />
-            <SetRow label={t("settings.notif.cityAlerts")} sub={t("settings.notif.cityAlertsSub")} on={notif.cityAlerts} onChange={(val) => handleNotifications("cityAlerts", val)} disabled={savingSection === "notif"} />
+            {/* Le categorie (nuovi eventi/attività/allerte) riguardano i
+                cittadini: gli admin ricevono le notifiche di servizio
+                (segnalazioni) a prescindere da questi interruttori. */}
+            {user?.role === "registered_user" && (
+              <>
+                <div className="s-div"></div>
+                <div className="s-sublabel">{t("settings.notif.categories")}</div>
+                <SetRow label={t("settings.notif.events")} sub={t("settings.notif.eventsSub")} on={notif.events} onChange={(val) => handleNotifications("events", val)} disabled={savingSection === "notif"} />
+                <SetRow label={t("settings.notif.activities")} sub={t("settings.notif.activitiesSub")} on={notif.activities} onChange={(val) => handleNotifications("activities", val)} disabled={savingSection === "notif"} />
+                <SetRow label={t("settings.notif.cityAlerts")} sub={t("settings.notif.cityAlertsSub")} on={notif.cityAlerts} onChange={(val) => handleNotifications("cityAlerts", val)} disabled={savingSection === "notif"} />
+              </>
+            )}
           </SetCard>
+          )}
 
-          {/* 4 — Privacy e posizione */}
+          {/* 4 — Privacy e posizione: visibilità partecipazioni e posizione
+              sono concetti da cittadino, non da admin/ente */}
+          {user?.role === "registered_user" && (
           <SetCard num={4} title={t("settings.privacy.title")} desc={t("settings.privacy.desc")} icon="pin" color="var(--teal)">
             <div>
               <div className="s-sublabel" style={{ marginBottom: 8 }}>{t("settings.privacy.useLocation")}</div>
@@ -610,12 +599,18 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
             <div className="s-div"></div>
             <SetRow label={t("settings.privacy.showProfile")} sub={t("settings.privacy.showProfileSub")} on={showProfile} onChange={(val) => handlePrivacyLocation("show", val)} disabled={savingSection === "privacy"} />
           </SetCard>
+          )}
 
-          {/* 5 — Preferenze */}
+          {/* 5 — Preferenze (solo cittadini). Gli interessi vivono nel
+              profilo: qui solo il rimando, niente doppioni da tenere in sync. */}
+          {user?.role === "registered_user" && (
           <SetCard num={5} title={t("settings.pref.title")} desc={t("settings.pref.desc")} icon="sparkle" color="var(--violet)">
             <div>
-              <div className="s-sublabel" style={{ marginBottom: 10 }}>{t("settings.pref.interests")}</div>
-              <SetInterests value={interests} onChange={(val) => handlePreferences("ints", val)} disabled={savingSection === "pref"} />
+              <div className="s-sublabel" style={{ marginBottom: 8 }}>{t("settings.pref.interests")}</div>
+              <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 8 }}>{t("settings.pref.manageInProfile")}</div>
+              <button className="s-acc-btn" style={{ alignSelf: "flex-start" }} onClick={() => setPage("profilo")}>
+                <Icon name="user" size={15} />{t("settings.pref.goToProfile")}
+              </button>
             </div>
             <div className="s-div"></div>
             <SetRow label={t("settings.pref.reliableOnly")} sub={t("settings.pref.reliableOnlySub")} on={reliableOnly} onChange={(val) => handlePreferences("rel", val)} disabled={savingSection === "pref"} />
@@ -630,6 +625,7 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
               ]} />
             </div>
           </SetCard>
+          )}
 
           {/* 6 — Accessibilità */}
           <SetCard num={6} title={t("settings.a11y.title")} desc={t("settings.a11y.desc")} icon="gauge" color="var(--green)">

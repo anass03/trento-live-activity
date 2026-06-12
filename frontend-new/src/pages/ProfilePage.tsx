@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
-import { getMyParticipations, leaveEvent, leaveActivity, getMe } from "../lib/api";
+import { getMyParticipations, leaveEvent, leaveActivity, getMe, regenerateRecoveryCodes } from "../lib/api";
 
 const PROFILE_INTERESTS = [
   { id: "outdoor",  icon: "bike",     color: "var(--teal)" },
@@ -38,7 +38,10 @@ const getCatIcon = (cat?: string) => {
 
 export function ProfilePage({ page, setPage, theme, setTheme, user }: any) {
   const { t, i18n } = useTranslation();
-  const [activeTab, setActiveTab] = useState("attivita");
+  // Partecipazioni e interessi sono concetti da cittadino: enti e admin
+  // vedono solo le informazioni account (+ sicurezza per gli admin di sistema).
+  const isCitizen = user?.role === "registered_user";
+  const [activeTab, setActiveTab] = useState(isCitizen ? "attivita" : "info");
   const [participations, setParticipations] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -48,8 +51,10 @@ export function ProfilePage({ page, setPage, theme, setTheme, user }: any) {
   const fetchParticipations = async () => {
     setLoading(true);
     try {
-      const parts = await getMyParticipations();
-      setParticipations(parts);
+      if (isCitizen) {
+        const parts = await getMyParticipations();
+        setParticipations(parts);
+      }
       const profile = await getMe();
       setUserProfile(profile);
     } catch (err) {
@@ -64,6 +69,29 @@ export function ProfilePage({ page, setPage, theme, setTheme, user }: any) {
       fetchParticipations();
     }
   }, [user?.id]);
+
+  // Se il ruolo cambia (es. re-login con un account diverso) il tab attivo
+  // non deve restare su una vista da cittadino.
+  useEffect(() => {
+    if (!isCitizen && activeTab !== "info") setActiveTab("info");
+  }, [isCitizen]);
+
+  const [newCodes, setNewCodes] = useState<string[]>([]);
+  const [regenPending, setRegenPending] = useState(false);
+  const [regenError, setRegenError] = useState("");
+
+  const handleRegenCodes = async () => {
+    setRegenPending(true);
+    setRegenError("");
+    try {
+      const res = await regenerateRecoveryCodes();
+      setNewCodes(res.recoveryCodes || []);
+    } catch (err: any) {
+      setRegenError(err?.message || "Errore");
+    } finally {
+      setRegenPending(false);
+    }
+  };
 
   const handleCancel = async (item: any) => {
     try {
@@ -99,39 +127,45 @@ export function ProfilePage({ page, setPage, theme, setTheme, user }: any) {
                 <Icon name="shieldCheck" size={10} style={{ color: "var(--cyan)" }} /> {t("profile.verifiedAuthor")}
               </div>
             </div>
-            <div className="revamp-profile-stats">
-              <div className="revamp-profile-stat">
-                <b>{participations.length}</b>
-                <span>{t("profile.participations")}</span>
+            {isCitizen && (
+              <div className="revamp-profile-stats">
+                <div className="revamp-profile-stat">
+                  <b>{participations.length}</b>
+                  <span>{t("profile.participations")}</span>
+                </div>
+                <div style={{ width: 1, background: "var(--border-soft-2)" }}></div>
+                <div className="revamp-profile-stat">
+                  <b>{typeof authorRating === "number" ? authorRating.toFixed(1) : "—"}</b>
+                  <span>{t("profile.rating")}</span>
+                </div>
+                <div style={{ width: 1, background: "var(--border-soft-2)" }}></div>
+                <div className="revamp-profile-stat">
+                  <b>{user?.role === "certified_entity" ? t("profile.yes") : t("profile.no")}</b>
+                  <span>{t("profile.certifiedEntity")}</span>
+                </div>
               </div>
-              <div style={{ width: 1, background: "var(--border-soft-2)" }}></div>
-              <div className="revamp-profile-stat">
-                <b>{typeof authorRating === "number" ? authorRating.toFixed(1) : "—"}</b>
-                <span>{t("profile.rating")}</span>
-              </div>
-              <div style={{ width: 1, background: "var(--border-soft-2)" }}></div>
-              <div className="revamp-profile-stat">
-                <b>{user?.role === "certified_entity" ? t("profile.yes") : t("profile.no")}</b>
-                <span>{t("profile.certifiedEntity")}</span>
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
         <div className="revamp-profile-card anim-in" style={{ "--accent": "var(--violet)", animationDelay: "120ms" } as React.CSSProperties}>
           <div className="revamp-profile-nav">
-            <button
-              className={"revamp-profile-tab" + (activeTab === "attivita" ? " active" : "")}
-              onClick={() => setActiveTab("attivita")}
-            >
-              {t("profile.tabBookings")}
-            </button>
-            <button
-              className={"revamp-profile-tab" + (activeTab === "interessi" ? " active" : "")}
-              onClick={() => setActiveTab("interessi")}
-            >
-              {t("profile.tabInterests")}
-            </button>
+            {isCitizen && (
+              <>
+                <button
+                  className={"revamp-profile-tab" + (activeTab === "attivita" ? " active" : "")}
+                  onClick={() => setActiveTab("attivita")}
+                >
+                  {t("profile.tabBookings")}
+                </button>
+                <button
+                  className={"revamp-profile-tab" + (activeTab === "interessi" ? " active" : "")}
+                  onClick={() => setActiveTab("interessi")}
+                >
+                  {t("profile.tabInterests")}
+                </button>
+              </>
+            )}
             <button
               className={"revamp-profile-tab" + (activeTab === "info" ? " active" : "")}
               onClick={() => setActiveTab("info")}
@@ -224,6 +258,54 @@ export function ProfilePage({ page, setPage, theme, setTheme, user }: any) {
             )}
           </div>
         </div>
+
+        {/* Sicurezza account: solo admin di sistema (2FA obbligatorio per loro).
+            Cambio authenticator = nuovo setup QR; i codici rigenerati invalidano i vecchi. */}
+        {user?.role === "system_admin" && (
+          <div className="revamp-profile-card anim-in" style={{ "--accent": "var(--amber)", animationDelay: "180ms" } as React.CSSProperties}>
+            <h3 style={{ margin: "0 0 6px", fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
+              <Icon name="shieldCheck" size={16} style={{ color: "var(--amber)" }} /> {t("twofa.securityTitle")}
+            </h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ flex: 1, minWidth: 220 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 650 }}>{t("twofa.changeAuthenticator")}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{t("twofa.changeAuthenticatorSub")}</div>
+                </div>
+                <button className="revamp-action-btn" onClick={() => setPage("setup-2fa")}>
+                  <Icon name="refresh" size={13} /> {t("twofa.changeAuthenticator")}
+                </button>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ flex: 1, minWidth: 220 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 650 }}>{t("twofa.regenCodes")}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{t("twofa.regenCodesSub")}</div>
+                </div>
+                <button className="revamp-action-btn" disabled={regenPending} onClick={handleRegenCodes}>
+                  <Icon name="key" size={13} /> {regenPending ? "…" : t("twofa.regenCodes")}
+                </button>
+              </div>
+              {regenError && (
+                <div className="revamp-status-pill danger" style={{ justifyContent: "center" }}>
+                  <Icon name="warn" size={12} /> {regenError}
+                </div>
+              )}
+              {newCodes.length > 0 && (
+                <div>
+                  <div className="revamp-status-pill warning" style={{ width: "100%", justifyContent: "center", marginBottom: 10 }}>
+                    <Icon name="warn" size={12} /> {t("twofa.regenDone")}
+                  </div>
+                  <div style={{
+                    background: "var(--chip-fill)", padding: 12, borderRadius: 8, border: "1px solid var(--border-soft)",
+                    fontFamily: "var(--mono)", fontSize: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8
+                  }}>
+                    {newCodes.map((c, i) => <div key={i}>● {c}</div>)}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

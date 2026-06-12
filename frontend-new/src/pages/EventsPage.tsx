@@ -185,7 +185,7 @@ function Composer({ search, setSearch }: any) {
 }
 
 /* ===================== EVENT POST CARD ===================== */
-function PostCard({ e, liked, saved, shared, onLike, onSave, onShare, onOpen, flash }: any) {
+function PostCard({ e, liked, saved, shared, onLike, onSave, onShare, onOpen, flash, canSave = true }: any) {
   const { t, i18n } = useTranslation();
   const onMove = useGlow();
   const meta = evMeta(e.category);
@@ -235,7 +235,9 @@ function PostCard({ e, liked, saved, shared, onLike, onSave, onShare, onOpen, fl
               aria-label={shared ? t("events.shareCopied") : t("events.ariaShare")} title={shared ? t("events.shareCopied") : undefined}>
               <Icon name={shared ? "check" : "share"} size={17} />
             </button>
-            <button className={"act-btn save icon-only" + (saved ? " on" : "")} onClick={stop(() => onSave(e.id))} aria-label={t("events.ariaSave")}><Icon name="bookmark" size={17} /></button>
+            {canSave && (
+              <button className={"act-btn save icon-only" + (saved ? " on" : "")} onClick={stop(() => onSave(e.id))} aria-label={t("events.ariaSave")}><Icon name="bookmark" size={17} /></button>
+            )}
           </div>
         </div>
       </div>
@@ -266,7 +268,8 @@ const Feed = React.forwardRef<any, any>(function Feed({ events, user, search, se
           </div>
           <div className="feed-body">
             <PostCard e={e} liked={!!likes[e.id]} saved={!!saves[e.id]} shared={sharedId === e.id}
-              onLike={onLike} onSave={onSave} onShare={onShare} onOpen={onOpen} flash={flashId === e.id} />
+              onLike={onLike} onSave={onSave} onShare={onShare} onOpen={onOpen} flash={flashId === e.id}
+              canSave={user?.role === "registered_user" || user?.role === "anonymous"} />
           </div>
         </div>
       ))}
@@ -275,7 +278,7 @@ const Feed = React.forwardRef<any, any>(function Feed({ events, user, search, se
 });
 
 /* ===================== NEXT ACTIVITY ===================== */
-function NextActivity({ event, joined, saved, busy, joinError, onJoin, onSave }: any) {
+function NextActivity({ event, joined, saved, busy, joinError, onJoin, onSave, canJoin = true }: any) {
   const { t, i18n } = useTranslation();
   if (!event) {
     return (
@@ -319,11 +322,15 @@ function NextActivity({ event, joined, saved, busy, joinError, onJoin, onSave }:
         <div className="np-n"><b>{event.participantCount || 0}</b> {event.maxPartecipanti ? `/ ${event.maxPartecipanti}` : ""}</div>
       </div>
       <div className="next-cta-row">
-        <button className={"next-cta" + (joined ? " joined" : "")} onClick={onJoin} aria-pressed={joined} disabled={busy} aria-busy={busy}>
-          <Icon name={joined ? "check" : "ticket"} size={17} />
-          {busy ? t("events.joining") : joined ? t("events.joinedCta") : t("events.joinCta")}
-        </button>
-        <button className={"next-save" + (saved ? " on" : "")} onClick={onSave} aria-label={t("events.ariaSaveEvent")}><Icon name="bookmark" size={19} /></button>
+        {canJoin && (
+          <button className={"next-cta" + (joined ? " joined" : "")} onClick={onJoin} aria-pressed={joined} disabled={busy} aria-busy={busy}>
+            <Icon name={joined ? "check" : "ticket"} size={17} />
+            {busy ? t("events.joining") : joined ? t("events.joinedCta") : t("events.joinCta")}
+          </button>
+        )}
+        {canJoin && (
+          <button className={"next-save" + (saved ? " on" : "")} onClick={onSave} aria-label={t("events.ariaSaveEvent")}><Icon name="bookmark" size={19} /></button>
+        )}
       </div>
       {joinError && <div className="next-join-error" role="alert"><Icon name="warn" size={13} />{joinError}</div>}
     </Widget>
@@ -575,6 +582,7 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
         <div className="ev-col right">
           <NextActivity
             event={nextEvent}
+            canJoin={user?.role === "registered_user" || user?.role === "anonymous"}
             joined={nextEvent ? !!(nextEvent.participantIds?.includes(user?.id || "")) : false}
             saved={nextEvent ? !!saves[nextEvent.id] : false}
             busy={joinBusy}

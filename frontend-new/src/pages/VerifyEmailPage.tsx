@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "../components/ui/Icon";
 import { verifyEmail } from "../lib/api";
+import { needsOnboardingAfterOauth } from "../components/auth/LoginModal";
 
 export function VerifyEmailPage({ page, setPage }: any) {
   const { t } = useTranslation();
@@ -68,7 +69,17 @@ export function VerifyEmailPage({ page, setPage }: any) {
             <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 20 }}>
               {t("verifyEmail.successBody")}
             </p>
-            <button className="revamp-form-btn" style={{ "--accent": "var(--cyan)" } as React.CSSProperties} onClick={() => setPage("home")}>
+            <button
+              className="revamp-form-btn"
+              style={{ "--accent": "var(--cyan)" } as React.CSSProperties}
+              onClick={async () => {
+                // La verifica fa auto-login: un cittadino nuovo passa prima
+                // dalla scelta interessi, poi dalla home.
+                window.dispatchEvent(new Event("tla:user-updated"));
+                const needsOnboarding = await needsOnboardingAfterOauth();
+                setPage(needsOnboarding ? "onboarding" : "home");
+              }}
+            >
               {t("verifyEmail.goDashboard")}
             </button>
           </div>
