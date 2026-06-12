@@ -260,7 +260,7 @@ function ActSortBar({ count, sort, setSort }: any) {
 }
 
 /* ===================== ACTIVITY CARD ===================== */
-function ActCard({ a, saved, onSave, onOpen }: any) {
+function ActCard({ a, saved, onSave, onOpen, canSave = true }: any) {
   const { t } = useTranslation();
   const onMove = useGlow();
   const cat = activityCat(a.cat);
@@ -280,7 +280,7 @@ function ActCard({ a, saved, onSave, onOpen }: any) {
       onMouseMove={onMove} onClick={() => onOpen(a.id)}>
       <div className="act-media">
         {badge && <span className={"act-badge " + badge.cls}><Icon name={badge.icon} size={11} />{badge.label}</span>}
-        <button className={"act-save" + (saved ? " on" : "")} onClick={stop(() => onSave(a.id))} aria-label={saved ? t("activities.removeSaved") : t("activities.save")} aria-pressed={saved}><Icon name="bookmark" size={16} /></button>
+        {canSave && <button className={"act-save" + (saved ? " on" : "")} onClick={stop(() => onSave(a.id))} aria-label={saved ? t("activities.removeSaved") : t("activities.save")} aria-pressed={saved}><Icon name="bookmark" size={16} /></button>}
         {a.rating != null && (
           <span className="am-rating"><Icon name="star" size={13} />{a.rating.toFixed(1)}{a.reviews ? <span>({a.reviews})</span> : null}</span>
         )}
@@ -314,7 +314,7 @@ function ActCard({ a, saved, onSave, onOpen }: any) {
 }
 
 /* ===================== RIGHT — NEXT ===================== */
-function ActNextWidget({ activity, saved, onSave, onOpen }: any) {
+function ActNextWidget({ activity, saved, onSave, onOpen, canSave = true }: any) {
   const { t, i18n } = useTranslation();
   const dtLocale = i18n.language.startsWith("en") ? "en-GB" : "it-IT";
   if (!activity) {
@@ -346,7 +346,7 @@ function ActNextWidget({ activity, saved, onSave, onOpen }: any) {
       </div>
       <div className="next-cta-row">
         <button className="next-cta" onClick={() => onOpen(a.id)}><Icon name="arrow" size={17} />{t("activities.viewDetails")}</button>
-        <button className={"next-save" + (saved ? " on" : "")} onClick={() => onSave(a.id)} aria-label={saved ? t("activities.removeSaved") : t("activities.save")} aria-pressed={saved}><Icon name="bookmark" size={19} /></button>
+        {canSave && <button className={"next-save" + (saved ? " on" : "")} onClick={() => onSave(a.id)} aria-label={saved ? t("activities.removeSaved") : t("activities.save")} aria-pressed={saved}><Icon name="bookmark" size={19} /></button>}
       </div>
     </Widget>
   );
@@ -422,6 +422,8 @@ function WeatherStrip() {
 
 export function ActivityPage({ page, setPage, theme, setTheme, user, setSelectedActivityId }: any) {
   const { t } = useTranslation();
+  // I preferiti sono una funzione da cittadino: admin ed enti non salvano.
+  const canSave = user?.role === "registered_user" || user?.role === "anonymous";
   const [backendActivities, setBackendActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -571,12 +573,12 @@ export function ActivityPage({ page, setPage, theme, setTheme, user, setSelected
                 <div className="feed-state-msg">{tab === "saved" ? t("activities.emptyNoSavedMsg") : t("activities.emptyNoFoundMsg")}</div>
               </div>
             : <div className="act-grid">
-                {list.map((a) => <ActCard key={a.id} a={a} saved={!!saves[a.id]} onSave={onSave} onOpen={() => handleOpenDetail(a.id)} />)}
+                {list.map((a) => <ActCard key={a.id} a={a} saved={!!saves[a.id]} onSave={onSave} canSave={canSave} onOpen={() => handleOpenDetail(a.id)} />)}
               </div>}
         </div>
 
         <div className="ev-col right">
-          <ActNextWidget activity={list[0]} saved={list[0] ? !!saves[list[0].id] : false} onSave={onSave} onOpen={() => list[0] && handleOpenDetail(list[0].id)} />
+          <ActNextWidget activity={list[0]} saved={list[0] ? !!saves[list[0].id] : false} onSave={onSave} canSave={canSave} onOpen={() => list[0] && handleOpenDetail(list[0].id)} />
           <MyActivitiesWidget user={user} setPage={setPage} onOpen={handleOpenDetail} />
           <WeatherStrip />
         </div>

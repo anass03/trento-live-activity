@@ -90,9 +90,9 @@ export function ContentActions({ kind, id, title, startIso, location, accent = "
         <button style={ghostBtn} onClick={openApple} title="Scarica .ics (si apre in Apple Calendar)">
           <AppleBrandIcon size={14} /> Apple Calendar
         </button>
-        {/* Segnalare è riservato a cittadini ed enti (gli admin moderano,
-            non segnalano): il backend rifiuterebbe comunque la chiamata. */}
-        {(userRole === "registered_user" || userRole === "certified_entity" || userRole === "anonymous") && (
+        {/* Segnalare è riservato ai cittadini (gli enti sono parte in causa,
+            gli admin moderano direttamente): il backend rifiuta gli altri. */}
+        {(userRole === "registered_user" || userRole === "anonymous") && (
           <button
             style={{ ...ghostBtn, marginLeft: "auto", color: "var(--red)", borderColor: "color-mix(in srgb, var(--red) 35%, transparent)" }}
             onClick={toggleReport}

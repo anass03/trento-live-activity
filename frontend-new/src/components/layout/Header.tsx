@@ -177,8 +177,12 @@ export function Header({ page, setPage, theme, setTheme, user, searchItems, onSe
                     </div>
                   </div>
                   <button className="profile-menu-item" onClick={() => go("profilo")}><Icon name="user" size={15} />{t("header.profile")}</button>
-                  <button className="profile-menu-item" onClick={() => go("attivita")}><Icon name="activity" size={15} />{t("header.myActivities")}</button>
-                  <button className="profile-menu-item" onClick={() => go("profilo")}><Icon name="bookmark" size={15} />{t("header.saved")}</button>
+                  {role === "registered_user" && (
+                    <>
+                      <button className="profile-menu-item" onClick={() => go("attivita")}><Icon name="activity" size={15} />{t("header.myActivities")}</button>
+                      <button className="profile-menu-item" onClick={() => go("profilo")}><Icon name="bookmark" size={15} />{t("header.saved")}</button>
+                    </>
+                  )}
                   <button className="profile-menu-item" onClick={() => go("impostazioni")}><Icon name="settings" size={15} />{t("header.settings")}</button>
                   <button className="profile-menu-item danger" onClick={handleLogout}><Icon name="logOut" size={15} />{t("header.logout")}</button>
                 </>
