@@ -10,6 +10,7 @@ jest.mock('../src/data/models', () => ({
     destroy: jest.fn().mockResolvedValue(1),
   },
   Event: { findByPk: jest.fn() },
+  Activity: { findByPk: jest.fn() },
   User: {
     findAll: jest.fn().mockResolvedValue([]),
     findByPk: jest.fn().mockResolvedValue(null),
@@ -21,6 +22,7 @@ jest.mock('../src/notifications/email.service', () => ({
   sendReportOutcome: jest.fn().mockResolvedValue(undefined),
 }));
 jest.mock('../src/notifications/push.service', () => ({
+  sendReportCreated: jest.fn().mockResolvedValue(undefined),
   sendReportOutcome: jest.fn().mockResolvedValue(undefined),
 }));
 
@@ -36,7 +38,7 @@ describe('Moderation Service — createReport', () => {
   test('TC-MOD-01: creates a report with stato=aperta (OCL C23)', async () => {
     Event.findByPk.mockResolvedValue({ id: EVENT_ID, titolo: 'Bad event', entityId: 'ent-1' });
     Report.create.mockResolvedValue({ id: REPORT_ID, stato: 'aperta', tipo: 'spam' });
-    const result = await moderationService.createReport(USER_ID, EVENT_ID, { tipo: 'spam' });
+    const result = await moderationService.createReport(USER_ID, { eventId: EVENT_ID }, { tipo: 'spam' });
     expect(Report.create).toHaveBeenCalledWith(expect.objectContaining({
       userId: USER_ID, eventId: EVENT_ID, tipo: 'spam', stato: 'aperta',
     }));
@@ -48,13 +50,31 @@ describe('Moderation Service — createReport', () => {
     const err = new Error('unique constraint');
     err.name = 'SequelizeUniqueConstraintError';
     Report.create.mockRejectedValue(err);
-    await expect(moderationService.createReport(USER_ID, EVENT_ID, { tipo: 'spam' }))
+    await expect(moderationService.createReport(USER_ID, { eventId: EVENT_ID }, { tipo: 'spam' }))
       .rejects.toMatchObject({ status: 409, code: 'ALREADY_REPORTED' });
   });
 
   test('TC-MOD-03: rejects report on non-existent event', async () => {
     Event.findByPk.mockResolvedValue(null);
-    await expect(moderationService.createReport(USER_ID, EVENT_ID, { tipo: 'spam' }))
+    await expect(moderationService.createReport(USER_ID, { eventId: EVENT_ID }, { tipo: 'spam' }))
+      .rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' });
+  });
+
+  test('TC-MOD-08: creates a report for a citizen activity', async () => {
+    const { Activity } = require('../src/data/models');
+    Activity.findByPk.mockResolvedValue({ id: 'act-1', title: 'Corsa al parco', tipo: 'corsa', creatorId: 'u-9' });
+    Report.create.mockResolvedValue({ id: REPORT_ID, stato: 'aperta', tipo: 'spam' });
+    const result = await moderationService.createReport(USER_ID, { activityId: 'act-1' }, { tipo: 'spam' });
+    expect(Report.create).toHaveBeenCalledWith(expect.objectContaining({
+      userId: USER_ID, activityId: 'act-1', eventId: null, stato: 'aperta',
+    }));
+    expect(result.stato).toBe('aperta');
+  });
+
+  test('TC-MOD-09: rejects report on non-existent activity', async () => {
+    const { Activity } = require('../src/data/models');
+    Activity.findByPk.mockResolvedValue(null);
+    await expect(moderationService.createReport(USER_ID, { activityId: 'act-x' }, { tipo: 'spam' }))
       .rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' });
   });
 });

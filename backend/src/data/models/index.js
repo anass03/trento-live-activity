@@ -38,10 +38,12 @@ Participation.belongsTo(Activity, { foreignKey: 'activityId' });
 Event.belongsTo(User, { foreignKey: 'entityId', as: 'entity' });
 User.hasMany(Event, { foreignKey: 'entityId', as: 'publishedEvents' });
 
-// Event <-> Report
+// Event/Activity <-> Report (segnalazione polimorfica: eventId XOR activityId)
 Report.belongsTo(User, { foreignKey: 'userId', as: 'reporter' });
 Report.belongsTo(Event, { foreignKey: 'eventId', as: 'event' });
 Event.hasMany(Report, { foreignKey: 'eventId', as: 'reports' });
+Report.belongsTo(Activity, { foreignKey: 'activityId', as: 'activity' });
+Activity.hasMany(Report, { foreignKey: 'activityId', as: 'reports' });
 
 // POI associations
 Activity.belongsTo(POI, { foreignKey: 'poiId', as: 'poi' });
