@@ -705,6 +705,9 @@ export function createAdminComunale(payload: { nome: string; cognome: string; em
 export function createAdminSistema(payload: { nome: string; cognome: string; email: string; password: string }): Promise<AdminSistema> {
   return request('/api/admin/users/sistema', { method: 'POST', body: payload });
 }
+export function toggleSuperAdmin(id: string, superAdmin: boolean): Promise<{ id: string; superAdmin: boolean }> {
+  return request(`/api/admin/users/sistema/${encodeURIComponent(id)}/super-admin`, { method: 'PATCH', body: { superAdmin } });
+}
 
 export interface POI {
   id: string; nome: string; latitudine: number; longitudine: number;
@@ -727,12 +730,16 @@ export function deletePOI(id: string): Promise<void> {
 // ============================== Moderation ==============================
 
 export interface Report {
-  id: string; userId: string; eventId: string;
+  id: string; userId: string; eventId: string | null; activityId: string | null;
   tipo: string; stato: string; descrizione?: string; createdAt: string;
-  event?: { id: string; titolo: string };
+  event?: { id: string; titolo: string } | null;
+  activity?: { id: string; title?: string | null; tipo?: string | null } | null;
 }
 export function reportEvent(eventId: string, tipo: string, descrizione?: string): Promise<Report> {
   return request(`/api/moderation/events/${encodeURIComponent(eventId)}/report`, { method: 'POST', body: { tipo, descrizione } });
+}
+export function reportActivity(activityId: string, tipo: string, descrizione?: string): Promise<Report> {
+  return request(`/api/moderation/activities/${encodeURIComponent(activityId)}/report`, { method: 'POST', body: { tipo, descrizione } });
 }
 export function getReports(stato?: string): Promise<{ reports: Report[] }> {
   const qs = stato ? `?stato=${encodeURIComponent(stato)}` : '';

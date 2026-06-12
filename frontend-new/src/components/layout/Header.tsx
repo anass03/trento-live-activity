@@ -26,7 +26,10 @@ export function Header({ page, setPage, theme, setTheme, user }: any) {
   const handleLogout = async () => {
     setProfileOpen(false);
     await apiLogout();
-    setPage("login");
+    // Refresh the shared user state (token is gone → guest) and land on home:
+    // logging back in is an explicit user choice, not a forced redirect.
+    window.dispatchEvent(new Event("tla:user-updated"));
+    setPage("home");
   };
 
   let nav = [

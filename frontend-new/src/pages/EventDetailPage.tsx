@@ -4,6 +4,7 @@ import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
 import { CommentsSection } from "../components/redesign/CommentsSection";
 import { getEventById, joinEvent, leaveEvent, ApiEvent } from "../lib/api";
+import { ContentActions } from "../components/ui/ContentActions";
 
 const grads: Record<string, string> = {
   musica: "linear-gradient(140deg,#db2777,#831843)",
@@ -173,6 +174,16 @@ export function EventDetailPage({ page, setPage, theme, setTheme, user, selected
               >
                 {isJoined ? t("events.cancelJoin") : t("events.joinCta")}
               </button>
+              <ContentActions
+                kind="event"
+                id={event.id}
+                title={event.title}
+                startIso={event.dateTime}
+                location={event.location}
+                accent="var(--magenta)"
+                userRole={user?.role}
+                onRequireLogin={() => setPage("login")}
+              />
             </div>
 
             <div className="revamp-detail-section-title" style={{ marginTop: 28 }}>{t("comments.discussionTitle")}</div>

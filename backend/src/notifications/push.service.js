@@ -128,6 +128,15 @@ async function sendParticipantLeft(userIds, activityTipo, participantName, activ
   });
 }
 
+// RNF24: avvisa gli admin di sistema che c'è una nuova segnalazione da moderare.
+async function sendReportCreated(adminUserIds, titolo, tipo) {
+  return sendToUsers(adminUserIds, {
+    title: 'Nuova segnalazione da moderare',
+    body: `"${titolo}" è stato segnalato (${tipo}). Apri la dashboard di moderazione.`,
+    data: { type: 'report_created' },
+  });
+}
+
 async function sendReportOutcome(userId, eventTitolo, outcome) {
   const tokens = await getUserTokens(userId);
   const labels = {
@@ -281,6 +290,7 @@ module.exports = {
   sendActivityCancelled,
   sendActivityUpdated,
   sendParticipantLeft,
+  sendReportCreated,
   sendReportOutcome,
   sendBroadcast,
   getTokenStats,

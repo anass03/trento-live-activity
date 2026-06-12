@@ -45,6 +45,8 @@ interface TrentoMapProps {
   theme: "light" | "dark" | "auto";
   markers: any[];
   activeFilter: string;
+  /* "all" | "event" | "activity": secondo asse di filtro, ortogonale alle categorie */
+  kindFilter?: string;
   onMarkerClick: (marker: any) => void;
   selectedMarkerId?: string | null;
   zoom: number;
@@ -56,12 +58,15 @@ interface TrentoMapProps {
      "Crea attività qui" nel popup dei POI */
   canCreateActivity?: boolean;
   onCreatePoi?: (marker: any) => void;
+  /* apre la pagina di dettaglio di un evento/attività dal popup */
+  onOpenDetail?: (marker: any) => void;
 }
 
 export const TrentoMap = React.memo(function TrentoMap({
   theme,
   markers,
   activeFilter,
+  kindFilter = "all",
   onMarkerClick,
   selectedMarkerId,
   zoom,
@@ -70,7 +75,8 @@ export const TrentoMap = React.memo(function TrentoMap({
   onLocateRef,
   onResetRef,
   canCreateActivity,
-  onCreatePoi
+  onCreatePoi,
+  onOpenDetail
 }: TrentoMapProps) {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -220,7 +226,13 @@ export const TrentoMap = React.memo(function TrentoMap({
     // Filter and add markers
     markers.forEach((m) => {
       const isPoi = m.type === "poi";
-      const dim = activeFilter !== "all" && activeFilter !== m.cat;
+      const catDim = activeFilter !== "all" && activeFilter !== m.cat;
+      // Filtro Eventi/Attività: con "activity" i POI restano accesi perché
+      // sono i luoghi dove un cittadino può creare un'attività.
+      const kindDim = kindFilter === "event" ? m.type !== "event"
+        : kindFilter === "activity" ? (m.type !== "activity" && !isPoi)
+        : false;
+      const dim = catDim || kindDim;
       const selected = selectedMarkerId === m.id;
       const crowd = m.raw?.crowdingStatus || "green";
       const color = isPoi ? CROWD_COLOR[crowd] : catColor(m.cat);
@@ -355,7 +367,9 @@ export const TrentoMap = React.memo(function TrentoMap({
         if (ctaBtn) {
           ctaBtn.addEventListener("click", (e) => {
             e.stopPropagation();
-            alert(`Grazie per esserti registrato all'evento: ${m.title}`);
+            // La partecipazione vera (join, calendario, segnalazione) vive
+            // nella pagina di dettaglio: il popup è solo l'aggancio rapido.
+            onOpenDetail && onOpenDetail(m);
           });
         }
 

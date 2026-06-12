@@ -189,7 +189,13 @@
     "sport": "Sport",
     "cibo": "Cibo & Drink",
     "outdoor": "Outdoor",
-    "famiglia": "Famiglia"
+    "famiglia": "Famiglia",
+    "poi": "POI"
+  },
+  "mapKind": {
+    "all": "Tutto",
+    "event": "Eventi",
+    "activity": "Attività"
   },
   "activities": {
     "joinCta": "Partecipa all'attività",

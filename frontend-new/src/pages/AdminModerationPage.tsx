@@ -15,7 +15,8 @@ export function AdminModerationPage({ page, setPage, theme, setTheme, user }: an
     setLoading(true);
     setErrorMsg("");
     try {
-      const data = await getReports("in_attesa");
+      // Stato backend: 'aperta' | 'in lavorazione' | 'risolta'
+      const data = await getReports("aperta");
       setReports(data.reports || []);
     } catch (err: any) {
       console.error(err);
@@ -83,11 +84,16 @@ export function AdminModerationPage({ page, setPage, theme, setTheme, user }: an
                       <td>
                         <span className="revamp-status-pill info">{r.tipo}</span>
                       </td>
-                      <td><b>{r.event?.titolo || t("admin.moderation.deletedEvent")}</b></td>
+                      <td>
+                        <span className={"revamp-status-pill " + (r.activityId ? "success" : "warning")}>
+                          {r.activityId ? t("comune.dashboard.typeActivity") : t("comune.dashboard.typeEvent")}
+                        </span>
+                      </td>
+                      <td><b>{r.event?.titolo || r.activity?.title || (r.activity?.tipo ? `${t("comune.dashboard.typeActivity")} di ${r.activity.tipo}` : t("admin.moderation.deletedEvent"))}</b></td>
                       <td>{r.descrizione || t("admin.moderation.noDetails")}</td>
                       <td>{r.createdAt ? new Date(r.createdAt).toLocaleDateString(dtLocale) : "—"}</td>
                       <td>
-                        {r.stato === "in_attesa" ? (
+                        {r.stato === "aperta" ? (
                           <div className="revamp-admin-row-actions">
                             <button className="revamp-action-btn danger" onClick={() => handleAction(r.id, true)}>
                               <Icon name="x" size={12} /> {t("admin.moderation.remove")}
