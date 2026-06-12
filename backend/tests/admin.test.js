@@ -16,7 +16,7 @@ jest.mock('../src/data/models', () => ({
   Report:      { destroy: jest.fn().mockResolvedValue(0) },
   Participation: { destroy: jest.fn().mockResolvedValue(0) },
   CittadinoProfile: {},
-  EnteProfile: {},
+  EnteProfile: { update: jest.fn().mockResolvedValue([1]) },
   AmministratoreComunaleProfile: {},
   AmministratoreSistemaProfile: { findOne: jest.fn() },
 }));
@@ -25,14 +25,18 @@ jest.mock('../src/data/models', () => ({
 // user create a separate express app with an overridden authenticate mock.
 jest.mock('../src/middleware/auth', () => ({
   authenticate: (req, _res, next) => {
-    req.user = { id: 'admin-1', ruolo: 'AmministratoreDiSistema', superAdmin: true, jti: 'jti-1' };
+    // Preserve a req.user injected upstream (the non-super-admin app installs
+    // its own identity middleware before the routes) — only default otherwise.
+    if (!req.user) {
+      req.user = { id: 'admin-1', ruolo: 'AmministratoreDiSistema', superAdmin: true, jti: 'jti-1' };
+    }
     next();
   },
   authorize: () => (_req, _res, next) => next(),
   authorizeSuperAdmin: () => (_req, _res, next) => next(),
 }));
 
-const { User, AmministratoreSistemaProfile } = require('../src/data/models');
+const { User, EnteProfile, AmministratoreSistemaProfile } = require('../src/data/models');
 const adminRoutes = require('../src/admin/admin.routes');
 
 const app = express();
@@ -59,6 +63,18 @@ describe('Admin routes — entity approval', () => {
     const res = await request(app).patch('/admin/entities/e1/approve');
     expect(res.status).toBe(200);
     expect(update).toHaveBeenCalledWith({ approvato: true });
+  });
+
+  test('TC-ADM-02b: PATCH /admin/entities/:id/approve syncs approvato on EnteProfile too', async () => {
+    const update = jest.fn().mockResolvedValue(undefined);
+    User.findOne.mockResolvedValue({ id: 'e1', update });
+    const res = await request(app).patch('/admin/entities/e1/approve');
+    expect(res.status).toBe(200);
+    // login/getMe e la tab "enti" leggono enteProfile.approvato: deve essere aggiornato
+    expect(EnteProfile.update).toHaveBeenCalledWith(
+      { approvato: true },
+      { where: { userId: 'e1' } },
+    );
   });
 
   test('TC-ADM-03: PATCH /admin/entities/:id/reject deletes the entity', async () => {

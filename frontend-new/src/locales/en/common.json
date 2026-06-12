@@ -1,0 +1,205 @@
+{
+  "common": {
+    "close": "Close",
+    "notAvailable": "Not available",
+    "na": "N/A",
+    "today": "Today",
+    "source": "Source"
+  },
+  "header": {
+    "brandSub": "Smart City · Real time",
+    "nav": {
+      "home": "Home",
+      "map": "Map",
+      "events": "Events",
+      "activities": "Activities",
+      "settings": "Settings",
+      "comuneDashboard": "Municipal dashboard",
+      "stats": "Statistics",
+      "export": "Export",
+      "users": "Users",
+      "poi": "POI",
+      "entities": "Entities",
+      "moderation": "Moderation",
+      "notifications": "Notifications",
+      "publish": "Publish"
+    },
+    "searchPlaceholder": "Search places, events…",
+    "notificationsAria": "Notifications",
+    "themeToggleAria": "Switch theme",
+    "themeToggleTitle": "Day / Night",
+    "profileAria": "Profile",
+    "guest": "Guest",
+    "guestAccess": "Guest access",
+    "guestTitle": "You're not signed in",
+    "guestSubtitle": "Log in to save and join activities",
+    "register": "Sign up",
+    "login": "Log in",
+    "profile": "Profile",
+    "myActivities": "My activities",
+    "saved": "Saved",
+    "settings": "Settings",
+    "logout": "Logout"
+  },
+  "home": {
+    "locate": "Locate",
+    "reset": "Reset",
+    "timeTBD": "Time TBD",
+    "dateTBD": "Date TBD",
+    "placeTBC": "Venue to be confirmed",
+    "area": {
+      "veryActive": "Very busy",
+      "active": "Busy",
+      "moderate": "Moderate",
+      "quiet": "Quiet"
+    }
+  },
+  "widgets": {
+    "weather": {
+      "title": "Weather",
+      "modalTitle": "Weather in Trento",
+      "unavailable": "Not available",
+      "condUnavailable": "Weather temporarily unavailable",
+      "emptyHourly": "Weather temporarily unavailable.",
+      "maxMin": "Max / Min",
+      "rain": "Rain",
+      "wind": "Wind"
+    },
+    "alerts": {
+      "title": "City alerts",
+      "active": "{{count}} active",
+      "empty": "City alerts temporarily unavailable.",
+      "seeAll": "See all alerts ({{count}})",
+      "tagUrgent": "Urgent",
+      "tagMedium": "Medium",
+      "tagInfo": "Info"
+    },
+    "parking": {
+      "title": "Parking",
+      "modalTitle": "Trento parking",
+      "cacheLive": "Live cache",
+      "unavailable": "Not available",
+      "occupied": "Occupied",
+      "avgOccupancy": "Average occupancy",
+      "scopeCar": "car areas",
+      "scopeBike": "bike areas",
+      "scopeBoth": "car and bike areas",
+      "monitored": "{{count}} {{scope}} monitored in real time in Trento city centre.",
+      "empty": "Parking data not available at the moment.",
+      "emptyFilter": "No parking for the selected filter.",
+      "cars": "Cars",
+      "bikes": "Bikes"
+    },
+    "areas": {
+      "title": "Most active areas",
+      "live": "Live",
+      "none": "None",
+      "empty": "No monitored areas available."
+    },
+    "events": {
+      "title": "Upcoming events",
+      "today": "{{count}} today",
+      "empty": "No events available at the moment."
+    },
+    "popup": {
+      "place": "Location",
+      "when": "When",
+      "participants": "Participants",
+      "join": "Join",
+      "close": "Close"
+    }
+  },
+  "detail": {
+    "closeAria": "Close",
+    "noLocation": "No precise location available",
+    "parking": {
+      "empty": "Parking data not available at the moment.",
+      "occupied": "occupied",
+      "statusFull": "Full",
+      "statusAlmostFull": "Almost full",
+      "statusModerate": "Moderate",
+      "statusAvailable": "Available",
+      "typeCar": "Cars",
+      "typeBike": "Bikes",
+      "typeFallback": "Parking",
+      "area": "Area",
+      "freeSpots": "Free spots",
+      "type": "Type",
+      "updated": "Updated",
+      "defaultSource": "Municipality of Trento",
+      "defaultArea": "Trento"
+    },
+    "areas": {
+      "empty": "No monitored areas available.",
+      "rowMeta": "{{events}} events · {{participants}} participants"
+    },
+    "weather": {
+      "unavailable": "Weather not available",
+      "humidity": "Humidity",
+      "wind": "Wind",
+      "cover": "Cloud cover",
+      "reading": "Reading",
+      "nextHours": "Next hours",
+      "rainPct": "{{pct}}% rain",
+      "emptyHourly": "Hourly forecast not available.",
+      "days": "Days",
+      "emptyDaily": "Daily forecast not available."
+    },
+    "alerts": {
+      "empty": "No city alerts available.",
+      "loadingDetail": "Loading details...",
+      "severity": "Severity",
+      "category": "Category",
+      "published": "Published",
+      "updated": "Updated",
+      "showOnMap": "Show on map"
+    },
+    "area": {
+      "noActivity": "Activity not available",
+      "scoreHint": "Index based on POI crowding, nearby events, participants and real-time status.",
+      "area": "Area",
+      "nearbyEvents": "Nearby events",
+      "estParticipants": "Estimated participants",
+      "poiStatus": "POI status"
+    },
+    "event": {
+      "place": "Location",
+      "when": "When",
+      "participants": "Participants",
+      "category": "Category",
+      "fallbackDesc": "Event card with key information, map provenance and quick actions.",
+      "open": "Open in Events"
+    },
+    "activity": {
+      "place": "Location",
+      "duration": "Duration",
+      "rating": "Rating",
+      "participants": "Participants",
+      "fallbackDesc": "Activity detail with useful info to decide whether to join.",
+      "open": "Open activity"
+    },
+    "generic": {
+      "empty": "No data available."
+    }
+  },
+  "categories": {
+    "all": "All",
+    "cultura": "Culture",
+    "musica": "Music",
+    "sport": "Sport",
+    "cibo": "Food & Drink",
+    "outdoor": "Outdoor",
+    "famiglia": "Family"
+  },
+  "activities": {
+    "joinCta": "Join this activity",
+    "leaveCta": "Cancel participation",
+    "joinPending": "One moment…",
+    "joinError": "Something went wrong. Please retry.",
+    "joinedPill": "You're taking part in this activity"
+  },
+  "toast": {
+    "closeAria": "Dismiss notification",
+    "pushFallbackTitle": "Notification"
+  }
+}

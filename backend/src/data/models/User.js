@@ -50,6 +50,22 @@ module.exports = (sequelize) => {
     lastLat: { type: DataTypes.FLOAT, allowNull: true },
     lastLng: { type: DataTypes.FLOAT, allowNull: true },
     lastLocationAt: { type: DataTypes.DATE, allowNull: true },
+    // Profilo social (commenti, recensioni, trust dell'autore)
+    avatarUrl: { type: DataTypes.STRING, allowNull: true },
+    verifiedProfile: { type: DataTypes.BOOLEAN, defaultValue: false },
+    authorTrustScore: { type: DataTypes.FLOAT, defaultValue: 0 },
+    // STRING (non ENUM): i livelli (NEW/GROWING/RELIABLE/…) sono calcolati da
+    // trust.service e devono restare estendibili senza ALTER TYPE.
+    authorTrustLevel: { type: DataTypes.STRING(20), defaultValue: 'NEW' },
+    // Sospensione autore (moderazione social): impostata da suspendAuthor e
+    // letta da trust.service (penalità -50). Senza colonna l'update era no-op.
+    isSuspended: { type: DataTypes.BOOLEAN, defaultValue: false },
+    // Statistiche denormalizzate aggiornate da trust.service.calculateTrustScore.
+    completedActivitiesCount: { type: DataTypes.INTEGER, defaultValue: 0 },
+    publishedActivitiesCount: { type: DataTypes.INTEGER, defaultValue: 0 },
+    averageAuthorRating: { type: DataTypes.FLOAT, defaultValue: 0 },
+    reportsCountLast90Days: { type: DataTypes.INTEGER, defaultValue: 0 },
+    cancellationRate: { type: DataTypes.FLOAT, defaultValue: 0 },
   }, {
     tableName: 'users',
     timestamps: true,

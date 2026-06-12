@@ -37,7 +37,20 @@ async function registerDeviceToken(userId, { token, platform = 'web' }) {
     }
     return existing;
   }
-  return DeviceToken.create({ userId, token, platform });
+  try {
+    return await DeviceToken.create({ userId, token, platform });
+  } catch (e) {
+    // Race: due registrazioni concorrenti dello stesso token superano entrambe
+    // il findOne sopra e la seconda create viola l'indice UNIQUE → 500.
+    // In quel caso ri-associamo la riga già inserita all'utente corrente.
+    if (e?.name !== 'SequelizeUniqueConstraintError') throw e;
+    const row = await DeviceToken.findOne({ where: { token } });
+    if (!row) throw e;
+    if (row.userId !== userId || row.platform !== platform) {
+      await row.update({ userId, platform });
+    }
+    return row;
+  }
 }
 
 async function unregisterDeviceToken(userId, token) {

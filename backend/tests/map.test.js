@@ -64,3 +64,36 @@ describe('Map Service — updatePOI', () => {
       .rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 });
+
+describe('Map Service — getMapData participant counts', () => {
+  const { Activity, Event } = require('../src/data/models');
+  beforeEach(() => jest.clearAllMocks());
+
+  test('TC-MAP-06: map payload carries coherent participantCount for activities and events', async () => {
+    POI.findAll.mockResolvedValue([]);
+    Activity.findAll.mockResolvedValue([{
+      id: 'act-1', tipo: 'sport', data: '2030-01-01', orarioInizio: '10:00',
+      maxPartecipanti: 10, stato: 'attiva', latitudine: 46.06, longitudine: 11.12,
+      participants: [{ id: 'u1' }, { id: 'u2' }, { id: 'u3' }],
+    }]);
+    Event.findAll.mockResolvedValue([{
+      id: 'ev-1', titolo: 'Concerto', categoria: 'musica', badgeVerifica: true,
+      latitudine: 46.07, longitudine: 11.13, data: '2030-01-01',
+      eventParticipants: [{ id: 'u1' }, { id: 'u2' }],
+    }]);
+
+    const data = await mapService.getMapData();
+
+    // The queries must eagerly load participants, otherwise counts are always 0
+    expect(Activity.findAll).toHaveBeenCalledWith(expect.objectContaining({
+      include: expect.arrayContaining([expect.objectContaining({ as: 'participants' })]),
+    }));
+    expect(Event.findAll).toHaveBeenCalledWith(expect.objectContaining({
+      include: expect.arrayContaining([expect.objectContaining({ as: 'eventParticipants' })]),
+    }));
+    expect(data.activities[0].participantCount).toBe(3);
+    expect(data.activities[0].participantIds).toEqual(['u1', 'u2', 'u3']);
+    expect(data.events[0].participantCount).toBe(2);
+    expect(data.events[0].participantIds).toEqual(['u1', 'u2']);
+  });
+});

@@ -42,6 +42,28 @@ describe('Notifications Service — registerDeviceToken', () => {
     await expect(notificationsService.registerDeviceToken(USER_ID, { token: TOKEN, platform: 'symbian' }))
       .rejects.toMatchObject({ status: 400, code: 'INVALID_PLATFORM' });
   });
+
+  test('TC-NOT-04b: race — concurrent insert of the same token re-associates instead of 500', async () => {
+    // Regression: findOne → null, ma un'altra richiesta inserisce il token
+    // prima della create → SequelizeUniqueConstraintError finiva in 500.
+    const update = jest.fn().mockResolvedValue(undefined);
+    const row = { id: 'd-1', userId: 'other-user', token: TOKEN, platform: 'web', update };
+    DeviceToken.findOne
+      .mockResolvedValueOnce(null) // pre-check: token non ancora registrato
+      .mockResolvedValueOnce(row); // re-fetch dopo la violazione UNIQUE
+    DeviceToken.create.mockRejectedValue({ name: 'SequelizeUniqueConstraintError' });
+
+    const result = await notificationsService.registerDeviceToken(USER_ID, { token: TOKEN, platform: 'web' });
+    expect(update).toHaveBeenCalledWith({ userId: USER_ID, platform: 'web' });
+    expect(result).toBe(row);
+  });
+
+  test('TC-NOT-04c: non-unique create errors still propagate', async () => {
+    DeviceToken.findOne.mockResolvedValue(null);
+    DeviceToken.create.mockRejectedValue(new Error('db down'));
+    await expect(notificationsService.registerDeviceToken(USER_ID, { token: TOKEN, platform: 'web' }))
+      .rejects.toThrow('db down');
+  });
 });
 
 describe('Notifications Service — unregisterDeviceToken', () => {

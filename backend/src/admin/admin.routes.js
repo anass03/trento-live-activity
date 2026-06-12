@@ -1,5 +1,6 @@
 const router = require('express').Router();
-const {
+const bcrypt = require('bcryptjs');
+const { sequelize,
   User, Activity, Event, Report, Participation,
   CittadinoProfile, EnteProfile,
   AmministratoreComunaleProfile, AmministratoreSistemaProfile,
@@ -7,6 +8,14 @@ const {
 const { authenticate, authorize, authorizeSuperAdmin } = require('../middleware/auth');
 const { sendEntityApproved, sendEntityRejected } = require('../notifications/email.service');
 const logger = require('../lib/logger');
+
+function validatePassword(password) {
+  if (!password || password.length < 8) return 'La password deve essere di almeno 8 caratteri';
+  if (!/[A-Z]/.test(password)) return 'La password deve contenere almeno una lettera maiuscola';
+  if (!/[0-9]/.test(password)) return 'La password deve contenere almeno un numero';
+  if (!/[^A-Za-z0-9]/.test(password)) return 'La password deve contenere almeno un carattere speciale';
+  return null;
+}
 
 //GET all pending entities
 router.get('/entities/pending', authenticate, authorize('AmministratoreDiSistema'), async (req, res, next) => {
@@ -27,6 +36,9 @@ router.patch('/entities/:id/approve', authenticate, authorize('AmministratoreDiS
         const entity = await User.findOne({ where: { id: req.params.id, ruolo: 'EnteCertificato' } });
         if (!entity) return res.status(404).json({ error: 'Entity not found', code: 'NOT FOUND' });
         await entity.update({ approvato: true });
+        // Il flag vive anche su EnteProfile: login/getMe e la tab admin "enti"
+        // leggono enteProfile.approvato, quindi va aggiornato insieme allo User.
+        await EnteProfile.update({ approvato: true }, { where: { userId: entity.id } });
         logger.audit('entity.approve', { actorId: req.user?.id, entityId: entity.id, nomeEnte: entity.nomeEnte });
         sendEntityApproved(entity.email, entity.nomeEnte).catch(() => {});
         res.json({ message: 'Entity approved' });
@@ -211,6 +223,71 @@ router.delete('/users/:id', authenticate, authorize('AmministratoreDiSistema'), 
         logger.audit('user.delete', { actorId: req.user?.id, targetId: req.params.id, targetEmail: deletedEmail, targetRuolo: deletedRuolo });
         res.status(204).send();
     } catch (error) { next(error); }
+});
+
+// POST crea un nuovo AmministratoreComunale — solo admin di sistema.
+router.post('/users/comunali', authenticate, authorize('AmministratoreDiSistema'), async (req, res, next) => {
+  try {
+    const { nome, cognome, email, ufficio, password } = req.body || {};
+    if (!nome || !cognome || !email || !password) {
+      return res.status(400).json({ error: 'nome, cognome, email e password sono obbligatori', code: 'MISSING_FIELDS' });
+    }
+    const pwErr = validatePassword(password);
+    if (pwErr) return res.status(400).json({ error: pwErr, code: 'WEAK_PASSWORD' });
+
+    const existing = await User.findOne({ where: { email: email.toLowerCase().trim() } });
+    if (existing) return res.status(409).json({ error: 'Email già in uso', code: 'EMAIL_TAKEN' });
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    const emailNorm = email.toLowerCase().trim();
+    const user = await sequelize.transaction(async (t) => {
+      const u = await User.create({
+        email: emailNorm, passwordHash,
+        nome, cognome, dataNascita: '1980-01-01',
+        ruolo: 'AmministratoreComunale',
+        emailVerified: true,
+      }, { transaction: t });
+      await AmministratoreComunaleProfile.create({
+        userId: u.id, nome, cognome, ufficio: ufficio || null, spidId: null,
+      }, { transaction: t });
+      return u;
+    });
+    logger.audit('admin.createComunale', { actorId: req.user?.id, newUserId: user.id, email: emailNorm });
+    res.status(201).json({ id: user.id, email: user.email, nome, cognome, ufficio: ufficio || null });
+  } catch (e) { next(e); }
+});
+
+// POST crea un nuovo AmministratoreDiSistema — solo super admin.
+router.post('/users/sistema', authenticate, authorizeSuperAdmin(), async (req, res, next) => {
+  try {
+    const { nome, cognome, email, password } = req.body || {};
+    if (!nome || !cognome || !email || !password) {
+      return res.status(400).json({ error: 'nome, cognome, email e password sono obbligatori', code: 'MISSING_FIELDS' });
+    }
+    const pwErr = validatePassword(password);
+    if (pwErr) return res.status(400).json({ error: pwErr, code: 'WEAK_PASSWORD' });
+
+    const existing = await User.findOne({ where: { email: email.toLowerCase().trim() } });
+    if (existing) return res.status(409).json({ error: 'Email già in uso', code: 'EMAIL_TAKEN' });
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    const emailNorm = email.toLowerCase().trim();
+    const user = await sequelize.transaction(async (t) => {
+      const u = await User.create({
+        email: emailNorm, passwordHash,
+        nome, cognome, dataNascita: '1980-01-01',
+        ruolo: 'AmministratoreDiSistema',
+        emailVerified: true,
+        twoFactorEnabled: false,
+      }, { transaction: t });
+      await AmministratoreSistemaProfile.create({
+        userId: u.id, nome, cognome, superAdmin: false,
+      }, { transaction: t });
+      return u;
+    });
+    logger.audit('admin.createSistema', { actorId: req.user?.id, newUserId: user.id, email: emailNorm });
+    res.status(201).json({ id: user.id, email: user.email, nome, cognome, superAdmin: false });
+  } catch (e) { next(e); }
 });
 
 module.exports = router;

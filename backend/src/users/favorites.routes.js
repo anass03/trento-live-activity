@@ -39,6 +39,8 @@ router.delete('/', authenticate, async (req, res, next) => {
     if (!VALID_TYPES.includes(markerType)) {
       return res.status(400).json({ error: 'markerType invalid', code: 'INVALID_TYPE' });
     }
+    // Senza guardia, `where: { markerId: undefined }` fa esplodere Sequelize → 500.
+    if (!markerId) return res.status(400).json({ error: 'markerId is required', code: 'MISSING_FIELD' });
     await Favorite.destroy({ where: { userId: req.user.id, markerType, markerId } });
     res.status(204).send();
   } catch (e) { next(e); }

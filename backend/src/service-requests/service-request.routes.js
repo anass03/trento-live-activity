@@ -15,7 +15,7 @@ router.post('/', authenticate, authorize('UtenteRegistrato'), async (req, res, n
     if (!SERVICE_REQUEST_CATEGORIES.includes(categoria)) {
       return res.status(400).json({ error: 'Categoria non valida', code: 'INVALID_CATEGORY' });
     }
-    if (typeof latitudine !== 'number' || typeof longitudine !== 'number') {
+    if (!Number.isFinite(latitudine) || !Number.isFinite(longitudine)) {
       return res.status(400).json({ error: 'Coordinate mancanti o non numeriche', code: 'MISSING_COORDS' });
     }
     // Validate subcategory — must belong to the selected categoria (RNF22)

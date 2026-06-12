@@ -2,6 +2,7 @@ const { Op } = require('sequelize');
 const { Activity, Participation, User, POI } = require('../data/models');
 const { serializeActivity } = require('../data/presenters');
 const { reverseGeocode } = require('../lib/geocode');
+const { ACTIVITY_TYPES } = require('../data/models/Activity');
 const {
   sendActivityJoinConfirmation,
   sendActivityNewParticipant,
@@ -20,6 +21,34 @@ const { buildIcs } = require('./ics');
 
 function isDatePast(data) {
   return new Date(data) < new Date(new Date().toDateString());
+}
+
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+// Validazione difensiva degli input: senza questi check un payload malformato
+// (orario mancante, tipo fuori enum, data invalida) farebbe crashare
+// timeToMinutes o esplodere Postgres → 500 invece di un 400 chiaro.
+function validateActivityInput({ tipo, data, orarioInizio, orarioFine }) {
+  if (!ACTIVITY_TYPES.includes(tipo)) {
+    throw { status: 400, code: 'INVALID_TIPO', error: `tipo must be one of: ${ACTIVITY_TYPES.join(', ')}` };
+  }
+  if (!data || Number.isNaN(new Date(data).getTime())) {
+    throw { status: 400, code: 'INVALID_DATE', error: 'data must be a valid date (YYYY-MM-DD)' };
+  }
+  if (!TIME_RE.test(orarioInizio || '') || !TIME_RE.test(orarioFine || '')) {
+    throw { status: 400, code: 'INVALID_TIME', error: 'orarioInizio and orarioFine must be in HH:MM format' };
+  }
+}
+
+// Pagina/limite sempre numerici e sensati: Number('abc') = NaN produrrebbe
+// un OFFSET NaN in SQL (500), e un limit arbitrario permetterebbe dump completi.
+function sanitizePagination(page, limit, defaultLimit = 20) {
+  page = Number(page);
+  limit = Number(limit);
+  if (!Number.isFinite(page) || page < 1) page = 1;
+  if (!Number.isFinite(limit) || limit < 1) limit = defaultLimit;
+  if (limit > 100) limit = 100;
+  return { page: Math.floor(page), limit: Math.floor(limit) };
 }
 
 function timeToMinutes(t) {
@@ -51,6 +80,8 @@ async function getParticipantIds(activityId, excludeUserId = null) {
 }
 
 async function createActivity(creatorId, { tipo, data, orarioInizio, orarioFine, maxPartecipanti, latitudine, longitudine, poiId }) {
+  validateActivityInput({ tipo, data, orarioInizio, orarioFine });
+
   // OCL C9: start date must not be in the past
   if (isDatePast(data)) {
     throw { status: 400, code: 'DATE_IN_PAST', error: 'Activity date must not be in the past' };
@@ -61,8 +92,11 @@ async function createActivity(creatorId, { tipo, data, orarioInizio, orarioFine,
     throw { status: 400, code: 'INVALID_TIME', error: 'End time must be after start time' };
   }
 
-  // OCL C8: maxPartecipanti 2-50 (also enforced at model level)
-  if (maxPartecipanti < 2 || maxPartecipanti > 50) {
+  // OCL C8: maxPartecipanti 2-50 (also enforced at model level).
+  // Number() esplicito: undefined/"abc" passerebbero i confronti (< e > con NaN
+  // sono sempre false) creando attività senza capienza → join illimitati.
+  maxPartecipanti = Number(maxPartecipanti);
+  if (!Number.isFinite(maxPartecipanti) || maxPartecipanti < 2 || maxPartecipanti > 50) {
     throw { status: 400, code: 'INVALID_MAX_PARTECIPANTI', error: 'maxPartecipanti must be between 2 and 50' };
   }
 
@@ -124,8 +158,11 @@ async function createActivity(creatorId, { tipo, data, orarioInizio, orarioFine,
   return activity;
 }
 
-async function listActivities({ tipo, q, userInterests, page = 1, limit = 20 }) {
+async function listActivities({ tipo, q, userInterests, page, limit }) {
+  ({ page, limit } = sanitizePagination(page, limit));
   const where = { stato: 'attiva' };
+  // Un valore fuori enum manderebbe in errore Postgres (500): filtra solo se valido.
+  if (tipo && !ACTIVITY_TYPES.includes(tipo)) tipo = undefined;
   if (tipo) where.tipo = tipo;
   // RF9 / RF14: personalise by user interests if provided and no explicit filter
   if (!tipo && Array.isArray(userInterests) && userInterests.length) {
@@ -185,14 +222,33 @@ async function updateActivity(userId, activityId, updates) {
   if (updates.data && isDatePast(updates.data)) {
     throw { status: 400, code: 'DATE_IN_PAST', error: 'Activity date must not be in the past' };
   }
-  if (updates.orarioInizio && updates.orarioFine) {
-    if (timeToMinutes(updates.orarioFine) <= timeToMinutes(updates.orarioInizio)) {
+  if (updates.orarioInizio || updates.orarioFine) {
+    // Confronta con i valori correnti quando ne viene aggiornato uno solo:
+    // prima il check scattava solo se entrambi erano nel payload, permettendo
+    // ad es. di spostare orarioFine prima di orarioInizio.
+    const inizio = updates.orarioInizio ?? activity.orarioInizio;
+    const fine = updates.orarioFine ?? activity.orarioFine;
+    if (!TIME_RE.test(inizio || '') || !TIME_RE.test(fine || '')) {
+      throw { status: 400, code: 'INVALID_TIME', error: 'orarioInizio and orarioFine must be in HH:MM format' };
+    }
+    if (timeToMinutes(fine) <= timeToMinutes(inizio)) {
       throw { status: 400, code: 'INVALID_TIME', error: 'End time must be after start time' };
     }
   }
-  if (updates.maxPartecipanti != null
-      && (updates.maxPartecipanti < 2 || updates.maxPartecipanti > 50)) {
-    throw { status: 400, code: 'INVALID_MAX_PARTECIPANTI', error: 'maxPartecipanti must be between 2 and 50' };
+  if (updates.maxPartecipanti != null) {
+    // Number() esplicito come in createActivity: una stringa non numerica
+    // supererebbe i confronti (NaN < 2 è false) e finirebbe in Postgres → 500.
+    const max = Number(updates.maxPartecipanti);
+    if (!Number.isFinite(max) || max < 2 || max > 50) {
+      throw { status: 400, code: 'INVALID_MAX_PARTECIPANTI', error: 'maxPartecipanti must be between 2 and 50' };
+    }
+    // Coerenza conteggi: non si può abbassare la capienza sotto gli iscritti
+    // attuali, altrimenti il frontend mostrerebbe 12/10.
+    const current = await Participation.count({ where: { activityId } });
+    if (Number.isFinite(current) && current > max) {
+      throw { status: 400, code: 'MAX_BELOW_PARTICIPANTS', error: `maxPartecipanti cannot be lower than current participants (${current})` };
+    }
+    updates.maxPartecipanti = Math.floor(max);
   }
 
   // Mass-assignment guard: solo i campi qui sotto sono modificabili.
@@ -245,20 +301,39 @@ async function joinActivity(userId, activityId) {
     throw { status: 400, code: 'ACTIVITY_STARTED', error: 'Activity has already started' };
   }
 
+  // OCL C18: doppia partecipazione → 409 chiaro, PRIMA del check capienza
+  // (altrimenti chi è già iscritto a un'attività piena riceverebbe ACTIVITY_FULL).
+  if (typeof Participation.findOne === 'function') {
+    const existing = await Participation.findOne({ where: { userId, activityId } });
+    if (existing) {
+      throw { status: 409, code: 'ALREADY_JOINED', error: 'Already joined this activity' };
+    }
+  }
+
   // OCL C13: spots must be available
   const count = await Participation.count({ where: { activityId } });
   if (count >= activity.maxPartecipanti) {
     throw { status: 400, code: 'ACTIVITY_FULL', error: 'Activity is full' };
   }
 
-  // OCL C18: unique constraint prevents duplicate joins
+  // OCL C18: unique constraint come rete di sicurezza contro le race condition
+  let created;
   try {
-    await Participation.create({ userId, activityId });
+    created = await Participation.create({ userId, activityId });
   } catch (e) {
     if (e.name === 'SequelizeUniqueConstraintError') {
       throw { status: 409, code: 'ALREADY_JOINED', error: 'Already joined this activity' };
     }
     throw e;
+  }
+
+  // Guardia anti-race sulla capienza (OCL C13): se due utenti diversi superano
+  // insieme il check `count >= max`, il riconteggio post-insert rileva lo
+  // sforamento e l'iscrizione viene compensata invece di superare il limite.
+  const afterCount = await Participation.count({ where: { activityId } });
+  if (Number.isFinite(afterCount) && afterCount > activity.maxPartecipanti) {
+    if (created && typeof created.destroy === 'function') await created.destroy();
+    throw { status: 400, code: 'ACTIVITY_FULL', error: 'Activity is full' };
   }
 
   // RF11: notify creator + send confirmation to participant
@@ -284,6 +359,12 @@ async function leaveActivity(userId, activityId) {
   }
 
   const activity = await Activity.findByPk(activityId);
+  // Guardia: una Participation orfana (attività rimossa) farebbe esplodere
+  // `activity.creatorId` con un TypeError → 500.
+  if (!activity) {
+    await participation.destroy();
+    return;
+  }
   if (activity.creatorId === userId) {
     throw { status: 400, code: 'CREATOR_CANNOT_LEAVE', error: 'Creator cannot leave the activity; cancel it instead' };
   }

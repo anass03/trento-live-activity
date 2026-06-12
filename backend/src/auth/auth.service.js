@@ -63,8 +63,15 @@ function validatePassword(password) {
 
 function signToken(user, extraClaims = {}) {
   const jti = crypto.randomUUID();
+  const roleMapping = {
+    'UtenteRegistrato': 'USER',
+    'EnteCertificato': 'PARTNER',
+    'AmministratoreComunale': 'MODERATOR',
+    'AmministratoreDiSistema': 'ADMIN'
+  };
+  const role = user.role || roleMapping[user.ruolo] || 'USER';
   const token = jwt.sign(
-    { id: user.id, ruolo: user.ruolo, jti, ...extraClaims },
+    { id: user.id, ruolo: user.ruolo, role, jti, ...extraClaims },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   );
@@ -334,6 +341,11 @@ async function getMe(userId) {
 
 async function updateProfile(userId, { nome, cognome, interessi }) {
   const { CittadinoProfile: _CittadinoProfile } = require('../data/models');
+  // interessi finisce in una colonna ARRAY: un valore non-array farebbe
+  // fallire la query Postgres con un 500 invece di un 400.
+  if (interessi !== undefined && interessi !== null && !Array.isArray(interessi)) {
+    throw { status: 400, code: 'INVALID_INTERESTS', error: 'interessi deve essere un array' };
+  }
   const user = await User.findByPk(userId);
   if (!user) throw { status: 404, code: 'NOT_FOUND', error: 'User not found' };
 
@@ -361,30 +373,48 @@ async function updateEnteProfile(userId, { noteAdmin }) {
 }
 
 // Marca onboarding interessi come completato (cittadini).
-async function completeOnboarding(userId, { interessi } = {}) {
+async function completeOnboarding(userId, { interessi, dataNascita } = {}) {
   const { CittadinoProfile: _CittadinoProfile } = require('../data/models');
   const profile = await _CittadinoProfile.findOne({ where: { userId } });
   if (!profile) throw { status: 404, code: 'NOT_FOUND', error: 'Cittadino profile not found' };
   const nextInteressi = Array.isArray(interessi) ? interessi : profile.interessi;
 
+  // Data di nascita: per gli utenti social non arriva piu' da Google, la
+  // chiediamo qui. Se fornita, validiamo formato + eta' minima (GDPR / OCL C5).
+  let nextDataNascita;
+  if (dataNascita !== undefined && dataNascita !== null && dataNascita !== '') {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dataNascita) || Number.isNaN(new Date(dataNascita).getTime())) {
+      throw { status: 400, code: 'INVALID_BIRTHDATE', error: 'Data di nascita non valida' };
+    }
+    if (calcAge(dataNascita) < 13) {
+      throw { status: 400, code: 'AGE_TOO_YOUNG', error: 'Devi avere almeno 13 anni (GDPR).' };
+    }
+    nextDataNascita = dataNascita;
+  }
+
   const updates = {
     interessi: nextInteressi,
     onboardingComplete: true,
   };
+  if (nextDataNascita) updates.dataNascita = nextDataNascita;
   await profile.update(updates);
 
-  // Sync su User: interessi sempre.
+  // Sync su User: interessi sempre, data di nascita se fornita.
   const user = await User.findByPk(userId);
   if (user) {
     const userUpdates = { interessi: nextInteressi };
+    if (nextDataNascita) userUpdates.dataNascita = nextDataNascita;
     await user.update(userUpdates);
   }
   return profile;
 }
 
 async function updateLocation(userId, { lat, lng }) {
-  if (typeof lat !== 'number' || typeof lng !== 'number') {
-    throw { status: 400, code: 'INVALID_LOCATION', error: 'lat and lng must be numbers' };
+  // Number.isFinite esclude NaN/Infinity (typeof NaN === 'number' passerebbe).
+  // Range check: lat in [-90, 90], lng in [-180, 180].
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) ||
+      lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    throw { status: 400, code: 'INVALID_LOCATION', error: 'lat and lng must be valid coordinates' };
   }
   const user = await User.findByPk(userId);
   if (!user) throw { status: 404, code: 'NOT_FOUND', error: 'User not found' };
@@ -514,6 +544,9 @@ async function regenerateRecoveryCodes(userId) {
 }
 
 async function forgotPassword(email) {
+  // Senza guardia, `where: { email: undefined }` fa esplodere Sequelize → 500.
+  // Rispondiamo "ok" silenzioso come per le email sconosciute (anti-enumeration).
+  if (!email || typeof email !== 'string') return;
   const user = await User.findOne({ where: { email } });
   // Anti-enumeration: ritorniamo sempre "ok" senza distinguere i casi sotto,
   // così un attaccante non scopre quali email esistono o di che tipo sono.
@@ -651,7 +684,9 @@ async function registerEntity({ password, nomeEnte, pec, email, consents }) {
   };
 }
 async function verifyEmail(token) {
-  if (!token) throw { status: 400, code: 'MISSING_TOKEN', error: 'Token mancante' };
+  // typeof check: con `?token=a&token=b` Express passa un array e
+  // crypto.update() lancerebbe un TypeError → 500 invece di 400.
+  if (!token || typeof token !== 'string') throw { status: 400, code: 'MISSING_TOKEN', error: 'Token mancante' };
   // #H4: il client passa il token in chiaro; in DB cerchiamo il SHA-256.
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
   const user = await User.findOne({ where: { emailVerificationToken: tokenHash } });

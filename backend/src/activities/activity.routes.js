@@ -11,10 +11,11 @@ router.get('/:id', ctrl.get);
 // RF12 / RF49: calendar export (public — the link can be shared)
 router.get('/:id/calendar', ctrl.calendar);
 
-// Registered users only
-router.post('/', authenticate, authorize(REGISTERED, 'EnteCertificato'), ctrl.create);
-router.put('/:id', authenticate, authorize(REGISTERED, 'EnteCertificato'), ctrl.update);
-router.delete('/:id', authenticate, authorize(REGISTERED, 'EnteCertificato'), ctrl.cancel);
+// Registered users only — gli Enti Certificati pubblicano esclusivamente
+// eventi (event.routes): le attività spontanee restano dei cittadini.
+router.post('/', authenticate, authorize(REGISTERED), ctrl.create);
+router.put('/:id', authenticate, authorize(REGISTERED), ctrl.update);
+router.delete('/:id', authenticate, authorize(REGISTERED), ctrl.cancel);
 router.post('/:id/join', authenticate, authorize(REGISTERED), ctrl.join);
 router.delete('/:id/join', authenticate, authorize(REGISTERED), ctrl.leave);
 

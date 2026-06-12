@@ -214,6 +214,23 @@ async function loginWithGoogle(accessToken) {
     throw { status: 503, code: 'OAUTH_NOT_CONFIGURED', error: 'GOOGLE_CLIENT_ID non configurato' };
   }
 
+  // SECURITY: verifica che l'access_token sia stato emesso per il NOSTRO
+  // client id (claim `aud` esposto da tokeninfo). Senza questo check un
+  // access_token ottenuto da una QUALSIASI app Google di terze parti
+  // permetterebbe di loggarsi qui come il suo proprietario (token substitution).
+  try {
+    const infoResp = await fetch(
+      `https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${encodeURIComponent(accessToken)}`,
+    );
+    if (!infoResp.ok) throw new Error(`HTTP ${infoResp.status}`);
+    const info = await infoResp.json();
+    if (info.aud !== process.env.GOOGLE_CLIENT_ID && info.azp !== process.env.GOOGLE_CLIENT_ID) {
+      throw new Error('audience mismatch');
+    }
+  } catch (e) {
+    throw { status: 401, code: 'OAUTH_INVALID_TOKEN', error: `Google access_token non valido: ${e.message}` };
+  }
+
   // Verifica identità via userinfo endpoint: Google convalida l'access_token e
   // ci restituisce email/nome/sub solo se il token è valido e non scaduto.
   // Equivale al check crittografico di verifyIdToken ma sull'access_token.

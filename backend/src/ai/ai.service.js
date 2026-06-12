@@ -148,8 +148,25 @@ async function suggestActivity({ description, location, time } = {}) {
   parsed.maxPartecipanti = Number.isFinite(max)
     ? Math.max(MIN_PART, Math.min(MAX_PART, Math.round(max)))
     : 10;
-  if (!/^[0-2]\d:[0-5]\d$/.test(parsed.orarioInizio || '')) parsed.orarioInizio = '18:00';
-  if (!/^[0-2]\d:[0-5]\d$/.test(parsed.orarioFine || '')) parsed.orarioFine = '20:00';
+  // Regex stretta sulle ore: [0-2]\d accettava orari inesistenti come "29:30",
+  // che createActivity avrebbe poi rifiutato (o peggio, rotto timeToMinutes).
+  const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+  if (!TIME_RE.test(parsed.orarioInizio || '')) parsed.orarioInizio = '18:00';
+  if (!TIME_RE.test(parsed.orarioFine || '')) parsed.orarioFine = '20:00';
+
+  // Coerenza fine > inizio (OCL C11): un suggerimento con fine <= inizio verrebbe
+  // rifiutato da createActivity. Normalizza a inizio + 2h (cap 23:59).
+  const toMin = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+  if (toMin(parsed.orarioFine) <= toMin(parsed.orarioInizio)) {
+    const end = Math.min(toMin(parsed.orarioInizio) + 120, 23 * 60 + 59);
+    if (end > toMin(parsed.orarioInizio)) {
+      parsed.orarioFine = `${String(Math.floor(end / 60)).padStart(2, '0')}:${String(end % 60).padStart(2, '0')}`;
+    } else {
+      // inizio era 23:59: nessuno slot possibile in giornata → default serale
+      parsed.orarioInizio = '18:00';
+      parsed.orarioFine = '20:00';
+    }
+  }
 
   // Data: deve essere YYYY-MM-DD e non nel passato (OCL C9).
   // Se il modello sbaglia formato o restituisce una data passata, fallback a oggi.
