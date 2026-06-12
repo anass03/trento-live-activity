@@ -25,7 +25,10 @@ function getIconSvg(name: string, size = 15): string {
     x: `<path d="M6 6l12 12" /><path d="M18 6L6 18" />`,
     pin: `<path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11z" /><circle cx="12" cy="10" r="2.5" />`,
     clock: `<circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" />`,
-    ticket: `<path d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2 2 2 0 0 0 0 4 2 2 0 0 1-2 2H6a2 2 0 0 1-2-2 2 2 0 0 0 0-4z" /><path d="M14 6v12" />`
+    ticket: `<path d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2 2 2 0 0 0 0 4 2 2 0 0 1-2 2H6a2 2 0 0 1-2-2 2 2 0 0 0 0-4z" /><path d="M14 6v12" />`,
+    sparkle: `<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" /><path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z" />`,
+    bookmark: `<path d="M6 4h12v17l-6-4.5L6 21z" />`,
+    layers: `<path d="M12 3l9 5-9 5-9-5z" /><path d="M3 13l9 5 9-5" />`
   };
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${paths[name] || paths.grid}</svg>`;
 }
@@ -388,7 +391,7 @@ export const TrentoMap = React.memo(function TrentoMap({
 
       mapMarkers.current.push(maplibreMarker);
     });
-  }, [markers, activeFilter, selectedMarkerId, styleLoaded, canCreateActivity, t]);
+  }, [markers, activeFilter, kindFilter, selectedMarkerId, styleLoaded, canCreateActivity, t]);
 
   return (
     <div 

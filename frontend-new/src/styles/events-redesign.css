@@ -46,7 +46,7 @@
   position: relative;
   z-index: 30;
   border-bottom: 1px solid var(--border-soft-2);
-  backdrop-filter: blur(14px);
+  backdrop-filter: blur(10px);
   background: linear-gradient(180deg, color-mix(in srgb, var(--bg-deep) 42%, transparent), transparent);
 }
 .events-header .header { pointer-events: auto; }
@@ -241,7 +241,7 @@
   height: 38px; padding: 0 14px; border-radius: 999px;
   border: 1px solid var(--border-soft-2); background: var(--chip-fill);
   color: var(--text-secondary); font-size: 12.5px; font-weight: 600;
-  transition: all 160ms ease; white-space: nowrap;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, opacity 160ms ease; white-space: nowrap;
 }
 .composer-chip svg { width: 15px; height: 15px; }
 .composer-chip:hover { color: var(--text-primary); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
@@ -376,7 +376,7 @@
 .act-btn {
   display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 10px; border-radius: 10px;
   border: 1px solid transparent; background: transparent; color: var(--text-muted);
-  font-size: 13px; font-weight: 600; transition: all 160ms ease;
+  font-size: 13px; font-weight: 600; transition: background 160ms ease, color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, opacity 160ms ease;
 }
 .act-btn svg { width: 17px; height: 17px; transition: transform 160ms ease; }
 .act-btn:hover { background: var(--hover-fill); color: var(--text-primary); }
@@ -442,7 +442,7 @@
 .next-save {
   width: 48px; height: 48px; flex: none; border-radius: 14px;
   border: 1px solid var(--border-soft); background: var(--chip-fill); color: var(--text-secondary);
-  display: grid; place-items: center; transition: all 160ms ease;
+  display: grid; place-items: center; transition: background 160ms ease, color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, opacity 160ms ease;
 }
 .next-save:hover { color: var(--text-primary); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
 .next-save.on { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
@@ -508,7 +508,7 @@
   border-radius: var(--radius-xl, 28px); position: relative;
   background: linear-gradient(150deg, var(--glass-1), var(--glass-2));
   border: 1px solid var(--border-soft);
-  backdrop-filter: blur(26px) saturate(140%);
+  backdrop-filter: blur(10px) saturate(140%);
   box-shadow: 0 40px 90px rgba(0,0,0,0.5), 0 0 50px color-mix(in srgb, var(--mc, var(--accent)) calc(26% * var(--glow)), transparent), inset 0 1px 0 var(--inset-hi);
   animation: modalIn 240ms cubic-bezier(.2,.8,.3,1);
   display: flex; flex-direction: column;

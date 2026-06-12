@@ -723,6 +723,12 @@ export function createPOI(payload: Partial<POI>): Promise<POI> {
 export function updatePOI(id: string, payload: Partial<POI>): Promise<POI> {
   return request(`/api/map/poi/${encodeURIComponent(id)}`, { method: 'PUT', body: payload });
 }
+export function geocodeForward(q: string): Promise<{ result: { lat: number; lng: number; formatted: string } | null }> {
+  return request(`/api/map/geocode-forward?q=${encodeURIComponent(q)}`, { auth: false });
+}
+export function reverseGeocode(lat: number, lon: number): Promise<{ address: string | null }> {
+  return request(`/api/map/geocode?lat=${lat}&lon=${lon}`, { auth: false });
+}
 export function deletePOI(id: string): Promise<void> {
   return request(`/api/map/poi/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }

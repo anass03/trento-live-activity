@@ -1,6 +1,7 @@
 const service = require('./map.service');
 const { assertUuid } = require('../data/presenters');
 const { reverseGeocode } = require('../lib/geocode');
+const { forwardGeocode } = require('../lib/forwardGeocode');
 const logger = require('../lib/logger');
 
 async function getMap(req, res, next) {
@@ -56,4 +57,17 @@ async function geocode(req, res, next) {
   } catch (e) { next(e); }
 }
 
-module.exports = { getMap, listPOIs, getPOI, createPOI, updatePOI, deletePOI, geocode };
+// Indirizzo → coordinate: usato dal form POI dell'admin per evitare
+// l'inserimento manuale di lat/lng.
+async function geocodeForward(req, res, next) {
+  try {
+    const q = (req.query.q || '').toString().trim();
+    if (q.length < 3) {
+      return res.status(400).json({ error: 'q (indirizzo) troppo corto', code: 'INVALID_QUERY' });
+    }
+    const result = await forwardGeocode(q);
+    res.json({ result: result || null });
+  } catch (e) { next(e); }
+}
+
+module.exports = { getMap, listPOIs, getPOI, createPOI, updatePOI, deletePOI, geocode, geocodeForward };

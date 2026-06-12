@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Icon } from "./Icon";
+import { GoogleBrandIcon, AppleBrandIcon } from "./BrandIcons";
 import {
   googleCalendarUrl,
   getEventCalendarUrl,
@@ -83,11 +84,11 @@ export function ContentActions({ kind, id, title, startIso, location, accent = "
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         {startIso && (
           <button style={ghostBtn} onClick={openGoogle} title="Apri Google Calendar">
-            <Icon name="calendar" size={14} /> Google Calendar
+            <GoogleBrandIcon size={14} /> Google Calendar
           </button>
         )}
         <button style={ghostBtn} onClick={openApple} title="Scarica .ics (si apre in Apple Calendar)">
-          <Icon name="calendar" size={14} /> Apple Calendar
+          <AppleBrandIcon size={14} /> Apple Calendar
         </button>
         <button
           style={{ ...ghostBtn, marginLeft: "auto", color: "var(--red)", borderColor: "color-mix(in srgb, var(--red) 35%, transparent)" }}

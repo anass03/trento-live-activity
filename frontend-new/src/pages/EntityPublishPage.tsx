@@ -4,7 +4,7 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
-import { createEvent, getPOIs, POI } from "../lib/api";
+import { createEvent, getPOIs, reverseGeocode, POI } from "../lib/api";
 
 const PUBLISH_CATEGORIES = [
   { id: "cultura",  icon: "landmark", color: "var(--violet)" },
@@ -81,6 +81,16 @@ export function EntityPublishPage({ page, setPage, theme, setTheme, user }: any)
   const [locationMode, setLocationMode] = useState<"poi" | "pin">("poi");
   const [poiId, setPoiId] = useState("");
   const [pin, setPin] = useState<{ lat: number; lng: number } | null>(null);
+  // Indirizzo leggibile del pin: l'ente ragiona per vie, non per coordinate.
+  const [pinAddress, setPinAddress] = useState<string | null>(null);
+  useEffect(() => {
+    if (!pin) { setPinAddress(null); return; }
+    let alive = true;
+    reverseGeocode(pin.lat, pin.lng)
+      .then((r) => { if (alive) setPinAddress(r.address); })
+      .catch(() => { if (alive) setPinAddress(null); });
+    return () => { alive = false; };
+  }, [pin?.lat, pin?.lng]);
   const [pois, setPois] = useState<POI[]>([]);
   const [when, setWhen] = useState(new Date().toISOString().substring(0, 10));
   const [startTime, setStartTime] = useState("18:00");
@@ -242,7 +252,7 @@ export function EntityPublishPage({ page, setPage, theme, setTheme, user }: any)
                     {t("ente.publish.pinMapLabel")}
                     {pin && (
                       <span style={{ marginLeft: 8, color: "var(--text-muted)", fontWeight: 400 }}>
-                        ({pin.lat.toFixed(5)}, {pin.lng.toFixed(5)})
+                        {pinAddress || `(${pin.lat.toFixed(5)}, ${pin.lng.toFixed(5)})`}
                       </span>
                     )}
                   </label>

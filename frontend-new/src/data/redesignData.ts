@@ -14,20 +14,30 @@ export const C = {
 // Le etichette sono chiavi i18n ("categories.*" in locales/{it,en}/common.json):
 // i componenti React le traducono con t(c.labelKey); per i moduli non-React
 // resta catLabel(), che traduce al volo con la lingua corrente.
+// Le categorie rispecchiano la tassonomia del backend (EVENT_CATEGORIES +
+// ACTIVITY_TYPES): sport, cultura, musica, arte, gastronomia, studio, altro.
+// Pillole inventate (cibo/outdoor/famiglia) facevano sembrare i filtri rotti
+// perché nessun contenuto reale le usava.
 export const CATEGORIES: any[] = [
-    { id: "all",      labelKey: "categories.all",      color: C.cyan,    icon: "grid" },
-    { id: "cultura",  labelKey: "categories.cultura",  color: C.violet,  icon: "landmark" },
-    { id: "musica",   labelKey: "categories.musica",   color: C.magenta, icon: "music" },
-    { id: "sport",    labelKey: "categories.sport",    color: C.green,   icon: "run" },
-    { id: "cibo",     labelKey: "categories.cibo",     color: C.amber,   icon: "food" },
-    { id: "outdoor",  labelKey: "categories.outdoor",  color: C.teal,    icon: "bike" },
-    { id: "famiglia", labelKey: "categories.famiglia", color: C.cyan,    icon: "family" },
-    { id: "poi",      labelKey: "categories.poi",      color: C.orange,  icon: "pin" },
+    { id: "all",         labelKey: "categories.all",         color: C.cyan,    icon: "grid" },
+    { id: "cultura",     labelKey: "categories.cultura",     color: C.violet,  icon: "landmark" },
+    { id: "musica",      labelKey: "categories.musica",      color: C.magenta, icon: "music" },
+    { id: "sport",       labelKey: "categories.sport",       color: C.green,   icon: "run" },
+    { id: "arte",        labelKey: "categories.arte",        color: C.orange,  icon: "sparkle" },
+    { id: "gastronomia", labelKey: "categories.gastronomia", color: C.amber,   icon: "food" },
+    { id: "studio",      labelKey: "categories.studio",      color: C.teal,    icon: "bookmark" },
+    { id: "altro",       labelKey: "categories.altro",       color: C.cyan,    icon: "layers" },
+    { id: "poi",         labelKey: "categories.poi",         color: C.red,     icon: "pin" },
 ];
 export const CAT_ICON: Record<string, string> = {
     musica: "music",
     cultura: "landmark",
     sport: "run",
+    arte: "sparkle",
+    gastronomia: "food",
+    studio: "bookmark",
+    altro: "layers",
+    // alias legacy (vecchie pillole) per dati/codice non ancora migrati
     cibo: "food",
     outdoor: "bike",
     famiglia: "family",

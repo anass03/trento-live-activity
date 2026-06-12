@@ -128,7 +128,7 @@
   border: 1px solid var(--border-soft-2); background: var(--chip-fill);
   color: var(--text-muted); font-size: 13px; font-weight: 600;
   display: flex; align-items: center; justify-content: center; gap: 7px;
-  transition: all 150ms ease; white-space: nowrap;
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease, opacity 150ms ease; white-space: nowrap;
 }
 .s-rpill:hover { color: var(--text-secondary); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
 .s-rpill.on {
@@ -187,7 +187,7 @@
   height: 34px; padding: 0 13px; border-radius: 999px;
   border: 1px solid var(--border-soft-2); background: var(--chip-fill);
   color: var(--text-secondary); font-size: 12.5px; font-weight: 600;
-  transition: all 150ms ease;
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease, opacity 150ms ease;
 }
 .s-int-chip svg { width: 14px; height: 14px; }
 .s-int-chip:hover { color: var(--text-primary); border-color: color-mix(in srgb, var(--ic) 40%, transparent); }
@@ -225,7 +225,7 @@
   height: 44px; padding: 0 18px; border-radius: 12px;
   border: 1px solid var(--border-soft); background: var(--chip-fill);
   color: var(--text-secondary); font-size: 13.5px; font-weight: 600;
-  transition: all 150ms ease;
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease, opacity 150ms ease;
 }
 .s-acc-btn svg { width: 17px; height: 17px; }
 .s-acc-btn:hover { color: var(--text-primary); border-color: color-mix(in srgb, var(--accent) 36%, transparent); background: var(--hover-fill); }
@@ -243,7 +243,7 @@
   width: 400px; max-width: 100%; border-radius: 22px;
   background: linear-gradient(150deg, var(--glass-1), var(--glass-2));
   border: 1px solid color-mix(in srgb, var(--red) 30%, var(--border-soft));
-  backdrop-filter: blur(26px) saturate(140%);
+  backdrop-filter: blur(10px) saturate(140%);
   box-shadow: 0 36px 80px rgba(0,0,0,0.5), 0 0 40px color-mix(in srgb, var(--red) calc(18% * var(--glow)), transparent);
   animation: modalIn 220ms cubic-bezier(.2,.8,.3,1);
   overflow: hidden;
@@ -262,7 +262,7 @@
   flex: 1; height: 44px; border-radius: 11px;
   border: 1px solid var(--border-soft); background: var(--chip-fill); color: var(--text-secondary);
   font-family: var(--font); font-size: 14px; font-weight: 700;
-  transition: all 150ms ease;
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease, opacity 150ms ease;
 }
 .del-cancel:hover { color: var(--text-primary); border-color: var(--border-soft); }
 .del-confirm {
@@ -280,6 +280,12 @@
 .a11y-reduce-motion *, .a11y-reduce-motion *::before, .a11y-reduce-motion *::after {
   animation-duration: 0.01ms !important; animation-iteration-count: 1 !important;
   transition-duration: 0.01ms !important;
+}
+/* "Riduci animazioni" è anche una modalità prestazioni: i backdrop-filter
+   sono il costo di rendering principale dell'app su GPU integrate. */
+.a11y-reduce-motion *, .a11y-reduce-motion *::before, .a11y-reduce-motion *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 .a11y-high-contrast { --border-soft: rgba(255,255,255,0.28); --border-soft-2: rgba(255,255,255,0.18); --text-secondary: rgba(226,232,240,0.95); --text-muted: rgba(203,213,225,0.88); }
 :root[data-theme="day"].a11y-high-contrast { --border-soft: rgba(47,111,78,0.36); --text-secondary: rgba(20,37,27,0.95); --text-muted: rgba(20,37,27,0.85); }

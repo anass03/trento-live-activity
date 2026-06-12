@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
-import { getMyParticipations, leaveEvent, leaveActivity, getMe } from "../lib/api";
+import { getMyParticipations, leaveEvent, leaveActivity, getMe, regenerateRecoveryCodes } from "../lib/api";
 
 const PROFILE_INTERESTS = [
   { id: "outdoor",  icon: "bike",     color: "var(--teal)" },
@@ -64,6 +64,23 @@ export function ProfilePage({ page, setPage, theme, setTheme, user }: any) {
       fetchParticipations();
     }
   }, [user?.id]);
+
+  const [newCodes, setNewCodes] = useState<string[]>([]);
+  const [regenPending, setRegenPending] = useState(false);
+  const [regenError, setRegenError] = useState("");
+
+  const handleRegenCodes = async () => {
+    setRegenPending(true);
+    setRegenError("");
+    try {
+      const res = await regenerateRecoveryCodes();
+      setNewCodes(res.recoveryCodes || []);
+    } catch (err: any) {
+      setRegenError(err?.message || "Errore");
+    } finally {
+      setRegenPending(false);
+    }
+  };
 
   const handleCancel = async (item: any) => {
     try {
@@ -224,6 +241,54 @@ export function ProfilePage({ page, setPage, theme, setTheme, user }: any) {
             )}
           </div>
         </div>
+
+        {/* Sicurezza account: solo admin di sistema (2FA obbligatorio per loro).
+            Cambio authenticator = nuovo setup QR; i codici rigenerati invalidano i vecchi. */}
+        {user?.role === "system_admin" && (
+          <div className="revamp-profile-card anim-in" style={{ "--accent": "var(--amber)", animationDelay: "180ms" } as React.CSSProperties}>
+            <h3 style={{ margin: "0 0 6px", fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
+              <Icon name="shieldCheck" size={16} style={{ color: "var(--amber)" }} /> {t("twofa.securityTitle")}
+            </h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ flex: 1, minWidth: 220 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 650 }}>{t("twofa.changeAuthenticator")}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{t("twofa.changeAuthenticatorSub")}</div>
+                </div>
+                <button className="revamp-action-btn" onClick={() => setPage("setup-2fa")}>
+                  <Icon name="refresh" size={13} /> {t("twofa.changeAuthenticator")}
+                </button>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ flex: 1, minWidth: 220 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 650 }}>{t("twofa.regenCodes")}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{t("twofa.regenCodesSub")}</div>
+                </div>
+                <button className="revamp-action-btn" disabled={regenPending} onClick={handleRegenCodes}>
+                  <Icon name="key" size={13} /> {regenPending ? "…" : t("twofa.regenCodes")}
+                </button>
+              </div>
+              {regenError && (
+                <div className="revamp-status-pill danger" style={{ justifyContent: "center" }}>
+                  <Icon name="warn" size={12} /> {regenError}
+                </div>
+              )}
+              {newCodes.length > 0 && (
+                <div>
+                  <div className="revamp-status-pill warning" style={{ width: "100%", justifyContent: "center", marginBottom: 10 }}>
+                    <Icon name="warn" size={12} /> {t("twofa.regenDone")}
+                  </div>
+                  <div style={{
+                    background: "var(--chip-fill)", padding: 12, borderRadius: 8, border: "1px solid var(--border-soft)",
+                    fontFamily: "var(--mono)", fontSize: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8
+                  }}>
+                    {newCodes.map((c, i) => <div key={i}>● {c}</div>)}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

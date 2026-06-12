@@ -46,7 +46,7 @@
   --grade-bg: transparent;
   --grade-mode: normal;
   --grade-op: 0;
-  --panel-blur: 18px;
+  --panel-blur: 10px;
 
   /* semantic surfaces / shadows (night defaults; overridden in day) */
   --accent: var(--cyan);
@@ -322,7 +322,7 @@ button { font-family: inherit; cursor: pointer; }
   background: var(--tip-bg);
   border: 1px solid var(--border-soft);
   box-shadow: 0 20px 44px rgba(0,0,0,0.5), 0 0 22px color-mix(in srgb, var(--mc) 28%, transparent);
-  backdrop-filter: blur(14px);
+  backdrop-filter: blur(10px);
   pointer-events: none;
   opacity: 0; transform: translateX(-50%) translateY(6px);
   transition: opacity 160ms ease, transform 160ms ease;
@@ -538,7 +538,7 @@ button { font-family: inherit; cursor: pointer; }
   border-radius: 999px;
   background: var(--surface-1);
   border: 1px solid var(--border-soft-2);
-  backdrop-filter: blur(18px);
+  backdrop-filter: blur(10px);
 }
 .nav-item {
   position: relative;
@@ -567,7 +567,7 @@ button { font-family: inherit; cursor: pointer; }
   border-radius: 999px;
   background: var(--surface-1);
   border: 1px solid var(--border-soft);
-  backdrop-filter: blur(18px);
+  backdrop-filter: blur(10px);
   color: var(--text-muted);
   transition: border-color 180ms ease, width 220ms ease;
 }
@@ -588,7 +588,7 @@ button { font-family: inherit; cursor: pointer; }
   display: grid; place-items: center;
   background: var(--surface-1);
   border: 1px solid var(--border-soft);
-  backdrop-filter: blur(18px);
+  backdrop-filter: blur(10px);
   color: var(--text-secondary);
   transition: border-color 180ms ease, color 180ms ease, transform 180ms ease;
 }
@@ -615,7 +615,7 @@ button { font-family: inherit; cursor: pointer; }
   background: var(--tip-bg);
   border: 1px solid var(--border-soft);
   box-shadow: var(--widget-shadow);
-  backdrop-filter: blur(20px) saturate(135%);
+  backdrop-filter: blur(10px) saturate(135%);
 }
 .profile-menu-head {
   display: flex; align-items: center; gap: 11px;
@@ -658,7 +658,7 @@ button { font-family: inherit; cursor: pointer; }
   border-radius: 999px;
   background: linear-gradient(150deg, var(--bar-1), var(--bar-2));
   border: 1px solid var(--border-soft);
-  backdrop-filter: blur(22px) saturate(140%);
+  backdrop-filter: blur(10px) saturate(140%);
   box-shadow: var(--bar-shadow), inset 0 1px 0 var(--inset-hi);
   pointer-events: auto;
   max-width: calc(100vw - 48px);
@@ -672,7 +672,7 @@ button { font-family: inherit; cursor: pointer; }
   color: var(--text-muted);
   font-size: 13px; font-weight: 600;
   white-space: nowrap;
-  transition: all 180ms ease;
+  transition: background 180ms ease, color 180ms ease, border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease, opacity 180ms ease;
 }
 .filter-pill svg { width: 16px; height: 16px; }
 .filter-pill .cnt {
@@ -694,6 +694,31 @@ button { font-family: inherit; cursor: pointer; }
 /* Seconda barra: filtro Tutto / Eventi / Attività, sotto le categorie */
 .kindbar { top: 150px; padding: 6px; }
 .kindbar .filter-pill { height: 34px; padding: 0 14px; font-size: 12.5px; }
+
+/* Risultati della ricerca live nell'header (solo home) */
+.search-bar-live { position: relative; }
+.search-results {
+  position: absolute; top: calc(100% + 8px); left: 0; right: 0;
+  display: flex; flex-direction: column;
+  padding: 6px; border-radius: 14px;
+  background: linear-gradient(150deg, var(--bar-1), var(--bar-2));
+  border: 1px solid var(--border-soft);
+  backdrop-filter: blur(10px) saturate(135%);
+  box-shadow: var(--bar-shadow);
+  z-index: 40;
+  max-height: 320px; overflow-y: auto;
+}
+.search-result {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 10px; border-radius: 9px;
+  background: transparent; border: none;
+  color: var(--text-secondary); font-size: 12.5px;
+  text-align: left; cursor: pointer; width: 100%;
+}
+.search-result:hover { background: var(--hover-fill); color: var(--text-primary); }
+.search-result .sr-title { font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.search-result .sr-place { margin-left: auto; color: var(--text-faint); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40%; }
+.search-result-empty { padding: 12px; text-align: center; color: var(--text-faint); font-size: 12px; }
 
 /* =========================================================
    WIDGET POSITIONING
@@ -894,7 +919,7 @@ button { font-family: inherit; cursor: pointer; }
   border-radius: 999px;
   background: linear-gradient(150deg, var(--bar-1), var(--bar-2));
   border: 1px solid var(--border-soft);
-  backdrop-filter: blur(22px);
+  backdrop-filter: blur(10px);
   box-shadow: var(--controls-shadow), inset 0 1px 0 var(--inset-hi);
   pointer-events: auto;
 }
@@ -904,7 +929,7 @@ button { font-family: inherit; cursor: pointer; }
   background: transparent; color: var(--text-secondary);
   display: flex; align-items: center; gap: 7px; justify-content: center;
   font-size: 12.5px; font-weight: 600;
-  transition: all 160ms ease;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, opacity 160ms ease;
 }
 .mc-btn svg { width: 17px; height: 17px; }
 .mc-btn:hover { background: var(--hover-fill); color: var(--text-primary); border-color: var(--border-soft-2); }
@@ -916,7 +941,7 @@ button { font-family: inherit; cursor: pointer; }
   width: 54px; height: 54px; border-radius: 50%;
   background: linear-gradient(150deg, var(--bar-1), var(--bar-2));
   border: 1px solid var(--border-soft);
-  backdrop-filter: blur(20px);
+  backdrop-filter: blur(10px);
   box-shadow: var(--controls-shadow), inset 0 1px 0 var(--inset-hi);
   display: grid; place-items: center;
   pointer-events: auto;
@@ -931,7 +956,7 @@ button { font-family: inherit; cursor: pointer; }
   display: flex; align-items: center; gap: 9px;
   height: 38px; padding: 0 14px; border-radius: 999px;
   background: var(--surface-1); border: 1px solid var(--border-soft);
-  backdrop-filter: blur(18px); pointer-events: auto;
+  backdrop-filter: blur(10px); pointer-events: auto;
 }
 .clock-pill .t { font-family: var(--mono); font-size: 13px; font-weight: 600; letter-spacing: 0.04em; }
 .clock-pill .d { font-size: 11px; color: var(--text-muted); }
@@ -965,6 +990,53 @@ button { font-family: inherit; cursor: pointer; }
   .brand-sub { display: none; }
 }
 
+/* =========================================================
+   MOBILE — la home è map-first: i widget laterali lasciano
+   spazio alla mappa, le barre scorrono in orizzontale.
+   ========================================================= */
+@media (max-width: 900px) {
+  .header { height: auto; padding: 10px 12px; flex-wrap: wrap; gap: 8px; }
+  .brand-name { font-size: 16px; }
+  .brand-logo { width: 34px; height: 34px; border-radius: 10px; }
+  .nav {
+    order: 3; width: 100%;
+    overflow-x: auto; scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav-item { height: 36px; padding: 0 12px; font-size: 12.5px; white-space: nowrap; flex-shrink: 0; }
+  .search-bar { display: none; }
+
+  .filterbar {
+    top: auto; bottom: 88px;
+    max-width: calc(100vw - 16px);
+    overflow-x: auto; scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    justify-content: flex-start;
+  }
+  .filterbar::-webkit-scrollbar { display: none; }
+  .filter-pill { flex-shrink: 0; height: 36px; padding: 0 12px; font-size: 12px; }
+  .kindbar { top: auto; bottom: 144px; }
+
+  /* widget: la colonna sinistra sparisce, la destra resta come striscia
+     compatta scrollabile in alto (meteo/eventi restano raggiungibili) */
+  .col-left { display: none; }
+  .col-right {
+    left: 12px; right: 12px; top: auto; bottom: 196px;
+    width: auto; max-height: 30vh; overflow-y: auto;
+    pointer-events: auto;
+  }
+
+  .map-controls { bottom: 14px; padding: 5px; max-width: calc(100vw - 90px); }
+  .mc-btn { height: 34px; min-width: 34px; padding: 0 9px; font-size: 11.5px; }
+  .compass { right: 12px; bottom: 14px; transform: scale(0.8); }
+
+  .revamp-admin-layout { padding: 16px 12px 40px; }
+  .revamp-admin-layout h1 { font-size: 22px; }
+  .revamp-detail-wrap { padding: 12px; }
+  .login-modal { width: calc(100vw - 20px); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition-duration: 0.01ms !important; }
 }
@@ -979,7 +1051,7 @@ button { font-family: inherit; cursor: pointer; }
   border-radius: 999px;
   background: var(--surface-1);
   border: 1px solid var(--border-soft);
-  backdrop-filter: blur(18px);
+  backdrop-filter: blur(10px);
   cursor: pointer;
 }
 .theme-toggle .tt-thumb {
@@ -1010,8 +1082,8 @@ button { font-family: inherit; cursor: pointer; }
   background: var(--tip-bg);
   border: 1px solid var(--border-soft);
   box-shadow: var(--widget-shadow), 0 0 34px color-mix(in srgb, var(--ec) calc(34% * var(--glow)), transparent);
-  backdrop-filter: blur(22px) saturate(140%);
-  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
   transform-origin: bottom center;
   transform: translateX(-50%);
   animation: popupIn 200ms cubic-bezier(.2,.8,.3,1);
@@ -1114,7 +1186,7 @@ button { font-family: inherit; cursor: pointer; }
   background: linear-gradient(150deg, var(--glass-1), var(--glass-2));
   border: 1px solid var(--border-soft);
   box-shadow: 0 34px 80px rgba(0,0,0,0.46), 0 0 38px color-mix(in srgb, var(--dm-accent, var(--accent)) calc(18% * var(--glow)), transparent);
-  backdrop-filter: blur(26px) saturate(140%);
+  backdrop-filter: blur(10px) saturate(140%);
   animation: modalIn 220ms cubic-bezier(.2,.8,.3,1);
 }
 .login-modal { position: relative; width: min(440px, 100%); padding: 30px 34px; }

@@ -212,21 +212,15 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
     return mapData.markers.filter((m: any) => m.latitude != null && m.longitude != null).map((m: any) => {
       const { x, y } = getSvgCoordinates(m.latitude, m.longitude, m.title);
       
-      // I POI non sono eventi: tengono cat "poi" (pin dedicato sulla mappa,
-      // esclusi dai conteggi del filtro categorie).
-      let cat = m.category || "cultura";
+      // I POI non sono eventi: tengono cat "poi" (pin dedicato sulla mappa).
+      // Per il resto la tassonomia backend (sport/cultura/musica/arte/
+      // gastronomia/studio/altro) passa invariata: le pillole la rispecchiano.
+      let cat = m.category || "altro";
       if (m.type === "poi") {
         cat = "poi";
       } else {
-        if (cat === "parking") cat = "outdoor";
-        if (cat === "ciclismo" || cat === "verde" || cat === "sport") cat = "sport";
-        if (cat === "teatro" || cat === "cinema" || cat === "museo") cat = "cultura";
-        if (cat === "biblioteca" || cat === "studio" || cat === "aula_studio") cat = "cultura";
-
-        const validCategories = ["musica", "cultura", "sport", "cibo", "outdoor", "famiglia"];
-        if (!validCategories.includes(cat)) {
-          cat = "cultura";
-        }
+        const validCategories = ["sport", "cultura", "musica", "arte", "gastronomia", "studio", "altro"];
+        if (!validCategories.includes(cat)) cat = "altro";
       }
 
       const dtLocale = dateLocale(i18n.language);
@@ -270,19 +264,18 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
   const dynamicEvents = React.useMemo(() => {
     if (!mapData || !mapData.events) return [];
     return mapData.events.slice(0, 7).map((e: any) => {
-      let cat = e.category || "cultura";
-      const validCategories = ["musica", "cultura", "sport", "cibo", "outdoor", "famiglia"];
-      if (!validCategories.includes(cat)) {
-        cat = "cultura";
-      }
-      
+      let cat = e.category || "altro";
+      const validCategories = ["sport", "cultura", "musica", "arte", "gastronomia", "studio", "altro"];
+      if (!validCategories.includes(cat)) cat = "altro";
+
       const gradients: Record<string, string> = {
         cultura: "linear-gradient(135deg,#7c3aed,#4c1d95)",
         musica: "linear-gradient(135deg,#db2777,#831843)",
-        cibo: "linear-gradient(135deg,#d97706,#7c2d12)",
         sport: "linear-gradient(135deg,#059669,#064e3b)",
-        outdoor: "linear-gradient(135deg,#0d9488,#134e4a)",
-        famiglia: "linear-gradient(135deg,#0ea5e9,#075985)"
+        arte: "linear-gradient(135deg,#ea580c,#7c2d12)",
+        gastronomia: "linear-gradient(135deg,#d97706,#7c2d12)",
+        studio: "linear-gradient(135deg,#0d9488,#134e4a)",
+        altro: "linear-gradient(135deg,#0ea5e9,#075985)"
       };
 
       return {
@@ -433,7 +426,13 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
       <div className="vignette"></div>
 
       {/* HEADER */}
-      <div className="layer-header"><Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} /></div>
+      <div className="layer-header">
+        <Header
+          page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user}
+          searchItems={dynamicMarkers}
+          onSearchSelect={(m: any) => openMarkerPopup(m)}
+        />
+      </div>
 
       {/* FILTER BAR */}
       <FilterBar active={active} setActive={setActive} markers={kindMarkers} />
@@ -655,6 +654,26 @@ export function App() {
     setPage(nextPage);
   };
 
+  // RBAC lato UI: lo stato `page` non deve mai mostrare una vista per cui il
+  // ruolo corrente non ha i permessi (il backend rifiuta comunque le API, ma
+  // l'interfaccia non deve proprio arrivarci — es. logout mentre si è su una
+  // pagina admin, o token scaduto).
+  const PAGE_ROLES: Record<string, UserRole[]> = {
+    "admin-users": ["system_admin"],
+    "admin-poi": ["system_admin"],
+    "admin-enti-richieste": ["system_admin"],
+    "admin-moderazione": ["system_admin"],
+    "admin-notifications": ["system_admin"],
+    "comune-dashboard": ["municipal_admin"],
+    "comune-statistiche": ["municipal_admin"],
+    "comune-export": ["municipal_admin"],
+    "ente-pubblica": ["certified_entity"],
+  };
+  useEffect(() => {
+    const allowed = PAGE_ROLES[page];
+    if (allowed && !allowed.includes(user.role)) setPage("home");
+  }, [page, user.role]);
+
   // Safety net for state changes that land a guest on the profile page (e.g. logout).
   useEffect(() => {
     if (page === "profilo" && user.role === "anonymous") {
@@ -728,10 +747,10 @@ export function App() {
       <LoginModal
         open={loginOpen}
         onClose={() => setLoginOpen(false)}
-        onSuccess={(needs2faSetup) => {
+        onSuccess={(needs2faSetup, needsOnboarding) => {
           setLoginOpen(false);
           fetchUser();
-          setPage(needs2faSetup ? "setup-2fa" : "home");
+          setPage(needs2faSetup ? "setup-2fa" : needsOnboarding ? "onboarding" : "home");
         }}
         onRegister={() => {
           setLoginOpen(false);

@@ -206,7 +206,9 @@ export function LoginModal({ open, onClose, onSuccess, onRegister, onPasswordRes
     setLoading(true);
     try {
       const res = await login(email, password, showOtp ? otpToken : undefined);
-      onSuccess(!!res.needs2faSetup);
+      // Cittadino senza onboarding completato → prima gli interessi.
+      const needsOnboarding = res.needs2faSetup ? false : await needsOnboardingAfterOauth();
+      onSuccess(!!res.needs2faSetup, needsOnboarding);
     } catch (err: any) {
       if (err.code === "2FA_REQUIRED") {
         setShowOtp(true);

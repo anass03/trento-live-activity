@@ -3,7 +3,54 @@ import { useTranslation } from "react-i18next";
 import { logout as apiLogout } from "../../lib/api";
 import { Icon } from "../ui/Icon";
 
-export function Header({ page, setPage, theme, setTheme, user }: any) {
+/* Ricerca live sui contenuti della mappa (eventi/attività/POI): compare solo
+   dove la pagina host passa searchItems — di fatto la home. */
+function HeaderSearch({ items, onSelect }: { items: any[]; onSelect: (m: any) => void }) {
+  const { t } = useTranslation();
+  const [query, setQuery] = useState("");
+  const [focused, setFocused] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const close = (e: MouseEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setFocused(false);
+    };
+    window.addEventListener("mousedown", close);
+    return () => window.removeEventListener("mousedown", close);
+  }, []);
+
+  const q = query.trim().toLowerCase();
+  const results = q.length < 2 ? [] : items
+    .filter((m) => (m.title || "").toLowerCase().includes(q) || (m.place || "").toLowerCase().includes(q))
+    .slice(0, 8);
+
+  return (
+    <div className="search-bar search-bar-live" ref={wrapRef}>
+      <Icon name="search" size={16} style={{ opacity: 0.6 }} />
+      <input
+        placeholder={t("header.searchPlaceholder")}
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onFocus={() => setFocused(true)}
+      />
+      {focused && q.length >= 2 && (
+        <div className="search-results">
+          {results.length === 0 ? (
+            <div className="search-result-empty">{t("header.searchNoResults")}</div>
+          ) : results.map((m) => (
+            <button key={m.id} className="search-result" onMouseDown={() => { onSelect(m); setQuery(""); setFocused(false); }}>
+              <Icon name={m.type === "poi" ? "pin" : m.type === "event" ? "calendar" : "activity"} size={13} />
+              <span className="sr-title">{m.title}</span>
+              <span className="sr-place">{m.place}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function Header({ page, setPage, theme, setTheme, user, searchItems, onSearchSelect }: any) {
   const { t } = useTranslation();
   const role = user?.role || "anonymous";
   const [profileOpen, setProfileOpen] = useState(false);
@@ -93,11 +140,9 @@ export function Header({ page, setPage, theme, setTheme, user }: any) {
       </div>
 
       <div className="header-right">
-        <div className="search-bar">
-          <Icon name="search" size={16} style={{ opacity: 0.6 }} />
-          <input placeholder={t("header.searchPlaceholder")} />
-          <kbd>⌘K</kbd>
-        </div>
+        {searchItems && onSearchSelect && (
+          <HeaderSearch items={searchItems} onSelect={onSearchSelect} />
+        )}
         <button className="icon-btn" aria-label={t("header.notificationsAria")} onClick={() => setPage(role === "system_admin" ? "admin-notifications" : "home")}><Icon name="bell" size={18} /><span className="badge"></span></button>
         <button className="theme-toggle" onClick={() => setTheme(theme === "day" ? "night" : "day")} aria-label={t("header.themeToggleAria")} title={t("header.themeToggleTitle")}>
           <span className="tt-thumb"></span>
