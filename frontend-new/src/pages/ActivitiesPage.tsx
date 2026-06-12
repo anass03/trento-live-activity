@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next";
 import { Header } from "../components/layout/Header";
 import { Widget, useGlow } from "../components/redesign/widgets";
 import { Icon, WxIcon } from "../components/ui/Icon";
+import { GeocodedLocation } from "../components/ui/GeocodedLocation";
 import { getActivities, addFavorite, removeFavorite, getFavorites, getMyActivities, getTrentoWeather, ApiError } from "../lib/api";
 
 
@@ -296,7 +297,7 @@ function ActCard({ a, saved, onSave, onOpen, canSave = true }: any) {
             {priceNode && <span className="act-attr"><Icon name="euro" size={13} />{priceNode}</span>}
           </div>
         )}
-        <div className="act-loc"><Icon name="pin" size={13} />{a.loc}{dist}</div>
+        <div className="act-loc"><Icon name="pin" size={13} /><GeocodedLocation value={a.loc} fallback={t("activities.locationTbd")} />{dist}</div>
         <div className="act-foot">
           <span className="act-creator">
             <CreatorAvatar name={a.creatorName} size={24} />
@@ -334,7 +335,7 @@ function ActNextWidget({ activity, saved, onSave, onOpen, canSave = true }: any)
       </div>
       <div className="next-title">{a.title}</div>
       <div className="next-fields">
-        <div className="next-field"><span className="nf-ic"><Icon name="pin" size={14} /></span><div><div className="nf-lbl">{t("activities.place")}</div><div className="nf-val">{a.loc}</div></div></div>
+        <div className="next-field"><span className="nf-ic"><Icon name="pin" size={14} /></span><div><div className="nf-lbl">{t("activities.place")}</div><div className="nf-val"><GeocodedLocation value={a.loc} fallback={t("activities.locationTbd")} /></div></div></div>
         <div className="next-field"><span className="nf-ic"><Icon name="users" size={14} /></span><div><div className="nf-lbl">{t("activities.participantsLabel")}</div><div className="nf-val">{a.going}{a.cap > 0 ? ` / ${a.cap}` : ""}</div></div></div>
       </div>
       <div className="next-part" style={{ marginTop: 12 }}>
@@ -454,7 +455,7 @@ export function ActivityPage({ page, setPage, theme, setTheme, user, setSelected
           diff: normalizeDifficulty(a.difficulty),
           price,
           priceLabel: a.priceLabel || null,
-          loc: a.location || a.address || t("activities.locationTbd"),
+          loc: a.location || a.address || null,
           dist: numOrNull(a.distance),
           rating,
           reviews: numOrNull(a.reviewCount ?? a.reviewsCount) ?? 0,
@@ -524,7 +525,7 @@ export function ActivityPage({ page, setPage, theme, setTheme, user, setSelected
     if (s.category !== "all") r = r.filter((a) => a.cat === s.category);
     if (s.search.trim()) {
       const q = s.search.toLowerCase();
-      r = r.filter((a) => (a.title + " " + t(activityCat(a.cat).labelKey) + " " + a.loc + " " + (a.creatorName || "")).toLowerCase().includes(q));
+      r = r.filter((a) => (a.title + " " + t(activityCat(a.cat).labelKey) + " " + (a.loc || "") + " " + (a.creatorName || "")).toLowerCase().includes(q));
     }
     // sort
     if (sort === "participants") r.sort((a, b) => b.going - a.going);

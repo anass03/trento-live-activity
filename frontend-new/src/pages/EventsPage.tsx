@@ -8,6 +8,7 @@ import { Header } from "../components/layout/Header";
 import { Avatars } from "../components/redesign/Avatars";
 import { Widget, useGlow } from "../components/redesign/widgets";
 import { Icon } from "../components/ui/Icon";
+import { GeocodedLocation } from "../components/ui/GeocodedLocation";
 import { getEvents, joinEvent, leaveEvent, addFavorite, removeFavorite, getFavorites, ApiEvent, ApiError } from "../lib/api";
 
 /* ---- category meta aligned with the backend enum
@@ -151,7 +152,7 @@ function MostParticipated({ list, onPick }: any) {
           <span className="trend-rank">{i + 1}</span>
           <span className="trend-body">
             <span className="trend-title">{e.title}</span>
-            <span className="trend-loc">{e.location || "Trento"}</span>
+            <span className="trend-loc"><GeocodedLocation value={e.location} fallback="Trento" /></span>
           </span>
           <span className="trend-count"><Icon name="users" size={13} />{fmt(e.participantCount)}</span>
         </button>
@@ -214,7 +215,7 @@ function PostCard({ e, liked, saved, shared, onLike, onSave, onShare, onOpen, fl
         <div className="post-title">{e.title}</div>
         <div className="post-desc">{e.description}</div>
         <div className="post-meta">
-          <span className="pm"><Icon name="pin" size={14} />{e.location || "Trento"}</span>
+          <span className="pm"><Icon name="pin" size={14} /><GeocodedLocation value={e.location} fallback="Trento" /></span>
           <span className="pm"><Icon name="clock" size={14} />{formatEventWhen(e, i18n.language) || t("events.today")}</span>
         </div>
         <div className="post-foot">
@@ -307,7 +308,7 @@ function NextActivity({ event, joined, saved, busy, joinError, onJoin, onSave, c
       <div className="next-fields">
         <div className="next-field">
           <span className="nf-ic"><Icon name="pin" size={14} /></span>
-          <div><div className="nf-lbl">{t("events.place")}</div><div className="nf-val">{event.location || "Trento"}</div></div>
+          <div><div className="nf-lbl">{t("events.place")}</div><div className="nf-val"><GeocodedLocation value={event.location} fallback="Trento" /></div></div>
         </div>
         <div className="next-field">
           <span className="nf-ic"><Icon name="clock" size={14} /></span>

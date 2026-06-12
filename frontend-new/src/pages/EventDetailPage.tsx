@@ -4,6 +4,7 @@ import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
 import { CommentsSection } from "../components/redesign/CommentsSection";
 import { getEventById, joinEvent, leaveEvent, ApiEvent } from "../lib/api";
+import { GeocodedLocation } from "../components/ui/GeocodedLocation";
 import { ContentActions } from "../components/ui/ContentActions";
 
 const grads: Record<string, string> = {
@@ -143,7 +144,9 @@ export function EventDetailPage({ page, setPage, theme, setTheme, user, selected
               </div>
               <div className="revamp-detail-attr" style={{ gridColumn: "span 2" }}>
                 <div className="lbl"><Icon name="pin" size={12} /> {t("events.place")}</div>
-                <div className="val" style={{ fontSize: 13 }}>{event.location || "Trento"}</div>
+                <div className="val" style={{ fontSize: 13 }}>
+                  <GeocodedLocation value={event.location} fallback="Trento" />
+                </div>
               </div>
             </div>
 
