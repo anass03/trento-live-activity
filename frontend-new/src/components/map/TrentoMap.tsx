@@ -229,14 +229,19 @@ export const TrentoMap = React.memo(function TrentoMap({
     // Filter and add markers
     markers.forEach((m) => {
       const isPoi = m.type === "poi";
-      const catDim = activeFilter !== "all" && activeFilter !== m.cat;
-      // Filtro Eventi/Attività: con "activity" i POI restano accesi perché
+      const catOut = activeFilter !== "all" && activeFilter !== m.cat;
+      // Filtro Eventi/Attività: con "activity" i POI restano visibili perché
       // sono i luoghi dove un cittadino può creare un'attività.
-      const kindDim = kindFilter === "event" ? m.type !== "event"
+      const kindOut = kindFilter === "event" ? m.type !== "event"
         : kindFilter === "activity" ? (m.type !== "activity" && !isPoi)
         : false;
-      const dim = catDim || kindDim;
       const selected = selectedMarkerId === m.id;
+
+      // Fuori filtro = fuori mappa: attenuarli soltanto lasciava la mappa
+      // affollata e i filtri sembravano non fare nulla. Il marker selezionato
+      // resta visibile per non far sparire il popup aperto sotto il mouse.
+      if ((catOut || kindOut) && !selected) return;
+
       const crowd = m.raw?.crowdingStatus || "green";
       const color = isPoi ? CROWD_COLOR[crowd] : catColor(m.cat);
       const crowdLabel = t(CROWD_KEY[crowd] || CROWD_KEY.green);
@@ -244,7 +249,7 @@ export const TrentoMap = React.memo(function TrentoMap({
       // L'elemento esterno è posizionato da maplibre via transform inline:
       // niente transform in CSS qui, le animazioni vivono sul .tla-pin interno.
       const el = document.createElement("div");
-      el.className = `tla-marker${isPoi ? " poi" : ""}${m.live ? " live" : ""}${dim ? " dimmed" : ""}${selected ? " selected" : ""}`;
+      el.className = `tla-marker${isPoi ? " poi" : ""}${m.live ? " live" : ""}${selected ? " selected" : ""}`;
       el.style.setProperty("--mc", color);
       if (selected) el.style.zIndex = "30";
 
