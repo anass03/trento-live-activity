@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
 import { getPushStats, sendAdminBroadcast, PushStats, PushAudience } from "../lib/api";
 
 export function AdminNotificationsPage({ page, setPage, theme, setTheme, user }: any) {
+  const { t } = useTranslation();
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
   const [audience, setAudience] = useState<PushAudience>("all");
@@ -45,7 +47,7 @@ export function AdminNotificationsPage({ page, setPage, theme, setTheme, user }:
       }, 2500);
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || "Errore durante l'invio del broadcast.");
+      setErrorMsg(err.message || t("admin.notifications.sendError"));
     } finally {
       setLoading(false);
     }
@@ -55,8 +57,8 @@ export function AdminNotificationsPage({ page, setPage, theme, setTheme, user }:
     <div className="revamp-legal-scene">
       <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
       <div className="revamp-admin-layout">
-        <h1>Invio Notifiche di Broadcast</h1>
-        <p>Invia avvisi e notifiche di sistema in tempo reale a tutti gli utenti dell'applicazione</p>
+        <h1>{t("admin.notifications.title")}</h1>
+        <p>{t("admin.notifications.subtitle")}</p>
 
         {errorMsg && (
           <div className="revamp-status-pill error" style={{ margin: "20px auto 0", maxWidth: 640, padding: "12px", width: "100%", justifyContent: "center" }}>
@@ -70,29 +72,29 @@ export function AdminNotificationsPage({ page, setPage, theme, setTheme, user }:
               <Icon name="bell" size={24} style={{ color: "var(--cyan)" }} />
               <div>
                 <h2>{stats.totalTokens}</h2>
-                <p>Token Dispositivi Registrati</p>
+                <p>{t("admin.notifications.statTokens")}</p>
               </div>
             </div>
             <div className="revamp-stat-card" style={{ "--accent": "var(--emerald)" } as any}>
               <Icon name="spid" size={24} style={{ color: "var(--emerald)" }} />
               <div>
                 <h2>{stats.usersReachable}</h2>
-                <p>Utenti Raggiungibili</p>
+                <p>{t("admin.notifications.statReachable")}</p>
               </div>
             </div>
           </div>
         )}
 
         <div className="revamp-legal-card anim-in" style={{ "--accent": "var(--cyan)", maxWidth: 640, margin: "20px auto 0" }}>
-          <h2>Compila Messaggio Broadcast</h2>
+          <h2>{t("admin.notifications.formTitle")}</h2>
           {success ? (
             <div className="revamp-status-pill success" style={{ width: "100%", padding: "12px 0", justifyContent: "center", marginBottom: 14 }}>
-              <Icon name="check" size={12} /> Notifica inviata con successo!
+              <Icon name="check" size={12} /> {t("admin.notifications.success")}
             </div>
           ) : (
             <form onSubmit={handleSend} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div className="revamp-form-group">
-                <label className="revamp-form-label">Destinatari (Audience)</label>
+                <label className="revamp-form-label">{t("admin.notifications.audienceLabel")}</label>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <button
                     type="button"
@@ -100,7 +102,7 @@ export function AdminNotificationsPage({ page, setPage, theme, setTheme, user }:
                     style={{ "--accent": "var(--cyan)" }}
                     onClick={() => setAudience("all")}
                   >
-                    Tutti gli Utenti
+                    {t("admin.notifications.audienceAll")}
                   </button>
                   <button
                     type="button"
@@ -108,7 +110,7 @@ export function AdminNotificationsPage({ page, setPage, theme, setTheme, user }:
                     style={{ "--accent": "var(--cyan)" }}
                     onClick={() => setAudience("cittadini")}
                   >
-                    Cittadini
+                    {t("admin.notifications.audienceCitizens")}
                   </button>
                   <button
                     type="button"
@@ -116,7 +118,7 @@ export function AdminNotificationsPage({ page, setPage, theme, setTheme, user }:
                     style={{ "--accent": "var(--cyan)" }}
                     onClick={() => setAudience("enti")}
                   >
-                    Enti Certificati
+                    {t("admin.notifications.audienceEntities")}
                   </button>
                   <button
                     type="button"
@@ -124,17 +126,17 @@ export function AdminNotificationsPage({ page, setPage, theme, setTheme, user }:
                     style={{ "--accent": "var(--cyan)" }}
                     onClick={() => setAudience("comunali")}
                   >
-                    Admins Comunali
+                    {t("admin.notifications.audienceMunicipal")}
                   </button>
                 </div>
               </div>
 
               <div className="revamp-form-group">
-                <label className="revamp-form-label">Titolo Notifica</label>
+                <label className="revamp-form-label">{t("admin.notifications.titleLabel")}</label>
                 <input
                   type="text"
                   className="revamp-form-input"
-                  placeholder="Es. Sospensione temporanea servizio bus"
+                  placeholder={t("admin.notifications.titlePlaceholder")}
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   style={{ paddingLeft: 14 }}
@@ -143,10 +145,10 @@ export function AdminNotificationsPage({ page, setPage, theme, setTheme, user }:
               </div>
 
               <div className="revamp-form-group">
-                <label className="revamp-form-label">Contenuto Notifica</label>
+                <label className="revamp-form-label">{t("admin.notifications.bodyLabel")}</label>
                 <textarea
                   className="revamp-textarea"
-                  placeholder="Inserisci i dettagli ed eventuali istruzioni utili per gli utenti..."
+                  placeholder={t("admin.notifications.bodyPlaceholder")}
                   value={desc}
                   onChange={(e) => setDesc(e.target.value)}
                   required
@@ -154,7 +156,7 @@ export function AdminNotificationsPage({ page, setPage, theme, setTheme, user }:
               </div>
 
               <button type="submit" className="revamp-form-btn" style={{ "--accent": "var(--cyan)" }} disabled={loading}>
-                {loading ? "Invio in corso..." : "Invia Notifica"}
+                {loading ? t("admin.notifications.sending") : t("admin.notifications.send")}
                 <Icon name={loading ? "refresh" : "bell"} size={16} className={loading ? "spin" : ""} />
               </button>
             </form>

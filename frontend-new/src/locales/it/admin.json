@@ -62,7 +62,13 @@
       "crowdingMedium": "Medio affollamento",
       "crowdingLow": "Basso affollamento",
       "toggleCrowding": "Cambia Affollamento",
-      "delete": "Elimina"
+      "delete": "Elimina",
+      "edit": "Modifica",
+      "latlngError": "Latitudine e longitudine devono essere numeri validi.",
+      "capacityError": "La capacità massima deve essere maggiore di zero.",
+      "saveError": "Impossibile salvare il Punto di Interesse.",
+      "editFormTitle": "Modifica Punto di Interesse",
+      "saveChanges": "Salva Modifiche"
     },
     "entities": {
       "title": "Richieste Verifiche Enti",
@@ -146,7 +152,8 @@
       "quickActions": "Azioni Rapide",
       "managePoi": "Gestione POI",
       "entityRequests": "Richieste Enti",
-      "moderation": "Moderazione Contenuti"
+      "moderation": "Moderazione Contenuti",
+      "noActions": "Nessuna azione disponibile per il tuo ruolo"
     },
     "stats": {
       "loading": "Caricamento statistiche territoriali...",
@@ -225,6 +232,18 @@
       "capacityLabel": "Capacità Max Posti",
       "publishing": "Pubblicazione...",
       "publish": "Pubblica Contenuto",
+      "publishEvent": "Pubblica Evento",
+      "eventTitle": "Pubblica Nuovo Evento",
+      "eventSubtitle": "Come Ente Certificato puoi pubblicare eventi comunali: compila il modulo e scegli il luogo sulla mappa o tra i punti di interesse.",
+      "eventSuccess": "Evento pubblicato con successo! Reindirizzamento...",
+      "step3Location": "3. Luogo",
+      "step4DateTime": "4. Data & Orari",
+      "locationModePoi": "Punto di Interesse",
+      "locationModePin": "Pin sulla Mappa",
+      "pinMapLabel": "Clicca sulla mappa per piazzare il pin",
+      "selectPoiError": "Seleziona un punto di interesse.",
+      "placePinError": "Piazza un pin sulla mappa per indicare il luogo dell'evento.",
+      "requiredFieldsError": "Compila tutti i campi richiesti.",
       "categories": {
         "cultura": "Cultura",
         "musica": "Musica",

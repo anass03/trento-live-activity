@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Header } from "../components/layout/Header";
@@ -6,12 +7,12 @@ import { Icon } from "../components/ui/Icon";
 import { createEvent, getPOIs, POI } from "../lib/api";
 
 const PUBLISH_CATEGORIES = [
-  { id: "cultura",  label: "Cultura",      icon: "landmark", color: "var(--violet)" },
-  { id: "musica",   label: "Musica",       icon: "music",    color: "var(--magenta)" },
-  { id: "sport",    label: "Sport",        icon: "run",      color: "var(--green)" },
-  { id: "cibo",     label: "Cibo & Drink", color: "var(--amber)",   icon: "food" },
-  { id: "outdoor",  label: "Outdoor",      color: "var(--teal)",    icon: "bike" },
-  { id: "famiglia", label: "Famiglia",     color: "var(--cyan)",    icon: "family" },
+  { id: "cultura",  icon: "landmark", color: "var(--violet)" },
+  { id: "musica",   icon: "music",    color: "var(--magenta)" },
+  { id: "sport",    icon: "run",      color: "var(--green)" },
+  { id: "cibo",     color: "var(--amber)",   icon: "food" },
+  { id: "outdoor",  color: "var(--teal)",    icon: "bike" },
+  { id: "famiglia", color: "var(--cyan)",    icon: "family" },
 ];
 
 const DARK_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
@@ -73,6 +74,7 @@ function PinPickerMap({ theme, pin, onPin }: {
 }
 
 export function EntityPublishPage({ page, setPage, theme, setTheme, user }: any) {
+  const { t } = useTranslation();
   const [cat, setCat] = useState("cultura");
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
@@ -99,15 +101,15 @@ export function EntityPublishPage({ page, setPage, theme, setTheme, user }: any)
     e.preventDefault();
     setError("");
     if (!title || !desc) {
-      setError("Compila tutti i campi richiesti.");
+      setError(t("ente.publish.requiredFieldsError"));
       return;
     }
     if (locationMode === "poi" && !poiId) {
-      setError("Seleziona un punto di interesse.");
+      setError(t("ente.publish.selectPoiError"));
       return;
     }
     if (locationMode === "pin" && !pin) {
-      setError("Piazza un pin sulla mappa per indicare il luogo dell'evento.");
+      setError(t("ente.publish.placePinError"));
       return;
     }
 
@@ -133,7 +135,7 @@ export function EntityPublishPage({ page, setPage, theme, setTheme, user }: any)
         setPage("eventi");
       }, 1500);
     } catch (err: any) {
-      setError(err.message || "Errore durante la pubblicazione.");
+      setError(err.message || t("ente.publish.publishError"));
     } finally {
       setLoading(false);
     }
@@ -144,8 +146,8 @@ export function EntityPublishPage({ page, setPage, theme, setTheme, user }: any)
       <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
       <div className="revamp-legal-wrap">
         <div className="revamp-legal-card anim-in" style={{ "--accent": "var(--violet)", maxWidth: "680px" } as React.CSSProperties}>
-          <h1>Pubblica Nuovo Evento</h1>
-          <p>Come Ente Certificato puoi pubblicare eventi comunali: compila il modulo e scegli il luogo sulla mappa o tra i punti di interesse.</p>
+          <h1>{t("ente.publish.eventTitle")}</h1>
+          <p>{t("ente.publish.eventSubtitle")}</p>
 
           {error && (
             <div className="revamp-status-pill danger" style={{ width: "100%", padding: "10px 0", justifyContent: "center", margin: "20px 0" }}>
@@ -155,11 +157,11 @@ export function EntityPublishPage({ page, setPage, theme, setTheme, user }: any)
 
           {success ? (
             <div className="revamp-status-pill success" style={{ width: "100%", padding: "16px 0", justifyContent: "center", margin: "20px 0" }}>
-              <Icon name="check" size={14} /> Evento pubblicato con successo! Reindirizzamento...
+              <Icon name="check" size={14} /> {t("ente.publish.eventSuccess")}
             </div>
           ) : (
             <form onSubmit={handleSubmit} style={{ marginTop: 20 }}>
-              <h3 className="revamp-detail-section-title">1. Seleziona una Categoria</h3>
+              <h3 className="revamp-detail-section-title">{t("ente.publish.step1")}</h3>
               <div className="s-interests" style={{ marginBottom: 24 }}>
                 {PUBLISH_CATEGORIES.map((item) => (
                   <button
@@ -169,18 +171,18 @@ export function EntityPublishPage({ page, setPage, theme, setTheme, user }: any)
                     style={{ "--ic": item.color } as React.CSSProperties}
                     onClick={() => setCat(item.id)}
                   >
-                    <Icon name={item.icon} size={14} /> {item.label}
+                    <Icon name={item.icon} size={14} /> {t(`ente.publish.categories.${item.id}`)}
                   </button>
                 ))}
               </div>
 
-              <h3 className="revamp-detail-section-title">2. Informazioni Principali</h3>
+              <h3 className="revamp-detail-section-title">{t("ente.publish.step2")}</h3>
               <div className="revamp-form-group">
-                <label className="revamp-form-label">Titolo</label>
+                <label className="revamp-form-label">{t("ente.publish.titleLabel")}</label>
                 <input
                   type="text"
                   className="revamp-form-input"
-                  placeholder="Es. Mostra fotografica all'aperto o Concerto in piazza"
+                  placeholder={t("ente.publish.titlePlaceholder")}
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   style={{ paddingLeft: 14 }}
@@ -189,17 +191,17 @@ export function EntityPublishPage({ page, setPage, theme, setTheme, user }: any)
               </div>
 
               <div className="revamp-form-group">
-                <label className="revamp-form-label">Descrizione</label>
+                <label className="revamp-form-label">{t("ente.publish.descLabel")}</label>
                 <textarea
                   className="revamp-textarea"
-                  placeholder="Fornisci dettagli sul programma, requisiti di ingresso ed informazioni utili..."
+                  placeholder={t("ente.publish.descPlaceholder")}
                   value={desc}
                   onChange={(e) => setDesc(e.target.value)}
                   required
                 />
               </div>
 
-              <h3 className="revamp-detail-section-title">3. Luogo</h3>
+              <h3 className="revamp-detail-section-title">{t("ente.publish.step3Location")}</h3>
               <div style={{ display: "flex", gap: "10px", marginBottom: 14 }}>
                 <button
                   type="button"
@@ -207,7 +209,7 @@ export function EntityPublishPage({ page, setPage, theme, setTheme, user }: any)
                   onClick={() => setLocationMode("poi")}
                   style={{ flex: 1, padding: "10px 0", justifyContent: "center" }}
                 >
-                  <Icon name="landmark" size={15} /> Punto di Interesse
+                  <Icon name="landmark" size={15} /> {t("ente.publish.locationModePoi")}
                 </button>
                 <button
                   type="button"
@@ -215,20 +217,20 @@ export function EntityPublishPage({ page, setPage, theme, setTheme, user }: any)
                   onClick={() => setLocationMode("pin")}
                   style={{ flex: 1, padding: "10px 0", justifyContent: "center" }}
                 >
-                  <Icon name="pin" size={15} /> Pin sulla Mappa
+                  <Icon name="pin" size={15} /> {t("ente.publish.locationModePin")}
                 </button>
               </div>
 
               {locationMode === "poi" ? (
                 <div className="revamp-form-group">
-                  <label className="revamp-form-label">Punto di Interesse (Luogo)</label>
+                  <label className="revamp-form-label">{t("ente.publish.poiLabel")}</label>
                   <select
                     className="revamp-select"
                     value={poiId}
                     onChange={(e) => setPoiId(e.target.value)}
                     style={{ height: "38px", width: "100%", padding: "0 10px" }}
                   >
-                    <option value="">Seleziona un POI...</option>
+                    <option value="">{t("ente.publish.poiPlaceholder")}</option>
                     {pois.map((p) => (
                       <option key={p.id} value={p.id}>{p.nome}</option>
                     ))}
@@ -237,7 +239,7 @@ export function EntityPublishPage({ page, setPage, theme, setTheme, user }: any)
               ) : (
                 <div className="revamp-form-group">
                   <label className="revamp-form-label">
-                    Clicca sulla mappa per piazzare il pin
+                    {t("ente.publish.pinMapLabel")}
                     {pin && (
                       <span style={{ marginLeft: 8, color: "var(--text-muted)", fontWeight: 400 }}>
                         ({pin.lat.toFixed(5)}, {pin.lng.toFixed(5)})
@@ -248,10 +250,10 @@ export function EntityPublishPage({ page, setPage, theme, setTheme, user }: any)
                 </div>
               )}
 
-              <h3 className="revamp-detail-section-title" style={{ marginTop: 24 }}>4. Data & Orari</h3>
+              <h3 className="revamp-detail-section-title" style={{ marginTop: 24 }}>{t("ente.publish.step4DateTime")}</h3>
               <div className="revamp-form-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 16 }}>
                 <div className="revamp-form-group" style={{ marginBottom: 0 }}>
-                  <label className="revamp-form-label">Data</label>
+                  <label className="revamp-form-label">{t("ente.publish.dateLabel")}</label>
                   <input
                     type="date"
                     className="revamp-form-input"
@@ -262,7 +264,7 @@ export function EntityPublishPage({ page, setPage, theme, setTheme, user }: any)
                   />
                 </div>
                 <div className="revamp-form-group" style={{ marginBottom: 0 }}>
-                  <label className="revamp-form-label">Capacità Max Posti</label>
+                  <label className="revamp-form-label">{t("ente.publish.capacityLabel")}</label>
                   <input
                     type="number"
                     className="revamp-form-input"
@@ -277,7 +279,7 @@ export function EntityPublishPage({ page, setPage, theme, setTheme, user }: any)
 
               <div className="revamp-form-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 24 }}>
                 <div className="revamp-form-group" style={{ marginBottom: 0 }}>
-                  <label className="revamp-form-label">Ora Inizio</label>
+                  <label className="revamp-form-label">{t("ente.publish.startLabel")}</label>
                   <input
                     type="time"
                     className="revamp-form-input"
@@ -288,7 +290,7 @@ export function EntityPublishPage({ page, setPage, theme, setTheme, user }: any)
                   />
                 </div>
                 <div className="revamp-form-group" style={{ marginBottom: 0 }}>
-                  <label className="revamp-form-label">Ora Fine</label>
+                  <label className="revamp-form-label">{t("ente.publish.endLabel")}</label>
                   <input
                     type="time"
                     className="revamp-form-input"
@@ -301,7 +303,7 @@ export function EntityPublishPage({ page, setPage, theme, setTheme, user }: any)
               </div>
 
               <button type="submit" className="revamp-form-btn" style={{ "--accent": "var(--violet)" } as React.CSSProperties} disabled={loading}>
-                {loading ? "Pubblicazione..." : "Pubblica Evento"}{" "}
+                {loading ? t("ente.publish.publishing") : t("ente.publish.publishEvent")}{" "}
                 {!loading && <Icon name="sparkle" size={16} />}
               </button>
             </form>

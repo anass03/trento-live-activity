@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
 import { getDashboardStats } from "../lib/api";
@@ -6,6 +7,7 @@ import { getDashboardStats } from "../lib/api";
 type Tab = "overview" | "trends" | "supply";
 
 export function ComuneStatistichePage({ page, setPage, theme, setTheme, user }: any) {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -53,7 +55,7 @@ export function ComuneStatistichePage({ page, setPage, theme, setTheme, user }: 
     const status = ratio > 2.5 ? "Critical" : ratio > 1.2 ? "Warning" : "Regular";
     const color = ratio > 2.5 ? "var(--red)" : ratio > 1.2 ? "var(--amber)" : "var(--green)";
     return {
-      cat: act.tipo || "Altro",
+      cat: act.tipo || t("comune.stats.otherCategory"),
       demand,
       supply,
       ratio,
@@ -74,7 +76,7 @@ export function ComuneStatistichePage({ page, setPage, theme, setTheme, user }: 
       <div className="revamp-legal-scene">
         <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
         <div style={{ color: "var(--text-muted)", fontSize: 15, padding: "100px 0", textAlign: "center" }}>
-          Caricamento statistiche territoriali...
+          {t("comune.stats.loading")}
         </div>
       </div>
     );
@@ -86,11 +88,11 @@ export function ComuneStatistichePage({ page, setPage, theme, setTheme, user }: 
       <div className="revamp-comune-layout">
         <div className="revamp-comune-head">
           <div>
-            <h1>Statistiche Territoriali</h1>
-            <p>Monitoraggio dell'offerta e dei picchi di domanda della community cittadina</p>
+            <h1>{t("comune.stats.title")}</h1>
+            <p>{t("comune.stats.subtitle")}</p>
           </div>
           <button className="revamp-action-btn" style={{ height: 40 }} onClick={() => setPage("comune-dashboard")}>
-            <Icon name="home" size={15} /> Torna al Comune
+            <Icon name="home" size={15} /> {t("comune.stats.back")}
           </button>
         </div>
 
@@ -100,26 +102,26 @@ export function ComuneStatistichePage({ page, setPage, theme, setTheme, user }: 
             className={"revamp-profile-tab" + (activeTab === "overview" ? " active" : "")}
             onClick={() => setActiveTab("overview")}
           >
-            Panoramica Attività
+            {t("comune.stats.tabOverview")}
           </button>
           <button
             className={"revamp-profile-tab" + (activeTab === "trends" ? " active" : "")}
             onClick={() => setActiveTab("trends")}
           >
-            Analisi Trend & Orari Picco
+            {t("comune.stats.tabTrends")}
           </button>
           <button
             className={"revamp-profile-tab" + (activeTab === "supply" ? " active" : "")}
             onClick={() => setActiveTab("supply")}
           >
-            Rapporto Offerta / Domanda
+            {t("comune.stats.tabSupply")}
           </button>
         </div>
 
         {activeTab === "overview" && (
           <div className="revamp-charts-grid">
             <div className="revamp-chart-card anim-in" style={{ "--accent": "var(--cyan)", animationDelay: "60ms" } as React.CSSProperties}>
-              <h3>Attività Create per Giorno (Ultimi 14 giorni) <span>Attive</span></h3>
+              <h3>{t("comune.stats.dailyTitle")} <span>{t("comune.stats.dailyBadge")}</span></h3>
               <div className="revamp-chart-body">
                 <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: H, overflow: "visible" }}>
                   {/* Y Axis Grid Lines & Labels */}
@@ -145,7 +147,7 @@ export function ComuneStatistichePage({ page, setPage, theme, setTheme, user }: 
             </div>
 
             <div className="revamp-chart-card anim-in" style={{ "--accent": "var(--violet)", animationDelay: "120ms" } as React.CSSProperties}>
-              <h3>Orari di Maggiore Affluenza (Attività Spontanee)</h3>
+              <h3>{t("comune.stats.peakTitle")}</h3>
               <div className="revamp-chart-body" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {peakHours.map((ph: any, idx: number) => {
                   const pct = (ph.count / maxHourCount) * 100;
@@ -155,7 +157,7 @@ export function ComuneStatistichePage({ page, setPage, theme, setTheme, user }: 
                       <div className="np-bar" style={{ flex: 1, margin: "0 14px", height: 6 }}>
                         <i style={{ width: pct + "%", background: "var(--violet)", boxShadow: "0 0 6px var(--violet)" }}></i>
                       </div>
-                      <span style={{ fontSize: 12.5, fontWeight: 700 }}>{ph.count} attività</span>
+                      <span style={{ fontSize: 12.5, fontWeight: 700 }}>{t("comune.stats.activitiesCount", { count: ph.count })}</span>
                     </div>
                   );
                 })}
@@ -166,17 +168,17 @@ export function ComuneStatistichePage({ page, setPage, theme, setTheme, user }: 
 
         {activeTab === "trends" && (
           <div className="revamp-chart-card anim-in" style={{ "--accent": "var(--teal)", animationDelay: "60ms" } as React.CSSProperties}>
-            <h3>Analisi di Trend Mensili</h3>
+            <h3>{t("comune.stats.trendsTitle")}</h3>
             <p style={{ fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.5 }}>
-              I flussi aggregati sul territorio di Trento indicano una partecipazione attiva elevata alle attività e una distribuzione dei punti di interesse che supportano la mobilità sostenibile (es. parcheggi gestiti).
+              {t("comune.stats.trendsText")}
             </p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 14 }}>
               <div className="revamp-detail-attr">
-                <div className="lbl">Totale Partecipazioni Registrate</div>
+                <div className="lbl">{t("comune.stats.totalParticipations")}</div>
                 <div className="val" style={{ color: "var(--green)" }}>{stats?.totalParticipations ?? 0}</div>
               </div>
               <div className="revamp-detail-attr">
-                <div className="lbl">Punti di Interesse Monitorati</div>
+                <div className="lbl">{t("comune.stats.poisMonitored")}</div>
                 <div className="val">{stats?.totalPOIs ?? 0}</div>
               </div>
             </div>
@@ -185,27 +187,29 @@ export function ComuneStatistichePage({ page, setPage, theme, setTheme, user }: 
 
         {activeTab === "supply" && (
           <div className="revamp-chart-card anim-in" style={{ "--accent": "var(--magenta)", animationDelay: "60ms" } as React.CSSProperties}>
-            <h3>Rapporto Domanda / Offerta Categorie</h3>
+            <h3>{t("comune.stats.supplyTitle")}</h3>
             <div className="revamp-table-wrap" style={{ marginTop: 12 }}>
               <table className="revamp-table">
                 <thead>
                   <tr>
-                    <th>Categoria Cella</th>
-                    <th>Domanda (Attività create)</th>
-                    <th>Offerta (POI mappati)</th>
-                    <th>Rapporto Gap (Demand/Supply)</th>
-                    <th>Stato Allerta</th>
+                    <th>{t("comune.stats.colCategory")}</th>
+                    <th>{t("comune.stats.colDemand")}</th>
+                    <th>{t("comune.stats.colSupply")}</th>
+                    <th>{t("comune.stats.colRatio")}</th>
+                    <th>{t("comune.stats.colStatus")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {finalSupplyRows.map((row: any, idx: number) => (
                     <tr key={idx}>
-                      <td><b>{row.cat}</b></td>
+                      <td><b>{t(`activities.cats.${row.cat.toLowerCase()}` as any, { defaultValue: row.cat })}</b></td>
                       <td>{row.demand}</td>
                       <td>{row.supply}</td>
                       <td>{row.ratio}x</td>
                       <td>
-                        <span style={{ color: row.color, fontWeight: 700 }}>{row.status}</span>
+                        <span style={{ color: row.color, fontWeight: 700 }}>
+                          {row.status === "Critical" ? t("comune.stats.statusCritical") : row.status === "Warning" ? t("comune.stats.statusWarning") : t("comune.stats.statusRegular")}
+                        </span>
                       </td>
                     </tr>
                   ))}

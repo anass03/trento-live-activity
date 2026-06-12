@@ -1,15 +1,15 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "../ui/Icon";
 import { createActivity, suggestActivityAi } from "../../lib/api";
 
-/* Categorie attività spontanee (enum backend ACTIVITY_TYPES) */
-const ACT_TYPES = [
-  { id: "sport",       label: "Sport",       icon: "run",      color: "var(--green)" },
-  { id: "cultura",     label: "Cultura",     icon: "landmark", color: "var(--violet)" },
-  { id: "musica",      label: "Musica",      icon: "music",    color: "var(--magenta)" },
-  { id: "arte",        label: "Arte",        icon: "sparkle",  color: "var(--orange, var(--amber))" },
-  { id: "gastronomia", label: "Gastronomia", icon: "food",     color: "var(--amber)" },
-  { id: "studio",      label: "Studio",      icon: "bookmark", color: "var(--cyan)" },
+const ACT_TYPE_DEFS = [
+  { id: "sport",       icon: "run",      color: "var(--green)" },
+  { id: "cultura",     icon: "landmark", color: "var(--violet)" },
+  { id: "musica",      icon: "music",    color: "var(--magenta)" },
+  { id: "arte",        icon: "sparkle",  color: "var(--orange, var(--amber))" },
+  { id: "gastronomia", icon: "food",     color: "var(--amber)" },
+  { id: "studio",      icon: "bookmark", color: "var(--cyan)" },
 ];
 
 function todayISO() {
@@ -26,6 +26,8 @@ export function CreateActivityPanel({ poi, onClose, onCreated }: {
   onClose: () => void;
   onCreated?: () => void;
 }) {
+  const { t } = useTranslation();
+  const ACT_TYPES = ACT_TYPE_DEFS.map((d) => ({ ...d, label: t(`activities.cats.${d.id}`) }));
   const [tipo, setTipo] = useState("");
   const [data, setData] = useState(todayISO());
   const [startTime, setStartTime] = useState("18:00");
@@ -55,7 +57,7 @@ export function CreateActivityPanel({ poi, onClose, onCreated }: {
       setCap(String(result.maxPartecipanti));
       setAiHint(result.reasoning);
     } catch (err: any) {
-      setAiError(err.message || "Suggerimento AI non disponibile al momento.");
+      setAiError(err.message || t("createActivity.aiUnavailable"));
     } finally {
       setAiLoading(false);
     }
@@ -65,7 +67,7 @@ export function CreateActivityPanel({ poi, onClose, onCreated }: {
     e.preventDefault();
     setError("");
     if (!tipo) {
-      setError("Scegli la categoria dell'attività.");
+      setError(t("createActivity.categoryError"));
       return;
     }
     setLoading(true);
@@ -81,7 +83,7 @@ export function CreateActivityPanel({ poi, onClose, onCreated }: {
       setSuccess(true);
       setTimeout(() => { onCreated && onCreated(); onClose(); }, 1500);
     } catch (err: any) {
-      setError(err.message || "Errore durante la creazione dell'attività.");
+      setError(err.message || t("createActivity.createError"));
     } finally {
       setLoading(false);
     }
@@ -98,10 +100,10 @@ export function CreateActivityPanel({ poi, onClose, onCreated }: {
       >
         <div className="detail-modal-head">
           <div>
-            <div className="detail-modal-kicker">Punto di interesse</div>
-            <h2>Crea attività — {poi.title}</h2>
+            <div className="detail-modal-kicker">{t("createActivity.kicker")}</div>
+            <h2>{t("createActivity.title")} — {poi.title}</h2>
           </div>
-          <button className="detail-modal-close" onClick={onClose} aria-label="Chiudi">
+          <button className="detail-modal-close" onClick={onClose} aria-label={t("widgets.popup.close")}>
             <Icon name="x" size={17} />
           </button>
         </div>
@@ -109,14 +111,14 @@ export function CreateActivityPanel({ poi, onClose, onCreated }: {
         <div className="detail-modal-body">
           {success ? (
             <div className="revamp-status-pill success" style={{ width: "100%", padding: "16px 0", justifyContent: "center" }}>
-              <Icon name="check" size={14} /> Attività creata con successo!
+              <Icon name="check" size={14} /> {t("createActivity.success")}
             </div>
           ) : (
             <>
               {/* AI suggester: descrizione libera → categoria/orari proposti */}
               <div className="cap-ai-box">
                 <label className="revamp-form-label" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <Icon name="sparkle" size={13} /> Descrivi cosa vuoi organizzare (AI)
+                  <Icon name="sparkle" size={13} /> {t("createActivity.aiLabel")}
                 </label>
                 <textarea
                   className="revamp-textarea"
@@ -124,7 +126,7 @@ export function CreateActivityPanel({ poi, onClose, onCreated }: {
                   rows={2}
                   value={aiDescription}
                   onChange={(e) => setAiDescription(e.target.value)}
-                  placeholder='Es. "Partita di calcetto domani sera con gli amici"'
+                  placeholder={t("createActivity.aiPlaceholder")}
                 />
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
                   <button
@@ -133,7 +135,7 @@ export function CreateActivityPanel({ poi, onClose, onCreated }: {
                     disabled={aiLoading || !aiDescription.trim()}
                     onClick={handleAiSuggest}
                   >
-                    <Icon name="sparkle" size={12} /> {aiLoading ? "Suggerimento in corso…" : "Suggerisci con AI"}
+                    <Icon name="sparkle" size={12} /> {aiLoading ? t("createActivity.aiLoading") : t("createActivity.aiSuggest")}
                   </button>
                   {aiHint && <small style={{ color: "var(--green)", fontSize: 12 }}>{aiHint}</small>}
                   {aiError && <small style={{ color: "var(--red)", fontSize: 12 }}>{aiError}</small>}
@@ -147,7 +149,7 @@ export function CreateActivityPanel({ poi, onClose, onCreated }: {
               )}
 
               <form onSubmit={handleSubmit} style={{ marginTop: 16 }}>
-                <h3 className="revamp-detail-section-title">Categoria</h3>
+                <h3 className="revamp-detail-section-title">{t("createActivity.sectionCategory")}</h3>
                 <div className="s-interests" style={{ marginBottom: 18 }}>
                   {ACT_TYPES.map((item) => (
                     <button
@@ -162,34 +164,34 @@ export function CreateActivityPanel({ poi, onClose, onCreated }: {
                   ))}
                 </div>
 
-                <h3 className="revamp-detail-section-title">Data & Orari</h3>
+                <h3 className="revamp-detail-section-title">{t("createActivity.sectionDateTime")}</h3>
                 <div className="revamp-form-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
                   <div className="revamp-form-group" style={{ marginBottom: 0 }}>
-                    <label className="revamp-form-label">Data</label>
+                    <label className="revamp-form-label">{t("createActivity.dateLabel")}</label>
                     <input type="date" className="revamp-form-input" value={data}
                       onChange={(e) => setData(e.target.value)} style={{ paddingLeft: 12 }} required />
                   </div>
                   <div className="revamp-form-group" style={{ marginBottom: 0 }}>
-                    <label className="revamp-form-label">Max partecipanti</label>
+                    <label className="revamp-form-label">{t("createActivity.maxParticipants")}</label>
                     <input type="number" min={2} max={50} className="revamp-form-input" value={cap}
                       onChange={(e) => setCap(e.target.value)} style={{ paddingLeft: 12 }} required />
                   </div>
                 </div>
                 <div className="revamp-form-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 18 }}>
                   <div className="revamp-form-group" style={{ marginBottom: 0 }}>
-                    <label className="revamp-form-label">Ora inizio</label>
+                    <label className="revamp-form-label">{t("createActivity.startLabel")}</label>
                     <input type="time" className="revamp-form-input" value={startTime}
                       onChange={(e) => setStartTime(e.target.value)} style={{ paddingLeft: 12 }} required />
                   </div>
                   <div className="revamp-form-group" style={{ marginBottom: 0 }}>
-                    <label className="revamp-form-label">Ora fine</label>
+                    <label className="revamp-form-label">{t("createActivity.endLabel")}</label>
                     <input type="time" className="revamp-form-input" value={endTime}
                       onChange={(e) => setEndTime(e.target.value)} style={{ paddingLeft: 12 }} required />
                   </div>
                 </div>
 
                 <button type="submit" className="revamp-form-btn" style={{ "--accent": "var(--teal)" } as React.CSSProperties} disabled={loading}>
-                  {loading ? "Creazione…" : "Crea Attività"} {!loading && <Icon name="check" size={15} />}
+                  {loading ? t("createActivity.creating") : t("createActivity.submit")} {!loading && <Icon name="check" size={15} />}
                 </button>
               </form>
             </>

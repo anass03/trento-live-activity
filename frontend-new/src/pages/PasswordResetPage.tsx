@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "../components/ui/Icon";
 import { forgotPassword, resetPassword } from "../lib/api";
 
 export function PasswordResetPage({ page, setPage }: any) {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -25,7 +27,7 @@ export function PasswordResetPage({ page, setPage }: any) {
   const handleRequestLink = async (e: any) => {
     e.preventDefault();
     if (!email) {
-      setError("Inserisci il tuo indirizzo email.");
+      setError(t("passwordReset.errors.missingEmail"));
       return;
     }
     setError("");
@@ -34,7 +36,7 @@ export function PasswordResetPage({ page, setPage }: any) {
       await forgotPassword(email);
       setSubmitted(true);
     } catch (err: any) {
-      setError(err.message || "Errore durante l'invio dell'email.");
+      setError(err.message || t("passwordReset.errors.sendError"));
     } finally {
       setLoading(false);
     }
@@ -43,29 +45,29 @@ export function PasswordResetPage({ page, setPage }: any) {
   const handleResetConfirm = async (e: any) => {
     e.preventDefault();
     if (!password || !confirmPassword) {
-      setError("Compila tutti i campi.");
+      setError(t("passwordReset.errors.fillAll"));
       return;
     }
     if (password !== confirmPassword) {
-      setError("Le password non coincidono.");
+      setError(t("passwordReset.errors.mismatch"));
       return;
     }
     if (password.length < 8) {
-      setError("La password deve contenere almeno 8 caratteri.");
+      setError(t("passwordReset.errors.length"));
       return;
     }
     setError("");
     setLoading(true);
     try {
       await resetPassword(token!, password);
-      setSuccessMsg("Password reimpostata con successo! Ora puoi accedere.");
+      setSuccessMsg(t("passwordReset.success"));
       setTimeout(() => {
         // Clean URL parameter
         window.history.replaceState({}, document.title, window.location.pathname);
         setPage("login");
       }, 3000);
     } catch (err: any) {
-      setError(err.message || "Errore durante la reimpostazione.");
+      setError(err.message || t("passwordReset.errors.resetError"));
     } finally {
       setLoading(false);
     }
@@ -81,8 +83,8 @@ export function PasswordResetPage({ page, setPage }: any) {
               <path d="M12 7v5l3 3" stroke="var(--magenta)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <h2>{token ? "Scegli Nuova Password" : "Reimposta Password"}</h2>
-          <p>{token ? "Inserisci la tua nuova password d'accesso" : "Riceverai un link via email per reimpostare la tua password"}</p>
+          <h2>{token ? t("passwordReset.titleNew") : t("passwordReset.titleRequest")}</h2>
+          <p>{token ? t("passwordReset.subtitleNew") : t("passwordReset.subtitleRequest")}</p>
         </div>
 
         {error && (
@@ -102,13 +104,13 @@ export function PasswordResetPage({ page, setPage }: any) {
           !successMsg && (
             <form onSubmit={handleResetConfirm}>
               <div className="revamp-form-group">
-                <label className="revamp-form-label">Nuova Password</label>
+                <label className="revamp-form-label">{t("passwordReset.newPassword")}</label>
                 <div className="revamp-form-input-wrap">
                   <Icon name="key" size={16} />
                   <input
                     type="password"
                     className="revamp-form-input"
-                    placeholder="Minimo 8 caratteri"
+                    placeholder={t("passwordReset.newPasswordPlaceholder")}
                     value={password}
                     disabled={loading}
                     onChange={(e) => setPassword(e.target.value)}
@@ -117,13 +119,13 @@ export function PasswordResetPage({ page, setPage }: any) {
               </div>
 
               <div className="revamp-form-group">
-                <label className="revamp-form-label">Conferma Password</label>
+                <label className="revamp-form-label">{t("passwordReset.confirmPassword")}</label>
                 <div className="revamp-form-input-wrap">
                   <Icon name="key" size={16} />
                   <input
                     type="password"
                     className="revamp-form-input"
-                    placeholder="Ripeti la nuova password"
+                    placeholder={t("passwordReset.confirmPasswordPlaceholder")}
                     value={confirmPassword}
                     disabled={loading}
                     onChange={(e) => setConfirmPassword(e.target.value)}
@@ -132,7 +134,7 @@ export function PasswordResetPage({ page, setPage }: any) {
               </div>
 
               <button type="submit" className="revamp-form-btn" style={{ "--accent": "var(--magenta)" } as React.CSSProperties} disabled={loading}>
-                {loading ? "Reimpostazione..." : "Reimposta Password"}{" "}
+                {loading ? t("passwordReset.resetting") : t("passwordReset.resetBtn")}{" "}
                 {!loading && <Icon name="check" size={16} />}
               </button>
             </form>
@@ -142,25 +144,25 @@ export function PasswordResetPage({ page, setPage }: any) {
           submitted ? (
             <div style={{ textAlign: "center", padding: "16px 0" }}>
               <div className="revamp-status-pill success" style={{ marginBottom: 16, display: "inline-flex", justifyContent: "center", width: "100%" }}>
-                <Icon name="check" size={12} /> Email inviata con successo!
+                <Icon name="check" size={12} /> {t("passwordReset.sentTitle")}
               </div>
               <p style={{ fontSize: 13.5, color: "var(--text-secondary)", marginBottom: 20 }}>
-                Controlla la tua casella postale all'indirizzo <b>{email}</b> e segui le istruzioni fornite.
+                {t("passwordReset.sentBodyPrefix")} <b>{email}</b> {t("passwordReset.sentBodySuffix")}
               </p>
               <button className="revamp-form-btn" style={{ "--accent": "var(--magenta)" } as React.CSSProperties} onClick={() => setPage("login")}>
-                Torna al Login
+                {t("passwordReset.backToLogin")}
               </button>
             </div>
           ) : (
             <form onSubmit={handleRequestLink}>
               <div className="revamp-form-group">
-                <label className="revamp-form-label">Email dell'account</label>
+                <label className="revamp-form-label">{t("passwordReset.emailLabel")}</label>
                 <div className="revamp-form-input-wrap">
                   <Icon name="mail" size={16} />
                   <input
                     type="email"
                     className="revamp-form-input"
-                    placeholder="nome@esempio.com"
+                    placeholder={t("passwordReset.emailPlaceholder")}
                     value={email}
                     disabled={loading}
                     onChange={(e) => setEmail(e.target.value)}
@@ -169,7 +171,7 @@ export function PasswordResetPage({ page, setPage }: any) {
               </div>
 
               <button type="submit" className="revamp-form-btn" style={{ "--accent": "var(--magenta)" } as React.CSSProperties} disabled={loading}>
-                {loading ? "Invio in corso..." : "Invia istruzioni"}{" "}
+                {loading ? t("passwordReset.sending") : t("passwordReset.sendBtn")}{" "}
                 {!loading && <Icon name="arrow" size={16} style={{ transform: "rotate(-45deg)" }} />}
               </button>
             </form>
@@ -179,7 +181,7 @@ export function PasswordResetPage({ page, setPage }: any) {
         {!submitted && !successMsg && (
           <div className="revamp-form-foot">
             <button className="revamp-form-link" style={{ background: "none", border: "none", padding: 0 }} onClick={() => setPage("login")}>
-              Annulla e torna indietro
+              {t("passwordReset.cancel")}
             </button>
           </div>
         )}

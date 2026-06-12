@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "../components/ui/Icon";
 import { verifyEmail } from "../lib/api";
 
 export function VerifyEmailPage({ page, setPage }: any) {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
@@ -19,7 +21,7 @@ export function VerifyEmailPage({ page, setPage }: any) {
           window.history.replaceState({}, document.title, window.location.pathname);
         })
         .catch((err: any) => {
-          setError(err.message || "Token di verifica non valido o scaduto.");
+          setError(err.message || t("verifyEmail.invalidToken"));
         })
         .finally(() => {
           setLoading(false);
@@ -34,13 +36,13 @@ export function VerifyEmailPage({ page, setPage }: any) {
           <div className="revamp-form-logo" style={{ "--accent": "var(--cyan)" } as React.CSSProperties}>
             <Icon name="mail" size={26} style={{ color: "var(--cyan)" }} />
           </div>
-          <h2>Verifica la tua Email</h2>
-          <p>Conferma il tuo indirizzo email per attivare l'account</p>
+          <h2>{t("verifyEmail.title")}</h2>
+          <p>{t("verifyEmail.subtitle")}</p>
         </div>
 
         {loading && (
           <div style={{ textAlign: "center", padding: "20px 0" }}>
-            <p style={{ color: "var(--text-muted)", fontSize: 14 }}>Verifica dell'indirizzo email in corso...</p>
+            <p style={{ color: "var(--text-muted)", fontSize: 14 }}>{t("verifyEmail.verifying")}</p>
           </div>
         )}
 
@@ -50,10 +52,10 @@ export function VerifyEmailPage({ page, setPage }: any) {
               <Icon name="warn" size={12} /> {error}
             </div>
             <p style={{ fontSize: 13.5, color: "var(--text-secondary)", marginBottom: 20 }}>
-              Il link potrebbe essere scaduto. Controlla la tua casella di posta o esegui nuovamente la registrazione.
+              {t("verifyEmail.expiredHint")}
             </p>
             <button className="revamp-form-btn" style={{ "--accent": "var(--cyan)" } as React.CSSProperties} onClick={() => setPage("login")}>
-              Torna al Login
+              {t("verifyEmail.backToLogin")}
             </button>
           </div>
         )}
@@ -61,13 +63,13 @@ export function VerifyEmailPage({ page, setPage }: any) {
         {!loading && !error && success && (
           <div style={{ textAlign: "center" }}>
             <div className="revamp-status-pill success" style={{ marginBottom: 16, display: "inline-flex", justifyContent: "center", width: "100%" }}>
-              <Icon name="check" size={12} /> Email verificata con successo!
+              <Icon name="check" size={12} /> {t("verifyEmail.success")}
             </div>
             <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 20 }}>
-              Grazie! Il tuo indirizzo email è stato verificato ed il tuo account è ora completamente attivo.
+              {t("verifyEmail.successBody")}
             </p>
             <button className="revamp-form-btn" style={{ "--accent": "var(--cyan)" } as React.CSSProperties} onClick={() => setPage("home")}>
-              Accedi alla Dashboard
+              {t("verifyEmail.goDashboard")}
             </button>
           </div>
         )}
@@ -75,10 +77,10 @@ export function VerifyEmailPage({ page, setPage }: any) {
         {!loading && !error && !success && (
           <div style={{ textAlign: "center" }}>
             <p style={{ fontSize: 13.5, color: "var(--text-secondary)", marginBottom: 20, lineHeight: 1.5 }}>
-              Abbiamo inviato un link di verifica alla tua email. Controlla la tua posta elettronica e clicca sul link per attivare l'account.
+              {t("verifyEmail.pendingBody")}
             </p>
             <button className="revamp-form-btn" style={{ "--accent": "var(--cyan)" } as React.CSSProperties} onClick={() => setPage("login")}>
-              Torna al Login
+              {t("verifyEmail.backToLogin")}
             </button>
           </div>
         )}

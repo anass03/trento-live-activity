@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
 import { CommentsSection } from "../components/redesign/CommentsSection";
@@ -14,6 +15,7 @@ const grads: Record<string, string> = {
 };
 
 export function EventDetailPage({ page, setPage, theme, setTheme, user, selectedEventId }: any) {
+  const { t } = useTranslation();
   const [event, setEvent] = useState<ApiEvent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -21,7 +23,7 @@ export function EventDetailPage({ page, setPage, theme, setTheme, user, selected
 
   const fetchEventDetail = async () => {
     if (!selectedEventId) {
-      setError("Nessun evento selezionato.");
+      setError(t("events.noneSelected"));
       setLoading(false);
       return;
     }
@@ -34,7 +36,7 @@ export function EventDetailPage({ page, setPage, theme, setTheme, user, selected
         setIsJoined(data.participantIds.includes(user.id));
       }
     } catch (err: any) {
-      setError(err.message || "Errore durante il caricamento dell'evento.");
+      setError(err.message || t("events.detailLoadError"));
     } finally {
       setLoading(false);
     }
@@ -71,7 +73,7 @@ export function EventDetailPage({ page, setPage, theme, setTheme, user, selected
       <div className="revamp-detail-scene">
         <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
         <div style={{ color: "var(--text-muted)", fontSize: 15, padding: "100px 0", textAlign: "center" }}>
-          Caricamento dettagli evento...
+          {t("events.detailLoading")}
         </div>
       </div>
     );
@@ -83,10 +85,10 @@ export function EventDetailPage({ page, setPage, theme, setTheme, user, selected
         <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
         <div style={{ maxWidth: 500, margin: "80px auto", textAlign: "center" }}>
           <div className="revamp-status-pill danger" style={{ justifyContent: "center", marginBottom: 20 }}>
-            <Icon name="warn" size={14} /> {error || "Evento non trovato."}
+            <Icon name="warn" size={14} /> {error || t("events.notFound")}
           </div>
           <button className="revamp-form-btn" style={{ "--accent": "var(--cyan)" } as React.CSSProperties} onClick={() => setPage("eventi")}>
-            Torna agli Eventi
+            {t("events.backToEvents")}
           </button>
         </div>
       </div>
@@ -105,7 +107,7 @@ export function EventDetailPage({ page, setPage, theme, setTheme, user, selected
         <div className="revamp-detail-card anim-in" style={{ "--accent": "var(--magenta)" } as React.CSSProperties}>
           <div className="revamp-detail-cover" style={{ "--dcg": grads[cat] || grads.musica } as React.CSSProperties}>
             <button className="back-btn" onClick={() => setPage("eventi")}>
-              <Icon name="chevronL" size={14} /> Torna agli Eventi
+              <Icon name="chevronL" size={14} /> {t("events.backToEvents")}
             </button>
             <div className="cover-badge">
               <Icon name="music" size={12} /> {cat}
@@ -120,11 +122,11 @@ export function EventDetailPage({ page, setPage, theme, setTheme, user, selected
             <div className="revamp-detail-rating" style={{ color: "var(--magenta)" }}>
               {event.isCertified ? (
                 <>
-                  <Icon name="shieldCheck" size={14} style={{ color: "var(--teal)", marginRight: 4 }} /> Evento Certificato
+                  <Icon name="shieldCheck" size={14} style={{ color: "var(--teal)", marginRight: 4 }} /> {t("events.certifiedEvent")}
                 </>
               ) : (
                 <>
-                  <span className="led live green"></span> Evento a Trento
+                  <span className="led live green"></span> {t("events.inTrento")}
                 </>
               )}
             </div>
@@ -135,23 +137,22 @@ export function EventDetailPage({ page, setPage, theme, setTheme, user, selected
 
             <div className="revamp-detail-attrs">
               <div className="revamp-detail-attr" style={{ gridColumn: "span 2" }}>
-                <div className="lbl"><Icon name="clock" size={12} /> Quando</div>
-                <div className="val" style={{ fontSize: 13 }}>{event.dateTime || event.createdAt || "Oggi"}</div>
+                <div className="lbl"><Icon name="clock" size={12} /> {t("events.when")}</div>
+                <div className="val" style={{ fontSize: 13 }}>{event.dateTime || event.createdAt || t("events.today")}</div>
               </div>
               <div className="revamp-detail-attr" style={{ gridColumn: "span 2" }}>
-                <div className="lbl"><Icon name="pin" size={12} /> Luogo</div>
+                <div className="lbl"><Icon name="pin" size={12} /> {t("events.place")}</div>
                 <div className="val" style={{ fontSize: 13 }}>{event.location || "Trento"}</div>
               </div>
             </div>
 
-            <div className="revamp-detail-section-title">Partecipazione</div>
+            <div className="revamp-detail-section-title">{t("events.participation")}</div>
             <div className="revamp-detail-box">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>Posti occupati</div>
-                  <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginTop: 3 }}>
-                    <b>{count}</b> di <b>{limit}</b> posti occupati
-                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{t("events.seatsTaken")}</div>
+                  <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginTop: 3 }}
+                    dangerouslySetInnerHTML={{ __html: t("events.seatsOf", { count, limit }) }} />
                 </div>
                 <div style={{ fontFamily: "var(--mono)", fontSize: 16, fontWeight: 700, color: "var(--magenta)" }}>
                   {pct}%
@@ -162,7 +163,7 @@ export function EventDetailPage({ page, setPage, theme, setTheme, user, selected
               </div>
               {isJoined && (
                 <span className="revamp-status-pill success" style={{ marginBottom: 14 }}>
-                  <Icon name="check" size={11} /> Partecipi a questo evento
+                  <Icon name="check" size={11} /> {t("events.youParticipate")}
                 </span>
               )}
               <button
@@ -170,11 +171,11 @@ export function EventDetailPage({ page, setPage, theme, setTheme, user, selected
                 style={{ "--accent": "var(--magenta)" } as React.CSSProperties}
                 onClick={handleJoinToggle}
               >
-                {isJoined ? "Annulla partecipazione" : "Partecipa all'evento"}
+                {isJoined ? t("events.cancelJoin") : t("events.joinCta")}
               </button>
             </div>
 
-            <div className="revamp-detail-section-title" style={{ marginTop: 28 }}>Discussione & Commenti</div>
+            <div className="revamp-detail-section-title" style={{ marginTop: 28 }}>{t("comments.discussionTitle")}</div>
             <div className="revamp-detail-box">
               <CommentsSection accent="var(--magenta)" user={user} eventId={event.id} />
             </div>

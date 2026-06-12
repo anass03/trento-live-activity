@@ -1,17 +1,19 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "../components/ui/Icon";
 import { completeOnboarding } from "../lib/api";
 
 const INTERESTS_ONBOARDING = [
-  { id: "musica",   label: "Musica",      icon: "music",    color: "var(--magenta)", desc: "Concerti live, DJ set, festival ed eventi musicali all'aperto." },
-  { id: "cultura",  label: "Cultura",     icon: "landmark", color: "var(--violet)",  desc: "Musei, mostre, gallerie d'arte, cinema, e visite guidate." },
-  { id: "outdoor",  label: "Outdoor",     icon: "bike",     color: "var(--teal)",    desc: "Trekking, escursioni guidate, giri in bici e percorsi panoramici." },
-  { id: "food",     label: "Food & Drink",icon: "food",     color: "var(--amber)",   desc: "Degustazioni in cantina, sagre tipiche, food truck e aperitivi." },
-  { id: "sport",    label: "Sport",       icon: "run",      color: "var(--green)",   desc: "Corsi, partite, allenamenti di gruppo all'aperto, e jogging." },
-  { id: "famiglia", label: "Famiglia",    icon: "family",   color: "var(--cyan)",    desc: "Laboratori didattici, picnic guidati ed attività adatte ai più piccoli." },
+  { id: "musica",   icon: "music",    color: "var(--magenta)" },
+  { id: "cultura",  icon: "landmark", color: "var(--violet)" },
+  { id: "outdoor",  icon: "bike",     color: "var(--teal)" },
+  { id: "food",     icon: "food",     color: "var(--amber)" },
+  { id: "sport",    icon: "run",      color: "var(--green)" },
+  { id: "famiglia", icon: "family",   color: "var(--cyan)" },
 ];
 
 export function OnboardingInteressiPage({ page, setPage }: any) {
+  const { t } = useTranslation();
   const [selected, setSelected] = useState<string[]>(["outdoor", "cultura"]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -29,7 +31,7 @@ export function OnboardingInteressiPage({ page, setPage }: any) {
       await completeOnboarding({ interessi: selected });
       setPage("home");
     } catch (err: any) {
-      setError(err.message || "Errore durante il salvataggio degli interessi.");
+      setError(err.message || t("onboarding.saveError"));
     } finally {
       setLoading(false);
     }
@@ -42,8 +44,8 @@ export function OnboardingInteressiPage({ page, setPage }: any) {
           <div className="revamp-form-logo" style={{ "--accent": "var(--teal)" } as React.CSSProperties}>
             <Icon name="sparkle" size={26} style={{ color: "var(--teal)" }} />
           </div>
-          <h2>I tuoi Interessi</h2>
-          <p>Seleziona i temi che preferisci per ricevere suggerimenti su misura</p>
+          <h2>{t("onboarding.title")}</h2>
+          <p>{t("onboarding.subtitle")}</p>
         </div>
 
         {error && (
@@ -66,15 +68,15 @@ export function OnboardingInteressiPage({ page, setPage }: any) {
                 <div className="ic-wrap">
                   <Icon name={item.icon} size={20} />
                 </div>
-                <div className="lbl">{item.label}</div>
-                <div className="desc">{item.desc}</div>
+                <div className="lbl">{t(`onboarding.interests.${item.id}.label`)}</div>
+                <div className="desc">{t(`onboarding.interests.${item.id}.desc`)}</div>
               </button>
             );
           })}
         </div>
 
         <button className="revamp-form-btn" style={{ "--accent": "var(--teal)" } as React.CSSProperties} onClick={handleFinish} disabled={loading}>
-          {loading ? "Salvataggio..." : "Salva e continua"}{" "}
+          {loading ? t("onboarding.saving") : t("onboarding.saveBtn")}{" "}
           {!loading && <Icon name="check" size={16} />}
         </button>
       </div>

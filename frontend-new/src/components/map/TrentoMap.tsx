@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { CAT_ICON, catColor, catLabel } from "../../data/redesignData";
@@ -34,10 +35,10 @@ const CROWD_COLOR: Record<string, string> = {
   yellow: "var(--amber)",
   red: "var(--red)",
 };
-const CROWD_LABEL: Record<string, string> = {
-  green: "Affollamento basso",
-  yellow: "Affollamento medio",
-  red: "Affollamento alto",
+const CROWD_KEY: Record<string, string> = {
+  green: "map.poi.crowdLow",
+  yellow: "map.poi.crowdMedium",
+  red: "map.poi.crowdHigh",
 };
 
 interface TrentoMapProps {
@@ -71,6 +72,7 @@ export const TrentoMap = React.memo(function TrentoMap({
   canCreateActivity,
   onCreatePoi
 }: TrentoMapProps) {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapInstance = useRef<maplibregl.Map | null>(null);
   const mapMarkers = useRef<maplibregl.Marker[]>([]);
@@ -222,6 +224,7 @@ export const TrentoMap = React.memo(function TrentoMap({
       const selected = selectedMarkerId === m.id;
       const crowd = m.raw?.crowdingStatus || "green";
       const color = isPoi ? CROWD_COLOR[crowd] : catColor(m.cat);
+      const crowdLabel = t(CROWD_KEY[crowd] || CROWD_KEY.green);
 
       // L'elemento esterno è posizionato da maplibre via transform inline:
       // niente transform in CSS qui, le animazioni vivono sul .tla-pin interno.
@@ -242,9 +245,9 @@ export const TrentoMap = React.memo(function TrentoMap({
         tip.style.setProperty("--mc", color);
         tip.innerHTML = isPoi
           ? `
-          <div class="tip-cat">Punto di interesse</div>
+          <div class="tip-cat">${t("map.poi.label")}</div>
           <div class="tip-title">${m.title}</div>
-          <div class="tip-meta"><span class="tip-crowd-dot"></span>${CROWD_LABEL[crowd] || CROWD_LABEL.green}</div>
+          <div class="tip-meta"><span class="tip-crowd-dot"></span>${crowdLabel}</div>
         `
           : `
           <div class="tip-cat">${catLabel(m.cat)}</div>
@@ -263,21 +266,21 @@ export const TrentoMap = React.memo(function TrentoMap({
         popupDiv.style.setProperty("--ec", color);
         popupDiv.innerHTML = `
           <div class="ep-head">
-            <div class="ep-cat"><span class="ep-cat-ic">${getIconSvg("pin", 12)}</span>Punto di interesse</div>
+            <div class="ep-cat"><span class="ep-cat-ic">${getIconSvg("pin", 12)}</span>${t("map.poi.label")}</div>
             <div class="ep-title">${m.title}</div>
-            <button class="ep-close" aria-label="Chiudi">${getIconSvg("x", 13)}</button>
+            <button class="ep-close" aria-label="${t("widgets.popup.close")}">${getIconSvg("x", 13)}</button>
           </div>
           <div class="ep-body">
             <div class="ep-field">
               <span class="ep-fic">${getIconSvg("grid", 14)}</span>
               <div class="ep-ftext">
-                <div class="ep-flbl">Stato</div>
-                <div class="ep-fval">${CROWD_LABEL[crowd] || CROWD_LABEL.green}</div>
+                <div class="ep-flbl">${t("map.poi.status")}</div>
+                <div class="ep-fval">${crowdLabel}</div>
               </div>
             </div>
             ${canCreateActivity
-              ? `<button class="ep-cta ep-create">${getIconSvg("pin", 15)} Crea attività qui</button>`
-              : `<div class="ep-flbl" style="text-align:center;padding:4px 0">Accedi come cittadino per creare un'attività qui</div>`}
+              ? `<button class="ep-cta ep-create">${getIconSvg("pin", 15)} ${t("map.poi.createHere")}</button>`
+              : `<div class="ep-flbl" style="text-align:center;padding:4px 0">${t("map.poi.loginToCreate")}</div>`}
           </div>
         `;
         popupDiv.addEventListener("click", (e) => e.stopPropagation());
@@ -308,31 +311,31 @@ export const TrentoMap = React.memo(function TrentoMap({
               ${catLabel(m.cat)}
             </div>
             <div class="ep-title">${m.title}</div>
-            <button class="ep-close" aria-label="Chiudi">${getIconSvg("x", 13)}</button>
+            <button class="ep-close" aria-label="${t("widgets.popup.close")}">${getIconSvg("x", 13)}</button>
           </div>
           <div class="ep-body">
             <div class="ep-field">
               <span class="ep-fic">${getIconSvg("pin", 14)}</span>
               <div class="ep-ftext">
-                <div class="ep-flbl">Luogo</div>
+                <div class="ep-flbl">${t("widgets.popup.place")}</div>
                 <div class="ep-fval">${m.place}</div>
               </div>
             </div>
             <div class="ep-field">
               <span class="ep-fic">${getIconSvg("clock", 14)}</span>
               <div class="ep-ftext">
-                <div class="ep-flbl">Quando</div>
+                <div class="ep-flbl">${t("widgets.popup.when")}</div>
                 <div class="ep-fval">${m.date}, ${m.time}</div>
               </div>
             </div>
             <div class="ep-part">
               <div class="ep-part-l">
-                <div class="ep-flbl">Partecipanti</div>
+                <div class="ep-flbl">${t("widgets.popup.participants")}</div>
                 <div class="ep-part-bar"><i style="width: ${pct}%"></i></div>
               </div>
               <div class="ep-part-n"><b>${going}</b> / ${cap}</div>
             </div>
-            <button class="ep-cta">${getIconSvg("ticket", 15)} Partecipa</button>
+            <button class="ep-cta">${getIconSvg("ticket", 15)} ${t("widgets.popup.join")}</button>
           </div>
         `;
 
@@ -371,7 +374,7 @@ export const TrentoMap = React.memo(function TrentoMap({
 
       mapMarkers.current.push(maplibreMarker);
     });
-  }, [markers, activeFilter, selectedMarkerId, styleLoaded, canCreateActivity]);
+  }, [markers, activeFilter, selectedMarkerId, styleLoaded, canCreateActivity, t]);
 
   return (
     <div 

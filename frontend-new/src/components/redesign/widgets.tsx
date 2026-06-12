@@ -2,6 +2,7 @@
    Trento Live Activity — widgets, markers, labels
    =========================================================== */
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { CAT_ICON, PLACES, catColor, catLabel } from "../../data/redesignData";
 import { Icon, WxIcon } from "../ui/Icon";
 import { getCityAlerts, getParking, getTrentoWeather } from "../../lib/api";
@@ -67,31 +68,32 @@ export function MapLabels() {
 
 /* ---------------- EVENT POPUP ---------------- */
 function EventPopup({ data, color, placeBelow, onClose }: any) {
+  const { t } = useTranslation();
   const pct = data.cap > 0 ? Math.min(100, Math.round((data.going / data.cap) * 100)) : 0;
   return (
     <div className={"event-popup" + (placeBelow ? " below" : "")} style={{ "--ec": color }} onClick={(e) => e.stopPropagation()}>
       <div className="ep-head">
         <div className="ep-cat"><span className="ep-cat-ic"><Icon name={CAT_ICON[data.cat] || "grid"} size={12} /></span>{catLabel(data.cat)}</div>
         <div className="ep-title">{data.title}</div>
-        <button className="ep-close" onClick={onClose} aria-label="Chiudi"><Icon name="x" size={13} /></button>
+        <button className="ep-close" onClick={onClose} aria-label={t("widgets.popup.close")}><Icon name="x" size={13} /></button>
       </div>
       <div className="ep-body">
         <div className="ep-field">
           <span className="ep-fic"><Icon name="pin" size={14} /></span>
-          <div className="ep-ftext"><div className="ep-flbl">Luogo</div><div className="ep-fval">{data.place}</div></div>
+          <div className="ep-ftext"><div className="ep-flbl">{t("widgets.popup.place")}</div><div className="ep-fval">{data.place}</div></div>
         </div>
         <div className="ep-field">
           <span className="ep-fic"><Icon name="clock" size={14} /></span>
-          <div className="ep-ftext"><div className="ep-flbl">Quando</div><div className="ep-fval">{data.when}</div></div>
+          <div className="ep-ftext"><div className="ep-flbl">{t("widgets.popup.when")}</div><div className="ep-fval">{data.when}</div></div>
         </div>
         <div className="ep-part">
           <div className="ep-part-l">
-            <div className="ep-flbl">Partecipanti</div>
+            <div className="ep-flbl">{t("widgets.popup.participants")}</div>
             <div className="ep-part-bar"><i style={{ width: pct + "%" }}></i></div>
           </div>
           <div className="ep-part-n"><b>{data.going}</b>{data.cap > 0 ? ` / ${data.cap}` : ""}</div>
         </div>
-        <button className="ep-cta"><Icon name="ticket" size={15} /> Partecipa</button>
+        <button className="ep-cta"><Icon name="ticket" size={15} /> {t("widgets.popup.join")}</button>
       </div>
     </div>
   );
@@ -138,6 +140,7 @@ export function MarkersLayer({ active, onFocus, popup, onClosePopup, markers }: 
 
 /* ---------------- WEATHER ---------------- */
 export function WeatherWidget({ delay, onOpen }: any) {
+  const { t, i18n } = useTranslation();
   const [weather, setWeather] = useState<any>(null);
 
   useEffect(() => {
@@ -162,7 +165,7 @@ export function WeatherWidget({ delay, onOpen }: any) {
   const daily = weather?.daily?.[0];
   const hourly = weather?.hourly?.length
     ? weather.hourly.slice(0, 6).map((h: any) => ({
-      h: new Date(h.time).toLocaleTimeString("it-IT", { hour: "2-digit" }),
+      h: new Date(h.time).toLocaleTimeString(i18n.language.startsWith("en") ? "en-GB" : "it-IT", { hour: "2-digit" }),
       t: h.temperature != null ? Math.round(h.temperature) : "--",
       p: Math.max(0.12, Math.min(1, (h.precipitationProbability ?? 0) / 100)),
     }))
@@ -171,7 +174,9 @@ export function WeatherWidget({ delay, onOpen }: any) {
   const display = {
     loc: weather?.city ? `${weather.city}, IT` : "Trento, IT",
     temp: hasWeather ? String(Math.round(current.temperature)) : "--",
-    cond: current?.condition || "Meteo temporaneamente non disponibile",
+    cond: current?.weatherCode != null
+      ? t(`wx.${current.weatherCode}` as any, { defaultValue: current?.condition || t("widgets.weather.condUnavailable") })
+      : (current?.condition || t("widgets.weather.condUnavailable")),
     high: daily?.temperatureMax != null ? String(Math.round(daily.temperatureMax)) : "--",
     low: daily?.temperatureMin != null ? String(Math.round(daily.temperatureMin)) : "--",
     rain: daily?.precipitationProbabilityMax ?? "--",
@@ -180,8 +185,8 @@ export function WeatherWidget({ delay, onOpen }: any) {
   };
 
   return (
-    <Widget title="Meteo" accent="var(--cyan)" upd={weather?.unavailable ? "Non disponibile" : "Open-Meteo"} delay={delay}
-      onClick={() => onOpen && onOpen({ type: "weather", title: "Meteo a Trento", data: weather })}>
+    <Widget title={t("widgets.weather.title")} accent="var(--cyan)" upd={weather?.unavailable ? t("widgets.weather.unavailable") : "Open-Meteo"} delay={delay}
+      onClick={() => onOpen && onOpen({ type: "weather", title: t("widgets.weather.modalTitle"), data: weather })}>
       <div className="wx-main">
         <WxIcon className="wx-icon" />
         <div className="wx-temp">{display.temp}<sup>°C</sup></div>
@@ -189,12 +194,12 @@ export function WeatherWidget({ delay, onOpen }: any) {
         <div className="wx-loc"><Icon name="pin" size={13} style={{ opacity: 0.6 }} />{display.loc}</div>
       </div>
       <div className="wx-stats">
-        <div className="wx-stat"><div className="lbl">Max / Min</div><div className="val">{display.high}° <span>/ {display.low}°</span></div></div>
-        <div className="wx-stat"><div className="lbl">Pioggia</div><div className="val">{display.rain}<span>%</span></div></div>
-        <div className="wx-stat"><div className="lbl">Vento</div><div className="val">{display.wind}<span> km/h</span></div></div>
+        <div className="wx-stat"><div className="lbl">{t("widgets.weather.maxMin")}</div><div className="val">{display.high}° <span>/ {display.low}°</span></div></div>
+        <div className="wx-stat"><div className="lbl">{t("widgets.weather.rain")}</div><div className="val">{display.rain}<span>%</span></div></div>
+        <div className="wx-stat"><div className="lbl">{t("widgets.weather.wind")}</div><div className="val">{display.wind}<span> km/h</span></div></div>
       </div>
       <div className="wx-hourly">
-        {display.hourly.length === 0 && <div className="widget-empty compact">Meteo temporaneamente non disponibile.</div>}
+        {display.hourly.length === 0 && <div className="widget-empty compact">{t("widgets.weather.emptyHourly")}</div>}
         {display.hourly.map((h: any, i: number) => (
           <div className="wx-hour" key={i}>
             <div className="t">{h.t}°</div>
@@ -209,6 +214,7 @@ export function WeatherWidget({ delay, onOpen }: any) {
 
 /* ---------------- ALERTS ---------------- */
 export function AlertsWidget({ delay, onOpen }: any) {
+  const { t } = useTranslation();
   const [alertsData, setAlertsData] = useState<any>(null);
 
   useEffect(() => {
@@ -231,10 +237,10 @@ export function AlertsWidget({ delay, onOpen }: any) {
 
   const ledClass: any = { red: "red", amber: "amber", blue: "blue", green: "green" };
   const sevMap: any = {
-    high: { sev: "red", color: "var(--red)", icon: "cone", tag: "Urgente" },
-    medium: { sev: "amber", color: "var(--amber)", icon: "calendar", tag: "Medio" },
-    low: { sev: "blue", color: "var(--cyan)", icon: "cloud", tag: "Info" },
-    info: { sev: "green", color: "var(--green)", icon: "bus", tag: "Info" },
+    high: { sev: "red", color: "var(--red)", icon: "cone", tag: t("widgets.alerts.tagUrgent") },
+    medium: { sev: "amber", color: "var(--amber)", icon: "calendar", tag: t("widgets.alerts.tagMedium") },
+    low: { sev: "blue", color: "var(--cyan)", icon: "cloud", tag: t("widgets.alerts.tagInfo") },
+    info: { sev: "green", color: "var(--green)", icon: "bus", tag: t("widgets.alerts.tagInfo") },
   };
   const displayAlerts = alertsData?.items?.length
     ? alertsData.items.map((a: any) => ({ ...a, ...(sevMap[a.severity] || sevMap.info), desc: a.summary }))
@@ -242,12 +248,12 @@ export function AlertsWidget({ delay, onOpen }: any) {
   const modalAlertsData = alertsData || { city: "Trento", items: [] };
 
   return (
-    <Widget title="Avvisi città" accent="var(--amber)" upd={displayAlerts.length + " attivi"} delay={delay}
-      onClick={() => onOpen && onOpen({ type: "alerts", title: "Avvisi città", data: modalAlertsData })}>
+    <Widget title={t("widgets.alerts.title")} accent="var(--amber)" upd={t("widgets.alerts.active", { count: displayAlerts.length })} delay={delay}
+      onClick={() => onOpen && onOpen({ type: "alerts", title: t("widgets.alerts.title"), data: modalAlertsData })}>
       <div className="widget-scroll" style={{ maxHeight: 150 }}>
-        {displayAlerts.length === 0 && <div className="widget-empty big">Avvisi città temporaneamente non disponibili.</div>}
+        {displayAlerts.length === 0 && <div className="widget-empty big">{t("widgets.alerts.empty")}</div>}
         {displayAlerts.map((a: any) => (
-          <div className="alert-row" key={a.id} style={{ "--ac": a.color }} onClick={(e) => { e.stopPropagation(); onOpen && onOpen({ type: "alerts", title: "Avvisi città", data: modalAlertsData }); }}>
+          <div className="alert-row" key={a.id} style={{ "--ac": a.color }} onClick={(e) => { e.stopPropagation(); onOpen && onOpen({ type: "alerts", title: t("widgets.alerts.title"), data: modalAlertsData }); }}>
             <div className="alert-ic"><Icon name={a.icon} size={17} /></div>
             <div className="alert-body">
               <div className="alert-top">
@@ -261,14 +267,14 @@ export function AlertsWidget({ delay, onOpen }: any) {
         ))}
       </div>
       <div className="widget-foot">
-        <button className="link-btn"><span>Vedi tutti gli avvisi ({displayAlerts.length})</span> <Icon name="arrow" size={15} /></button>
+        <button className="link-btn"><span>{t("widgets.alerts.seeAll", { count: displayAlerts.length })}</span> <Icon name="arrow" size={15} /></button>
       </div>
     </Widget>
   );
 }
 
 /* ---------------- PARKING ---------------- */
-function ParkingRing({ pct }: any) {
+function ParkingRing({ pct, occupiedLabel }: any) {
   const R = 37, C = 2 * Math.PI * R;
   const off = C * (1 - pct / 100);
   return (
@@ -306,7 +312,7 @@ function ParkingRing({ pct }: any) {
           color: "var(--text-faint)",
           textTransform: "uppercase",
           marginTop: "1px"
-        }}>Occupato</div>
+        }}>{occupiedLabel}</div>
       </div>
     </div>
   );
@@ -341,6 +347,7 @@ function ParkingSection({ label, icon, items, color }: any) {
 }
 
 export function ParkingWidget({ delay, onOpen }: any) {
+  const { t } = useTranslation();
   const [parking, setParking] = useState<any>(null);
   const [pref, setPref] = useState<string>(getParkingPref);
 
@@ -401,23 +408,23 @@ export function ParkingWidget({ delay, onOpen }: any) {
   const free = shown.reduce((acc: number, p: any) => acc + p.free, 0);
   const avg = cap > 0 ? Math.round(((cap - free) / cap) * 100) : 0;
 
-  const scopeLabel = pref === "car" ? "aree auto" : pref === "bike" ? "aree bici" : "aree auto e bici";
+  const scopeLabel = pref === "car" ? t("widgets.parking.scopeCar") : pref === "bike" ? t("widgets.parking.scopeBike") : t("widgets.parking.scopeBoth");
 
   return (
-    <Widget title="Parcheggi" accent="var(--teal)" upd={parking?.raw?.source?.scrapedAt ? "Cache live" : "Non disponibile"} delay={delay}
-      onClick={() => onOpen && onOpen({ type: "parking", title: "Parcheggi Trento", data: parking?.raw || { city: "Trento", items: [] } })}>
+    <Widget title={t("widgets.parking.title")} accent="var(--teal)" upd={parking?.raw?.source?.scrapedAt ? t("widgets.parking.cacheLive") : t("widgets.parking.unavailable")} delay={delay}
+      onClick={() => onOpen && onOpen({ type: "parking", title: t("widgets.parking.modalTitle"), data: parking?.raw || { city: "Trento", items: [] } })}>
       <div className="pk-top">
-        <ParkingRing pct={avg} />
+        <ParkingRing pct={avg} occupiedLabel={t("widgets.parking.occupied")} />
         <div className="pk-summary">
-          <div className="big">Occupazione media</div>
-          <div className="sub">{shown.length} {scopeLabel} monitorate in tempo reale nel centro di Trento.</div>
+          <div className="big">{t("widgets.parking.avgOccupancy")}</div>
+          <div className="sub">{t("widgets.parking.monitored", { count: shown.length, scope: scopeLabel })}</div>
         </div>
       </div>
       <div className="pk-list widget-scroll" style={{ maxHeight: 150 }}>
-        {displayParking.list.length === 0 && <div className="widget-empty">Dati parcheggi momentaneamente non disponibili.</div>}
-        {displayParking.list.length > 0 && shown.length === 0 && <div className="widget-empty">Nessun parcheggio per il filtro selezionato.</div>}
-        {showCar && <ParkingSection label="Auto" icon="car" items={cars} color={color} />}
-        {showBike && <ParkingSection label="Bici" icon="bike" items={bikes} color={color} />}
+        {displayParking.list.length === 0 && <div className="widget-empty">{t("widgets.parking.empty")}</div>}
+        {displayParking.list.length > 0 && shown.length === 0 && <div className="widget-empty">{t("widgets.parking.emptyFilter")}</div>}
+        {showCar && <ParkingSection label={t("widgets.parking.cars")} icon="car" items={cars} color={color} />}
+        {showBike && <ParkingSection label={t("widgets.parking.bikes")} icon="bike" items={bikes} color={color} />}
       </div>
     </Widget>
   );
@@ -425,16 +432,15 @@ export function ParkingWidget({ delay, onOpen }: any) {
 
 /* ---------------- ACTIVE AREAS ---------------- */
 export function ActiveAreasWidget({ delay, areas, onOpen }: any) {
+  const { t } = useTranslation();
   const displayAreas = (areas || []).slice().sort((a: any, b: any) => (b.level || 0) - (a.level || 0));
-  // Clicking the widget chrome opens the full ranked list (not just the top area);
-  // clicking a row drills into that specific area.
   const openSummary = () => {
-    onOpen && onOpen({ type: "areas", title: "Aree più attive", accent: "var(--magenta)", data: { areas: displayAreas } });
+    onOpen && onOpen({ type: "areas", title: t("widgets.areas.title"), accent: "var(--magenta)", data: { areas: displayAreas } });
   };
   return (
-    <Widget title="Aree più attive" accent="var(--magenta)" upd={displayAreas.length ? "Live" : "Nessuna"} delay={delay} onClick={openSummary}>
+    <Widget title={t("widgets.areas.title")} accent="var(--magenta)" upd={displayAreas.length ? t("widgets.areas.live") : t("widgets.areas.none")} delay={delay} onClick={openSummary}>
       <div className="widget-scroll" style={{ maxHeight: 232 }}>
-        {displayAreas.length === 0 && <div className="widget-empty">Nessuna area monitorata disponibile.</div>}
+        {displayAreas.length === 0 && <div className="widget-empty">{t("widgets.areas.empty")}</div>}
         {displayAreas.map((a: any, i: number) => (
           <div className="area-row clickable-row" key={i} onClick={(event) => { event.stopPropagation(); onOpen && onOpen({ type: "area", title: a.name, accent: a.color, data: a }); }}>
             <div className={"area-rank" + (i === 0 ? " top" : "")}>{String(i + 1).padStart(2, "0")}</div>
@@ -454,11 +460,12 @@ export function ActiveAreasWidget({ delay, areas, onOpen }: any) {
 
 /* ---------------- EVENTS ---------------- */
 export function EventsWidget({ delay, onFocus, events, onWidgetClick }: any) {
+  const { t } = useTranslation();
   const displayEvents = events || [];
   return (
-    <Widget title="Prossimi eventi" accent="var(--cyan)" upd={displayEvents.length + " oggi"} delay={delay} onClick={onWidgetClick}>
+    <Widget title={t("widgets.events.title")} accent="var(--cyan)" upd={t("widgets.events.today", { count: displayEvents.length })} delay={delay} onClick={onWidgetClick}>
       <div className="widget-scroll" style={{ maxHeight: 300, margin: "0 -10px", padding: "0 10px" }}>
-        {displayEvents.length === 0 && <div className="widget-empty big">Nessun evento disponibile al momento.</div>}
+        {displayEvents.length === 0 && <div className="widget-empty big">{t("widgets.events.empty")}</div>}
         {displayEvents.map((e: any) => (
           <div className="ev-row" key={e.id} style={{ "--ec": catColor(e.cat) }} onClick={(event) => { event.stopPropagation(); onFocus && onFocus(e); }}>
             <div className="ev-thumb" style={{ background: e.img }}><div className="ev-dot"></div></div>
