@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "../ui/Icon";
 import { getComments, postComment, getActivityReviews, postActivityReview } from "../../lib/api";
 
@@ -18,6 +19,8 @@ interface CommentsSectionProps {
 }
 
 export function CommentsSection({ accent = "var(--magenta)", user, eventId, activityId }: CommentsSectionProps) {
+  const { t, i18n } = useTranslation();
+  const dtLocale = i18n.language.startsWith("en") ? "en-GB" : "it-IT";
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(false);
@@ -31,13 +34,13 @@ export function CommentsSection({ accent = "var(--magenta)", user, eventId, acti
       if (eventId) {
         const raw = await getComments(eventId);
         const mapped = raw.map((c: any) => {
-          const author = c.user ? `${c.user.nome} ${c.user.cognome}` : (c.nomeEnte || "Utente");
+          const author = c.user ? `${c.user.nome} ${c.user.cognome}` : (c.nomeEnte || t("comments.defaultUser"));
           const avatar = c.nomeEnte ? c.nomeEnte.substring(0, 2).toUpperCase() : (c.user?.nome ? c.user.nome[0].toUpperCase() : "U");
           return {
             id: c.id,
             author,
             avatar,
-            time: c.createdAt ? new Date(c.createdAt).toLocaleDateString("it-IT") : "Recent",
+            time: c.createdAt ? new Date(c.createdAt).toLocaleDateString(dtLocale) : t("comments.recent"),
             text: c.text
           };
         });
@@ -45,21 +48,21 @@ export function CommentsSection({ accent = "var(--magenta)", user, eventId, acti
       } else if (activityId) {
         const raw = await getActivityReviews(activityId);
         const mapped = raw.map((c: any) => {
-          const author = c.user ? `${c.user.nome} ${c.user.cognome}` : "Utente";
+          const author = c.user ? `${c.user.nome} ${c.user.cognome}` : t("comments.defaultUser");
           const avatar = c.user?.nome ? c.user.nome[0].toUpperCase() : "U";
           return {
             id: c.id,
             author,
             avatar,
-            time: c.createdAt ? new Date(c.createdAt).toLocaleDateString("it-IT") : "Recent",
-            text: c.comment || "Nessun commento testuale."
+            time: c.createdAt ? new Date(c.createdAt).toLocaleDateString(dtLocale) : t("comments.recent"),
+            text: c.comment || t("comments.noTextComment")
           };
         });
         setComments(mapped);
       }
     } catch (err: any) {
       console.error(err);
-      setError("Impossibile caricare la discussione.");
+      setError(t("comments.loadError"));
     } finally {
       setLoading(false);
     }
@@ -73,7 +76,7 @@ export function CommentsSection({ accent = "var(--magenta)", user, eventId, acti
     ev.preventDefault();
     if (!newComment.trim()) return;
     if (user?.role === "anonymous") {
-      setError("Devi effettuare l'accesso per commentare.");
+      setError(t("comments.loginRequired"));
       return;
     }
 
@@ -97,7 +100,7 @@ export function CommentsSection({ accent = "var(--magenta)", user, eventId, acti
         loadData();
       }
     } catch (err: any) {
-      setError(err.message || "Errore durante l'invio.");
+      setError(err.message || t("comments.sendError"));
     }
   };
 
@@ -111,7 +114,7 @@ export function CommentsSection({ accent = "var(--magenta)", user, eventId, acti
 
       {loading && comments.length === 0 ? (
         <div style={{ color: "var(--text-muted)", fontSize: 13, padding: "10px 0", textAlign: "center" }}>
-          Caricamento commenti...
+          {t("comments.loading")}
         </div>
       ) : (
         <div className="comments-list" style={{ maxHeight: "250px", overflowY: "auto" }}>
@@ -129,7 +132,7 @@ export function CommentsSection({ accent = "var(--magenta)", user, eventId, acti
           ))}
           {comments.length === 0 && (
             <div style={{ color: "var(--text-muted)", fontSize: 13, padding: "10px 0", textAlign: "center" }}>
-              Nessun commento presente. Scrivi il primo!
+              {t("comments.empty")}
             </div>
           )}
         </div>
@@ -140,7 +143,7 @@ export function CommentsSection({ accent = "var(--magenta)", user, eventId, acti
           <input
             type="text"
             className="comment-input"
-            placeholder={user?.role === "anonymous" ? "Accedi per scrivere un commento..." : "Scrivi un commento pubblico..."}
+            placeholder={user?.role === "anonymous" ? t("comments.placeholderLogin") : t("comments.placeholder")}
             value={newComment}
             disabled={user?.role === "anonymous"}
             onChange={(e) => setNewComment(e.target.value)}

@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
 import { getPOIs, createPOI, updatePOI, deletePOI, POI } from "../lib/api";
 
 export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
+  const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const [pois, setPois] = useState<POI[]>([]);
   const [loading, setLoading] = useState(false);
@@ -31,7 +33,7 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
       setPois(data);
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || "Impossibile caricare i Punti di Interesse.");
+      setErrorMsg(err.message || t("admin.poi.loadError"));
     } finally {
       setLoading(false);
     }
@@ -49,12 +51,12 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
       setPois((prev) => prev.map((p) => (p.id === id ? updated : p)));
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || "Impossibile aggiornare lo stato di affollamento.");
+      setErrorMsg(err.message || t("admin.poi.updateError"));
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm("Sei sicuro di voler eliminare questo Punto di Interesse?")) {
+    if (!window.confirm(t("admin.poi.deleteConfirm"))) {
       return;
     }
     setErrorMsg("");
@@ -63,22 +65,22 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
       setPois((prev) => prev.filter((p) => p.id !== id));
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || "Errore durante l'eliminazione del POI.");
+      setErrorMsg(err.message || t("admin.poi.deleteError"));
     }
   };
 
   const handleSave = async (e: any) => {
     e.preventDefault();
     if (!newPoi.nome || !newPoi.tipo) {
-      setErrorMsg("Nome e tipologia sono obbligatori.");
+      setErrorMsg(t("admin.poi.requiredError"));
       return;
     }
     if (!Number.isFinite(newPoi.latitudine) || !Number.isFinite(newPoi.longitudine)) {
-      setErrorMsg("Latitudine e longitudine devono essere numeri validi.");
+      setErrorMsg(t("admin.poi.latlngError"));
       return;
     }
     if (!Number.isFinite(newPoi.capacitaMax) || newPoi.capacitaMax <= 0) {
-      setErrorMsg("La capacità massima deve essere maggiore di zero.");
+      setErrorMsg(t("admin.poi.capacityError"));
       return;
     }
     setErrorMsg("");
@@ -95,7 +97,7 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
       setNewPoi(EMPTY_POI);
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || "Impossibile salvare il Punto di Interesse.");
+      setErrorMsg(err.message || t("admin.poi.saveError"));
     }
   };
 
@@ -125,8 +127,8 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
       <div className="revamp-admin-layout">
         <div className="revamp-comune-head" style={{ marginBottom: 20 }}>
           <div>
-            <h1>Gestione Punti di Interesse (POI)</h1>
-            <p>Aggiungi, modifica e imposta i flussi di affollamento per la mappa interattiva</p>
+            <h1>{t("admin.poi.title")}</h1>
+            <p>{t("admin.poi.subtitle")}</p>
           </div>
           <button 
             className="revamp-action-btn" 
@@ -137,7 +139,7 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
             }}
           >
             <Icon name={showAddForm ? "x" : "plus"} size={14} />
-            {showAddForm ? "Annulla" : "Nuovo POI"}
+            {showAddForm ? t("admin.poi.cancel") : t("admin.poi.new")}
           </button>
         </div>
 
@@ -149,30 +151,30 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
 
         {showAddForm && (
           <div className="revamp-chart-card anim-in" style={{ "--accent": "var(--teal)", marginBottom: 20 }}>
-            <h3>{editingId ? "Modifica Punto di Interesse" : "Aggiungi Nuovo Punto di Interesse"}</h3>
+            <h3>{editingId ? t("admin.poi.editFormTitle") : t("admin.poi.formTitle")}</h3>
             <form onSubmit={handleSave} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 15 }}>
               <div className="revamp-form-group">
-                <label className="revamp-form-label">Nome POI</label>
+                <label className="revamp-form-label">{t("admin.poi.name")}</label>
                 <input
                   className="revamp-form-input"
-                  placeholder="es. Piazza Dante"
+                  placeholder={t("admin.poi.namePlaceholder")}
                   value={newPoi.nome}
                   onChange={(e) => setNewPoi({ ...newPoi, nome: e.target.value })}
                 />
               </div>
 
               <div className="revamp-form-group">
-                <label className="revamp-form-label">Tipologia</label>
+                <label className="revamp-form-label">{t("admin.poi.type")}</label>
                 <input
                   className="revamp-form-input"
-                  placeholder="es. Parco, Monumento, Biblioteca"
+                  placeholder={t("admin.poi.typePlaceholder")}
                   value={newPoi.tipo}
                   onChange={(e) => setNewPoi({ ...newPoi, tipo: e.target.value })}
                 />
               </div>
 
               <div className="revamp-form-group">
-                <label className="revamp-form-label">Latitudine</label>
+                <label className="revamp-form-label">{t("admin.poi.latitude")}</label>
                 <input
                   type="number"
                   step="0.000001"
@@ -183,7 +185,7 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
               </div>
 
               <div className="revamp-form-group">
-                <label className="revamp-form-label">Longitudine</label>
+                <label className="revamp-form-label">{t("admin.poi.longitude")}</label>
                 <input
                   type="number"
                   step="0.000001"
@@ -194,7 +196,7 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
               </div>
 
               <div className="revamp-form-group">
-                <label className="revamp-form-label">Capacità Massima</label>
+                <label className="revamp-form-label">{t("admin.poi.maxCapacity")}</label>
                 <input
                   type="number"
                   className="revamp-form-input"
@@ -204,23 +206,23 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
               </div>
 
               <div className="revamp-form-group">
-                <label className="revamp-form-label">Affollamento Iniziale</label>
+                <label className="revamp-form-label">{t("admin.poi.initialCrowding")}</label>
                 <select
                   className="revamp-select"
                   value={newPoi.statoAffollamento}
                   onChange={(e) => setNewPoi({ ...newPoi, statoAffollamento: e.target.value as any })}
                 >
-                  <option value="verde">Basso (Verde)</option>
-                  <option value="giallo">Medio (Giallo)</option>
-                  <option value="rosso">Alto (Rosso)</option>
+                  <option value="verde">{t("admin.poi.crowdingLowOption")}</option>
+                  <option value="giallo">{t("admin.poi.crowdingMediumOption")}</option>
+                  <option value="rosso">{t("admin.poi.crowdingHighOption")}</option>
                 </select>
               </div>
 
               <div className="revamp-form-group" style={{ gridColumn: "span 2" }}>
-                <label className="revamp-form-label">Descrizione</label>
+                <label className="revamp-form-label">{t("admin.poi.description")}</label>
                 <textarea
                   className="revamp-form-input"
-                  placeholder="Breve descrizione del luogo..."
+                  placeholder={t("admin.poi.descriptionPlaceholder")}
                   style={{ height: 60, padding: 10 }}
                   value={newPoi.descrizione}
                   onChange={(e) => setNewPoi({ ...newPoi, descrizione: e.target.value })}
@@ -229,7 +231,7 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
 
               <div style={{ gridColumn: "span 2", display: "flex", justifyContent: "flex-end" }}>
                 <button type="submit" className="revamp-form-btn" style={{ "--accent": "var(--teal)", width: "auto", padding: "0 20px" }}>
-                  {editingId ? "Salva Modifiche" : "Salva POI"}
+                  {editingId ? t("admin.poi.saveChanges") : t("admin.poi.save")}
                 </button>
               </div>
             </form>
@@ -240,7 +242,7 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
           <div className="act-search" style={{ background: "var(--surface-1)" }}>
             <Icon name="search" size={16} />
             <input
-              placeholder="Filtra punti di interesse per nome o tipo..."
+              placeholder={t("admin.poi.searchPlaceholder")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -249,35 +251,35 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
 
         <div className="revamp-chart-card anim-in" style={{ "--accent": "var(--teal)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 15 }}>
-            <h3 style={{ margin: 0 }}>Database POI Monitorati</h3>
+            <h3 style={{ margin: 0 }}>{t("admin.poi.tableTitle")}</h3>
             {loading && <Icon name="refresh" size={16} className="spin" style={{ color: "var(--text-muted)" }} />}
           </div>
           <div className="revamp-table-wrap">
             <table className="revamp-table">
               <thead>
                 <tr>
-                  <th>Nome POI</th>
-                  <th>Tipologia</th>
-                  <th>Affollamento Attuale</th>
-                  <th>Posizione (Lat, Lng)</th>
-                  <th>Azioni</th>
+                  <th>{t("admin.poi.colName")}</th>
+                  <th>{t("admin.poi.colType")}</th>
+                  <th>{t("admin.poi.colCrowding")}</th>
+                  <th>{t("admin.poi.colPosition")}</th>
+                  <th>{t("admin.poi.colActions")}</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredPois.length === 0 && !loading ? (
                   <tr>
                     <td colSpan={5} style={{ textAlign: "center", color: "var(--text-muted)", padding: 20 }}>
-                      Nessun Punto di Interesse trovato
+                      {t("admin.poi.empty")}
                     </td>
                   </tr>
                 ) : (
                   filteredPois.map((p) => (
                     <tr key={p.id}>
                       <td><b>{p.nome}</b></td>
-                      <td>{p.tipo || "—"}</td>
+                      <td>{p.tipo ? t(`poiTypes.${p.tipo.toLowerCase()}` as any, { defaultValue: p.tipo }) : "—"}</td>
                       <td>
                         <span className={"revamp-status-pill " + (p.statoAffollamento === "rosso" ? "danger" : p.statoAffollamento === "giallo" ? "warning" : "success")}>
-                          {p.statoAffollamento === "rosso" ? "Alto affollamento" : p.statoAffollamento === "giallo" ? "Medio affollamento" : "Basso affollamento"}
+                          {p.statoAffollamento === "rosso" ? t("admin.poi.crowdingHigh") : p.statoAffollamento === "giallo" ? t("admin.poi.crowdingMedium") : t("admin.poi.crowdingLow")}
                         </span>
                       </td>
                       <td style={{ fontSize: 11, color: "var(--text-muted)" }}>
@@ -285,13 +287,13 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
                       </td>
                       <td style={{ display: "flex", gap: 8 }}>
                         <button className="revamp-action-btn" onClick={() => handleToggleDensity(p.id, p.statoAffollamento)}>
-                          <Icon name="sparkle" size={12} /> Cambia Affollamento
+                          <Icon name="sparkle" size={12} /> {t("admin.poi.toggleCrowding")}
                         </button>
                         <button className="revamp-action-btn" onClick={() => handleEdit(p)}>
-                          <Icon name="edit" size={12} /> Modifica
+                          <Icon name="edit" size={12} /> {t("admin.poi.edit")}
                         </button>
                         <button className="revamp-action-btn danger" onClick={() => handleDelete(p.id)}>
-                          <Icon name="x" size={12} /> Elimina
+                          <Icon name="x" size={12} /> {t("admin.poi.delete")}
                         </button>
                       </td>
                     </tr>

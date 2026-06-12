@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+const dtLocale = (lang: string) => (lang.startsWith("en") ? "en-GB" : "it-IT");
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
 import { getDashboardStats, getDashboardServiceRequests, getEvents, getActivities } from "../lib/api";
 
 export function ComuneDashboardPage({ page, setPage, theme, setTheme, user }: any) {
+  const { t, i18n } = useTranslation();
   const [stats, setStats] = useState<any>(null);
   const [serviceStats, setServiceStats] = useState<any>(null);
   const [recentLogs, setRecentLogs] = useState<any[]>([]);
@@ -27,27 +30,27 @@ export function ComuneDashboardPage({ page, setPage, theme, setTheme, user }: an
         evs.forEach((e) => {
           logs.push({
             id: `ev-${e.id}`,
-            type: "Evento",
-            desc: `Inserito nuovo evento '${e.title}' presso ${e.location || 'Trento'}`,
-            time: e.createdAt ? new Date(e.createdAt).toLocaleDateString("it-IT") : "Recent",
+            type: t("comune.dashboard.typeEvent"),
+            desc: t("comune.dashboard.logEvent", { title: e.title, location: e.location || "Trento" }),
+            time: e.createdAt ? new Date(e.createdAt).toLocaleDateString(dtLocale(i18n.language)) : t("comune.dashboard.recent"),
           });
         });
 
         acts.forEach((a) => {
           logs.push({
             id: `act-${a.id}`,
-            type: "Attività",
-            desc: `Creata attività spontanea '${a.title}' di tipo ${a.category}`,
-            time: a.createdAt ? new Date(a.createdAt).toLocaleDateString("it-IT") : "Recent",
+            type: t("comune.dashboard.typeActivity"),
+            desc: t("comune.dashboard.logActivity", { title: a.title, category: a.category }),
+            time: a.createdAt ? new Date(a.createdAt).toLocaleDateString(dtLocale(i18n.language)) : t("comune.dashboard.recent"),
           });
         });
 
         // Add a stub POI update
         logs.push({
           id: "poi-1",
-          type: "POI",
-          desc: "Aggiornamento affollamento Piazza Duomo a 'giallo'",
-          time: "Recent"
+          type: t("comune.dashboard.typePoi"),
+          desc: t("comune.dashboard.logPoiStub"),
+          time: t("comune.dashboard.recent")
         });
 
         setRecentLogs(logs.slice(0, 5));
@@ -67,18 +70,18 @@ export function ComuneDashboardPage({ page, setPage, theme, setTheme, user }: an
   // - Statistiche / export (/api/dashboard/*)      → authorize('AmministratoreComunale')
   const role = user?.role;
   const quickActions = [
-    { id: "comune-statistiche", label: "Statistiche Territoriali", icon: "trending", accent: "var(--cyan)", roles: ["municipal_admin"] },
-    { id: "comune-export", label: "Esporta Dati Territoriali", icon: "share", accent: "var(--violet)", roles: ["municipal_admin"] },
-    { id: "admin-poi", label: "Gestione POI", icon: "pin", accent: "var(--cyan)", roles: ["system_admin"] },
-    { id: "admin-enti-richieste", label: "Richieste Enti", icon: "shieldCheck", accent: "var(--violet)", roles: ["system_admin"] },
-    { id: "admin-moderazione", label: "Moderazione Contenuti", icon: "warn", accent: "var(--magenta)", roles: ["system_admin"] },
+    { id: "comune-statistiche", label: t("comune.stats.title"), icon: "trending", accent: "var(--cyan)", roles: ["municipal_admin"] },
+    { id: "comune-export", label: t("comune.export.title"), icon: "share", accent: "var(--violet)", roles: ["municipal_admin"] },
+    { id: "admin-poi", label: t("comune.dashboard.managePoi"), icon: "pin", accent: "var(--cyan)", roles: ["system_admin"] },
+    { id: "admin-enti-richieste", label: t("comune.dashboard.entityRequests"), icon: "shieldCheck", accent: "var(--violet)", roles: ["system_admin"] },
+    { id: "admin-moderazione", label: t("comune.dashboard.moderation"), icon: "warn", accent: "var(--magenta)", roles: ["system_admin"] },
   ].filter((a) => a.roles.includes(role));
 
   const kpis = [
-    { label: "Attività Attive", val: stats?.totalActivities ?? 0, icon: "activity", color: "var(--cyan)" },
-    { label: "Eventi Certificati", val: stats?.totalEvents ?? 0, icon: "calendar", color: "var(--violet)" },
-    { label: "Punti di Interesse", val: stats?.totalPOIs ?? 0, icon: "pin", color: "var(--teal)" },
-    { label: "Richieste Cittadini", val: serviceStats?.total ?? 0, icon: "bell", color: "var(--magenta)" },
+    { label: t("comune.dashboard.kpiActivities"), val: stats?.totalActivities ?? 0, icon: "activity", color: "var(--cyan)" },
+    { label: t("comune.dashboard.kpiEvents"), val: stats?.totalEvents ?? 0, icon: "calendar", color: "var(--violet)" },
+    { label: t("comune.dashboard.kpiPois"), val: stats?.totalPOIs ?? 0, icon: "pin", color: "var(--teal)" },
+    { label: t("comune.dashboard.kpiRequests"), val: serviceStats?.total ?? 0, icon: "bell", color: "var(--magenta)" },
   ];
 
   if (loading) {
@@ -86,7 +89,7 @@ export function ComuneDashboardPage({ page, setPage, theme, setTheme, user }: an
       <div className="revamp-legal-scene">
         <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
         <div style={{ color: "var(--text-muted)", fontSize: 15, padding: "100px 0", textAlign: "center" }}>
-          Caricamento dati dashboard comunale...
+          {t("comune.dashboard.loading")}
         </div>
       </div>
     );
@@ -98,15 +101,15 @@ export function ComuneDashboardPage({ page, setPage, theme, setTheme, user }: an
       <div className="revamp-comune-layout">
         <div className="revamp-comune-head">
           <div>
-            <h1>Dashboard Comunale</h1>
-            <p>Pannello di controllo per la gestione amministrativa del territorio e dei flussi cittadini</p>
+            <h1>{t("comune.dashboard.title")}</h1>
+            <p>{t("comune.dashboard.subtitle")}</p>
           </div>
           <div style={{ display: "flex", gap: 10 }}>
             <button className="revamp-action-btn" style={{ height: 40 }} onClick={() => setPage("comune-statistiche")}>
-              <Icon name="trending" size={15} /> Vedi Statistiche
+              <Icon name="trending" size={15} /> {t("comune.dashboard.viewStats")}
             </button>
             <button className="revamp-action-btn" style={{ height: 40 }} onClick={() => setPage("comune-export")}>
-              <Icon name="share" size={15} /> Esporta Report
+              <Icon name="share" size={15} /> {t("comune.dashboard.exportReport")}
             </button>
           </div>
         </div>
@@ -127,15 +130,15 @@ export function ComuneDashboardPage({ page, setPage, theme, setTheme, user }: an
           {/* Main Logs Table */}
           <div className="revamp-chart-card anim-in" style={{ "--accent": "var(--cyan)", animationDelay: "240ms" } as React.CSSProperties}>
             <h3>
-              Registri e Segnalazioni Recenti <span>Live</span>
+              {t("comune.dashboard.logsTitle")} <span>{t("comune.dashboard.live")}</span>
             </h3>
             <div className="revamp-table-wrap">
               <table className="revamp-table">
                 <thead>
                   <tr>
-                    <th>Categoria</th>
-                    <th>Descrizione Log</th>
-                    <th>Orario</th>
+                    <th>{t("comune.dashboard.colCategory")}</th>
+                    <th>{t("comune.dashboard.colDescription")}</th>
+                    <th>{t("comune.dashboard.colTime")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -157,7 +160,7 @@ export function ComuneDashboardPage({ page, setPage, theme, setTheme, user }: an
 
           {/* Quick Actions Card */}
           <div className="revamp-chart-card anim-in" style={{ "--accent": "var(--violet)", animationDelay: "300ms" } as React.CSSProperties}>
-            <h3>Azioni Rapide</h3>
+            <h3>{t("comune.dashboard.quickActions")}</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, justifyContent: "center" }}>
               {quickActions.map((a) => (
                 <button key={a.id} className="revamp-form-btn" style={{ "--accent": a.accent } as React.CSSProperties} onClick={() => setPage(a.id)}>
@@ -166,7 +169,7 @@ export function ComuneDashboardPage({ page, setPage, theme, setTheme, user }: an
               ))}
               {quickActions.length === 0 && (
                 <span style={{ color: "var(--text-muted)", fontSize: 13, textAlign: "center" }}>
-                  Nessuna azione disponibile per il tuo ruolo
+                  {t("comune.dashboard.noActions")}
                 </span>
               )}
             </div>

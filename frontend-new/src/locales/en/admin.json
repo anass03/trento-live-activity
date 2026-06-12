@@ -96,7 +96,13 @@
       "crowdingMedium": "Medium crowding",
       "crowdingLow": "Low crowding",
       "toggleCrowding": "Change Crowding",
-      "delete": "Delete"
+      "delete": "Delete",
+      "edit": "Edit",
+      "latlngError": "Latitude and longitude must be valid numbers.",
+      "capacityError": "Maximum capacity must be greater than zero.",
+      "saveError": "Unable to save the Point of Interest.",
+      "editFormTitle": "Edit Point of Interest",
+      "saveChanges": "Save Changes"
     },
     "entities": {
       "title": "Entity Verification Requests",
@@ -180,7 +186,8 @@
       "quickActions": "Quick Actions",
       "managePoi": "Manage POIs",
       "entityRequests": "Entity Requests",
-      "moderation": "Content Moderation"
+      "moderation": "Content Moderation",
+      "noActions": "No actions available for your role"
     },
     "stats": {
       "loading": "Loading territorial statistics...",
@@ -259,6 +266,18 @@
       "capacityLabel": "Max Capacity",
       "publishing": "Publishing...",
       "publish": "Publish Content",
+      "publishEvent": "Publish Event",
+      "eventTitle": "Publish New Event",
+      "eventSubtitle": "As a Certified Entity you can publish municipal events: fill in the form and choose the location on the map or from points of interest.",
+      "eventSuccess": "Event published successfully! Redirecting...",
+      "step3Location": "3. Location",
+      "step4DateTime": "4. Date & Times",
+      "locationModePoi": "Point of Interest",
+      "locationModePin": "Map Pin",
+      "pinMapLabel": "Click on the map to place a pin",
+      "selectPoiError": "Select a point of interest.",
+      "placePinError": "Place a pin on the map to indicate the event location.",
+      "requiredFieldsError": "Fill in all required fields.",
       "categories": {
         "cultura": "Culture",
         "musica": "Music",

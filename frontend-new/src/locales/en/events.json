@@ -89,7 +89,11 @@
       "relax": "Relax",
       "social": "Social",
       "famiglia": "Family",
-      "nightlife": "Nightlife"
+      "nightlife": "Nightlife",
+      "musica": "Music",
+      "arte": "Art",
+      "studio": "Study",
+      "gastronomia": "Food & Drink"
     },
     "diff": {
       "easy": "Easy",
@@ -173,6 +177,26 @@
     "ratingsTitle": "Detailed Ratings",
     "ratingsAvailable": "Aggregated ratings are available in the reviews section.",
     "noRatings": "No ratings available."
+  },
+  "createActivity": {
+    "kicker": "Point of interest",
+    "title": "Create activity",
+    "success": "Activity created successfully!",
+    "aiLabel": "Describe what you want to organise (AI)",
+    "aiPlaceholder": "E.g. \"Football match tomorrow evening with friends\"",
+    "aiLoading": "Generating suggestion…",
+    "aiUnavailable": "AI suggestion not available at the moment.",
+    "aiSuggest": "Suggest with AI",
+    "categoryError": "Choose the activity category.",
+    "createError": "Error while creating the activity.",
+    "sectionCategory": "Category",
+    "sectionDateTime": "Date & Times",
+    "dateLabel": "Date",
+    "maxParticipants": "Max participants",
+    "startLabel": "Start time",
+    "endLabel": "End time",
+    "creating": "Creating…",
+    "submit": "Create Activity"
   },
   "comments": {
     "discussionTitle": "Discussion & Comments",

@@ -89,7 +89,11 @@
       "relax": "Relax",
       "social": "Social",
       "famiglia": "Famiglia",
-      "nightlife": "Nightlife"
+      "nightlife": "Nightlife",
+      "musica": "Musica",
+      "arte": "Arte",
+      "studio": "Studio",
+      "gastronomia": "Gastronomia"
     },
     "diff": {
       "easy": "Facile",
@@ -173,6 +177,26 @@
     "ratingsTitle": "Valutazioni di Dettaglio",
     "ratingsAvailable": "Valutazioni aggregate disponibili nella sezione recensioni.",
     "noRatings": "Nessuna valutazione disponibile."
+  },
+  "createActivity": {
+    "kicker": "Punto di interesse",
+    "title": "Crea attività",
+    "success": "Attività creata con successo!",
+    "aiLabel": "Descrivi cosa vuoi organizzare (AI)",
+    "aiPlaceholder": "Es. \"Partita di calcetto domani sera con gli amici\"",
+    "aiLoading": "Suggerimento in corso…",
+    "aiUnavailable": "Suggerimento AI non disponibile al momento.",
+    "aiSuggest": "Suggerisci con AI",
+    "categoryError": "Scegli la categoria dell'attività.",
+    "createError": "Errore durante la creazione dell'attività.",
+    "sectionCategory": "Categoria",
+    "sectionDateTime": "Data & Orari",
+    "dateLabel": "Data",
+    "maxParticipants": "Max partecipanti",
+    "startLabel": "Ora inizio",
+    "endLabel": "Ora fine",
+    "creating": "Creazione…",
+    "submit": "Crea Attività"
   },
   "comments": {
     "discussionTitle": "Discussione & Commenti",

@@ -5,6 +5,7 @@
    backend doesn't yet return are hidden rather than faked.
    =========================================================== */
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Header } from "../components/layout/Header";
 import { Widget, useGlow } from "../components/redesign/widgets";
 import { Icon, WxIcon } from "../components/ui/Icon";
@@ -12,17 +13,17 @@ import { getActivities, addFavorite, removeFavorite, getFavorites, getMyActiviti
 
 
 const ACT_CAT = {
-  outdoor:  { label: "Outdoor",      icon: "bike",     color: "var(--teal)" },
-  cultura:  { label: "Cultura",      icon: "landmark", color: "var(--violet)" },
-  food:     { label: "Food & Drink", icon: "food",     color: "var(--amber)" },
-  sport:    { label: "Sport",        icon: "run",      color: "var(--green)" },
-  relax:    { label: "Relax",        icon: "leaf",     color: "var(--cyan)" },
-  social:   { label: "Social",       icon: "users",    color: "var(--magenta)" },
-  famiglia: { label: "Famiglia",     icon: "family",   color: "var(--cyan)" },
-  nightlife:{ label: "Nightlife",    icon: "moon",     color: "var(--violet)" },
-  musica:   { label: "Musica",       icon: "music",    color: "var(--magenta)" },
-  arte:     { label: "Arte",         icon: "sparkle",  color: "var(--orange)" },
-  studio:   { label: "Studio",       icon: "bookmark", color: "var(--cyan)" },
+  outdoor:  { labelKey: "activities.cats.outdoor",   icon: "bike",     color: "var(--teal)" },
+  cultura:  { labelKey: "activities.cats.cultura",   icon: "landmark", color: "var(--violet)" },
+  food:     { labelKey: "activities.cats.food",      icon: "food",     color: "var(--amber)" },
+  sport:    { labelKey: "activities.cats.sport",     icon: "run",      color: "var(--green)" },
+  relax:    { labelKey: "activities.cats.relax",     icon: "leaf",     color: "var(--cyan)" },
+  social:   { labelKey: "activities.cats.social",    icon: "users",    color: "var(--magenta)" },
+  famiglia: { labelKey: "activities.cats.famiglia",  icon: "family",   color: "var(--cyan)" },
+  nightlife:{ labelKey: "activities.cats.nightlife", icon: "moon",     color: "var(--violet)" },
+  musica:   { labelKey: "activities.cats.musica",    icon: "music",    color: "var(--magenta)" },
+  arte:     { labelKey: "activities.cats.arte",      icon: "sparkle",  color: "var(--orange)" },
+  studio:   { labelKey: "activities.cats.studio",    icon: "bookmark", color: "var(--cyan)" },
 };
 const ACT_GRAD = {
   outdoor: "linear-gradient(140deg,#0d9488,#134e4a)",
@@ -37,10 +38,10 @@ const ACT_GRAD = {
   arte:    "linear-gradient(140deg,#ea580c,#9a3412)",
   studio:  "linear-gradient(140deg,#2563eb,#1e3a8a)",
 };
-const ACT_DIFF: Record<string, { label: string; color: string }> = {
-  easy:   { label: "Facile",    color: "var(--green)" },
-  medium: { label: "Media",     color: "var(--amber)" },
-  hard:   { label: "Difficile", color: "var(--red)" },
+const ACT_DIFF: Record<string, { labelKey: string; color: string }> = {
+  easy:   { labelKey: "activities.diff.easy",   color: "var(--green)" },
+  medium: { labelKey: "activities.diff.medium", color: "var(--amber)" },
+  hard:   { labelKey: "activities.diff.hard",   color: "var(--red)" },
 };
 
 /* Real creators come from the API (creator.name). We derive a stable avatar
@@ -67,12 +68,12 @@ const creatorGradient = (name?: string | null) => {
 };
 
 const ACT_TABS = [
-  { id: "esplora", label: "Esplora", icon: "grid" },
-  { id: "saved",   label: "Salvate", icon: "bookmark" },
+  { id: "esplora", labelKey: "activities.tabs.esplora", icon: "grid" },
+  { id: "saved",   labelKey: "activities.tabs.saved",   icon: "bookmark" },
 ];
 const ACT_SORTS = [
-  { id: "relevance",    label: "Rilevanza" },
-  { id: "participants", label: "Partecipanti" },
+  { id: "relevance",    labelKey: "activities.sorts.relevance" },
+  { id: "participants", labelKey: "activities.sorts.participants" },
 ];
 
 const ACT_CAT_ALIASES: Record<string, keyof typeof ACT_CAT> = {
@@ -122,11 +123,11 @@ const distanceLabel = (distance: any) => {
   const n = numOrNull(distance);
   return n == null ? "" : ` · ${n.toFixed(n >= 10 ? 0 : 1)} km`;
 };
-const formatActivityTime = (value: any) => {
-  if (!value) return "Orario da definire";
+const formatActivityTime = (value: any, timeTbd: string, locale = "it-IT") => {
+  if (!value) return timeTbd;
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Orario da definire";
-  return date.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+  if (Number.isNaN(date.getTime())) return timeTbd;
+  return date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
 };
 const durLabel = (m: any) => {
   const n = numOrNull(m);
@@ -152,24 +153,25 @@ function CreatorAvatar({ name, size }: { name?: string | null; size: number }) {
 
 /* ===================== LEFT FILTERS ===================== */
 function ActFilters({ s, set, activities = [] }: any) {
+  const { t } = useTranslation();
   const cats = Object.keys(ACT_CAT);
   const anyFilter = s.category !== "all" || s.search;
   return (
-    <Widget title="Filtri attività" accent="var(--accent)" delay={60}>
+    <Widget title={t("activities.filtersTitle")} accent="var(--accent)" delay={60}>
       <div className="act-search">
         <Icon name="search" size={16} />
-        <input placeholder="Cerca attività…" value={s.search} onChange={(e: any) => set({ search: e.target.value })} />
+        <input placeholder={t("activities.searchPlaceholder")} value={s.search} onChange={(e: any) => set({ search: e.target.value })} />
       </div>
 
       <div className="filter-block">
         <div className="filter-block-label">
-          Categorie
-          {anyFilter && <button className="filter-reset" onClick={() => set({ category: "all", search: "" })}>Reset</button>}
+          {t("activities.categories")}
+          {anyFilter && <button className="filter-reset" onClick={() => set({ category: "all", search: "" })}>{t("activities.reset")}</button>}
         </div>
         <div className="qf-list">
           <button className={"qf-item" + (s.category === "all" ? " active" : "")} style={{ "--qc": "var(--accent)" } as any} onClick={() => set({ category: "all" })}>
             <span className="qf-ic"><Icon name="grid" size={16} /></span>
-            <span className="qf-label">Tutte</span>
+            <span className="qf-label">{t("activities.all")}</span>
             <span className="qf-count">{activities.length}</span>
           </button>
           {cats.map((c) => {
@@ -179,7 +181,7 @@ function ActFilters({ s, set, activities = [] }: any) {
             return (
               <button key={c} className={"qf-item" + (s.category === c ? " active" : "")} style={{ "--qc": cfg.color } as any} onClick={() => set({ category: s.category === c ? "all" : c })}>
                 <span className="qf-ic"><Icon name={cfg.icon} size={16} /></span>
-                <span className="qf-label">{cfg.label}</span>
+                <span className="qf-label">{t(cfg.labelKey)}</span>
                 <span className="qf-count">{n}</span>
               </button>
             );
@@ -192,6 +194,7 @@ function ActFilters({ s, set, activities = [] }: any) {
 
 /* ===================== HERO ===================== */
 function ActHero() {
+  const { t } = useTranslation();
   return (
     <div className="act-hero">
       <div className="hero-bloom"></div>
@@ -205,8 +208,8 @@ function ActHero() {
         </svg>
       </div>
       <div className="hero-content">
-        <h1>Cosa vuoi fare <em>oggi</em> a Trento?</h1>
-        <p>Esplora le attività proposte dalla community: filtra per categoria e unisciti a chi le organizza.</p>
+        <h1 dangerouslySetInnerHTML={{ __html: t("activities.heroTitle") }} />
+        <p>{t("activities.heroSubtitle")}</p>
       </div>
     </div>
   );
@@ -214,17 +217,19 @@ function ActHero() {
 
 /* ===================== TABS + SORT ===================== */
 function ActTabs({ tab, setTab }: any) {
+  const { t } = useTranslation();
   return (
     <div className="act-tabs">
-      {ACT_TABS.map((t) => (
-        <button key={t.id} className={"act-tab" + (tab === t.id ? " on" : "")} onClick={() => setTab(t.id)}>
-          <Icon name={t.icon} size={15} />{t.label}
+      {ACT_TABS.map((tabItem) => (
+        <button key={tabItem.id} className={"act-tab" + (tab === tabItem.id ? " on" : "")} onClick={() => setTab(tabItem.id)}>
+          <Icon name={tabItem.icon} size={15} />{t(tabItem.labelKey)}
         </button>
       ))}
     </div>
   );
 }
 function ActSortBar({ count, sort, setSort }: any) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const cur = ACT_SORTS.find((x) => x.id === sort) || ACT_SORTS[0];
   useEffect(() => {
@@ -235,16 +240,16 @@ function ActSortBar({ count, sort, setSort }: any) {
   }, [open]);
   return (
     <div className="act-sortbar">
-      <div className="act-count"><b>{count}</b> {count === 1 ? "attività trovata" : "attività trovate"}</div>
+      <div className="act-count"><b>{count}</b> {t("activities.foundWord", { count })}</div>
       <div className="act-sort" onClick={(e) => e.stopPropagation()}>
         <button className="act-sort-btn" onClick={() => setOpen((v) => !v)} aria-haspopup="listbox" aria-expanded={open}>
-          <span className="lbl">Ordina per:</span> {cur.label} <Icon name="chevron" size={14} style={{ transform: "rotate(90deg)" }} />
+          <span className="lbl">{t("activities.orderBy")}</span> {t(cur.labelKey)} <Icon name="chevron" size={14} style={{ transform: "rotate(90deg)" }} />
         </button>
         {open && (
           <div className="act-sort-menu" role="listbox">
             {ACT_SORTS.map((o) => (
               <button key={o.id} role="option" aria-selected={sort === o.id} className={"act-sort-opt" + (sort === o.id ? " on" : "")} onClick={() => { setSort(o.id); setOpen(false); }}>
-                {o.label}{sort === o.id && <Icon name="check" size={14} />}
+                {t(o.labelKey)}{sort === o.id && <Icon name="check" size={14} />}
               </button>
             ))}
           </div>
@@ -256,6 +261,7 @@ function ActSortBar({ count, sort, setSort }: any) {
 
 /* ===================== ACTIVITY CARD ===================== */
 function ActCard({ a, saved, onSave, onOpen }: any) {
+  const { t } = useTranslation();
   const onMove = useGlow();
   const cat = activityCat(a.cat);
   const diff = a.diff ? ACT_DIFF[a.diff] : null;
@@ -263,29 +269,30 @@ function ActCard({ a, saved, onSave, onOpen }: any) {
   const stop = (fn: any) => (e: any) => { e.stopPropagation(); fn(); };
   const dur = durLabel(a.dur);
   const dist = distanceLabel(a.dist);
+  const catLabel = t(cat.labelKey);
   const priceNode = a.price === "free"
-    ? <span className="free">Gratis</span>
-    : a.price === "paid" ? (a.priceLabel || "A pagamento") : null;
+    ? <span className="free">{t("activities.free")}</span>
+    : a.price === "paid" ? (a.priceLabel || t("activities.paid")) : null;
   const hasAttrs = !!(dur || diff || priceNode);
-  const badge = a.status.rising ? { cls: "rising", icon: "trending", label: "In crescita" } : null;
+  const badge = a.status.rising ? { cls: "rising", icon: "trending", label: t("activities.rising") } : null;
   return (
     <div className="act-card" style={{ "--ac": cat.color, "--aimg": activityGrad(a.cat), "--mx": "50%", "--my": "0%" } as any}
       onMouseMove={onMove} onClick={() => onOpen(a.id)}>
       <div className="act-media">
         {badge && <span className={"act-badge " + badge.cls}><Icon name={badge.icon} size={11} />{badge.label}</span>}
-        <button className={"act-save" + (saved ? " on" : "")} onClick={stop(() => onSave(a.id))} aria-label={saved ? "Rimuovi dai salvati" : "Salva"} aria-pressed={saved}><Icon name="bookmark" size={16} /></button>
+        <button className={"act-save" + (saved ? " on" : "")} onClick={stop(() => onSave(a.id))} aria-label={saved ? t("activities.removeSaved") : t("activities.save")} aria-pressed={saved}><Icon name="bookmark" size={16} /></button>
         {a.rating != null && (
           <span className="am-rating"><Icon name="star" size={13} />{a.rating.toFixed(1)}{a.reviews ? <span>({a.reviews})</span> : null}</span>
         )}
         <span className="am-ghost"><Icon name={cat.icon} size={92} /></span>
       </div>
       <div className="act-body">
-        <div className="act-cat"><Icon name={cat.icon} size={12} />{cat.label}{a.subtype && a.subtype !== cat.label ? <><span className="dotsep">·</span><span className="subtype">{a.subtype}</span></> : null}</div>
+        <div className="act-cat"><Icon name={cat.icon} size={12} />{catLabel}{a.subtype && a.subtype !== catLabel ? <><span className="dotsep">·</span><span className="subtype">{a.subtype}</span></> : null}</div>
         <div className="act-name">{a.title}</div>
         {hasAttrs && (
           <div className="act-attrs">
             {dur && <span className="act-attr"><Icon name="clock" size={13} />{dur}</span>}
-            {diff && <span className="act-attr"><span className="diff-mini" style={{ "--dc": diff.color } as any}><span className="dot"></span>{diff.label}</span></span>}
+            {diff && <span className="act-attr"><span className="diff-mini" style={{ "--dc": diff.color } as any}><span className="dot"></span>{t(diff.labelKey)}</span></span>}
             {priceNode && <span className="act-attr"><Icon name="euro" size={13} />{priceNode}</span>}
           </div>
         )}
@@ -293,14 +300,14 @@ function ActCard({ a, saved, onSave, onOpen }: any) {
         <div className="act-foot">
           <span className="act-creator">
             <CreatorAvatar name={a.creatorName} size={24} />
-            <span className="act-creator-name">{a.creatorName || "Autore di Trento"}</span>
+            <span className="act-creator-name">{a.creatorName || t("activities.defaultCreator")}</span>
           </span>
           <span className="act-part">
             <span className="cap-bar" style={{ "--capc": capColor(ratio) } as any}><i style={{ width: Math.max(8, ratio * 100) + "%" }}></i></span>
             <span className="pnum"><b>{a.going}</b>{a.cap > 0 ? `/${a.cap}` : ""}</span>
           </span>
         </div>
-        <button className="act-cta" onClick={stop(() => onOpen(a.id))}><Icon name="arrow" size={15} />Vedi dettagli</button>
+        <button className="act-cta" onClick={stop(() => onOpen(a.id))}><Icon name="arrow" size={15} />{t("activities.viewDetails")}</button>
       </div>
     </div>
   );
@@ -308,42 +315,45 @@ function ActCard({ a, saved, onSave, onOpen }: any) {
 
 /* ===================== RIGHT — NEXT ===================== */
 function ActNextWidget({ activity, saved, onSave, onOpen }: any) {
+  const { t, i18n } = useTranslation();
+  const dtLocale = i18n.language.startsWith("en") ? "en-GB" : "it-IT";
   if (!activity) {
     return (
-      <Widget title="Prossima attività" accent="var(--accent)" delay={120}>
-        <div className="widget-empty big">Nessuna attività disponibile al momento.</div>
+      <Widget title={t("activities.next")} accent="var(--accent)" delay={120}>
+        <div className="widget-empty big">{t("activities.noneAvailable")}</div>
       </Widget>
     );
   }
   const a = activity;
   const cat = activityCat(a.cat);
   return (
-    <Widget title="Prossima attività" accent="var(--accent)" delay={120}>
+    <Widget title={t("activities.next")} accent="var(--accent)" delay={120}>
       <div className="next-media" style={{ "--nimg": activityGrad(a.cat) } as any}>
-        <span className="nm-count"><span className="led live green"></span><span><span className="lbl">PROSSIMA</span><br />{formatActivityTime(a.startsAt)}</span></span>
+        <span className="nm-count"><span className="led live green"></span><span><span className="lbl">{t("activities.nextBadge")}</span><br />{formatActivityTime(a.startsAt, t("activities.timeTbd"), dtLocale)}</span></span>
         <span className="nm-ghost"><Icon name={cat.icon} size={96} /></span>
       </div>
       <div className="next-title">{a.title}</div>
       <div className="next-fields">
-        <div className="next-field"><span className="nf-ic"><Icon name="pin" size={14} /></span><div><div className="nf-lbl">Luogo</div><div className="nf-val">{a.loc}</div></div></div>
-        <div className="next-field"><span className="nf-ic"><Icon name="users" size={14} /></span><div><div className="nf-lbl">Partecipanti</div><div className="nf-val">{a.going}{a.cap > 0 ? ` / ${a.cap}` : ""}</div></div></div>
+        <div className="next-field"><span className="nf-ic"><Icon name="pin" size={14} /></span><div><div className="nf-lbl">{t("activities.place")}</div><div className="nf-val">{a.loc}</div></div></div>
+        <div className="next-field"><span className="nf-ic"><Icon name="users" size={14} /></span><div><div className="nf-lbl">{t("activities.participantsLabel")}</div><div className="nf-val">{a.going}{a.cap > 0 ? ` / ${a.cap}` : ""}</div></div></div>
       </div>
       <div className="next-part" style={{ marginTop: 12 }}>
         <CreatorAvatar name={a.creatorName} size={38} />
         <div className="np-l" style={{ marginLeft: 2 }}>
-          <div className="nf-lbl">Organizzata da</div>
-          <div style={{ fontSize: 13, fontWeight: 700, marginTop: 3 }}>{a.creatorName || "Autore di Trento"}</div>
+          <div className="nf-lbl">{t("activities.organizedBy")}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, marginTop: 3 }}>{a.creatorName || t("activities.defaultCreator")}</div>
         </div>
       </div>
       <div className="next-cta-row">
-        <button className="next-cta" onClick={() => onOpen(a.id)}><Icon name="arrow" size={17} />Vedi dettagli</button>
-        <button className={"next-save" + (saved ? " on" : "")} onClick={() => onSave(a.id)} aria-label={saved ? "Rimuovi dai salvati" : "Salva"} aria-pressed={saved}><Icon name="bookmark" size={19} /></button>
+        <button className="next-cta" onClick={() => onOpen(a.id)}><Icon name="arrow" size={17} />{t("activities.viewDetails")}</button>
+        <button className={"next-save" + (saved ? " on" : "")} onClick={() => onSave(a.id)} aria-label={saved ? t("activities.removeSaved") : t("activities.save")} aria-pressed={saved}><Icon name="bookmark" size={19} /></button>
       </div>
     </Widget>
   );
 }
 
 function MyActivitiesWidget({ user, setPage, onOpen }: any) {
+  const { t } = useTranslation();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -361,20 +371,20 @@ function MyActivitiesWidget({ user, setPage, onOpen }: any) {
   if (user?.role === "anonymous") return null;
 
   return (
-    <Widget title="LE MIE ATTIVITÀ" accent="var(--cyan)" upd={loading ? "Carico" : `${items.length} attive`} delay={180}>
-      {loading && <div className="widget-empty big">Caricamento attività...</div>}
+    <Widget title={t("activities.myActivities")} accent="var(--cyan)" upd={loading ? t("activities.loadingShort") : t("activities.activeCount", { count: items.length })} delay={180}>
+      {loading && <div className="widget-empty big">{t("activities.loading")}</div>}
       {!loading && items.length === 0 && (
         <div className="widget-empty big">
-          <span>Nessuna attività pubblicata.</span>
+          <span>{t("activities.noneCreated")}</span>
           {/* Activity creation is POI-first: it starts from a map pin on the home page. */}
-          <button className="link-btn inline" onClick={() => setPage("home")}><Icon name="plus" size={14} />Crea la prima attività</button>
+          <button className="link-btn inline" onClick={() => setPage("home")}><Icon name="plus" size={14} />{t("activities.createFirst")}</button>
         </div>
       )}
       {!loading && items.map((item) => (
         <button key={item.id} className="my-act-row" onClick={() => onOpen(item.id)}>
           <span>
             <b>{item.title}</b>
-            <small>{item.status} · {item.participantsCount}{item.capacity ? ` / ${item.capacity}` : ""} partecipanti{item.reviewCount > 0 ? ` · ${item.averageRating} rating` : ""}</small>
+            <small>{item.status} · {item.participantsCount}{item.capacity ? ` / ${item.capacity}` : ""} {t("activities.participantsWord", { count: item.participantsCount || 0 })}{item.reviewCount > 0 ? ` · ${item.averageRating} ${t("activities.ratingWord")}` : ""}</small>
           </span>
           <span className="my-act-actions">
             <Icon name={item.verifiedActivity ? "shieldCheck" : "activity"} size={14} />
@@ -387,6 +397,7 @@ function MyActivitiesWidget({ user, setPage, onOpen }: any) {
 
 /* ===================== RIGHT — WEATHER ===================== */
 function WeatherStrip() {
+  const { t } = useTranslation();
   const [weather, setWeather] = useState<any>(null);
   useEffect(() => {
     let active = true;
@@ -394,14 +405,14 @@ function WeatherStrip() {
     return () => { active = false; };
   }, []);
   const temp = weather?.current?.temperature;
-  const cond = weather?.current?.condition || "Meteo non disponibile";
+  const cond = weather?.current?.condition || t("activities.weatherUnavailable");
   return (
-    <Widget title="Meteo attuale a Trento" accent="var(--amber)" delay={320}>
+    <Widget title={t("activities.weatherTitle")} accent="var(--amber)" delay={320}>
       <div className="wx-strip">
         <WxIcon className="wxs-ic" />
         <div className="wxs-body">
           <div className="wxs-cond">{cond}</div>
-          <div className="wxs-note"><span className="led green"></span>{weather?.unavailable ? "Dati non disponibili" : "Aggiornato da Open-Meteo"}</div>
+          <div className="wxs-note"><span className="led green"></span>{weather?.unavailable ? t("activities.weatherDataUnavailable") : t("activities.weatherUpdated")}</div>
         </div>
         <div className="wxs-temp">{temp != null ? Math.round(temp) : "--"}<sup>°C</sup></div>
       </div>
@@ -410,6 +421,7 @@ function WeatherStrip() {
 }
 
 export function ActivityPage({ page, setPage, theme, setTheme, user, setSelectedActivityId }: any) {
+  const { t } = useTranslation();
   const [backendActivities, setBackendActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -440,7 +452,7 @@ export function ActivityPage({ page, setPage, theme, setTheme, user, setSelected
           diff: normalizeDifficulty(a.difficulty),
           price,
           priceLabel: a.priceLabel || null,
-          loc: a.location || a.address || "Luogo da confermare",
+          loc: a.location || a.address || t("activities.locationTbd"),
           dist: numOrNull(a.distance),
           rating,
           reviews: numOrNull(a.reviewCount ?? a.reviewsCount) ?? 0,
@@ -449,12 +461,12 @@ export function ActivityPage({ page, setPage, theme, setTheme, user, setSelected
           cap: capacity,
           startsAt: a.startsAt || a.startAt || a.dateTime || a.scheduledAt || null,
           status: { rising: participants >= 5 },
-          desc: a.description || "Informazioni dettagliate non ancora disponibili.",
+          desc: a.description || t("activities.noDescription"),
         };
       });
       setBackendActivities(mapped);
     } catch (err: any) {
-      setError(err instanceof ApiError ? err.message : "Impossibile caricare le attività. Riprova.");
+      setError(err instanceof ApiError ? err.message : t("activities.loadError"));
       setLoading(false);
       return;
     }
@@ -510,7 +522,7 @@ export function ActivityPage({ page, setPage, theme, setTheme, user, setSelected
     if (s.category !== "all") r = r.filter((a) => a.cat === s.category);
     if (s.search.trim()) {
       const q = s.search.toLowerCase();
-      r = r.filter((a) => (a.title + " " + activityCat(a.cat).label + " " + a.loc + " " + (a.creatorName || "")).toLowerCase().includes(q));
+      r = r.filter((a) => (a.title + " " + t(activityCat(a.cat).labelKey) + " " + a.loc + " " + (a.creatorName || "")).toLowerCase().includes(q));
     }
     // sort
     if (sort === "participants") r.sort((a, b) => b.going - a.going);
@@ -522,7 +534,7 @@ export function ActivityPage({ page, setPage, theme, setTheme, user, setSelected
       <div className="activity-scene">
         <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
         <div style={{ color: "var(--text-secondary)", fontSize: 15, padding: "100px 0", textAlign: "center" }}>
-          Caricamento attività...
+          {t("activities.loading")}
         </div>
       </div>
     );
@@ -534,9 +546,9 @@ export function ActivityPage({ page, setPage, theme, setTheme, user, setSelected
         <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
         <div className="feed-state error" role="alert">
           <Icon name="warn" size={20} />
-          <div className="feed-state-title">Qualcosa è andato storto</div>
+          <div className="feed-state-title">{t("activities.errorTitle")}</div>
           <div className="feed-state-msg">{error}</div>
-          <button className="feed-state-retry" onClick={loadActivities}>Riprova</button>
+          <button className="feed-state-retry" onClick={loadActivities}>{t("activities.retry")}</button>
         </div>
       </div>
     );
@@ -555,8 +567,8 @@ export function ActivityPage({ page, setPage, theme, setTheme, user, setSelected
           {list.length === 0
             ? <div className="feed-state empty">
                 <Icon name="search" size={20} />
-                <div className="feed-state-title">{tab === "saved" ? "Nessuna attività salvata" : "Nessuna attività trovata"}</div>
-                <div className="feed-state-msg">{tab === "saved" ? "Salva un'attività per ritrovarla qui." : "Prova a rimuovere qualche filtro o a cambiare categoria."}</div>
+                <div className="feed-state-title">{tab === "saved" ? t("activities.emptyNoSavedTitle") : t("activities.emptyNoFoundTitle")}</div>
+                <div className="feed-state-msg">{tab === "saved" ? t("activities.emptyNoSavedMsg") : t("activities.emptyNoFoundMsg")}</div>
               </div>
             : <div className="act-grid">
                 {list.map((a) => <ActCard key={a.id} a={a} saved={!!saves[a.id]} onSave={onSave} onOpen={() => handleOpenDetail(a.id)} />)}

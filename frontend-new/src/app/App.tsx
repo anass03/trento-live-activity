@@ -229,10 +229,11 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
         }
       }
 
-      let timeStr = "Orario da definire";
+      const dtLocale = dateLocale(i18n.language);
+      let timeStr = t("home.timeTBD");
       if (m.dateTime) {
         try {
-          timeStr = new Date(m.dateTime).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+          timeStr = new Date(m.dateTime).toLocaleTimeString(dtLocale, { hour: "2-digit", minute: "2-digit" });
         } catch (e) {}
       }
 
@@ -251,12 +252,12 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
         time: timeStr,
         cap: m.total || m.maxPartecipanti || m.capacity || 0,
         going: m.free !== undefined && m.total !== undefined ? m.total - m.free : (m.participantCount || 0),
-        date: m.dateTime ? new Date(m.dateTime).toLocaleDateString("it-IT", { day: "numeric", month: "short" }) : "Data da definire",
+        date: m.dateTime ? new Date(m.dateTime).toLocaleDateString(dtLocale, { day: "numeric", month: "short" }) : t("home.dateTBD"),
         description: m.description || null,
         raw: m
       };
     });
-  }, [mapData]);
+  }, [mapData, t, i18n.language]);
 
   // Marker visibili secondo il filtro Eventi/Attività: con "Attività" i POI
   // restano visibili perché sono i luoghi dove le attività nascono.
@@ -287,13 +288,13 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
       return {
         id: e.id,
         cat,
-        date: e.dateTime ? new Date(e.dateTime).toLocaleDateString("it-IT", { day: "numeric", month: "short" }) : "Data da definire",
+        date: e.dateTime ? new Date(e.dateTime).toLocaleDateString(dateLocale(i18n.language), { day: "numeric", month: "short" }) : t("home.dateTBD"),
         start: e.startTime ? e.startTime.slice(0, 5) : "N/D",
         end: e.endTime ? e.endTime.slice(0, 5) : "N/D",
         going: e.participantCount ?? 0,
         cap: e.maxPartecipanti ?? 0,
         title: e.title,
-        place: e.location || "Luogo da confermare",
+        place: e.location || t("home.placeTBC"),
         description: e.description,
         latitude: e.latitude,
         longitude: e.longitude,
@@ -301,7 +302,7 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
         raw: e
       };
     });
-  }, [mapData]);
+  }, [mapData, t, i18n.language]);
 
   const dynamicAreas = React.useMemo(() => {
     if (!mapData || !mapData.pois) return [];
