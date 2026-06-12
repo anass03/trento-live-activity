@@ -5,8 +5,9 @@ const { authenticate, authorize } = require('../middleware/auth');
 const REGISTERED = 'UtenteRegistrato';
 const ADMIN_SISTEMA = 'AmministratoreDiSistema';
 
-// RF16: registered users can report an event
+// RF16: registered users can report an event or a citizen activity
 router.post('/events/:eventId/report', authenticate, authorize(REGISTERED, 'EnteCertificato'), ctrl.createReport);
+router.post('/activities/:activityId/report', authenticate, authorize(REGISTERED, 'EnteCertificato'), ctrl.createReport);
 
 // RF33: system admin manages reports
 router.get('/reports', authenticate, authorize(ADMIN_SISTEMA), ctrl.listReports);

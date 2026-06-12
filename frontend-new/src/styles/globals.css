@@ -691,6 +691,10 @@ button { font-family: inherit; cursor: pointer; }
 }
 .filter-pill.active .cnt { background: rgba(255,255,255,0.18); color: #fff; }
 
+/* Seconda barra: filtro Tutto / Eventi / Attività, sotto le categorie */
+.kindbar { top: 150px; padding: 6px; }
+.kindbar .filter-pill { height: 34px; padding: 0 14px; font-size: 12.5px; }
+
 /* =========================================================
    WIDGET POSITIONING
    ========================================================= */

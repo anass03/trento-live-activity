@@ -2,7 +2,8 @@ const service = require('./moderation.service');
 
 async function createReport(req, res, next) {
   try {
-    const report = await service.createReport(req.user.id, req.params.eventId, req.body);
+    const { eventId, activityId } = req.params;
+    const report = await service.createReport(req.user.id, { eventId, activityId }, req.body);
     res.status(201).json(report);
   } catch (e) { next(e); }
 }

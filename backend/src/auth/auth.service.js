@@ -73,7 +73,7 @@ function signToken(user, extraClaims = {}) {
   const token = jwt.sign(
     { id: user.id, ruolo: user.ruolo, role, jti, ...extraClaims },
     process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
   );
   return token;
 }

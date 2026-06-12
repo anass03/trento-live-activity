@@ -31,6 +31,10 @@ async function start() {
   await sequelize.authenticate();
   console.log('PostgreSQL connected');
   await sequelize.sync({ alter: true });
+  // sync({alter}) non rimuove il NOT NULL da colonne FK preesistenti:
+  // reports.eventId deve essere nullable da quando le segnalazioni
+  // coprono anche le attività (eventId XOR activityId). Idempotente.
+  await sequelize.query('ALTER TABLE "reports" ALTER COLUMN "eventId" DROP NOT NULL').catch(() => {});
   console.log('Models synced');
   app.listen(PORT, () => console.log(`API Gateway listening on port ${PORT}`));
 }
