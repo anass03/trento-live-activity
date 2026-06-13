@@ -3,86 +3,101 @@ import { useTranslation } from "react-i18next";
 const dtLocale = (lang: string) => (lang.startsWith("en") ? "en-GB" : "it-IT");
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
-import { getDashboardStats, getDashboardServiceRequests, getEvents, getActivities } from "../lib/api";
+import {
+  getDashboardStats,
+  getDashboardServiceRequests,
+  getDashboardRecentServiceRequests,
+  getEvents,
+  getActivities,
+} from "../lib/api";
+
+type DrillDown = null | "activities" | "events" | "requests";
+
+function pill(type: string) {
+  if (type === "Richiesta" || type === "Report") return "danger";
+  if (type === "Evento" || type === "Event") return "warning";
+  if (type === "Attività" || type === "Activity") return "success";
+  return "info";
+}
 
 export function ComuneDashboardPage({ page, setPage, theme, setTheme, user }: any) {
   const { t, i18n } = useTranslation();
   const [stats, setStats] = useState<any>(null);
   const [serviceStats, setServiceStats] = useState<any>(null);
   const [recentLogs, setRecentLogs] = useState<any[]>([]);
+  const [allActivities, setAllActivities] = useState<any[]>([]);
+  const [allEvents, setAllEvents] = useState<any[]>([]);
+  const [recentRequests, setRecentRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [drillDown, setDrillDown] = useState<DrillDown>(null);
 
   useEffect(() => {
-    const loadData = async () => {
+    const load = async () => {
       try {
-        const dashboardStats = await getDashboardStats();
-        setStats(dashboardStats);
-        const reqStats = await getDashboardServiceRequests();
-        setServiceStats(reqStats);
-
-        // Fetch recent items to generate a live log feed
-        const [evs, acts] = await Promise.all([
-          getEvents({ limit: 3 }),
-          getActivities({ limit: 3 })
+        const [dashboardStats, reqStats, evs, acts, reqs] = await Promise.all([
+          getDashboardStats(),
+          getDashboardServiceRequests(),
+          getEvents({ limit: 12 }),
+          getActivities({ limit: 12 }),
+          getDashboardRecentServiceRequests(12).catch(() => [] as any[]),
         ]);
 
+        setStats(dashboardStats);
+        setServiceStats(reqStats);
+        setAllEvents(evs);
+        setAllActivities(acts);
+        setRecentRequests(reqs);
+
+        const locale = dtLocale(i18n.language);
         const logs: any[] = [];
-        evs.forEach((e) => {
+
+        reqs.slice(0, 4).forEach((r: any) => {
+          const cat = r.categoria.replace(/_/g, " ");
+          const sub = r.sottocategoria ? ` › ${r.sottocategoria.replace(/_/g, " ")}` : "";
+          logs.push({
+            id: `sr-${r.id}`,
+            type: t("comune.dashboard.typeReport"),
+            desc: t("comune.dashboard.logRequest", { category: cat + sub }),
+            time: r.createdAt ? new Date(r.createdAt).toLocaleDateString(locale) : "—",
+          });
+        });
+
+        evs.slice(0, 3).forEach((e: any) => {
           logs.push({
             id: `ev-${e.id}`,
             type: t("comune.dashboard.typeEvent"),
             desc: t("comune.dashboard.logEvent", { title: e.title, location: e.location || "Trento" }),
-            time: e.createdAt ? new Date(e.createdAt).toLocaleDateString(dtLocale(i18n.language)) : t("comune.dashboard.recent"),
+            time: e.createdAt ? new Date(e.createdAt).toLocaleDateString(locale) : t("comune.dashboard.recent"),
           });
         });
 
-        acts.forEach((a) => {
+        acts.slice(0, 3).forEach((a: any) => {
           logs.push({
             id: `act-${a.id}`,
             type: t("comune.dashboard.typeActivity"),
             desc: t("comune.dashboard.logActivity", { title: a.title, category: a.category }),
-            time: a.createdAt ? new Date(a.createdAt).toLocaleDateString(dtLocale(i18n.language)) : t("comune.dashboard.recent"),
+            time: a.createdAt ? new Date(a.createdAt).toLocaleDateString(locale) : t("comune.dashboard.recent"),
           });
         });
 
-        // Add a stub POI update
-        logs.push({
-          id: "poi-1",
-          type: t("comune.dashboard.typePoi"),
-          desc: t("comune.dashboard.logPoiStub"),
-          time: t("comune.dashboard.recent")
-        });
-
-        setRecentLogs(logs.slice(0, 5));
+        setRecentLogs(logs.slice(0, 10));
       } catch (err) {
         console.error("Failed to load Comune dashboard stats:", err);
       } finally {
         setLoading(false);
       }
     };
-    loadData();
+    load();
   }, []);
 
-  // Azioni rapide filtrate sui permessi reali del backend:
-  // - POI CRUD (/api/map/poi)            → authorize('AmministratoreDiSistema')
-  // - Richieste enti (/api/admin/entities) → authorize('AmministratoreDiSistema')
-  // - Moderazione eventi (/api/moderation/reports) → authorize('AmministratoreDiSistema')
-  // - Statistiche / export (/api/dashboard/*)      → authorize('AmministratoreComunale')
-  const role = user?.role;
-  const quickActions = [
-    { id: "comune-statistiche", label: t("comune.stats.title"), icon: "trending", accent: "var(--cyan)", roles: ["municipal_admin"] },
-    { id: "comune-export", label: t("comune.export.title"), icon: "share", accent: "var(--violet)", roles: ["municipal_admin"] },
-    { id: "admin-poi", label: t("comune.dashboard.managePoi"), icon: "pin", accent: "var(--cyan)", roles: ["system_admin"] },
-    { id: "admin-enti-richieste", label: t("comune.dashboard.entityRequests"), icon: "shieldCheck", accent: "var(--violet)", roles: ["system_admin"] },
-    { id: "admin-moderazione", label: t("comune.dashboard.moderation"), icon: "warn", accent: "var(--magenta)", roles: ["system_admin"] },
-  ].filter((a) => a.roles.includes(role));
-
   const kpis = [
-    { label: t("comune.dashboard.kpiActivities"), val: stats?.totalActivities ?? 0, icon: "activity", color: "var(--cyan)" },
-    { label: t("comune.dashboard.kpiEvents"), val: stats?.totalEvents ?? 0, icon: "calendar", color: "var(--violet)" },
-    { label: t("comune.dashboard.kpiPois"), val: stats?.totalPOIs ?? 0, icon: "pin", color: "var(--teal)" },
-    { label: t("comune.dashboard.kpiRequests"), val: serviceStats?.total ?? 0, icon: "bell", color: "var(--magenta)" },
+    { label: t("comune.dashboard.kpiActivities"), val: stats?.totalActivities ?? 0, icon: "activity", color: "var(--cyan)", drill: "activities" as DrillDown },
+    { label: t("comune.dashboard.kpiEvents"), val: stats?.totalEvents ?? 0, icon: "calendar", color: "var(--violet)", drill: "events" as DrillDown },
+    { label: t("comune.dashboard.kpiPois"), val: stats?.totalPOIs ?? 0, icon: "pin", color: "var(--teal)", drill: null, navPage: "admin-poi" },
+    { label: t("comune.dashboard.kpiRequests"), val: serviceStats?.total ?? 0, icon: "bell", color: "var(--magenta)", drill: "requests" as DrillDown },
   ];
+
+  const locale = dtLocale(i18n.language);
 
   if (loading) {
     return (
@@ -99,6 +114,8 @@ export function ComuneDashboardPage({ page, setPage, theme, setTheme, user }: an
     <div className="revamp-legal-scene">
       <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
       <div className="revamp-comune-layout">
+
+        {/* Header */}
         <div className="revamp-comune-head">
           <div>
             <h1>{t("comune.dashboard.title")}</h1>
@@ -114,91 +131,226 @@ export function ComuneDashboardPage({ page, setPage, theme, setTheme, user }: an
           </div>
         </div>
 
+        {/* KPI grid — cards are clickable */}
         <div className="revamp-kpi-grid">
           {kpis.map((k, i) => (
-            <div key={i} className="revamp-kpi-card anim-in" style={{ "--accent": k.color, animationDelay: `${i * 60}ms` } as React.CSSProperties}>
+            <div
+              key={i}
+              className="revamp-kpi-card anim-in"
+              style={{
+                "--accent": k.color,
+                animationDelay: `${i * 60}ms`,
+                cursor: "pointer",
+                transition: "transform 120ms, box-shadow 120ms",
+              } as React.CSSProperties}
+              onClick={() => {
+                if ((k as any).navPage) { setPage((k as any).navPage); return; }
+                setDrillDown(drillDown === k.drill ? null : k.drill);
+              }}
+              title={t("comune.dashboard.clickToExpand")}
+            >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span className="revamp-kpi-lbl">{k.label}</span>
                 <Icon name={k.icon} size={16} style={{ color: k.color }} />
               </div>
               <strong className="revamp-kpi-val">{k.val}</strong>
+              <div style={{ fontSize: 10.5, color: "var(--text-faint)", marginTop: 2 }}>
+                {(k as any).navPage ? t("comune.dashboard.clickToManage") : t("comune.dashboard.clickToExpand")}
+              </div>
             </div>
           ))}
         </div>
 
-        <div className="revamp-charts-grid" style={{ gridTemplateColumns: "2fr 1fr" }}>
-          {/* Main Logs Table */}
-          <div className="revamp-chart-card anim-in" style={{ "--accent": "var(--cyan)", animationDelay: "240ms" } as React.CSSProperties}>
-            <h3>
-              {t("comune.dashboard.logsTitle")} <span>{t("comune.dashboard.live")}</span>
-            </h3>
+        {/* Drill-down panel */}
+        {drillDown === "activities" && (
+          <div className="revamp-chart-card anim-in" style={{ "--accent": "var(--cyan)" } as React.CSSProperties}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <h3 style={{ margin: 0 }}>{t("comune.dashboard.kpiActivities")}</h3>
+              <button className="detail-modal-close bare-btn" onClick={() => setDrillDown(null)}>
+                <Icon name="x" size={15} />
+              </button>
+            </div>
             <div className="revamp-table-wrap">
               <table className="revamp-table">
                 <thead>
                   <tr>
+                    <th>{t("comune.dashboard.colTitle")}</th>
                     <th>{t("comune.dashboard.colCategory")}</th>
-                    <th>{t("comune.dashboard.colDescription")}</th>
-                    <th>{t("comune.dashboard.colTime")}</th>
+                    <th>{t("comune.dashboard.colParticipants")}</th>
+                    <th>{t("comune.dashboard.colDate")}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {recentLogs.map((log) => (
-                    <tr key={log.id}>
-                      <td>
-                        <span className={"revamp-status-pill " + (log.type === "Segnalazione" ? "danger" : log.type === "Attività" ? "success" : log.type === "Evento" ? "warning" : "info")}>
-                          {log.type}
-                        </span>
+                  {allActivities.length === 0 && (
+                    <tr><td colSpan={4} style={{ textAlign: "center", color: "var(--text-muted)", padding: "20px 0" }}>—</td></tr>
+                  )}
+                  {allActivities.map((a: any) => (
+                    <tr key={a.id}>
+                      <td><b>{a.title}</b></td>
+                      <td><span className="revamp-status-pill success">{a.category}</span></td>
+                      <td>{a.participantCount ?? 0} / {a.maxParticipants ?? "∞"}</td>
+                      <td style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                        {a.createdAt ? new Date(a.createdAt).toLocaleDateString(locale) : "—"}
                       </td>
-                      <td>{log.desc}</td>
-                      <td>{log.time}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           </div>
+        )}
 
-          {/* Quick Actions Card */}
-          <div className="revamp-chart-card anim-in" style={{ "--accent": "var(--violet)", animationDelay: "300ms" } as React.CSSProperties}>
-            <h3>{t("comune.dashboard.quickActions")}</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, justifyContent: "center" }}>
-              {quickActions.map((a) => (
-                <button key={a.id} className="revamp-form-btn" style={{ "--accent": a.accent } as React.CSSProperties} onClick={() => setPage(a.id)}>
-                  <Icon name={a.icon} size={16} /> {a.label}
-                </button>
-              ))}
-              {quickActions.length === 0 && (
-                <span style={{ color: "var(--text-muted)", fontSize: 13, textAlign: "center" }}>
-                  {t("comune.dashboard.noActions")}
-                </span>
-              )}
+        {drillDown === "events" && (
+          <div className="revamp-chart-card anim-in" style={{ "--accent": "var(--violet)" } as React.CSSProperties}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <h3 style={{ margin: 0 }}>{t("comune.dashboard.kpiEvents")}</h3>
+              <button className="detail-modal-close bare-btn" onClick={() => setDrillDown(null)}>
+                <Icon name="x" size={15} />
+              </button>
             </div>
+            <div className="revamp-table-wrap">
+              <table className="revamp-table">
+                <thead>
+                  <tr>
+                    <th>{t("comune.dashboard.colTitle")}</th>
+                    <th>{t("comune.dashboard.colCategory")}</th>
+                    <th>{t("comune.dashboard.colLocation")}</th>
+                    <th>{t("comune.dashboard.colDate")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allEvents.length === 0 && (
+                    <tr><td colSpan={4} style={{ textAlign: "center", color: "var(--text-muted)", padding: "20px 0" }}>—</td></tr>
+                  )}
+                  {allEvents.map((e: any) => (
+                    <tr key={e.id}>
+                      <td><b>{e.title}</b></td>
+                      <td><span className="revamp-status-pill warning">{e.category}</span></td>
+                      <td style={{ fontSize: 12 }}>{e.location || "Trento"}</td>
+                      <td style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                        {e.dateTime ? new Date(e.dateTime).toLocaleDateString(locale) : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {drillDown === "requests" && (
+          <div className="revamp-chart-card anim-in" style={{ "--accent": "var(--magenta)" } as React.CSSProperties}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <h3 style={{ margin: 0 }}>{t("comune.dashboard.kpiRequests")}</h3>
+              <button className="detail-modal-close bare-btn" onClick={() => setDrillDown(null)}>
+                <Icon name="x" size={15} />
+              </button>
+            </div>
+            <div className="revamp-table-wrap">
+              <table className="revamp-table">
+                <thead>
+                  <tr>
+                    <th>{t("comune.dashboard.colCategory")}</th>
+                    <th>{t("comune.dashboard.colSubcategory")}</th>
+                    <th>{t("comune.dashboard.colDate")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentRequests.length === 0 && (
+                    <tr><td colSpan={3} style={{ textAlign: "center", color: "var(--text-muted)", padding: "20px 0" }}>—</td></tr>
+                  )}
+                  {recentRequests.map((r: any) => (
+                    <tr key={r.id}>
+                      <td><span className="revamp-status-pill danger">{r.categoria.replace(/_/g, " ")}</span></td>
+                      <td style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                        {r.sottocategoria ? r.sottocategoria.replace(/_/g, " ") : <em style={{ color: "var(--text-faint)" }}>—</em>}
+                      </td>
+                      <td style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                        {r.createdAt ? new Date(r.createdAt).toLocaleDateString(locale) : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Logs table — Registri e Segnalazioni */}
+        <div className="revamp-chart-card anim-in" style={{ "--accent": "var(--cyan)", animationDelay: "240ms" } as React.CSSProperties}>
+          <h3>
+            {t("comune.dashboard.logsTitle")} <span>{t("comune.dashboard.live")}</span>
+          </h3>
+          <div className="revamp-table-wrap">
+            <table className="revamp-table">
+              <thead>
+                <tr>
+                  <th>{t("comune.dashboard.colCategory")}</th>
+                  <th>{t("comune.dashboard.colDescription")}</th>
+                  <th>{t("comune.dashboard.colDate")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentLogs.length === 0 && (
+                  <tr><td colSpan={3} style={{ textAlign: "center", color: "var(--text-muted)", padding: "20px 0" }}>—</td></tr>
+                )}
+                {recentLogs.map((log) => (
+                  <tr key={log.id}>
+                    <td>
+                      <span className={`revamp-status-pill ${pill(log.type)}`}>{log.type}</span>
+                    </td>
+                    <td>{log.desc}</td>
+                    <td style={{ whiteSpace: "nowrap" }}>{log.time}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 
-        {/* Citizen Needs Panel */}
+        {/* Citizen needs breakdown with subcategories */}
         {serviceStats && serviceStats.total > 0 && (
-          <div className="revamp-chart-card anim-in" style={{ "--accent": "var(--magenta)", animationDelay: "360ms" } as React.CSSProperties}>
+          <div className="revamp-chart-card anim-in" style={{ "--accent": "var(--magenta)", animationDelay: "300ms" } as React.CSSProperties}>
             <h3>
               📍 {t("comune.dashboard.kpiRequests")}
               <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: "var(--text-muted)" }}>
-                {serviceStats.total} {t("comune.dashboard.recent").toLowerCase()}
+                {serviceStats.total} {t("comune.dashboard.totalLabel")}
               </span>
             </h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
-              {serviceStats.byCategory.slice(0, 6).map((row: any) => {
+            <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 6 }}>
+              {serviceStats.byCategory.map((row: any) => {
                 const pct = Math.round((Number(row.count) / serviceStats.total) * 100);
+                const subcats = (serviceStats.bySubcategory ?? []).filter((s: any) => s.categoria === row.categoria);
                 return (
-                  <div key={row.categoria} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}>
-                        <span style={{ fontWeight: 500, textTransform: "capitalize" }}>{row.categoria.replace(/_/g, " ")}</span>
-                        <span style={{ color: "var(--text-muted)" }}>{row.count} ({pct}%)</span>
-                      </div>
-                      <div style={{ height: 5, borderRadius: 3, background: "var(--border-soft, rgba(255,255,255,0.08))" }}>
-                        <div style={{ height: "100%", borderRadius: 3, width: `${pct}%`, background: "var(--magenta)", transition: "width 0.5s" }} />
+                  <div key={row.categoria}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 5 }}>
+                          <span style={{ fontWeight: 600, textTransform: "capitalize" }}>{row.categoria.replace(/_/g, " ")}</span>
+                          <span style={{ color: "var(--text-muted)" }}>{row.count} ({pct}%)</span>
+                        </div>
+                        <div style={{ height: 5, borderRadius: 3, background: "var(--border-soft)" }}>
+                          <div style={{ height: "100%", borderRadius: 3, width: `${pct}%`, background: "var(--magenta)", transition: "width 0.6s cubic-bezier(.2,.8,.3,1)" }} />
+                        </div>
                       </div>
                     </div>
+                    {subcats.length > 0 && (
+                      <div style={{ marginTop: 6, paddingLeft: 2, display: "flex", flexWrap: "wrap", gap: 5 }}>
+                        {subcats.map((s: any) => (
+                          <span key={s.sottocategoria} style={{
+                            fontSize: 10.5,
+                            background: "color-mix(in srgb, var(--magenta) 12%, transparent)",
+                            border: "1px solid color-mix(in srgb, var(--magenta) 28%, transparent)",
+                            borderRadius: 6,
+                            padding: "2px 8px",
+                            color: "color-mix(in srgb, var(--magenta) 85%, var(--text-primary))",
+                            fontWeight: 500,
+                          }}>
+                            {s.sottocategoria.replace(/_/g, " ")} <b>({s.count})</b>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}
