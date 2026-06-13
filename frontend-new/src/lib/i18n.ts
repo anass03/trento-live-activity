@@ -17,8 +17,17 @@ import enAccount from "../locales/en/account.json";
 import enEvents from "../locales/en/events.json";
 import enAdmin from "../locales/en/admin.json";
 
-const it = { ...itCommon, ...itAuth, ...itAccount, ...itEvents, ...itAdmin };
-const en = { ...enCommon, ...enAuth, ...enAccount, ...enEvents, ...enAdmin };
+// itCommon and itEvents both define an "activities" top-level key.
+// A plain spread would let the later file win, losing the other's keys.
+// Deep-merge "activities" so both sets of keys coexist.
+const it = {
+  ...itCommon, ...itAuth, ...itAccount, ...itEvents, ...itAdmin,
+  activities: { ...(itCommon as any).activities, ...(itEvents as any).activities },
+};
+const en = {
+  ...enCommon, ...enAuth, ...enAccount, ...enEvents, ...enAdmin,
+  activities: { ...(enCommon as any).activities, ...(enEvents as any).activities },
+};
 
 void i18n
   .use(LanguageDetector)

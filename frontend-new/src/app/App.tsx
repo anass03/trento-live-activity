@@ -36,7 +36,7 @@ import { AdminModerationPage } from "../pages/AdminModerationPage";
 import { AdminNotificationsPage } from "../pages/AdminNotificationsPage";
 import { PrivacyPage } from "../pages/PrivacyPage";
 import { TermsPage } from "../pages/TermsPage";
-import { getMe, getToken, setToken, UserRole, getHomeMapData } from "../lib/api";
+import { getMe, getToken, setToken, UserRole, getHomeMapData, getMyActivities, getMyEvents } from "../lib/api";
 import "../styles/revamp-pages.css";
 
 function getSvgCoordinates(lat: number, lng: number, placeName?: string | null): { x: number, y: number } {
@@ -212,8 +212,30 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
   const [loading, setLoading] = useState(false);
   // POI scelto dal popup mappa per creare un'attività (id + nome)
   const [createPoi, setCreatePoi] = useState<{ id: string; title: string } | null>(null);
+  const [ownedIds, setOwnedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => { document.documentElement.style.setProperty("--zoom", String(zoom)); }, [zoom]);
+
+  useEffect(() => {
+    if (!user?.id) { setOwnedIds(new Set()); return; }
+    const fetch = async () => {
+      const ids = new Set<string>();
+      if (user.role === "registered_user") {
+        try {
+          const res = await getMyActivities();
+          (res.items || []).forEach((a: any) => ids.add(a.id));
+        } catch (_) {}
+      }
+      if (user.role === "certified_entity") {
+        try {
+          const res = await getMyEvents();
+          (res.events || []).forEach((e: any) => ids.add(e.id));
+        } catch (_) {}
+      }
+      setOwnedIds(ids);
+    };
+    fetch();
+  }, [user?.id, user?.role]);
 
   const toggleCategory = (id: string) => {
     if (id === "all") {
@@ -258,7 +280,14 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
 
   const dynamicMarkers = React.useMemo(() => {
     if (!mapData || !mapData.markers) return [];
-    return mapData.markers.filter((m: any) => m.latitude != null && m.longitude != null).map((m: any) => {
+    const now = Date.now();
+    return mapData.markers.filter((m: any) => {
+      if (m.latitude == null || m.longitude == null) return false;
+      if (m.type !== "poi" && m.dateTime) {
+        try { if (new Date(m.dateTime).getTime() < now) return false; } catch (_) {}
+      }
+      return true;
+    }).map((m: any) => {
       const { x, y } = getSvgCoordinates(m.latitude, m.longitude, m.title);
       
       // I POI non sono eventi: tengono cat "poi" (pin dedicato sulla mappa).
@@ -310,7 +339,12 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
 
   const dynamicEvents = React.useMemo(() => {
     if (!mapData || !mapData.events) return [];
-    return mapData.events.slice(0, 7).map((e: any) => {
+    const now = Date.now();
+    return mapData.events.filter((e: any) => {
+      const dt = e.dateTime || e.startTime;
+      if (dt) { try { if (new Date(dt).getTime() < now) return false; } catch (_) {} }
+      return true;
+    }).slice(0, 7).map((e: any) => {
       let cat = e.category || "altro";
       const validCategories = ["sport", "cultura", "musica", "arte", "gastronomia", "studio", "altro"];
       if (!validCategories.includes(cat)) cat = "altro";
@@ -448,6 +482,8 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
                 onLocateRef={locateRef}
                 onResetRef={resetRef}
                 canCreateActivity={user?.role === "registered_user"}
+                canJoin={user?.role === "registered_user"}
+                ownedIds={ownedIds}
                 onCreatePoi={(m) => {
                   setPopup(null);
                   setCreatePoi({ id: m.sourceId || m.id, title: m.title });
@@ -693,7 +729,7 @@ export function App() {
 
   const navigate = (nextPage: string) => {
     // The profile page only makes sense with an account: guests get the login modal.
-    if (nextPage === "login" || (nextPage === "profilo" && user.role === "anonymous")) {
+    if (nextPage === "login" || ((nextPage === "profilo" || nextPage === "profilo-saved") && user.role === "anonymous")) {
       setLoginOpen(true);
       return;
     }
@@ -751,8 +787,8 @@ export function App() {
         ? <ActivityPage {...shared} />
         : page === "impostazioni"
         ? <SettingsPage {...shared} />
-        : page === "profilo"
-        ? <ProfilePage {...shared} />
+        : (page === "profilo" || page === "profilo-saved")
+        ? <ProfilePage {...shared} initialTab={page === "profilo-saved" ? "saved" : undefined} />
         : page === "attivita-dettaglio"
         ? <ActivityDetailPage {...shared} />
         : page === "evento-dettaglio"

@@ -107,6 +107,7 @@
       "when": "When",
       "participants": "Participants",
       "join": "Join",
+      "view": "View details",
       "close": "Close"
     }
   },
@@ -205,10 +206,14 @@
   },
   "activities": {
     "joinCta": "Join this activity",
-    "leaveCta": "Cancel participation",
+    "leaveCta": "Quit",
     "joinPending": "One moment…",
     "joinError": "Something went wrong. Please retry.",
-    "joinedPill": "You're taking part in this activity"
+    "joinedPill": "You're taking part in this activity",
+    "deleteActivity": "Delete activity",
+    "deletingActivity": "Deleting…",
+    "deleteConfirm": "Permanently delete this activity?",
+    "deleteError": "Could not delete the activity."
   },
   "toast": {
     "closeAria": "Dismiss notification",

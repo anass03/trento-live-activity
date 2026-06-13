@@ -28,7 +28,8 @@ function getIconSvg(name: string, size = 15): string {
     ticket: `<path d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2 2 2 0 0 0 0 4 2 2 0 0 1-2 2H6a2 2 0 0 1-2-2 2 2 0 0 0 0-4z" /><path d="M14 6v12" />`,
     sparkle: `<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" /><path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z" />`,
     bookmark: `<path d="M6 4h12v17l-6-4.5L6 21z" />`,
-    layers: `<path d="M12 3l9 5-9 5-9-5z" /><path d="M3 13l9 5 9-5" />`
+    layers: `<path d="M12 3l9 5-9 5-9-5z" /><path d="M3 13l9 5 9-5" />`,
+    arrow: `<path d="M5 12h14" /><path d="M13 6l6 6-6 6" />`
   };
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${paths[name] || paths.grid}</svg>`;
 }
@@ -61,6 +62,10 @@ interface TrentoMapProps {
   /* true quando l'utente loggato è un cittadino: abilita la CTA
      "Crea attività qui" nel popup dei POI */
   canCreateActivity?: boolean;
+  /* true quando l'utente può partecipare (registered_user); false = mostra "Vedi" */
+  canJoin?: boolean;
+  /* IDs of events/activities owned by the current user — show "View" not "Join" */
+  ownedIds?: Set<string>;
   onCreatePoi?: (marker: any) => void;
   /* apre la pagina di dettaglio di un evento/attività dal popup */
   onOpenDetail?: (marker: any) => void;
@@ -78,6 +83,8 @@ export const TrentoMap = React.memo(function TrentoMap({
   is3d,
   onLocateRef,
   onResetRef,
+  canJoin = false,
+  ownedIds,
   canCreateActivity,
   onCreatePoi,
   onOpenDetail
@@ -356,7 +363,7 @@ export const TrentoMap = React.memo(function TrentoMap({
               </div>
               <div class="ep-part-n"><b>${going}</b> / ${cap}</div>
             </div>
-            <button class="ep-cta">${getIconSvg("ticket", 15)} ${t("widgets.popup.join")}</button>
+            <button class="ep-cta">${(() => { const own = !!(ownedIds && (ownedIds.has(m.sourceId) || ownedIds.has(m.id))); const join = canJoin && !own; return `${join ? getIconSvg("ticket", 15) : getIconSvg("arrow", 15)} ${join ? t("widgets.popup.join") : t("widgets.popup.view")}`; })()}</button>
           </div>
         `;
 
@@ -397,7 +404,7 @@ export const TrentoMap = React.memo(function TrentoMap({
 
       mapMarkers.current.push(maplibreMarker);
     });
-  }, [markers, activeCategories, kindFilter, selectedMarkerId, styleLoaded, canCreateActivity, t]);
+  }, [markers, activeCategories, kindFilter, selectedMarkerId, styleLoaded, canCreateActivity, canJoin, ownedIds, t]);
 
   return (
     <div 

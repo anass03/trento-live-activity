@@ -107,6 +107,7 @@
       "when": "Quando",
       "participants": "Partecipanti",
       "join": "Partecipa",
+      "view": "Vedi dettagli",
       "close": "Chiudi"
     }
   },
@@ -205,10 +206,14 @@
   },
   "activities": {
     "joinCta": "Partecipa all'attività",
-    "leaveCta": "Annulla partecipazione",
+    "leaveCta": "Esci",
     "joinPending": "Un attimo…",
     "joinError": "Operazione non riuscita. Riprova.",
-    "joinedPill": "Partecipi a questa attività"
+    "joinedPill": "Partecipi a questa attività",
+    "deleteActivity": "Elimina attività",
+    "deletingActivity": "Eliminazione…",
+    "deleteConfirm": "Eliminare definitivamente questa attività?",
+    "deleteError": "Eliminazione non riuscita."
   },
   "toast": {
     "closeAria": "Chiudi notifica",

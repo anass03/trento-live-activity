@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
-import { getMyParticipations, leaveEvent, leaveActivity, getMe, regenerateRecoveryCodes } from "../lib/api";
+import { getMyParticipations, leaveEvent, leaveActivity, getMe, regenerateRecoveryCodes, getFavorites, getEventById, getActivityById, getMyActivities } from "../lib/api";
 
 const PROFILE_INTERESTS = [
   { id: "outdoor",  icon: "bike",     color: "var(--teal)" },
@@ -36,13 +36,15 @@ const getCatIcon = (cat?: string) => {
   }
 };
 
-export function ProfilePage({ page, setPage, theme, setTheme, user }: any) {
+export function ProfilePage({ page, setPage, theme, setTheme, user, initialTab, setSelectedEventId, setSelectedActivityId }: any) {
   const { t, i18n } = useTranslation();
-  // Partecipazioni e interessi sono concetti da cittadino: enti e admin
-  // vedono solo le informazioni account (+ sicurezza per gli admin di sistema).
   const isCitizen = user?.role === "registered_user";
-  const [activeTab, setActiveTab] = useState(isCitizen ? "attivita" : "info");
+  const defaultTab = initialTab || (isCitizen ? "attivita" : "info");
+  const [activeTab, setActiveTab] = useState(defaultTab);
   const [participations, setParticipations] = useState<any[]>([]);
+  const [savedItems, setSavedItems] = useState<any[]>([]);
+  const [loadingSaved, setLoadingSaved] = useState(false);
+  const [createdActivities, setCreatedActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
 
@@ -52,8 +54,12 @@ export function ProfilePage({ page, setPage, theme, setTheme, user }: any) {
     setLoading(true);
     try {
       if (isCitizen) {
-        const parts = await getMyParticipations();
-        setParticipations(parts);
+        const [parts, myActs] = await Promise.allSettled([
+          getMyParticipations(),
+          getMyActivities(),
+        ]);
+        if (parts.status === "fulfilled") setParticipations(parts.value);
+        if (myActs.status === "fulfilled") setCreatedActivities(myActs.value.items || []);
       }
       const profile = await getMe();
       setUserProfile(profile);
@@ -64,9 +70,35 @@ export function ProfilePage({ page, setPage, theme, setTheme, user }: any) {
     }
   };
 
+  const fetchSaved = async () => {
+    setLoadingSaved(true);
+    try {
+      const favs = await getFavorites();
+      const results = await Promise.allSettled(
+        favs.map((f) =>
+          f.markerType === "event"
+            ? getEventById(f.markerId).then((e) => ({ ...e, _favType: "event" }))
+            : f.markerType === "activity"
+            ? getActivityById(f.markerId).then((a) => ({ ...a, _favType: "activity" }))
+            : Promise.reject("unsupported")
+        )
+      );
+      setSavedItems(
+        results
+          .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
+          .map((r) => r.value)
+      );
+    } catch (err) {
+      console.error("Failed to load saved items:", err);
+    } finally {
+      setLoadingSaved(false);
+    }
+  };
+
   useEffect(() => {
     if (user?.id) {
       fetchParticipations();
+      fetchSaved();
     }
   }, [user?.id]);
 
@@ -159,6 +191,12 @@ export function ProfilePage({ page, setPage, theme, setTheme, user }: any) {
                   {t("profile.tabBookings")}
                 </button>
                 <button
+                  className={"revamp-profile-tab" + (activeTab === "saved" ? " active" : "")}
+                  onClick={() => setActiveTab("saved")}
+                >
+                  {t("profile.tabSaved")}
+                </button>
+                <button
                   className={"revamp-profile-tab" + (activeTab === "interessi" ? " active" : "")}
                   onClick={() => setActiveTab("interessi")}
                 >
@@ -175,46 +213,164 @@ export function ProfilePage({ page, setPage, theme, setTheme, user }: any) {
           </div>
 
           <div className="revamp-profile-tab-body">
-            {activeTab === "attivita" && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {loading && (
-                  <div style={{ color: "var(--text-muted)", fontSize: 13.5, padding: "20px 0", textAlign: "center" }}>
-                    {t("profile.loadingBookings")}
-                  </div>
-                )}
-                {!loading && participations.length === 0 && (
-                  <div style={{ color: "var(--text-muted)", fontSize: 13.5, padding: "20px 0", textAlign: "center" }}>
-                    {t("profile.noBookings")}
-                  </div>
-                )}
-                {!loading && participations.map((item) => {
-                  const title = item.target?.title || item.target?.titolo || t("profile.fallbackTitle");
-                  const cat = item.target?.category || item.target?.categoria || "altro";
-                  const color = getCatColor(cat);
-                  const iconName = getCatIcon(cat);
-                  const when = item.target?.dateTime || item.target?.data || t("profile.toBeDefined");
+            {activeTab === "attivita" && (() => {
+              const eventParts = participations.filter((p) => p.targetType === "EVENT");
+              const actParts = participations.filter((p) => p.targetType !== "EVENT");
 
+              const renderRow = (item: any) => {
+                const title = item.target?.title || item.target?.titolo || t("profile.fallbackTitle");
+                const cat = item.target?.category || item.target?.categoria || "altro";
+                const color = getCatColor(cat);
+                const iconName = getCatIcon(cat);
+                const when = item.target?.dateTime || item.target?.data || t("profile.toBeDefined");
+                return (
+                  <div key={item.id} className="area-row" style={{ padding: "12px 14px", border: "1px solid var(--border-soft-2)", borderRadius: 12, background: "var(--chip-fill)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, width: "100%" }}>
+                      <div style={{
+                        width: 38, height: 38, borderRadius: 8, background: `color-mix(in srgb, ${color} 16%, transparent)`,
+                        border: `1px solid color-mix(in srgb, ${color} 30%, transparent)`, color,
+                        display: "grid", placeItems: "center"
+                      }}>
+                        <Icon name={iconName} size={16} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700 }}>{title}</div>
+                        <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 3 }}>
+                          <Icon name="clock" size={11} /> {when} | <Icon name="pin" size={11} /> {item.target?.location || "Trento"}
+                        </div>
+                      </div>
+                      <button className="revamp-action-btn danger" style={{ height: 34 }} onClick={() => handleCancel(item)}>
+                        <Icon name="x" size={12} /> {t("profile.cancelBooking")}
+                      </button>
+                    </div>
+                  </div>
+                );
+              };
+
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {loading && (
+                    <div style={{ color: "var(--text-muted)", fontSize: 13.5, padding: "20px 0", textAlign: "center" }}>
+                      {t("profile.loadingBookings")}
+                    </div>
+                  )}
+                  {!loading && participations.length === 0 && (
+                    <div style={{ color: "var(--text-muted)", fontSize: 13.5, padding: "20px 0", textAlign: "center" }}>
+                      {t("profile.noBookings")}
+                    </div>
+                  )}
+                  {!loading && eventParts.length > 0 && (
+                    <>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--magenta)", letterSpacing: "0.06em", textTransform: "uppercase", marginTop: 4 }}>
+                        <Icon name="calendar" size={11} /> {t("header.nav.events")}
+                      </div>
+                      {eventParts.map(renderRow)}
+                    </>
+                  )}
+                  {!loading && actParts.length > 0 && (
+                    <>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--teal)", letterSpacing: "0.06em", textTransform: "uppercase", marginTop: eventParts.length > 0 ? 8 : 4 }}>
+                        <Icon name="activity" size={11} /> {t("header.nav.activities")}
+                      </div>
+                      {actParts.map(renderRow)}
+                    </>
+                  )}
+                  {!loading && (
+                    <>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--violet)", letterSpacing: "0.06em", textTransform: "uppercase", marginTop: 8 }}>
+                        <Icon name="sparkle" size={11} /> {t("profile.createdActivitiesSection")}
+                      </div>
+                      {createdActivities.length === 0 ? (
+                        <div style={{ color: "var(--text-muted)", fontSize: 13, padding: "8px 0" }}>
+                          {t("profile.noCreatedActivities")}
+                        </div>
+                      ) : createdActivities.map((act) => {
+                        const statusSlug: Record<string, string> = { draft: "Draft", published: "Published", active: "Active", completed: "Completed", cancelled: "Cancelled", under_review: "Review" };
+                        const statusKey = `profile.activityStatus${statusSlug[act.status] || "Draft"}`;
+                        const statusLabel = t(statusKey, { defaultValue: act.status || "" });
+                        return (
+                          <div key={act.id} className="area-row" style={{ padding: "12px 14px", border: "1px solid var(--border-soft-2)", borderRadius: 12, background: "var(--chip-fill)" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 12, width: "100%" }}>
+                              <div style={{
+                                width: 38, height: 38, borderRadius: 8,
+                                background: "color-mix(in srgb, var(--violet) 16%, transparent)",
+                                border: "1px solid color-mix(in srgb, var(--violet) 30%, transparent)",
+                                color: "var(--violet)", display: "grid", placeItems: "center"
+                              }}>
+                                <Icon name="activity" size={16} />
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 14, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{act.title}</div>
+                                <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 3 }}>
+                                  <Icon name="users" size={11} /> {act.participantsCount ?? 0}{act.capacity ? ` / ${act.capacity}` : ""} · {statusLabel}
+                                </div>
+                              </div>
+                              <button className="revamp-action-btn" style={{ height: 34 }} onClick={() => { setSelectedActivityId?.(act.id); setPage("attivita-dettaglio"); }}>
+                                <Icon name="arrow" size={12} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </>
+                  )}
+                </div>
+              );
+            })()}
+
+            {activeTab === "saved" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {loadingSaved && (
+                  <div style={{ color: "var(--text-muted)", fontSize: 13.5, padding: "20px 0", textAlign: "center" }}>
+                    {t("profile.loadingSaved")}
+                  </div>
+                )}
+                {!loadingSaved && savedItems.length === 0 && (
+                  <div style={{ color: "var(--text-muted)", fontSize: 13.5, padding: "20px 0", textAlign: "center" }}>
+                    {t("profile.noSaved")}
+                  </div>
+                )}
+                {!loadingSaved && savedItems.map((item) => {
+                  const isEvent = item._favType === "event";
+                  const title = item.title || t("profile.fallbackTitle");
+                  const color = isEvent ? "var(--magenta)" : "var(--teal)";
+                  const iconName = isEvent ? "calendar" : "activity";
+                  const when = item.dateTime || item.startsAt || null;
+                  const loc = item.location || item.address || null;
                   return (
-                    <div key={item.id} className="area-row" style={{ padding: "12px 14px", border: "1px solid var(--border-soft-2)", borderRadius: 12, background: "var(--chip-fill)" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 12, width: "100%" }}>
+                    <button
+                      key={item.id}
+                      className="area-row"
+                      style={{ padding: "12px 14px", border: "1px solid var(--border-soft-2)", borderRadius: 12, background: "var(--chip-fill)", textAlign: "left", width: "100%", cursor: "pointer" }}
+                      onClick={() => {
+                        if (isEvent) {
+                          setSelectedEventId?.(item.id);
+                          setPage("evento-dettaglio");
+                        } else {
+                          setSelectedActivityId?.(item.id);
+                          setPage("attivita-dettaglio");
+                        }
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                         <div style={{
-                          width: 38, height: 38, borderRadius: 8, background: `color-mix(in srgb, ${color} 16%, transparent)`,
-                          border: `1px solid color-mix(in srgb, ${color} 30%, transparent)`, color: color,
-                          display: "grid", placeItems: "center"
+                          width: 38, height: 38, borderRadius: 8,
+                          background: `color-mix(in srgb, ${color} 16%, transparent)`,
+                          border: `1px solid color-mix(in srgb, ${color} 30%, transparent)`, color,
+                          display: "grid", placeItems: "center", flexShrink: 0,
                         }}>
                           <Icon name={iconName} size={16} />
                         </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 14, fontWeight: 700 }}>{title}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>
                           <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 3 }}>
-                            <Icon name="clock" size={11} /> {when} | <Icon name="pin" size={11} /> {item.target?.location || "Trento"}
+                            {when && <><Icon name="clock" size={11} /> {new Date(when).toLocaleDateString(dateLocale)}{loc ? " · " : ""}</>}
+                            {loc && <><Icon name="pin" size={11} /> {loc}</>}
                           </div>
                         </div>
-                        <button className="revamp-action-btn danger" style={{ height: 34 }} onClick={() => handleCancel(item)}>
-                          <Icon name="x" size={12} /> {t("profile.cancelBooking")}
-                        </button>
+                        <Icon name="arrow" size={14} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>

@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
-import { CommentsSection } from "../components/redesign/CommentsSection";
-import { getActivityById, joinActivity, leaveActivity, ApiActivity } from "../lib/api";
+import { GeocodedLocation } from "../components/ui/GeocodedLocation";
+import { getActivityById, joinActivity, leaveActivity, cancelActivity, ApiActivity } from "../lib/api";
 import { ContentActions } from "../components/ui/ContentActions";
 
 const grads: Record<string, string> = {
@@ -45,6 +45,20 @@ const normalizeCat = (value?: string | null) => {
   return grads[key] ? key : (catAliases[key] || "outdoor");
 };
 
+const durLabel = (m: any) => {
+  const n = Number.isFinite(Number(m)) ? Number(m) : null;
+  if (n == null || n <= 0) return null;
+  return n >= 60 ? `${Math.floor(n / 60)}h${n % 60 ? " " + (n % 60) + "min" : ""}` : `${n}min`;
+};
+
+const formatWhen = (value: any, locale = "it-IT") => {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString(locale, { weekday: "short", day: "numeric", month: "short" }) +
+    ", " + d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
+};
+
 export function ActivityDetailPage({ page, setPage, theme, setTheme, user, selectedActivityId }: any) {
   const { t } = useTranslation();
   const [activity, setActivity] = useState<ApiActivity | null>(null);
@@ -53,6 +67,8 @@ export function ActivityDetailPage({ page, setPage, theme, setTheme, user, selec
   const [isJoined, setIsJoined] = useState(false);
   const [joinPending, setJoinPending] = useState(false);
   const [joinError, setJoinError] = useState("");
+  const [deletePending, setDeletePending] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   const fetchActivityDetail = async () => {
     if (!selectedActivityId) {
@@ -81,19 +97,13 @@ export function ActivityDetailPage({ page, setPage, theme, setTheme, user, selec
 
   const handleJoinToggle = async () => {
     if (!activity || joinPending) return;
-    if (!user?.id || user?.role === "anonymous") {
-      setPage("login");
-      return;
-    }
     setJoinPending(true);
     setJoinError("");
     try {
       if (isJoined) {
         await leaveActivity(activity.id);
-        setIsJoined(false);
       } else {
         await joinActivity(activity.id);
-        setIsJoined(true);
       }
       const updated = await getActivityById(activity.id);
       setActivity(updated);
@@ -103,6 +113,21 @@ export function ActivityDetailPage({ page, setPage, theme, setTheme, user, selec
       setJoinError(err?.message || t("activities.joinError"));
     } finally {
       setJoinPending(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!activity || deletePending) return;
+    if (!window.confirm(t("activities.deleteConfirm"))) return;
+    setDeletePending(true);
+    setDeleteError("");
+    try {
+      await cancelActivity(activity.id);
+      setPage("attivita");
+    } catch (err: any) {
+      setDeleteError(err?.message || t("activities.deleteError"));
+    } finally {
+      setDeletePending(false);
     }
   };
 
@@ -133,17 +158,16 @@ export function ActivityDetailPage({ page, setPage, theme, setTheme, user, selec
     );
   }
 
+  const isOwner = !!(user?.id && (activity as any).creator?.id === user.id);
   const cat = normalizeCat(activity.category);
   const limit = Number.isFinite(Number(activity.maxParticipants)) ? Number(activity.maxParticipants) : null;
   const count = Number(activity.participantCount || 0);
   const pct = limit ? Math.min(100, Math.round((count / limit) * 100)) : null;
   const details: any = activity;
-  const rating = details.averageRating ?? details.rating ?? null;
-  const reviewCount = details.reviewCount ?? details.reviewsCount ?? 0;
   const duration = details.durationMinutes ?? details.duration ?? null;
-  const difficulty = details.difficulty ?? null;
-  const price = details.priceLabel || (details.priceType === "PAID" ? "A pagamento" : details.priceType === "FREE" ? "Gratis" : null);
-  const distance = details.distance != null ? `${details.distance} km` : null;
+  const location = details.location || details.address || null;
+  const startsAt = details.startsAt || details.startAt || details.dateTime || details.scheduledAt || null;
+  const whenLabel = formatWhen(startsAt);
 
   return (
     <div className="revamp-detail-scene">
@@ -164,32 +188,32 @@ export function ActivityDetailPage({ page, setPage, theme, setTheme, user, selec
 
           <div className="revamp-detail-body">
             <h1 className="revamp-detail-title">{activity.title}</h1>
-            <div className="revamp-detail-rating">
-              <Icon name="star" size={14} /> {rating != null ? rating.toFixed ? rating.toFixed(1) : rating : "N/D"}{" "}
-              <span>- {reviewCount} recensioni</span>
-            </div>
-            
+
             <div className="revamp-detail-desc">
               {activity.description || "Informazioni dettagliate non ancora disponibili."}
             </div>
 
             <div className="revamp-detail-attrs">
-              <div className="revamp-detail-attr">
-                <div className="lbl"><Icon name="clock" size={12} /> Durata</div>
-                <div className="val">{duration ? `${duration} min` : "N/D"}</div>
-              </div>
-              <div className="revamp-detail-attr">
-                <div className="lbl"><Icon name="gauge" size={12} /> Difficoltà</div>
-                <div className="val">{difficulty || "N/D"}</div>
-              </div>
-              <div className="revamp-detail-attr">
-                <div className="lbl"><Icon name="euro" size={12} /> Costo</div>
-                <div className="val" style={{ color: price === "Gratis" ? "var(--green)" : undefined }}>{price || "N/D"}</div>
-              </div>
-              <div className="revamp-detail-attr">
-                <div className="lbl"><Icon name="pin" size={12} /> Distanza</div>
-                <div className="val">{distance || "N/D"}</div>
-              </div>
+              {whenLabel && (
+                <div className="revamp-detail-attr" style={{ gridColumn: "span 2" }}>
+                  <div className="lbl"><Icon name="clock" size={12} /> Quando</div>
+                  <div className="val" style={{ fontSize: 13 }}>{whenLabel}</div>
+                </div>
+              )}
+              {location && (
+                <div className="revamp-detail-attr" style={{ gridColumn: "span 2" }}>
+                  <div className="lbl"><Icon name="pin" size={12} /> Luogo</div>
+                  <div className="val" style={{ fontSize: 13 }}>
+                    <GeocodedLocation value={location} fallback="Trento" />
+                  </div>
+                </div>
+              )}
+              {durLabel(duration) && (
+                <div className="revamp-detail-attr">
+                  <div className="lbl"><Icon name="clock" size={12} /> Durata</div>
+                  <div className="val">{durLabel(duration)}</div>
+                </div>
+              )}
             </div>
 
             <div className="revamp-detail-section-title">Partecipazione</div>
@@ -201,19 +225,33 @@ export function ActivityDetailPage({ page, setPage, theme, setTheme, user, selec
                     ? <><b>{count}</b> di <b>{limit}</b> posti occupati{pct != null ? ` · ${pct}%` : ""}</>
                     : <><b>{count}</b> {count === 1 ? "partecipante" : "partecipanti"}</>}
                 </div>
-                {isJoined && (
-                  <span className="revamp-status-pill success" style={{ marginTop: 10 }}>
-                    <Icon name="check" size={11} /> {t("activities.joinedPill")}
-                  </span>
-                )}
                 {joinError && (
                   <div className="revamp-status-pill danger" role="alert" style={{ marginTop: 10 }}>
                     <Icon name="warn" size={11} /> {joinError}
                   </div>
                 )}
+                {deleteError && (
+                  <div className="revamp-status-pill danger" role="alert" style={{ marginTop: 10 }}>
+                    <Icon name="warn" size={11} /> {deleteError}
+                  </div>
+                )}
               </div>
-              {/* Solo i cittadini partecipano (il backend nega agli altri ruoli) */}
-              {(user?.role === "registered_user" || user?.role === "anonymous") && (
+              {isOwner ? (
+                <button
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 7,
+                    padding: "9px 14px", borderRadius: 10,
+                    background: "transparent",
+                    border: "1px solid color-mix(in srgb, var(--red) 40%, transparent)",
+                    color: "var(--red)", fontSize: 13, fontWeight: 600, cursor: "pointer",
+                    opacity: deletePending ? 0.6 : 1,
+                  }}
+                  onClick={handleDelete}
+                  disabled={deletePending}
+                >
+                  <Icon name="x" size={14} /> {deletePending ? t("activities.deletingActivity") : t("activities.deleteActivity")}
+                </button>
+              ) : user?.role === "registered_user" && (
                 <button
                   className={"revamp-form-btn" + (isJoined ? " joined" : "")}
                   style={{ width: "auto", padding: "0 20px", "--accent": "var(--teal)", opacity: joinPending ? 0.6 : 1 } as React.CSSProperties}
@@ -228,25 +266,13 @@ export function ActivityDetailPage({ page, setPage, theme, setTheme, user, selec
                   kind="activity"
                   id={activity.id}
                   title={activity.title || "Attività a Trento"}
-                  startIso={(activity as any).dateTime || null}
-                  location={(activity as any).location || (activity as any).indirizzo || null}
+                  startIso={startsAt}
+                  location={location}
                   accent="var(--teal)"
                   userRole={user?.role}
                   onRequireLogin={() => setPage("login")}
                 />
               </div>
-            </div>
-
-            <div className="revamp-detail-section-title">Valutazioni di Dettaglio</div>
-            {reviewCount > 0 ? (
-              <div className="revamp-detail-box">Valutazioni aggregate disponibili nella sezione recensioni.</div>
-            ) : (
-              <div className="widget-empty big">Nessuna valutazione disponibile.</div>
-            )}
-
-            <div className="revamp-detail-section-title" style={{ marginTop: 28 }}>Discussione & Commenti</div>
-            <div className="revamp-detail-box">
-              <CommentsSection accent="var(--teal)" user={user} activityId={activity.id} />
             </div>
 
           </div>

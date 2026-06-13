@@ -2,9 +2,8 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
-import { CommentsSection } from "../components/redesign/CommentsSection";
-import { getEventById, joinEvent, leaveEvent, ApiEvent } from "../lib/api";
 import { GeocodedLocation } from "../components/ui/GeocodedLocation";
+import { getEventById, joinEvent, leaveEvent, deleteEvent, ApiEvent } from "../lib/api";
 import { ContentActions } from "../components/ui/ContentActions";
 
 const grads: Record<string, string> = {
@@ -16,12 +15,25 @@ const grads: Record<string, string> = {
   famiglia: "linear-gradient(140deg,#0ea5e9,#075985)",
 };
 
+const formatWhen = (value: any, lang?: string) => {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  const locale = lang?.startsWith("en") ? "en-GB" : "it-IT";
+  return d.toLocaleDateString(locale, { weekday: "short", day: "numeric", month: "short" }) +
+    ", " + d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
+};
+
 export function EventDetailPage({ page, setPage, theme, setTheme, user, selectedEventId }: any) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [event, setEvent] = useState<ApiEvent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isJoined, setIsJoined] = useState(false);
+  const [joinPending, setJoinPending] = useState(false);
+  const [joinError, setJoinError] = useState("");
+  const [deletePending, setDeletePending] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   const fetchEventDetail = async () => {
     if (!selectedEventId) {
@@ -49,24 +61,38 @@ export function EventDetailPage({ page, setPage, theme, setTheme, user, selected
   }, [selectedEventId, user?.id]);
 
   const handleJoinToggle = async () => {
-    if (!event) return;
-    if (user?.role === "anonymous") {
-      setPage("login");
-      return;
-    }
+    if (!event || joinPending) return;
+    setJoinPending(true);
+    setJoinError("");
     try {
       if (isJoined) {
         await leaveEvent(event.id);
-        setIsJoined(false);
       } else {
         await joinEvent(event.id);
-        setIsJoined(true);
       }
-      // Reload details to get fresh participants count
       const updated = await getEventById(event.id);
       setEvent(updated);
+      if (updated.participantIds) setIsJoined(updated.participantIds.includes(user.id));
     } catch (err: any) {
       console.error(err);
+      setJoinError(err?.message || t("events.joinError"));
+    } finally {
+      setJoinPending(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!event || deletePending) return;
+    if (!window.confirm(t("events.deleteConfirm"))) return;
+    setDeletePending(true);
+    setDeleteError("");
+    try {
+      await deleteEvent(event.id);
+      setPage("eventi");
+    } catch (err: any) {
+      setDeleteError(err?.message || t("events.deleteError"));
+    } finally {
+      setDeletePending(false);
     }
   };
 
@@ -101,6 +127,7 @@ export function EventDetailPage({ page, setPage, theme, setTheme, user, selected
   const limit = event.maxPartecipanti || 100;
   const count = event.participantCount || 0;
   const pct = Math.min(100, Math.round((count / limit) * 100));
+  const whenLabel = formatWhen(event.dateTime || event.createdAt, i18n.language);
 
   return (
     <div className="revamp-detail-scene">
@@ -140,7 +167,9 @@ export function EventDetailPage({ page, setPage, theme, setTheme, user, selected
             <div className="revamp-detail-attrs">
               <div className="revamp-detail-attr" style={{ gridColumn: "span 2" }}>
                 <div className="lbl"><Icon name="clock" size={12} /> {t("events.when")}</div>
-                <div className="val" style={{ fontSize: 13 }}>{event.dateTime || event.createdAt || t("events.today")}</div>
+                <div className="val" style={{ fontSize: 13 }}>
+                  {whenLabel || t("events.today")}
+                </div>
               </div>
               <div className="revamp-detail-attr" style={{ gridColumn: "span 2" }}>
                 <div className="lbl"><Icon name="pin" size={12} /> {t("events.place")}</div>
@@ -170,16 +199,19 @@ export function EventDetailPage({ page, setPage, theme, setTheme, user, selected
                   <Icon name="check" size={11} /> {t("events.youParticipate")}
                 </span>
               )}
-              {/* Partecipare è un'azione da cittadino: enti e admin non hanno
-                  il permesso lato backend, quindi niente bottone. I guest lo
-                  vedono e vengono mandati al login. */}
-              {(user?.role === "registered_user" || user?.role === "anonymous") && (
+              {joinError && (
+                <div className="revamp-status-pill danger" role="alert" style={{ marginBottom: 14 }}>
+                  <Icon name="warn" size={11} /> {joinError}
+                </div>
+              )}
+              {user?.role === "registered_user" && (
                 <button
                   className={"revamp-form-btn" + (isJoined ? " joined" : "")}
-                  style={{ "--accent": "var(--magenta)" } as React.CSSProperties}
+                  style={{ "--accent": "var(--magenta)", opacity: joinPending ? 0.6 : 1 } as React.CSSProperties}
                   onClick={handleJoinToggle}
+                  disabled={joinPending}
                 >
-                  {isJoined ? t("events.cancelJoin") : t("events.joinCta")}
+                  {joinPending ? t("events.joining") : isJoined ? t("events.cancelJoin") : t("events.joinCta")}
                 </button>
               )}
               <ContentActions
@@ -192,11 +224,29 @@ export function EventDetailPage({ page, setPage, theme, setTheme, user, selected
                 userRole={user?.role}
                 onRequireLogin={() => setPage("login")}
               />
-            </div>
-
-            <div className="revamp-detail-section-title" style={{ marginTop: 28 }}>{t("comments.discussionTitle")}</div>
-            <div className="revamp-detail-box">
-              <CommentsSection accent="var(--magenta)" user={user} eventId={event.id} />
+              {user?.role === "certified_entity" && user?.id && event.entity?.id === user.id && (
+                <div style={{ marginTop: 12 }}>
+                  {deleteError && (
+                    <div className="revamp-status-pill danger" style={{ marginBottom: 8 }}>
+                      <Icon name="warn" size={11} /> {deleteError}
+                    </div>
+                  )}
+                  <button
+                    style={{
+                      display: "inline-flex", alignItems: "center", gap: 7,
+                      padding: "9px 14px", borderRadius: 10,
+                      background: "transparent",
+                      border: "1px solid color-mix(in srgb, var(--red) 40%, transparent)",
+                      color: "var(--red)", fontSize: 13, fontWeight: 600, cursor: "pointer",
+                      opacity: deletePending ? 0.6 : 1,
+                    }}
+                    onClick={handleDelete}
+                    disabled={deletePending}
+                  >
+                    <Icon name="x" size={14} /> {deletePending ? t("events.deletingEvent") : t("events.deleteEvent")}
+                  </button>
+                </div>
+              )}
             </div>
 
           </div>
