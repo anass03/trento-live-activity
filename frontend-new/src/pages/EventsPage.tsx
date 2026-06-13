@@ -8,6 +8,7 @@ import { Header } from "../components/layout/Header";
 import { Avatars } from "../components/redesign/Avatars";
 import { Widget, useGlow } from "../components/redesign/widgets";
 import { Icon } from "../components/ui/Icon";
+import { GeocodedLocation } from "../components/ui/GeocodedLocation";
 import { getEvents, joinEvent, leaveEvent, addFavorite, removeFavorite, getFavorites, ApiEvent, ApiError } from "../lib/api";
 
 /* ---- category meta aligned with the backend enum
@@ -119,19 +120,23 @@ function MiniCalendar({ events = [], selected, onSelect }: any) {
 }
 
 /* ===================== QUICK FILTERS ===================== */
-function QuickFilters({ active, setActive, counts }: any) {
+function QuickFilters({ activeCategories, onToggle, counts }: any) {
   const { t } = useTranslation();
   return (
     <Widget title={t("events.filters.title")} accent="var(--cyan)" delay={140}>
       <div className="qf-list">
-        {EV_FILTERS.map((f) => (
-          <button key={f.id} className={"qf-item" + (active === f.id ? " active" : "")}
-            style={{ "--qc": f.color } as React.CSSProperties} onClick={() => setActive(f.id)} aria-pressed={active === f.id}>
-            <span className="qf-ic"><Icon name={f.icon} size={16} /></span>
-            <span className="qf-label">{t(f.label)}</span>
-            <span className="qf-count">{counts[f.id] || 0}</span>
-          </button>
-        ))}
+        {EV_FILTERS.map((f) => {
+          const isAll = f.id === "all";
+          const isActive = isAll ? activeCategories.size === 0 : activeCategories.has(f.id);
+          return (
+            <button key={f.id} className={"qf-item" + (isActive ? " active" : "")}
+              style={{ "--qc": f.color } as React.CSSProperties} onClick={() => onToggle(f.id)} aria-pressed={isActive}>
+              <span className="qf-ic"><Icon name={f.icon} size={16} /></span>
+              <span className="qf-label">{t(f.label)}</span>
+              <span className="qf-count">{counts[f.id] || 0}</span>
+            </button>
+          );
+        })}
       </div>
     </Widget>
   );
@@ -151,7 +156,7 @@ function MostParticipated({ list, onPick }: any) {
           <span className="trend-rank">{i + 1}</span>
           <span className="trend-body">
             <span className="trend-title">{e.title}</span>
-            <span className="trend-loc">{e.location || "Trento"}</span>
+            <span className="trend-loc"><GeocodedLocation value={e.location} fallback="Trento" /></span>
           </span>
           <span className="trend-count"><Icon name="users" size={13} />{fmt(e.participantCount)}</span>
         </button>
@@ -185,15 +190,11 @@ function Composer({ search, setSearch }: any) {
 }
 
 /* ===================== EVENT POST CARD ===================== */
-function PostCard({ e, liked, saved, shared, onLike, onSave, onShare, onOpen, flash, canSave = true }: any) {
+function PostCard({ e, saved, shared, onSave, onShare, onOpen, flash, canSave = true }: any) {
   const { t, i18n } = useTranslation();
   const onMove = useGlow();
   const meta = evMeta(e.category);
   const catLabel = t(`events.filters.${e.category}`, { defaultValue: e.category });
-  // The list API doesn't return a like total yet, so only show a count once it's real.
-  const hasLikeCount = typeof e.likes === "number";
-  const likes = (e.likes || 0) + (liked ? 1 : 0);
-  const hasCommentCount = typeof e.commentsCount === "number";
   const count = e.participantCount || 0;
   const stop = (fn: any) => (ev: any) => { ev.stopPropagation(); fn(); };
   return (
@@ -214,7 +215,7 @@ function PostCard({ e, liked, saved, shared, onLike, onSave, onShare, onOpen, fl
         <div className="post-title">{e.title}</div>
         <div className="post-desc">{e.description}</div>
         <div className="post-meta">
-          <span className="pm"><Icon name="pin" size={14} />{e.location || "Trento"}</span>
+          <span className="pm"><Icon name="pin" size={14} /><GeocodedLocation value={e.location} fallback="Trento" /></span>
           <span className="pm"><Icon name="clock" size={14} />{formatEventWhen(e, i18n.language) || t("events.today")}</span>
         </div>
         <div className="post-foot">
@@ -225,12 +226,6 @@ function PostCard({ e, liked, saved, shared, onLike, onSave, onShare, onOpen, fl
             <b>{fmt(count)}</b> {t("events.participantsWord", { count })}
           </span>
           <div className="post-actions">
-            <button className={"act-btn" + (liked ? " on" : "")} onClick={stop(() => onLike(e.id))} aria-label={t("events.ariaLike")} aria-pressed={liked}>
-              <Icon name="heart" size={17} />{hasLikeCount ? fmt(likes) : null}
-            </button>
-            <button className="act-btn" onClick={stop(() => onOpen(e.id))} aria-label={t("events.ariaComments")}>
-              <Icon name="comment" size={17} />{hasCommentCount ? e.commentsCount : null}
-            </button>
             <button className={"act-btn icon-only" + (shared ? " on-share" : "")} onClick={stop(() => onShare(e))}
               aria-label={shared ? t("events.shareCopied") : t("events.ariaShare")} title={shared ? t("events.shareCopied") : undefined}>
               <Icon name={shared ? "check" : "share"} size={17} />
@@ -246,7 +241,7 @@ function PostCard({ e, liked, saved, shared, onLike, onSave, onShare, onOpen, fl
 }
 
 /* ===================== FEED ===================== */
-const Feed = React.forwardRef<any, any>(function Feed({ events, user, search, setSearch, hasFilter, likes, saves, sharedId, onLike, onSave, onShare, onOpen, flashId }, ref) {
+const Feed = React.forwardRef<any, any>(function Feed({ events, user, search, setSearch, hasFilter, saves, sharedId, onSave, onShare, onOpen, flashId }, ref) {
   const { t } = useTranslation();
   const emptyTitle = search ? t("events.emptyNoResultsTitle") : hasFilter ? t("events.emptyNoCategoryTitle") : t("events.emptyNoEventsTitle");
   const emptyMsg = search ? t("events.emptyNoResultsMsg") : hasFilter ? t("events.emptyNoCategoryMsg") : t("events.emptyNoEventsMsg");
@@ -267,8 +262,8 @@ const Feed = React.forwardRef<any, any>(function Feed({ events, user, search, se
             <span className={"tl-label" + (e.isCertified ? " live" : "")}>{shortTime(e.startTime) || t("events.live")}</span>
           </div>
           <div className="feed-body">
-            <PostCard e={e} liked={!!likes[e.id]} saved={!!saves[e.id]} shared={sharedId === e.id}
-              onLike={onLike} onSave={onSave} onShare={onShare} onOpen={onOpen} flash={flashId === e.id}
+            <PostCard e={e} saved={!!saves[e.id]} shared={sharedId === e.id}
+              onSave={onSave} onShare={onShare} onOpen={onOpen} flash={flashId === e.id}
               canSave={user?.role === "registered_user" || user?.role === "anonymous"} />
           </div>
         </div>
@@ -307,7 +302,7 @@ function NextActivity({ event, joined, saved, busy, joinError, onJoin, onSave, c
       <div className="next-fields">
         <div className="next-field">
           <span className="nf-ic"><Icon name="pin" size={14} /></span>
-          <div><div className="nf-lbl">{t("events.place")}</div><div className="nf-val">{event.location || "Trento"}</div></div>
+          <div><div className="nf-lbl">{t("events.place")}</div><div className="nf-val"><GeocodedLocation value={event.location} fallback="Trento" /></div></div>
         </div>
         <div className="next-field">
           <span className="nf-ic"><Icon name="clock" size={14} /></span>
@@ -368,14 +363,13 @@ function CityGrid({ list, onOpen }: any) {
 /* ===================== PAGE ===================== */
 export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEventId }: any) {
   const { t } = useTranslation();
-  const [filter, setFilter] = useState("all");
+  const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [selDate, setSelDate] = useState<Date | null>(null);
   const [events, setEvents] = useState<ApiEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [likes, setLikes] = useState<Record<string, boolean>>({});
   const [saves, setSaves] = useState<Record<string, boolean>>({});
   const [sharedId, setSharedId] = useState<string | null>(null);
   const [joinBusy, setJoinBusy] = useState(false);
@@ -419,11 +413,23 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
     loadEventsData();
   }, [user?.id]);
 
+  const toggleCategory = (id: string) => {
+    if (id === "all") { setActiveCategories(new Set()); return; }
+    setActiveCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   /* ---- client-side filtering (category + calendar day + free-text) ---- */
   const filtered = React.useMemo(() => {
     const q = search.trim().toLowerCase();
+    const now = Date.now();
     return events.filter((e) => {
-      if (filter !== "all" && e.category !== filter) return false;
+      const dt = e.dateTime || (e as any).startTime;
+      if (dt) { try { if (new Date(dt).getTime() < now) return false; } catch (_) {} }
+      if (activeCategories.size > 0 && !activeCategories.has(e.category)) return false;
       if (selDate) {
         const d = parseEventDate(e);
         if (!d || !sameDay(d, selDate)) return false;
@@ -432,17 +438,12 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
       return [e.title, e.description, e.location]
         .some((v) => (v || "").toLowerCase().includes(q));
     });
-  }, [events, filter, selDate, search]);
+  }, [events, activeCategories, selDate, search]);
 
   const requireAuth = () => {
-    if (user?.role !== "anonymous" && user?.id) return true;
-    setPage("login");
+    if (user?.role === "registered_user" && user?.id) return true;
+    if (!user?.id || user?.role === "anonymous") setPage("login");
     return false;
-  };
-
-  const handleLike = (id: string) => {
-    if (!requireAuth()) return;
-    setLikes((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
   const handleSave = async (id: string) => {
@@ -514,24 +515,33 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
     }
   };
 
-  // Sidebar filter counters are computed on ALL events, not the filtered list,
-  // so picking a category doesn't zero out the other counters.
+  // Sidebar filter counters: all future events per category (ignoring active search/category filter
+  // so the other category pills still show non-zero counts).
+  const futureEvents = React.useMemo(() => {
+    const now = Date.now();
+    return events.filter((e) => {
+      const dt = e.dateTime || (e as any).startTime;
+      if (dt) { try { return new Date(dt).getTime() >= now; } catch (_) {} }
+      return true;
+    });
+  }, [events]);
+
   const categoryCounts = React.useMemo(() => {
-    const counts: Record<string, number> = { all: events.length };
-    events.forEach((e) => {
+    const counts: Record<string, number> = { all: futureEvents.length };
+    futureEvents.forEach((e) => {
       counts[e.category] = (counts[e.category] || 0) + 1;
     });
     return counts;
-  }, [events]);
+  }, [futureEvents]);
 
-  // "Next event": the soonest upcoming one (fall back to the first listed).
+  // "Next event": the soonest upcoming one — no fallback to past events.
   const nextEvent = React.useMemo(() => {
     const now = Date.now();
     const upcoming = events
       .map((e) => ({ e, d: parseEventDate(e) }))
       .filter((x) => x.d && x.d.getTime() >= now)
       .sort((a, b) => a.d!.getTime() - b.d!.getTime());
-    return upcoming[0]?.e || events[0] || null;
+    return upcoming[0]?.e || null;
   }, [events]);
 
   if (loading) {
@@ -569,20 +579,20 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
         {/* LEFT */}
         <div className="ev-col left">
           <MiniCalendar events={events} selected={selDate} onSelect={setSelDate} />
-          <QuickFilters active={filter} setActive={setFilter} counts={categoryCounts} />
+          <QuickFilters activeCategories={activeCategories} onToggle={toggleCategory} counts={categoryCounts} />
           <MostParticipated list={events} onPick={handleOpenDetail} />
         </div>
 
         {/* CENTER */}
-        <Feed ref={feedRef} events={filtered} user={user} search={search} setSearch={setSearch} hasFilter={filter !== "all" || !!selDate}
-          likes={likes} saves={saves} sharedId={sharedId} onLike={handleLike} onSave={handleSave} onShare={handleShare}
+        <Feed ref={feedRef} events={filtered} user={user} search={search} setSearch={setSearch} hasFilter={activeCategories.size > 0 || !!selDate}
+          saves={saves} sharedId={sharedId} onSave={handleSave} onShare={handleShare}
           onOpen={handleOpenDetail} flashId={null} />
 
         {/* RIGHT */}
         <div className="ev-col right">
           <NextActivity
             event={nextEvent}
-            canJoin={user?.role === "registered_user" || user?.role === "anonymous"}
+            canJoin={user?.role === "registered_user"}
             joined={nextEvent ? !!(nextEvent.participantIds?.includes(user?.id || "")) : false}
             saved={nextEvent ? !!saves[nextEvent.id] : false}
             busy={joinBusy}
@@ -590,7 +600,7 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
             onJoin={() => nextEvent && handleJoinToggle(nextEvent)}
             onSave={() => nextEvent && handleSave(nextEvent.id)}
           />
-          <CityGrid list={events.filter((e) => e.id !== nextEvent?.id)} onOpen={handleOpenDetail} />
+          <CityGrid list={filtered.filter((e) => e.id !== nextEvent?.id)} onOpen={handleOpenDetail} />
         </div>
       </div>
     </div>

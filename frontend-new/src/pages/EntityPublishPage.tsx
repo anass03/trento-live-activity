@@ -57,9 +57,13 @@ function PinPickerMap({ theme, pin, onPin }: {
     if (!mapRef.current) return;
     if (!pin) { markerRef.current?.remove(); markerRef.current = null; return; }
     if (!markerRef.current) {
-      markerRef.current = new maplibregl.Marker({ color: "#8b5cf6" })
+      markerRef.current = new maplibregl.Marker({ color: "#8b5cf6", draggable: true })
         .setLngLat([pin.lng, pin.lat])
         .addTo(mapRef.current);
+      markerRef.current.on("dragend", () => {
+        const ll = markerRef.current!.getLngLat();
+        onPinRef.current({ lat: ll.lat, lng: ll.lng });
+      });
     } else {
       markerRef.current.setLngLat([pin.lng, pin.lat]);
     }

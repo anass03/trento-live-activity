@@ -9,7 +9,8 @@ import { useTranslation } from "react-i18next";
 import { Header } from "../components/layout/Header";
 import { Widget, useGlow } from "../components/redesign/widgets";
 import { Icon, WxIcon } from "../components/ui/Icon";
-import { getActivities, addFavorite, removeFavorite, getFavorites, getMyActivities, getTrentoWeather, ApiError } from "../lib/api";
+import { GeocodedLocation } from "../components/ui/GeocodedLocation";
+import { getActivities, addFavorite, removeFavorite, getFavorites, getMyActivities, getTrentoWeather, ApiError, isActivityDeleted } from "../lib/api";
 
 
 const ACT_CAT = {
@@ -152,10 +153,10 @@ function CreatorAvatar({ name, size }: { name?: string | null; size: number }) {
 }
 
 /* ===================== LEFT FILTERS ===================== */
-function ActFilters({ s, set, activities = [] }: any) {
+function ActFilters({ s, set, activities = [], activeCategories, onToggleCategory }: any) {
   const { t } = useTranslation();
   const cats = Object.keys(ACT_CAT);
-  const anyFilter = s.category !== "all" || s.search;
+  const anyFilter = activeCategories.size > 0 || s.search;
   return (
     <Widget title={t("activities.filtersTitle")} accent="var(--accent)" delay={60}>
       <div className="act-search">
@@ -166,10 +167,10 @@ function ActFilters({ s, set, activities = [] }: any) {
       <div className="filter-block">
         <div className="filter-block-label">
           {t("activities.categories")}
-          {anyFilter && <button className="filter-reset" onClick={() => set({ category: "all", search: "" })}>{t("activities.reset")}</button>}
+          {anyFilter && <button className="filter-reset" onClick={() => { set({ search: "" }); onToggleCategory("all"); }}>{t("activities.reset")}</button>}
         </div>
         <div className="qf-list">
-          <button className={"qf-item" + (s.category === "all" ? " active" : "")} style={{ "--qc": "var(--accent)" } as any} onClick={() => set({ category: "all" })}>
+          <button className={"qf-item" + (activeCategories.size === 0 ? " active" : "")} style={{ "--qc": "var(--accent)" } as any} onClick={() => onToggleCategory("all")}>
             <span className="qf-ic"><Icon name="grid" size={16} /></span>
             <span className="qf-label">{t("activities.all")}</span>
             <span className="qf-count">{activities.length}</span>
@@ -178,8 +179,9 @@ function ActFilters({ s, set, activities = [] }: any) {
             const cfg = ACT_CAT[c as keyof typeof ACT_CAT];
             const n = activities.filter((a: any) => a.cat === c).length;
             if (!n) return null;
+            const isActive = activeCategories.has(c);
             return (
-              <button key={c} className={"qf-item" + (s.category === c ? " active" : "")} style={{ "--qc": cfg.color } as any} onClick={() => set({ category: s.category === c ? "all" : c })}>
+              <button key={c} className={"qf-item" + (isActive ? " active" : "")} style={{ "--qc": cfg.color } as any} onClick={() => onToggleCategory(c)}>
                 <span className="qf-ic"><Icon name={cfg.icon} size={16} /></span>
                 <span className="qf-label">{t(cfg.labelKey)}</span>
                 <span className="qf-count">{n}</span>
@@ -281,9 +283,6 @@ function ActCard({ a, saved, onSave, onOpen, canSave = true }: any) {
       <div className="act-media">
         {badge && <span className={"act-badge " + badge.cls}><Icon name={badge.icon} size={11} />{badge.label}</span>}
         {canSave && <button className={"act-save" + (saved ? " on" : "")} onClick={stop(() => onSave(a.id))} aria-label={saved ? t("activities.removeSaved") : t("activities.save")} aria-pressed={saved}><Icon name="bookmark" size={16} /></button>}
-        {a.rating != null && (
-          <span className="am-rating"><Icon name="star" size={13} />{a.rating.toFixed(1)}{a.reviews ? <span>({a.reviews})</span> : null}</span>
-        )}
         <span className="am-ghost"><Icon name={cat.icon} size={92} /></span>
       </div>
       <div className="act-body">
@@ -296,7 +295,7 @@ function ActCard({ a, saved, onSave, onOpen, canSave = true }: any) {
             {priceNode && <span className="act-attr"><Icon name="euro" size={13} />{priceNode}</span>}
           </div>
         )}
-        <div className="act-loc"><Icon name="pin" size={13} />{a.loc}{dist}</div>
+        <div className="act-loc"><Icon name="pin" size={13} /><GeocodedLocation value={a.loc} fallback={t("activities.locationTbd")} />{dist}</div>
         <div className="act-foot">
           <span className="act-creator">
             <CreatorAvatar name={a.creatorName} size={24} />
@@ -334,7 +333,7 @@ function ActNextWidget({ activity, saved, onSave, onOpen, canSave = true }: any)
       </div>
       <div className="next-title">{a.title}</div>
       <div className="next-fields">
-        <div className="next-field"><span className="nf-ic"><Icon name="pin" size={14} /></span><div><div className="nf-lbl">{t("activities.place")}</div><div className="nf-val">{a.loc}</div></div></div>
+        <div className="next-field"><span className="nf-ic"><Icon name="pin" size={14} /></span><div><div className="nf-lbl">{t("activities.place")}</div><div className="nf-val"><GeocodedLocation value={a.loc} fallback={t("activities.locationTbd")} /></div></div></div>
         <div className="next-field"><span className="nf-ic"><Icon name="users" size={14} /></span><div><div className="nf-lbl">{t("activities.participantsLabel")}</div><div className="nf-val">{a.going}{a.cap > 0 ? ` / ${a.cap}` : ""}</div></div></div>
       </div>
       <div className="next-part" style={{ marginTop: 12 }}>
@@ -361,8 +360,14 @@ function MyActivitiesWidget({ user, setPage, onOpen }: any) {
     if (user?.role === "anonymous") return;
     let active = true;
     setLoading(true);
-    getMyActivities({ limit: 5 })
-      .then((res) => { if (active) setItems(res.items || []); })
+    getMyActivities({ limit: 20 })
+      .then((res) => {
+        if (!active) return;
+        const active_ = (res.items || []).filter((a: any) =>
+          !isActivityDeleted(a.id) && a.status !== "completed" && a.status !== "cancelled"
+        );
+        setItems(active_.slice(0, 5));
+      })
       .catch(() => { if (active) setItems([]); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -384,7 +389,7 @@ function MyActivitiesWidget({ user, setPage, onOpen }: any) {
         <button key={item.id} className="my-act-row" onClick={() => onOpen(item.id)}>
           <span>
             <b>{item.title}</b>
-            <small>{item.status} · {item.participantsCount}{item.capacity ? ` / ${item.capacity}` : ""} {t("activities.participantsWord", { count: item.participantsCount || 0 })}{item.reviewCount > 0 ? ` · ${item.averageRating} ${t("activities.ratingWord")}` : ""}</small>
+            <small>{item.status} · {item.participantsCount}{item.capacity ? ` / ${item.capacity}` : ""} {t("activities.participantsWord", { count: item.participantsCount || 0 })}</small>
           </span>
           <span className="my-act-actions">
             <Icon name={item.verifiedActivity ? "shieldCheck" : "activity"} size={14} />
@@ -428,11 +433,20 @@ export function ActivityPage({ page, setPage, theme, setTheme, user, setSelected
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [s, setS] = useState({ search: "", category: "all" });
+  const [s, setS] = useState({ search: "" });
+  const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set());
   const [tab, setTab] = useState("esplora");
   const [sort, setSort] = useState("relevance");
   const [saves, setSaves] = useState<Record<string, boolean>>({});
   const set = (patch: any) => setS((prev) => ({ ...prev, ...patch }));
+  const toggleCategory = (id: string) => {
+    if (id === "all") { setActiveCategories(new Set()); return; }
+    setActiveCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   const loadActivities = async () => {
     setLoading(true);
@@ -454,7 +468,7 @@ export function ActivityPage({ page, setPage, theme, setTheme, user, setSelected
           diff: normalizeDifficulty(a.difficulty),
           price,
           priceLabel: a.priceLabel || null,
-          loc: a.location || a.address || t("activities.locationTbd"),
+          loc: a.location || a.address || null,
           dist: numOrNull(a.distance),
           rating,
           reviews: numOrNull(a.reviewCount ?? a.reviewsCount) ?? 0,
@@ -462,6 +476,7 @@ export function ActivityPage({ page, setPage, theme, setTheme, user, setSelected
           going: participants,
           cap: capacity,
           startsAt: a.startsAt || a.startAt || a.dateTime || a.scheduledAt || null,
+          rawStatus: a.status || null,
           status: { rising: participants >= 5 },
           desc: a.description || t("activities.noDescription"),
         };
@@ -517,19 +532,26 @@ export function ActivityPage({ page, setPage, theme, setTheme, user, setSelected
   };
 
   const list = useMemo(() => {
-    let r = backendActivities.slice();
+    const now = Date.now();
+    let r = backendActivities.filter((a) => {
+      if (isActivityDeleted(a.id)) return false;
+      if (a.rawStatus === "cancelled" || a.rawStatus === "deleted") return false;
+      const dt = a.startsAt || a.startAt || a.dateTime || a.scheduledAt;
+      if (dt) { try { if (new Date(dt).getTime() < now) return false; } catch (_) {} }
+      return true;
+    });
     // tab
     if (tab === "saved") r = r.filter((a) => saves[a.id]);
     // filters
-    if (s.category !== "all") r = r.filter((a) => a.cat === s.category);
+    if (activeCategories.size > 0) r = r.filter((a) => activeCategories.has(a.cat));
     if (s.search.trim()) {
       const q = s.search.toLowerCase();
-      r = r.filter((a) => (a.title + " " + t(activityCat(a.cat).labelKey) + " " + a.loc + " " + (a.creatorName || "")).toLowerCase().includes(q));
+      r = r.filter((a) => (a.title + " " + t(activityCat(a.cat).labelKey) + " " + (a.loc || "") + " " + (a.creatorName || "")).toLowerCase().includes(q));
     }
     // sort
     if (sort === "participants") r.sort((a, b) => b.going - a.going);
     return r;
-  }, [backendActivities, s, tab, sort, saves]);
+  }, [backendActivities, s, activeCategories, tab, sort, saves]);
 
   if (loading) {
     return (
@@ -560,7 +582,7 @@ export function ActivityPage({ page, setPage, theme, setTheme, user, setSelected
     <div className="activity-scene">
       <div className="events-header"><Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} /></div>
       <div className="activity-layout">
-        <div className="ev-col left"><ActFilters s={s} set={set} activities={backendActivities} /></div>
+        <div className="ev-col left"><ActFilters s={s} set={set} activities={backendActivities} activeCategories={activeCategories} onToggleCategory={toggleCategory} /></div>
 
         <div className="ev-col feed" style={{ paddingRight: 8 }}>
           <ActHero />

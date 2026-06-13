@@ -2,7 +2,9 @@ import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
-import { getPOIs, createPOI, updatePOI, deletePOI, geocodeForward, POI } from "../lib/api";
+import { GeocodedLocation } from "../components/ui/GeocodedLocation";
+import { POIMapPicker } from "../components/map/POIMapPicker";
+import { getPOIs, createPOI, updatePOI, deletePOI, reverseGeocode, POI } from "../lib/api";
 
 export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
   const { t } = useTranslation();
@@ -11,14 +13,15 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showMapPicker, setShowMapPicker] = useState(false);
   // id del POI in modifica; null = il form crea un nuovo POI
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const EMPTY_POI = {
     nome: "",
     tipo: "",
-    latitudine: 46.067,
-    longitudine: 11.121,
+    latitudine: null as number | null,
+    longitudine: null as number | null,
     capacitaMax: 100,
     statoAffollamento: "verde" as "verde" | "giallo" | "rosso",
     descrizione: "",
@@ -26,27 +29,6 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
   };
   const [newPoi, setNewPoi] = useState(EMPTY_POI);
   const [typeFilter, setTypeFilter] = useState("all");
-  const [geoPending, setGeoPending] = useState(false);
-
-  // Indirizzo → coordinate via backend (Google/Nominatim): l'admin lavora
-  // con le vie, le coordinate restano un dettaglio regolabile.
-  const handleFindCoords = async () => {
-    if (!newPoi.indirizzo || newPoi.indirizzo.trim().length < 3) return;
-    setGeoPending(true);
-    setErrorMsg("");
-    try {
-      const { result } = await geocodeForward(newPoi.indirizzo.includes("Trento") ? newPoi.indirizzo : `${newPoi.indirizzo}, Trento`);
-      if (!result) {
-        setErrorMsg(t("admin.poi.findCoordsError"));
-      } else {
-        setNewPoi((p) => ({ ...p, latitudine: result.lat, longitudine: result.lng, indirizzo: result.formatted || p.indirizzo }));
-      }
-    } catch {
-      setErrorMsg(t("admin.poi.findCoordsError"));
-    } finally {
-      setGeoPending(false);
-    }
-  };
 
   const loadPois = async () => {
     setLoading(true);
@@ -98,7 +80,7 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
       setErrorMsg(t("admin.poi.requiredError"));
       return;
     }
-    if (!Number.isFinite(newPoi.latitudine) || !Number.isFinite(newPoi.longitudine)) {
+    if (newPoi.latitudine == null || newPoi.longitudine == null) {
       setErrorMsg(t("admin.poi.latlngError"));
       return;
     }
@@ -129,8 +111,8 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
     setNewPoi({
       nome: p.nome,
       tipo: p.tipo || "",
-      latitudine: p.latitudine,
-      longitudine: p.longitudine,
+      latitudine: p.latitudine ?? null,
+      longitudine: p.longitudine ?? null,
       capacitaMax: p.capacitaMax,
       statoAffollamento: (p.statoAffollamento as any) || "verde",
       descrizione: p.descrizione || "",
@@ -151,8 +133,27 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
       (p.indirizzo || "").toLowerCase().includes(search.toLowerCase()))
   );
 
+  const handleMapPickerConfirm = async ({ latitudine, longitudine }: { latitudine: number; longitudine: number }) => {
+    setShowMapPicker(false);
+    setNewPoi((p) => ({ ...p, latitudine, longitudine, indirizzo: p.indirizzo || "…" }));
+    try {
+      const { address } = await reverseGeocode(latitudine, longitudine);
+      setNewPoi((p) => ({ ...p, indirizzo: address || p.indirizzo }));
+    } catch {
+      setNewPoi((p) => ({ ...p, indirizzo: p.indirizzo === "…" ? "" : p.indirizzo }));
+    }
+  };
+
   return (
     <div className="revamp-legal-scene">
+      {showMapPicker && (
+        <POIMapPicker
+          theme={theme}
+          initial={newPoi.latitudine != null ? { latitudine: newPoi.latitudine, longitudine: newPoi.longitudine! } : undefined}
+          onConfirm={handleMapPickerConfirm}
+          onCancel={() => setShowMapPicker(false)}
+        />
+      )}
       <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
       <div className="revamp-admin-layout">
         <div className="revamp-comune-head" style={{ marginBottom: 20 }}>
@@ -213,32 +214,19 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
                     value={newPoi.indirizzo}
                     onChange={(e) => setNewPoi({ ...newPoi, indirizzo: e.target.value })}
                   />
-                  <button type="button" className="revamp-action-btn" disabled={geoPending} onClick={handleFindCoords}>
-                    <Icon name="locate" size={13} /> {geoPending ? t("admin.poi.findCoordsPending") : t("admin.poi.findCoords")}
+                  <button
+                    type="button"
+                    className="revamp-action-btn"
+                    onClick={() => setShowMapPicker(true)}
+                  >
+                    <Icon name="pin" size={13} /> {t("admin.poi.pickOnMap")}
                   </button>
                 </div>
-              </div>
-
-              <div className="revamp-form-group">
-                <label className="revamp-form-label">{t("admin.poi.latitude")}</label>
-                <input
-                  type="number"
-                  step="0.000001"
-                  className="revamp-form-input"
-                  value={newPoi.latitudine}
-                  onChange={(e) => setNewPoi({ ...newPoi, latitudine: parseFloat(e.target.value) })}
-                />
-              </div>
-
-              <div className="revamp-form-group">
-                <label className="revamp-form-label">{t("admin.poi.longitude")}</label>
-                <input
-                  type="number"
-                  step="0.000001"
-                  className="revamp-form-input"
-                  value={newPoi.longitudine}
-                  onChange={(e) => setNewPoi({ ...newPoi, longitudine: parseFloat(e.target.value) })}
-                />
+                {newPoi.latitudine == null && (
+                  <span style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4, display: "block" }}>
+                    {t("admin.poi.pickOnMapHint")}
+                  </span>
+                )}
               </div>
 
               <div className="revamp-form-group">
@@ -352,9 +340,10 @@ export function AdminPOIPage({ page, setPage, theme, setTheme, user }: any) {
                       </td>
                       <td style={{ fontFamily: "var(--mono)", fontSize: 12 }}>{p.capacitaMax ?? "—"}</td>
                       <td style={{ fontSize: 12, maxWidth: 220 }}>
-                        {p.indirizzo
-                          ? <span>{p.indirizzo}</span>
-                          : <span style={{ color: "var(--text-muted)", fontSize: 11 }}>{p.latitudine.toFixed(4)}, {p.longitudine.toFixed(4)}</span>}
+                        <GeocodedLocation
+                          value={p.indirizzo || (p.latitudine != null ? `${p.latitudine}, ${p.longitudine}` : null)}
+                          fallback="—"
+                        />
                       </td>
                       <td style={{ display: "flex", gap: 8 }}>
                         <button className="revamp-action-btn" onClick={() => handleToggleDensity(p.id, p.statoAffollamento)}>

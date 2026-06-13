@@ -117,13 +117,7 @@ export function Header({ page, setPage, theme, setTheme, user, searchItems, onSe
     <div className="header">
       <div className="brand" style={{ cursor: "pointer" }} onClick={() => setPage("home")}>
         <div className="brand-logo">
-          <svg viewBox="0 0 24 24" fill="none">
-            <path d="M5 21V11l4-3 4 3v10" stroke="#7dd3fc" strokeWidth="1.7" strokeLinejoin="round" />
-            <path d="M13 21V8l3-2 3 2v13" stroke="#a78bfa" strokeWidth="1.7" strokeLinejoin="round" />
-            <path d="M3 21h18" stroke="#7dd3fc" strokeWidth="1.7" strokeLinecap="round" />
-            <circle cx="16" cy="9.5" r="1" fill="#f472b6" />
-            <path d="M9 21v-4h0" stroke="#7dd3fc" strokeWidth="1.7" />
-          </svg>
+          <img src="/logo.png" alt="TLA" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
         </div>
         <div>
           <div className="brand-name">Trento <span className="live">Live</span> Activity</div>
@@ -143,7 +137,6 @@ export function Header({ page, setPage, theme, setTheme, user, searchItems, onSe
         {searchItems && onSearchSelect && (
           <HeaderSearch items={searchItems} onSelect={onSearchSelect} />
         )}
-        <button className="icon-btn" aria-label={t("header.notificationsAria")} onClick={() => setPage(role === "system_admin" ? "admin-notifications" : "home")}><Icon name="bell" size={18} /><span className="badge"></span></button>
         <button className="theme-toggle" onClick={() => setTheme(theme === "day" ? "night" : "day")} aria-label={t("header.themeToggleAria")} title={t("header.themeToggleTitle")}>
           <span className="tt-thumb"></span>
           <span className={"tt-ic" + (theme === "night" ? " on" : "")}><Icon name="moon" size={15} /></span>
@@ -180,7 +173,7 @@ export function Header({ page, setPage, theme, setTheme, user, searchItems, onSe
                   {role === "registered_user" && (
                     <>
                       <button className="profile-menu-item" onClick={() => go("attivita")}><Icon name="activity" size={15} />{t("header.myActivities")}</button>
-                      <button className="profile-menu-item" onClick={() => go("profilo")}><Icon name="bookmark" size={15} />{t("header.saved")}</button>
+                      <button className="profile-menu-item" onClick={() => go("profilo-saved")}><Icon name="bookmark" size={15} />{t("header.saved")}</button>
                     </>
                   )}
                   <button className="profile-menu-item" onClick={() => go("impostazioni")}><Icon name="settings" size={15} />{t("header.settings")}</button>

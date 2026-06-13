@@ -46,7 +46,14 @@ export function ContentActions({ kind, id, title, startIso, location, accent = "
     window.open(googleCalendarUrl(title, startIso, location), "_blank", "noopener");
   };
   const openApple = () => {
-    window.location.href = icsUrl;
+    // On macOS/iOS the browser hands the .ics to Calendar automatically.
+    window.open(icsUrl, "_blank", "noopener");
+  };
+  const downloadIcs = () => {
+    const a = document.createElement("a");
+    a.href = icsUrl;
+    a.download = `${title.replace(/[^a-z0-9]/gi, "_") || "evento"}.ics`;
+    a.click();
   };
 
   const toggleReport = () => {
@@ -87,8 +94,11 @@ export function ContentActions({ kind, id, title, startIso, location, accent = "
             <GoogleBrandIcon size={14} /> Google Calendar
           </button>
         )}
-        <button style={ghostBtn} onClick={openApple} title="Scarica .ics (si apre in Apple Calendar)">
+        <button style={ghostBtn} onClick={openApple} title="Aggiungi ad Apple Calendar">
           <AppleBrandIcon size={14} /> Apple Calendar
+        </button>
+        <button style={ghostBtn} onClick={downloadIcs} title="Scarica il file .ics">
+          <Icon name="download" size={14} /> Scarica .ics
         </button>
         {/* Segnalare è riservato ai cittadini (gli enti sono parte in causa,
             gli admin moderano direttamente): il backend rifiuta gli altri. */}

@@ -28,7 +28,9 @@ function getIconSvg(name: string, size = 15): string {
     ticket: `<path d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2 2 2 0 0 0 0 4 2 2 0 0 1-2 2H6a2 2 0 0 1-2-2 2 2 0 0 0 0-4z" /><path d="M14 6v12" />`,
     sparkle: `<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" /><path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z" />`,
     bookmark: `<path d="M6 4h12v17l-6-4.5L6 21z" />`,
-    layers: `<path d="M12 3l9 5-9 5-9-5z" /><path d="M3 13l9 5 9-5" />`
+    layers: `<path d="M12 3l9 5-9 5-9-5z" /><path d="M3 13l9 5 9-5" />`,
+    arrow: `<path d="M5 12h14" /><path d="M13 6l6 6-6 6" />`,
+    parking: `<rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 17V7h4a3 3 0 0 1 0 6H9" />`
   };
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${paths[name] || paths.grid}</svg>`;
 }
@@ -47,8 +49,9 @@ const CROWD_KEY: Record<string, string> = {
 interface TrentoMapProps {
   theme: "light" | "dark" | "auto";
   markers: any[];
-  activeFilter: string;
-  /* "all" | "event" | "activity": secondo asse di filtro, ortogonale alle categorie */
+  /* categorie attive (multiselect); array vuoto = mostra tutto */
+  activeCategories: string[];
+  /* "all" | "poi" | "event" | "activity" */
   kindFilter?: string;
   onMarkerClick: (marker: any) => void;
   selectedMarkerId?: string | null;
@@ -60,6 +63,10 @@ interface TrentoMapProps {
   /* true quando l'utente loggato è un cittadino: abilita la CTA
      "Crea attività qui" nel popup dei POI */
   canCreateActivity?: boolean;
+  /* true quando l'utente può partecipare (registered_user); false = mostra "Vedi" */
+  canJoin?: boolean;
+  /* IDs of events/activities owned by the current user — show "View" not "Join" */
+  ownedIds?: Set<string>;
   onCreatePoi?: (marker: any) => void;
   /* apre la pagina di dettaglio di un evento/attività dal popup */
   onOpenDetail?: (marker: any) => void;
@@ -68,7 +75,7 @@ interface TrentoMapProps {
 export const TrentoMap = React.memo(function TrentoMap({
   theme,
   markers,
-  activeFilter,
+  activeCategories,
   kindFilter = "all",
   onMarkerClick,
   selectedMarkerId,
@@ -77,6 +84,8 @@ export const TrentoMap = React.memo(function TrentoMap({
   is3d,
   onLocateRef,
   onResetRef,
+  canJoin = false,
+  ownedIds,
   canCreateActivity,
   onCreatePoi,
   onOpenDetail
@@ -228,34 +237,38 @@ export const TrentoMap = React.memo(function TrentoMap({
 
     // Filter and add markers
     markers.forEach((m) => {
-      const isPoi = m.type === "poi";
-      const catOut = activeFilter !== "all" && activeFilter !== m.cat;
-      // Filtro Eventi/Attività: con "activity" i POI restano visibili perché
-      // sono i luoghi dove un cittadino può creare un'attività.
-      const kindOut = kindFilter === "event" ? m.type !== "event"
-        : kindFilter === "activity" ? (m.type !== "activity" && !isPoi)
-        : false;
+      const isParking = m.type === "parking";
+      const isPoi = m.type === "poi" && !isParking;
       const selected = selectedMarkerId === m.id;
 
-      // Fuori filtro = fuori mappa: attenuarli soltanto lasciava la mappa
-      // affollata e i filtri sembravano non fare nulla. Il marker selezionato
-      // resta visibile per non far sparire il popup aperto sotto il mouse.
-      if ((catOut || kindOut) && !selected) return;
+      // Parking markers: visible on "all" and "parking"; hidden on poi/event/activity.
+      // Non-parking markers: hidden on "parking"; otherwise standard kind check.
+      const kindOut = m.type === "parking"
+        ? (kindFilter !== "all" && kindFilter !== "parking")
+        : (kindFilter === "parking" || (kindFilter !== "all" && m.type !== kindFilter));
+
+      // Category filter: applies to all marker types.
+      // An empty activeCategories array means "show all".
+      const catOut = activeCategories.length > 0 && !activeCategories.includes(m.cat);
+
+      // Out-of-filter markers are removed entirely. The selected marker is always
+      // kept so an open popup doesn't vanish when the user changes filters.
+      if ((kindOut || catOut) && !selected) return;
 
       const crowd = m.raw?.crowdingStatus || "green";
-      const color = isPoi ? CROWD_COLOR[crowd] : catColor(m.cat);
+      const color = isParking ? "var(--teal)" : isPoi ? CROWD_COLOR[crowd] : catColor(m.cat);
       const crowdLabel = t(CROWD_KEY[crowd] || CROWD_KEY.green);
 
       // L'elemento esterno è posizionato da maplibre via transform inline:
       // niente transform in CSS qui, le animazioni vivono sul .tla-pin interno.
       const el = document.createElement("div");
-      el.className = `tla-marker${isPoi ? " poi" : ""}${m.live ? " live" : ""}${selected ? " selected" : ""}`;
+      el.className = `tla-marker${(isPoi || isParking) ? " poi" : ""}${m.live ? " live" : ""}${selected ? " selected" : ""}`;
       el.style.setProperty("--mc", color);
       if (selected) el.style.zIndex = "30";
 
       const pin = document.createElement("div");
       pin.className = "tla-pin";
-      pin.innerHTML = `<span class="tla-pin-ic">${getIconSvg(isPoi ? "pin" : (CAT_ICON[m.cat] || "grid"), 14)}</span>`;
+      pin.innerHTML = `<span class="tla-pin-ic">${getIconSvg(isParking ? "parking" : isPoi ? "pin" : (CAT_ICON[m.cat] || "grid"), 14)}</span>`;
       el.appendChild(pin);
 
       // Add popup tooltip content only if NOT selected
@@ -263,20 +276,68 @@ export const TrentoMap = React.memo(function TrentoMap({
         const tip = document.createElement("div");
         tip.className = "marker-tip";
         tip.style.setProperty("--mc", color);
-        tip.innerHTML = isPoi
-          ? `
+        if (isParking) {
+          const free = m.raw?.free ?? null;
+          const cap = m.raw?.capacity ?? 0;
+          tip.innerHTML = `
+            <div class="tip-cat">${t("widgets.parking.title")}</div>
+            <div class="tip-title">${m.title}</div>
+            <div class="tip-meta">${free != null ? `${free} / ${cap} ${t("widgets.parking.cars")}` : t("widgets.parking.unavailable")}</div>
+          `;
+        } else if (isPoi) {
+          tip.innerHTML = `
           <div class="tip-cat">${t("map.poi.label")}</div>
           <div class="tip-title">${m.title}</div>
           <div class="tip-meta"><span class="tip-crowd-dot"></span>${crowdLabel}</div>
-        `
-          : `
+        `;
+        } else {
+          tip.innerHTML = `
           <div class="tip-cat">${catLabel(m.cat)}</div>
           <div class="tip-title">${m.title}</div>
           <div class="tip-meta">
             <span>${m.time}</span> · <span>${m.place}</span>
           </div>
         `;
+        }
         el.appendChild(tip);
+      } else if (isParking) {
+        const popupDiv = document.createElement("div");
+        const placeBelow = (m.latitude ?? 46.067) > 46.07;
+        popupDiv.className = `event-popup poi-popup ${placeBelow ? "below" : ""}`;
+        popupDiv.style.setProperty("--ec", color);
+        const free = m.raw?.free ?? null;
+        const cap = m.raw?.capacity ?? 0;
+        const pct = cap > 0 && free != null ? Math.min(100, Math.round(((cap - free) / cap) * 100)) : 0;
+        const typeLabel = m.raw?.type === "bike" ? t("widgets.parking.bikes") : t("widgets.parking.cars");
+        popupDiv.innerHTML = `
+          <div class="ep-head">
+            <div class="ep-cat"><span class="ep-cat-ic">${getIconSvg("parking", 12)}</span>${t("widgets.parking.title")}</div>
+            <div class="ep-title">${m.title}</div>
+            <button class="ep-close" aria-label="${t("widgets.popup.close")}">${getIconSvg("x", 13)}</button>
+          </div>
+          <div class="ep-body">
+            <div class="ep-field">
+              <span class="ep-fic">${getIconSvg("pin", 14)}</span>
+              <div class="ep-ftext">
+                <div class="ep-flbl">${t("widgets.popup.place")}</div>
+                <div class="ep-fval">${m.raw?.address || m.title}</div>
+              </div>
+            </div>
+            <div class="ep-part">
+              <div class="ep-part-l">
+                <div class="ep-flbl">${t("widgets.parking.occupied")} · ${typeLabel}</div>
+                <div class="ep-part-bar"><i style="width: ${pct}%; background: ${pct > 85 ? "var(--red)" : pct > 60 ? "var(--amber)" : "var(--teal)"}"></i></div>
+              </div>
+              <div class="ep-part-n"><b>${free != null ? cap - free : "?"}</b> / ${cap}</div>
+            </div>
+          </div>
+        `;
+        popupDiv.addEventListener("click", (e) => e.stopPropagation());
+        popupDiv.querySelector(".ep-close")?.addEventListener("click", (e) => {
+          e.stopPropagation();
+          onMarkerClick(null);
+        });
+        el.appendChild(popupDiv);
       } else if (isPoi) {
         // POI selezionato: card con stato affollamento e creazione attività.
         // Il flusso cittadino parte da qui: prima il POI, poi la categoria.
@@ -355,7 +416,7 @@ export const TrentoMap = React.memo(function TrentoMap({
               </div>
               <div class="ep-part-n"><b>${going}</b> / ${cap}</div>
             </div>
-            <button class="ep-cta">${getIconSvg("ticket", 15)} ${t("widgets.popup.join")}</button>
+            <button class="ep-cta">${(() => { const own = !!(ownedIds && (ownedIds.has(m.sourceId) || ownedIds.has(m.id))); const join = canJoin && !own; return `${join ? getIconSvg("ticket", 15) : getIconSvg("arrow", 15)} ${join ? t("widgets.popup.join") : t("widgets.popup.view")}`; })()}</button>
           </div>
         `;
 
@@ -396,7 +457,7 @@ export const TrentoMap = React.memo(function TrentoMap({
 
       mapMarkers.current.push(maplibreMarker);
     });
-  }, [markers, activeFilter, kindFilter, selectedMarkerId, styleLoaded, canCreateActivity, t]);
+  }, [markers, activeCategories, kindFilter, selectedMarkerId, styleLoaded, canCreateActivity, canJoin, ownedIds, t]);
 
   return (
     <div 
