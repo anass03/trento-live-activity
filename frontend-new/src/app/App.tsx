@@ -114,15 +114,21 @@ function FilterBar({ activeCategories, toggleCategory, markers, kind }: {
   const count = (id: string) => baseMarkers.filter((m: any) => m.cat === id).length;
   const totalCount = baseMarkers.length;
 
-  // When kind is "poi" or "parking", categories don't apply — hide the bar
-  if (kind === "poi" || kind === "parking") return null;
+  // When kind is "poi" or "parking", categories don't apply. Rather than
+  // unmounting the bar, we freeze it behind frosted glass so it stays in place
+  // and visibly reads as "not selectable" instead of vanishing.
+  const locked = kind === "poi" || kind === "parking";
 
   return (
-    <div className="filterbar">
+    <div
+      className={"filterbar" + (locked ? " is-locked" : "")}
+      aria-disabled={locked || undefined}
+    >
       <button
         className={"filter-pill" + (allSelected ? " active" : "")}
         style={{ "--fc": C.cyan } as React.CSSProperties}
         onClick={() => toggleCategory("all")}
+        tabIndex={locked ? -1 : undefined}
       >
         <Icon name="grid" size={16} />
         {t("categories.all")}
@@ -134,6 +140,7 @@ function FilterBar({ activeCategories, toggleCategory, markers, kind }: {
           className={"filter-pill" + (activeCategories.has(c.id) ? " active" : "")}
           style={{ "--fc": c.color } as React.CSSProperties}
           onClick={() => toggleCategory(c.id)}
+          tabIndex={locked ? -1 : undefined}
         >
           <Icon name={c.icon} size={16} />
           {t(c.labelKey)}
@@ -141,6 +148,94 @@ function FilterBar({ activeCategories, toggleCategory, markers, kind }: {
         </button>
       ))}
     </div>
+  );
+}
+
+// Builds the displacement map for the lens as a RASTER PNG. This matters:
+// feImage DOES drive a displacement map inside a `backdrop-filter` in Chromium,
+// but only with a raster bitmap — an inline-SVG data-URI whose map is built with
+// mix-blend-mode rasterizes wrong (Chromium drops those CSS props). So we paint
+// the map pixel-by-pixel on a canvas instead. R encodes horizontal shift, G
+// vertical; 128 = no shift. Values ramp out from the centre so the whole pane
+// magnifies like a real convex glass lens (uniform, not random wobble).
+function buildLensMapDataURL() {
+  const W = 256;
+  const H = 64;
+  const c = document.createElement("canvas");
+  c.width = W;
+  c.height = H;
+  const ctx = c.getContext("2d");
+  if (!ctx) return "";
+  const img = ctx.createImageData(W, H);
+  for (let j = 0; j < H; j++) {
+    for (let i = 0; i < W; i++) {
+      const k = (j * W + i) * 4;
+      const nx = (i / (W - 1)) * 2 - 1; // -1 (left) .. 1 (right)
+      const ny = (j / (H - 1)) * 2 - 1; // -1 (top)  .. 1 (bottom)
+      img.data[k] = Math.round(128 + nx * 127); // R → x displacement
+      img.data[k + 1] = Math.round(128 + ny * 127); // G → y displacement
+      img.data[k + 2] = 128; // B neutral
+      img.data[k + 3] = 255; // A opaque (required, or the map reads as empty)
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return c.toDataURL("image/png");
+}
+
+// SVG filter behind the "liquid glass" lens on the locked category bar. feImage
+// paints the bevel/lens map; three feDisplacementMap passes at slightly
+// different scales (R/G/B) give a subtle chromatic-aberration fringe like real
+// thick glass, recombined with screen blends. No trailing blur — that would
+// turn the crisp lens back into frost. Referenced from CSS via
+// backdrop-filter: url(#liquidGlass). The displaced map tracks the live MapLibre
+// canvas every compositor frame, so it refracts the moving city in real time.
+function LiquidGlassFilter() {
+  // The map is resolution-independent (stretched to the bar via preserveAspectRatio
+  // none), so it only needs building once on the client.
+  const [lensMap] = useState(() =>
+    typeof document === "undefined" ? "" : buildLensMapDataURL()
+  );
+  return (
+    <svg
+      aria-hidden="true"
+      width="0"
+      height="0"
+      style={{ position: "absolute", width: 0, height: 0, pointerEvents: "none" }}
+    >
+      <defs>
+        {/* Region extends past the bar so the displacement samples real map
+            pixels near the edges (no transparent rim). The feImage is mapped
+            back onto the element box in region-relative %: x=-30%/w=160% →
+            18.75%–81.25%; y=-150%/h=400% → 37.5%–62.5%. */}
+        <filter
+          id="liquidGlass"
+          x="-30%" y="-150%" width="160%" height="400%"
+          colorInterpolationFilters="sRGB"
+        >
+          <feImage
+            href={lensMap}
+            xlinkHref={lensMap}
+            x="18.75%" y="37.5%" width="62.5%" height="25%"
+            preserveAspectRatio="none"
+            result="map"
+          />
+          <feDisplacementMap in="SourceGraphic" in2="map" scale={72}
+            xChannelSelector="R" yChannelSelector="G" result="dR" />
+          <feColorMatrix in="dR" type="matrix"
+            values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cR" />
+          <feDisplacementMap in="SourceGraphic" in2="map" scale={66}
+            xChannelSelector="R" yChannelSelector="G" result="dG" />
+          <feColorMatrix in="dG" type="matrix"
+            values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cG" />
+          <feDisplacementMap in="SourceGraphic" in2="map" scale={60}
+            xChannelSelector="R" yChannelSelector="G" result="dB" />
+          <feColorMatrix in="dB" type="matrix"
+            values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="cB" />
+          <feBlend in="cR" in2="cG" mode="screen" result="rg" />
+          <feBlend in="rg" in2="cB" mode="screen" />
+        </filter>
+      </defs>
+    </svg>
   );
 }
 
@@ -573,6 +668,7 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
       </div>
 
       {/* FILTER BARS */}
+      <LiquidGlassFilter />
       <KindBar kind={kind} setKind={setKind} />
       <FilterBar activeCategories={activeCategories} toggleCategory={toggleCategory} markers={kindMarkers} kind={kind} />
       <Clock />
