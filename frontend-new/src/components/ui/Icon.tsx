@@ -85,6 +85,7 @@ export const Icon = ({ name, size, style, className }: IconProps) => {
     edit:     <><path d="M4 20l4.5-1L20 7.5a2.1 2.1 0 0 0-3-3L5.5 16z" /><path d="M14.5 6.5l3 3" /></>,
     refresh:  <><path d="M20 12a8 8 0 1 1-2.3-5.6" /><path d="M20 3v4h-4" /></>,
     download: <><path d="M12 3v13" /><path d="M6 11l6 6 6-6" /><path d="M4 20h16" /></>,
+    parking:  <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 17V7h4a3 3 0 0 1 0 6H9" /></>,
   };
   return <svg {...common}>{P[name] || null}</svg>;
 };

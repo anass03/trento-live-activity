@@ -563,6 +563,12 @@ export function cancelActivity(activityId: string): Promise<void> {
   return request(`/api/activities/${encodeURIComponent(activityId)}`, { method: 'DELETE' });
 }
 
+// Module-level set of activity IDs that have been deleted in this session.
+// Avoids stale-data issues when the backend soft-deletes (status !== 404).
+const _locallyDeletedActivityIds = new Set<string>();
+export function markActivityDeleted(id: string): void { _locallyDeletedActivityIds.add(id); }
+export function isActivityDeleted(id: string): boolean { return _locallyDeletedActivityIds.has(id); }
+
 // ============================== Events (write) ==============================
 
 export interface CreateEventPayload {

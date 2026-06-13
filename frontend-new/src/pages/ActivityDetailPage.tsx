@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
 import { GeocodedLocation } from "../components/ui/GeocodedLocation";
-import { getActivityById, joinActivity, leaveActivity, cancelActivity, ApiActivity } from "../lib/api";
+import { getActivityById, joinActivity, leaveActivity, cancelActivity, removeFavorite, markActivityDeleted, ApiActivity } from "../lib/api";
 import { ContentActions } from "../components/ui/ContentActions";
 
 const grads: Record<string, string> = {
@@ -123,6 +123,8 @@ export function ActivityDetailPage({ page, setPage, theme, setTheme, user, selec
     setDeleteError("");
     try {
       await cancelActivity(activity.id);
+      markActivityDeleted(activity.id);
+      removeFavorite("activity", activity.id).catch(() => {});
       setPage("attivita");
     } catch (err: any) {
       setDeleteError(err?.message || t("activities.deleteError"));

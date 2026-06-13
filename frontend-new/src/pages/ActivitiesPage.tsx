@@ -10,7 +10,7 @@ import { Header } from "../components/layout/Header";
 import { Widget, useGlow } from "../components/redesign/widgets";
 import { Icon, WxIcon } from "../components/ui/Icon";
 import { GeocodedLocation } from "../components/ui/GeocodedLocation";
-import { getActivities, addFavorite, removeFavorite, getFavorites, getMyActivities, getTrentoWeather, ApiError } from "../lib/api";
+import { getActivities, addFavorite, removeFavorite, getFavorites, getMyActivities, getTrentoWeather, ApiError, isActivityDeleted } from "../lib/api";
 
 
 const ACT_CAT = {
@@ -360,8 +360,14 @@ function MyActivitiesWidget({ user, setPage, onOpen }: any) {
     if (user?.role === "anonymous") return;
     let active = true;
     setLoading(true);
-    getMyActivities({ limit: 5 })
-      .then((res) => { if (active) setItems(res.items || []); })
+    getMyActivities({ limit: 20 })
+      .then((res) => {
+        if (!active) return;
+        const active_ = (res.items || []).filter((a: any) =>
+          !isActivityDeleted(a.id) && a.status !== "completed" && a.status !== "cancelled"
+        );
+        setItems(active_.slice(0, 5));
+      })
       .catch(() => { if (active) setItems([]); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -470,6 +476,7 @@ export function ActivityPage({ page, setPage, theme, setTheme, user, setSelected
           going: participants,
           cap: capacity,
           startsAt: a.startsAt || a.startAt || a.dateTime || a.scheduledAt || null,
+          rawStatus: a.status || null,
           status: { rising: participants >= 5 },
           desc: a.description || t("activities.noDescription"),
         };
@@ -527,6 +534,8 @@ export function ActivityPage({ page, setPage, theme, setTheme, user, setSelected
   const list = useMemo(() => {
     const now = Date.now();
     let r = backendActivities.filter((a) => {
+      if (isActivityDeleted(a.id)) return false;
+      if (a.rawStatus === "cancelled" || a.rawStatus === "deleted") return false;
       const dt = a.startsAt || a.startAt || a.dateTime || a.scheduledAt;
       if (dt) { try { if (new Date(dt).getTime() < now) return false; } catch (_) {} }
       return true;

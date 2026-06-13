@@ -515,24 +515,33 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
     }
   };
 
-  // Sidebar filter counters are computed on ALL events, not the filtered list,
-  // so picking a category doesn't zero out the other counters.
+  // Sidebar filter counters: all future events per category (ignoring active search/category filter
+  // so the other category pills still show non-zero counts).
+  const futureEvents = React.useMemo(() => {
+    const now = Date.now();
+    return events.filter((e) => {
+      const dt = e.dateTime || (e as any).startTime;
+      if (dt) { try { return new Date(dt).getTime() >= now; } catch (_) {} }
+      return true;
+    });
+  }, [events]);
+
   const categoryCounts = React.useMemo(() => {
-    const counts: Record<string, number> = { all: events.length };
-    events.forEach((e) => {
+    const counts: Record<string, number> = { all: futureEvents.length };
+    futureEvents.forEach((e) => {
       counts[e.category] = (counts[e.category] || 0) + 1;
     });
     return counts;
-  }, [events]);
+  }, [futureEvents]);
 
-  // "Next event": the soonest upcoming one (fall back to the first listed).
+  // "Next event": the soonest upcoming one — no fallback to past events.
   const nextEvent = React.useMemo(() => {
     const now = Date.now();
     const upcoming = events
       .map((e) => ({ e, d: parseEventDate(e) }))
       .filter((x) => x.d && x.d.getTime() >= now)
       .sort((a, b) => a.d!.getTime() - b.d!.getTime());
-    return upcoming[0]?.e || events[0] || null;
+    return upcoming[0]?.e || null;
   }, [events]);
 
   if (loading) {
@@ -591,7 +600,7 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
             onJoin={() => nextEvent && handleJoinToggle(nextEvent)}
             onSave={() => nextEvent && handleSave(nextEvent.id)}
           />
-          <CityGrid list={events.filter((e) => e.id !== nextEvent?.id)} onOpen={handleOpenDetail} />
+          <CityGrid list={filtered.filter((e) => e.id !== nextEvent?.id)} onOpen={handleOpenDetail} />
         </div>
       </div>
     </div>

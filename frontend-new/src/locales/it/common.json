@@ -202,7 +202,8 @@
     "all": "Tutto",
     "poi": "POI",
     "event": "Eventi",
-    "activity": "Attività"
+    "activity": "Attività",
+    "parking": "Parcheggi"
   },
   "activities": {
     "joinCta": "Partecipa all'attività",

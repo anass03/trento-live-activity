@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
-import { getMyParticipations, leaveEvent, leaveActivity, getMe, regenerateRecoveryCodes, getFavorites, getEventById, getActivityById, getMyActivities } from "../lib/api";
+import { getMyParticipations, leaveEvent, leaveActivity, getMe, regenerateRecoveryCodes, getFavorites, getEventById, getActivityById, getMyActivities, isActivityDeleted } from "../lib/api";
 
 const PROFILE_INTERESTS = [
   { id: "outdoor",  icon: "bike",     color: "var(--teal)" },
@@ -50,6 +50,12 @@ export function ProfilePage({ page, setPage, theme, setTheme, user, initialTab, 
 
   const dateLocale = i18n.language?.startsWith("en") ? "en-GB" : "it-IT";
 
+  const isFuture = (item: any) => {
+    const dt = item?.target?.dateTime || item?.target?.data || item?.dateTime || item?.startsAt || item?.startAt || item?.scheduledAt;
+    if (!dt) return true;
+    try { return new Date(dt).getTime() >= Date.now(); } catch (_) { return true; }
+  };
+
   const fetchParticipations = async () => {
     setLoading(true);
     try {
@@ -58,8 +64,16 @@ export function ProfilePage({ page, setPage, theme, setTheme, user, initialTab, 
           getMyParticipations(),
           getMyActivities(),
         ]);
-        if (parts.status === "fulfilled") setParticipations(parts.value);
-        if (myActs.status === "fulfilled") setCreatedActivities(myActs.value.items || []);
+        if (parts.status === "fulfilled") {
+          setParticipations(parts.value.filter((p) => p.target != null && isFuture(p) && (p.target as any)?.status !== "cancelled" && (p.target as any)?.status !== "deleted" && !isActivityDeleted(p.target?.id)));
+        }
+        if (myActs.status === "fulfilled") {
+          setCreatedActivities(
+            (myActs.value.items || []).filter((a: any) =>
+              !isActivityDeleted(a.id) && a.status !== "completed" && a.status !== "cancelled"
+            )
+          );
+        }
       }
       const profile = await getMe();
       setUserProfile(profile);
@@ -87,6 +101,8 @@ export function ProfilePage({ page, setPage, theme, setTheme, user, initialTab, 
         results
           .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
           .map((r) => r.value)
+          .filter(isFuture)
+          .filter((item) => item.status !== "cancelled" && item.status !== "deleted" && !isActivityDeleted(item.id))
       );
     } catch (err) {
       console.error("Failed to load saved items:", err);
@@ -218,6 +234,7 @@ export function ProfilePage({ page, setPage, theme, setTheme, user, initialTab, 
               const actParts = participations.filter((p) => p.targetType !== "EVENT");
 
               const renderRow = (item: any) => {
+                if (!item.target) return null;
                 const title = item.target?.title || item.target?.titolo || t("profile.fallbackTitle");
                 const cat = item.target?.category || item.target?.categoria || "altro";
                 const color = getCatColor(cat);

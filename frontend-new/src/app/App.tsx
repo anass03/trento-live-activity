@@ -36,7 +36,7 @@ import { AdminModerationPage } from "../pages/AdminModerationPage";
 import { AdminNotificationsPage } from "../pages/AdminNotificationsPage";
 import { PrivacyPage } from "../pages/PrivacyPage";
 import { TermsPage } from "../pages/TermsPage";
-import { getMe, getToken, setToken, UserRole, getHomeMapData, getMyActivities, getMyEvents } from "../lib/api";
+import { getMe, getToken, setToken, UserRole, getHomeMapData, getMyActivities, getMyEvents, getParking, isActivityDeleted } from "../lib/api";
 import "../styles/revamp-pages.css";
 
 function getSvgCoordinates(lat: number, lng: number, placeName?: string | null): { x: number, y: number } {
@@ -104,8 +104,8 @@ function FilterBar({ activeCategories, toggleCategory, markers, kind }: {
   const count = (id: string) => baseMarkers.filter((m: any) => m.cat === id).length;
   const totalCount = baseMarkers.length;
 
-  // When kind is "poi", categories don't apply — hide the bar
-  if (kind === "poi") return null;
+  // When kind is "poi" or "parking", categories don't apply — hide the bar
+  if (kind === "poi" || kind === "parking") return null;
 
   return (
     <div className="filterbar">
@@ -143,6 +143,7 @@ function KindBar({ kind, setKind }: { kind: string; setKind: (k: string) => void
     { id: "poi",      icon: "pin",      color: "#f87171" },
     { id: "event",    icon: "calendar", color: "#a78bfa" },
     { id: "activity", icon: "activity", color: "#34d399" },
+    { id: "parking",  icon: "parking",  color: "var(--teal)" },
   ];
   return (
     <div className="filterbar kindbar">
@@ -213,28 +214,30 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
   // POI scelto dal popup mappa per creare un'attività (id + nome)
   const [createPoi, setCreatePoi] = useState<{ id: string; title: string } | null>(null);
   const [ownedIds, setOwnedIds] = useState<Set<string>>(new Set());
+  const [parkingSpots, setParkingSpots] = useState<any[]>([]);
 
   useEffect(() => { document.documentElement.style.setProperty("--zoom", String(zoom)); }, [zoom]);
 
-  useEffect(() => {
+  const refreshOwnedIds = async () => {
     if (!user?.id) { setOwnedIds(new Set()); return; }
-    const fetch = async () => {
-      const ids = new Set<string>();
-      if (user.role === "registered_user") {
-        try {
-          const res = await getMyActivities();
-          (res.items || []).forEach((a: any) => ids.add(a.id));
-        } catch (_) {}
-      }
-      if (user.role === "certified_entity") {
-        try {
-          const res = await getMyEvents();
-          (res.events || []).forEach((e: any) => ids.add(e.id));
-        } catch (_) {}
-      }
-      setOwnedIds(ids);
-    };
-    fetch();
+    const ids = new Set<string>();
+    if (user.role === "registered_user") {
+      try {
+        const res = await getMyActivities();
+        (res.items || []).forEach((a: any) => ids.add(a.id));
+      } catch (_) {}
+    }
+    if (user.role === "certified_entity") {
+      try {
+        const res = await getMyEvents();
+        (res.events || []).forEach((e: any) => ids.add(e.id));
+      } catch (_) {}
+    }
+    setOwnedIds(ids);
+  };
+
+  useEffect(() => {
+    refreshOwnedIds();
   }, [user?.id, user?.role]);
 
   const toggleCategory = (id: string) => {
@@ -273,6 +276,19 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
   }, []);
 
   useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const res = await getParking();
+        if (active) setParkingSpots(res.parkings || []);
+      } catch (_) {}
+    };
+    load();
+    const iv = setInterval(load, 30000);
+    return () => { active = false; clearInterval(iv); };
+  }, []);
+
+  useEffect(() => {
     const onKey = (e: any) => { if (e.key === "Escape") setPopup(null); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -283,6 +299,7 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
     const now = Date.now();
     return mapData.markers.filter((m: any) => {
       if (m.latitude == null || m.longitude == null) return false;
+      if (m.type === "activity" && isActivityDeleted(m.sourceId || m.id)) return false;
       if (m.type !== "poi" && m.dateTime) {
         try { if (new Date(m.dateTime).getTime() < now) return false; } catch (_) {}
       }
@@ -331,9 +348,34 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
     });
   }, [mapData, t, i18n.language]);
 
+  const parkingMarkers = React.useMemo(() => {
+    return parkingSpots
+      .filter((p) => p.latitude != null && p.longitude != null)
+      .map((p) => ({
+        id: `parking:${p.id}`,
+        sourceId: p.id,
+        type: "parking",
+        cat: "parking",
+        latitude: p.latitude,
+        longitude: p.longitude,
+        live: false,
+        title: p.name,
+        place: p.address || p.name,
+        time: "",
+        cap: p.capacity,
+        going: p.occupied ?? (p.capacity - (p.free ?? 0)),
+        free: p.free,
+        date: "",
+        description: p.address || null,
+        raw: p,
+      }));
+  }, [parkingSpots]);
+
+  const allMarkers = React.useMemo(() => [...dynamicMarkers, ...parkingMarkers], [dynamicMarkers, parkingMarkers]);
+
   // Markers filtered by kind — used for category counts in FilterBar.
   const kindMarkers = React.useMemo(() => {
-    if (kind === "all") return dynamicMarkers;
+    if (kind === "all") return dynamicMarkers; // parking shown separately
     return dynamicMarkers.filter((m: any) => m.type === kind);
   }, [dynamicMarkers, kind]);
 
@@ -471,7 +513,7 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
             <div className="map-tilt" style={tiltStyle}>
               <TrentoMap
                 theme={theme}
-                markers={dynamicMarkers}
+                markers={allMarkers}
                 activeCategories={Array.from(activeCategories)}
                 kindFilter={kind}
                 onMarkerClick={(m) => m ? openMarkerPopup(m) : closePopup()}
@@ -559,7 +601,7 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
         <CreateActivityPanel
           poi={createPoi}
           onClose={() => setCreatePoi(null)}
-          onCreated={loadMapData}
+          onCreated={() => { loadMapData(); refreshOwnedIds(); }}
         />
       )}
 
@@ -777,7 +819,7 @@ export function App() {
     selectedEventId,
     setSelectedEventId,
     selectedActivityId,
-    setSelectedActivityId
+    setSelectedActivityId,
   };
   return (
     <React.Fragment>
