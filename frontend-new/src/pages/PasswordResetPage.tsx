@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "../components/ui/Icon";
+import { PasswordStrengthBar } from "../components/ui/PasswordStrengthBar";
 import { forgotPassword, resetPassword } from "../lib/api";
 
 export function PasswordResetPage({ page, setPage }: any) {
@@ -116,6 +117,7 @@ export function PasswordResetPage({ page, setPage }: any) {
                     onChange={(e) => setPassword(e.target.value)}
                   />
                 </div>
+                <PasswordStrengthBar password={password} />
               </div>
 
               <div className="revamp-form-group">

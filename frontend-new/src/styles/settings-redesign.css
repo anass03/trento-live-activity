@@ -289,7 +289,7 @@
 }
 .a11y-high-contrast { --border-soft: rgba(255,255,255,0.28); --border-soft-2: rgba(255,255,255,0.18); --text-secondary: rgba(226,232,240,0.95); --text-muted: rgba(203,213,225,0.88); }
 :root[data-theme="day"].a11y-high-contrast { --border-soft: rgba(47,111,78,0.36); --text-secondary: rgba(20,37,27,0.95); --text-muted: rgba(20,37,27,0.85); }
-.a11y-larger-text { font-size: 106.25%; }
+.a11y-larger-text { zoom: 1.12; }
 
 /* =========================================================
    LEGAL MODAL (Privacy / Termini da Impostazioni)

@@ -2,7 +2,8 @@ import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
-import { getMyParticipations, leaveEvent, leaveActivity, getMe, regenerateRecoveryCodes, getFavorites, getEventById, getActivityById, getMyActivities, isActivityDeleted } from "../lib/api";
+import { PasswordStrengthBar } from "../components/ui/PasswordStrengthBar";
+import { getMyParticipations, leaveEvent, leaveActivity, getMe, regenerateRecoveryCodes, getFavorites, getEventById, getActivityById, getMyActivities, isActivityDeleted, changePassword } from "../lib/api";
 
 const PROFILE_INTERESTS = [
   { id: "outdoor",  icon: "bike",     color: "var(--teal)" },
@@ -51,7 +52,7 @@ export function ProfilePage({ page, setPage, theme, setTheme, user, initialTab, 
   const dateLocale = i18n.language?.startsWith("en") ? "en-GB" : "it-IT";
 
   const isFuture = (item: any) => {
-    const dt = item?.target?.dateTime || item?.target?.data || item?.dateTime || item?.startsAt || item?.startAt || item?.scheduledAt;
+    const dt = item?.target?.dateTime || item?.target?.data || item?.dateTime || item?.data || item?.startsAt || item?.startAt || item?.scheduledAt;
     if (!dt) return true;
     try { return new Date(dt).getTime() >= Date.now(); } catch (_) { return true; }
   };
@@ -69,9 +70,11 @@ export function ProfilePage({ page, setPage, theme, setTheme, user, initialTab, 
         }
         if (myActs.status === "fulfilled") {
           setCreatedActivities(
-            (myActs.value.items || []).filter((a: any) =>
-              !isActivityDeleted(a.id) && a.status !== "completed" && a.status !== "cancelled"
-            )
+            (myActs.value.items || []).filter((a: any) => {
+              if (isActivityDeleted(a.id)) return false;
+              if (a.status === "completed" || a.status === "cancelled" || a.stato === "cancellata" || a.stato === "conclusa") return false;
+              return isFuture(a);
+            })
           );
         }
       }
@@ -128,6 +131,30 @@ export function ProfilePage({ page, setPage, theme, setTheme, user, initialTab, 
   const [regenPending, setRegenPending] = useState(false);
   const [regenError, setRegenError] = useState("");
 
+  // Change password form
+  const [pwCurrent, setPwCurrent] = useState("");
+  const [pwNew, setPwNew] = useState("");
+  const [pwConfirm, setPwConfirm] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwMsg, setPwMsg] = useState<{ kind: "success" | "danger"; text: string } | null>(null);
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwMsg(null);
+    if (pwNew !== pwConfirm) { setPwMsg({ kind: "danger", text: t("profile.changePasswordMismatch") }); return; }
+    if (pwNew.length < 8) { setPwMsg({ kind: "danger", text: t("profile.changePasswordShort") }); return; }
+    setPwSaving(true);
+    try {
+      await changePassword({ currentPassword: pwCurrent, newPassword: pwNew });
+      setPwMsg({ kind: "success", text: t("profile.changePasswordSuccess") });
+      setPwCurrent(""); setPwNew(""); setPwConfirm("");
+    } catch (err: any) {
+      setPwMsg({ kind: "danger", text: err?.message || t("profile.changePasswordError") });
+    } finally {
+      setPwSaving(false);
+    }
+  };
+
   const handleRegenCodes = async () => {
     setRegenPending(true);
     setRegenError("");
@@ -155,9 +182,6 @@ export function ProfilePage({ page, setPage, theme, setTheme, user, initialTab, 
   };
 
   const interestsList = userProfile?.profile?.interessi || [];
-  // Real author rating only: no hardcoded placeholder when the backend has no value.
-  const rawRating = userProfile?.averageAuthorRating ?? userProfile?.profile?.averageAuthorRating;
-  const authorRating = typeof rawRating === "number" ? rawRating : (rawRating != null && !Number.isNaN(Number(rawRating)) ? Number(rawRating) : null);
 
   return (
     <div className="revamp-legal-scene">
@@ -183,13 +207,8 @@ export function ProfilePage({ page, setPage, theme, setTheme, user, initialTab, 
                 </div>
                 <div style={{ width: 1, background: "var(--border-soft-2)" }}></div>
                 <div className="revamp-profile-stat">
-                  <b>{typeof authorRating === "number" ? authorRating.toFixed(1) : "—"}</b>
-                  <span>{t("profile.rating")}</span>
-                </div>
-                <div style={{ width: 1, background: "var(--border-soft-2)" }}></div>
-                <div className="revamp-profile-stat">
-                  <b>{user?.role === "certified_entity" ? t("profile.yes") : t("profile.no")}</b>
-                  <span>{t("profile.certifiedEntity")}</span>
+                  <b>{createdActivities.length}</b>
+                  <span>{t("profile.createdActivitiesSection")}</span>
                 </div>
               </div>
             )}
@@ -264,6 +283,15 @@ export function ProfilePage({ page, setPage, theme, setTheme, user, initialTab, 
                 );
               };
 
+              const sectionLabel = (color: string, icon: string, label: string, mt = 4) => (
+                <div style={{ fontSize: 12, fontWeight: 700, color, letterSpacing: "0.06em", textTransform: "uppercase", marginTop: mt }}>
+                  <Icon name={icon} size={11} /> {label}
+                </div>
+              );
+              const emptyNote = (msg: string) => (
+                <div style={{ color: "var(--text-muted)", fontSize: 13, padding: "6px 2px" }}>{msg}</div>
+              );
+
               return (
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {loading && (
@@ -271,36 +299,21 @@ export function ProfilePage({ page, setPage, theme, setTheme, user, initialTab, 
                       {t("profile.loadingBookings")}
                     </div>
                   )}
-                  {!loading && participations.length === 0 && (
-                    <div style={{ color: "var(--text-muted)", fontSize: 13.5, padding: "20px 0", textAlign: "center" }}>
-                      {t("profile.noBookings")}
-                    </div>
-                  )}
-                  {!loading && eventParts.length > 0 && (
-                    <>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--magenta)", letterSpacing: "0.06em", textTransform: "uppercase", marginTop: 4 }}>
-                        <Icon name="calendar" size={11} /> {t("header.nav.events")}
-                      </div>
-                      {eventParts.map(renderRow)}
-                    </>
-                  )}
-                  {!loading && actParts.length > 0 && (
-                    <>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--teal)", letterSpacing: "0.06em", textTransform: "uppercase", marginTop: eventParts.length > 0 ? 8 : 4 }}>
-                        <Icon name="activity" size={11} /> {t("header.nav.activities")}
-                      </div>
-                      {actParts.map(renderRow)}
-                    </>
-                  )}
                   {!loading && (
                     <>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--violet)", letterSpacing: "0.06em", textTransform: "uppercase", marginTop: 8 }}>
-                        <Icon name="sparkle" size={11} /> {t("profile.createdActivitiesSection")}
-                      </div>
+                      {sectionLabel("var(--magenta)", "calendar", t("profile.joinedEvents"))}
+                      {eventParts.length === 0
+                        ? emptyNote(t("profile.noJoinedEvents"))
+                        : eventParts.map(renderRow)}
+
+                      {sectionLabel("var(--teal)", "activity", t("profile.joinedActivities"), 8)}
+                      {actParts.length === 0
+                        ? emptyNote(t("profile.noJoinedActivities"))
+                        : actParts.map(renderRow)}
+
+                      {sectionLabel("var(--violet)", "sparkle", t("profile.createdActivitiesSection"), 8)}
                       {createdActivities.length === 0 ? (
-                        <div style={{ color: "var(--text-muted)", fontSize: 13, padding: "8px 0" }}>
-                          {t("profile.noCreatedActivities")}
-                        </div>
+                        emptyNote(t("profile.noCreatedActivities"))
                       ) : createdActivities.map((act) => {
                         const statusSlug: Record<string, string> = { draft: "Draft", published: "Published", active: "Active", completed: "Completed", cancelled: "Cancelled", under_review: "Review" };
                         const statusKey = `profile.activityStatus${statusSlug[act.status] || "Draft"}`;
@@ -431,6 +444,47 @@ export function ProfilePage({ page, setPage, theme, setTheme, user, initialTab, 
             )}
           </div>
         </div>
+
+        {/* Cambio password: visibile a tutti gli utenti non-anonimi */}
+        {user?.role !== "anonymous" && (
+          <div className="revamp-profile-card anim-in" style={{ "--accent": "var(--teal)", animationDelay: "160ms" } as React.CSSProperties}>
+            <h3 style={{ margin: "0 0 12px", fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
+              <Icon name="key" size={16} style={{ color: "var(--teal)" }} /> {t("profile.changePasswordTitle")}
+            </h3>
+            <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 14 }}>{t("profile.changePasswordDesc")}</p>
+            <form onSubmit={handleChangePassword} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div className="revamp-form-group" style={{ margin: 0 }}>
+                <label className="revamp-form-label">{t("profile.currentPassword")}</label>
+                <div className="revamp-form-input-wrap">
+                  <Icon name="key" size={15} />
+                  <input type="password" className="revamp-form-input" placeholder="••••••••" value={pwCurrent} disabled={pwSaving} onChange={(e) => setPwCurrent(e.target.value)} />
+                </div>
+              </div>
+              <div className="revamp-form-group" style={{ margin: 0 }}>
+                <label className="revamp-form-label">{t("profile.newPassword")}</label>
+                <div className="revamp-form-input-wrap">
+                  <Icon name="shieldCheck" size={15} />
+                  <input type="password" className="revamp-form-input" placeholder="••••••••" value={pwNew} disabled={pwSaving} onChange={(e) => setPwNew(e.target.value)} />
+                </div>
+                <PasswordStrengthBar password={pwNew} />
+              </div>
+              <div className="revamp-form-group" style={{ margin: 0 }}>
+                <label className="revamp-form-label">{t("profile.confirmPassword")}</label>
+                <div className="revamp-form-input-wrap">
+                  <input type="password" className="revamp-form-input" placeholder="••••••••" value={pwConfirm} disabled={pwSaving} onChange={(e) => setPwConfirm(e.target.value)} />
+                </div>
+              </div>
+              {pwMsg && (
+                <div className={`revamp-status-pill ${pwMsg.kind}`} style={{ justifyContent: "center" }}>
+                  <Icon name={pwMsg.kind === "success" ? "check" : "warn"} size={12} /> {pwMsg.text}
+                </div>
+              )}
+              <button type="submit" className="revamp-action-btn" style={{ alignSelf: "flex-start" }} disabled={pwSaving || !pwCurrent || !pwNew || !pwConfirm}>
+                <Icon name="key" size={13} /> {pwSaving ? t("profile.changePasswordSaving") : t("profile.changePasswordBtn")}
+              </button>
+            </form>
+          </div>
+        )}
 
         {/* Sicurezza account: solo admin di sistema (2FA obbligatorio per loro).
             Cambio authenticator = nuovo setup QR; i codici rigenerati invalidano i vecchi. */}

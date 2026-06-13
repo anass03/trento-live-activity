@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "../components/ui/Icon";
+import { PasswordStrengthBar } from "../components/ui/PasswordStrengthBar";
 import { register, registerEntity } from "../lib/api";
 
 export function RegistrationPage({ page, setPage }: any) {
@@ -250,32 +251,31 @@ export function RegistrationPage({ page, setPage }: any) {
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: "12px" }}>
-              <div className="revamp-form-group" style={{ flex: 1 }}>
-                <label className="revamp-form-label">{t("register.password")}</label>
-                <div className="revamp-form-input-wrap">
-                  <Icon name="key" size={16} />
-                  <input
-                    type="password"
-                    className="revamp-form-input"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                </div>
+            <div className="revamp-form-group">
+              <label className="revamp-form-label">{t("register.password")}</label>
+              <div className="revamp-form-input-wrap">
+                <Icon name="key" size={16} />
+                <input
+                  type="password"
+                  className="revamp-form-input"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
               </div>
+              <PasswordStrengthBar password={password} />
+            </div>
 
-              <div className="revamp-form-group" style={{ flex: 1 }}>
-                <label className="revamp-form-label">{t("register.confirmPassword")}</label>
-                <div className="revamp-form-input-wrap">
-                  <input
-                    type="password"
-                    className="revamp-form-input"
-                    placeholder="••••••••"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                  />
-                </div>
+            <div className="revamp-form-group">
+              <label className="revamp-form-label">{t("register.confirmPassword")}</label>
+              <div className="revamp-form-input-wrap">
+                <input
+                  type="password"
+                  className="revamp-form-input"
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
               </div>
             </div>
 

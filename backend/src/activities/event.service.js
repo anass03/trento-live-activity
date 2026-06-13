@@ -88,7 +88,8 @@ async function createEvent(entityId, { titolo, descrizione, categoria, latitudin
 
 async function listEvents({ categoria, q, page, limit }) {
   ({ page, limit } = sanitizePagination(page, limit));
-  const where = {};
+  // Exclude cancelled/ended events from public listing
+  const where = { status: { [Op.notIn]: ['CANCELLED', 'ENDED'] } };
   // Un valore fuori enum manderebbe in errore Postgres (500): filtra solo se valido.
   if (categoria && EVENT_CATEGORIES.includes(categoria)) where.categoria = categoria;
   // RF15: textual search on titolo / descrizione

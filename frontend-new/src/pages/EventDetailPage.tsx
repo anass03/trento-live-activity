@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
 import { GeocodedLocation } from "../components/ui/GeocodedLocation";
-import { getEventById, joinEvent, leaveEvent, deleteEvent, ApiEvent } from "../lib/api";
+import { getEventById, joinEvent, leaveEvent, deleteEvent, addFavorite, removeFavorite, getFavorites, ApiEvent } from "../lib/api";
 import { getTimeFormat } from "../lib/i18n";
 import { ContentActions } from "../components/ui/ContentActions";
 
@@ -36,6 +36,9 @@ export function EventDetailPage({ page, setPage, theme, setTheme, user, selected
   const [joinError, setJoinError] = useState("");
   const [deletePending, setDeletePending] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  const [isSaved, setIsSaved] = useState(false);
+  const [savePending, setSavePending] = useState(false);
+  const [shared, setShared] = useState(false);
 
   const fetchEventDetail = async () => {
     if (!selectedEventId) {
@@ -46,11 +49,15 @@ export function EventDetailPage({ page, setPage, theme, setTheme, user, selected
     setLoading(true);
     setError("");
     try {
-      const data = await getEventById(selectedEventId);
+      const [data, favs] = await Promise.all([
+        getEventById(selectedEventId),
+        user?.role === "registered_user" ? getFavorites().catch(() => []) : Promise.resolve([]),
+      ]);
       setEvent(data);
       if (user?.id && data.participantIds) {
         setIsJoined(data.participantIds.includes(user.id));
       }
+      setIsSaved(favs.some((f: any) => f.markerType === "event" && f.markerId === selectedEventId));
     } catch (err: any) {
       setError(err.message || t("events.detailLoadError"));
     } finally {
@@ -95,6 +102,37 @@ export function EventDetailPage({ page, setPage, theme, setTheme, user, selected
       setDeleteError(err?.message || t("events.deleteError"));
     } finally {
       setDeletePending(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (savePending || !event) return;
+    const next = !isSaved;
+    setIsSaved(next);
+    setSavePending(true);
+    try {
+      if (next) await addFavorite("event", event.id);
+      else await removeFavorite("event", event.id);
+    } catch {
+      setIsSaved(!next);
+    } finally {
+      setSavePending(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!event) return;
+    const text = `${event.title} — ${event.location || "Trento"}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: event.title, text, url: window.location.href });
+      } else {
+        await navigator.clipboard.writeText(`${text}\n${window.location.href}`);
+      }
+      setShared(true);
+      setTimeout(() => setShared(false), 1800);
+    } catch {
+      // dismissed or clipboard denied
     }
   };
 
@@ -149,7 +187,38 @@ export function EventDetailPage({ page, setPage, theme, setTheme, user, selected
           </div>
 
           <div className="revamp-detail-body">
-            <h1 className="revamp-detail-title">{event.title}</h1>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 2 }}>
+              <h1 className="revamp-detail-title" style={{ flex: 1, margin: 0 }}>{event.title}</h1>
+              <div style={{ display: "flex", gap: 6, flexShrink: 0, paddingTop: 2 }}>
+                <button
+                  onClick={handleShare}
+                  title={shared ? t("events.shareCopied") : t("events.ariaShare")}
+                  style={{
+                    width: 36, height: 36, borderRadius: 10, border: "1px solid var(--border-soft-2)",
+                    background: shared ? "color-mix(in srgb, var(--teal) 14%, transparent)" : "var(--chip-fill)",
+                    color: shared ? "var(--teal)" : "var(--text-muted)",
+                    display: "grid", placeItems: "center", cursor: "pointer", transition: "all 180ms",
+                  }}
+                >
+                  <Icon name={shared ? "check" : "share"} size={16} />
+                </button>
+                {user?.role === "registered_user" && (
+                  <button
+                    onClick={handleSave}
+                    disabled={savePending}
+                    title={t("events.ariaSave")}
+                    style={{
+                      width: 36, height: 36, borderRadius: 10, border: "1px solid var(--border-soft-2)",
+                      background: isSaved ? "color-mix(in srgb, var(--magenta) 14%, transparent)" : "var(--chip-fill)",
+                      color: isSaved ? "var(--magenta)" : "var(--text-muted)",
+                      display: "grid", placeItems: "center", cursor: "pointer", transition: "all 180ms",
+                    }}
+                  >
+                    <Icon name="bookmark" size={16} />
+                  </button>
+                )}
+              </div>
+            </div>
             <div className="revamp-detail-rating" style={{ color: "var(--magenta)" }}>
               {event.isCertified ? (
                 <>

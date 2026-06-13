@@ -1,4 +1,4 @@
-const { User, Activity, Event, SocialParticipation, SavedItem, Review, POI, UserSettings, sequelize } = require('../data/models');
+const { User, Activity, Event, SocialParticipation, EventParticipation, SavedItem, Review, POI, UserSettings, sequelize } = require('../data/models');
 const { Op } = require('sequelize');
 const { calculateTrustScore } = require('./trust.service');
 
@@ -145,24 +145,54 @@ async function suspendAuthor(userId) {
 }
 
 async function getMyParticipations(userId) {
-  const participations = await SocialParticipation.findAll({
+  // Social participations (activities joined via social API, events via social join)
+  const socialParts = await SocialParticipation.findAll({
     where: { userId, status: { [Op.in]: ['JOINED', 'WAITLISTED', 'ATTENDED'] } },
     order: [['joinedAt', 'DESC']]
   });
 
-  const resolved = await Promise.all(participations.map(async (part) => {
+  // Classic event participations (events joined via /api/events/:id/participate)
+  const eventParts = await EventParticipation.findAll({
+    where: { userId },
+    order: [['createdAt', 'DESC']]
+  });
+
+  // Collect event IDs already covered by SocialParticipation to avoid duplicates
+  const socialEventIds = new Set(
+    socialParts.filter(p => p.targetType === 'EVENT').map(p => p.targetId)
+  );
+
+  const resolvedSocial = await Promise.all(socialParts.map(async (part) => {
     const item = part.toJSON();
     if (part.targetType === 'EVENT') {
       const event = await Event.findByPk(part.targetId);
-      item.details = event;
+      item.target = event ? event.toJSON() : null;
     } else {
       const activity = await Activity.findByPk(part.targetId);
-      item.details = activity;
+      item.target = activity ? activity.toJSON() : null;
     }
     return item;
   }));
 
-  return resolved;
+  const resolvedEvents = await Promise.all(
+    eventParts
+      .filter(ep => !socialEventIds.has(ep.eventId))
+      .map(async (ep) => {
+        const event = await Event.findByPk(ep.eventId);
+        return {
+          id: ep.id,
+          userId: ep.userId,
+          targetType: 'EVENT',
+          targetId: ep.eventId,
+          status: 'JOINED',
+          joinedAt: ep.createdAt,
+          createdAt: ep.createdAt,
+          target: event ? event.toJSON() : null,
+        };
+      })
+  );
+
+  return [...resolvedSocial, ...resolvedEvents];
 }
 
 async function confirmAttendance(userId, participationId, userRole) {

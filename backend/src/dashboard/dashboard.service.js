@@ -28,8 +28,8 @@ async function getStats({ tipo, da, a, centerLat, centerLng, radiusKm, poiId } =
     });
   }
 
-  const activityWhere = { ...dateFilter, ...(tipo ? { tipo } : {}), ...geoFilter };
-  const eventWhere = { ...geoFilter };
+  const activityWhere = { stato: 'attiva', ...dateFilter, ...(tipo ? { tipo } : {}), ...geoFilter };
+  const eventWhere = { status: { [Op.notIn]: ['CANCELLED', 'ENDED'] }, ...geoFilter };
   const poiWhere = poiId ? { id: poiId } : (centerLat !== undefined ? geoFilter : {});
 
   // SCOPE RIDOTTO (#15): solo metriche aggregate, mai dati individuali.
@@ -51,7 +51,7 @@ async function getStats({ tipo, da, a, centerLat, centerLng, radiusKm, poiId } =
     POI.count({ where: poiWhere }),
     Activity.findAll({
       attributes: ['tipo', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
-      where: { ...dateFilter, ...geoFilter },
+      where: { stato: 'attiva', ...dateFilter, ...geoFilter },
       group: ['tipo'],
       raw: true,
     }),
@@ -94,6 +94,7 @@ async function getStats({ tipo, da, a, centerLat, centerLng, radiusKm, poiId } =
         [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
       ],
       where: {
+        stato: 'attiva',
         ...(tipo ? { tipo } : {}),
         ...geoFilter,
         createdAt: { [Op.gte]: sequelize.literal("NOW() - INTERVAL '14 days'") },

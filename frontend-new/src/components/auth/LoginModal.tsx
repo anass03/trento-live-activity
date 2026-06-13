@@ -187,6 +187,10 @@ export function LoginModal({ open, onClose, onSuccess, onRegister, onPasswordRes
 
   useEffect(() => {
     if (!open) return;
+    setEmail("");
+    setPassword("");
+    setOtpToken("");
+    setShowOtp(false);
     setError("");
   }, [open]);
 
