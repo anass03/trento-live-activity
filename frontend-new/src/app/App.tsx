@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { Header } from "../components/layout/Header";
 import { TrentoMap } from "../components/map/TrentoMap";
 import { CreateActivityPanel } from "../components/map/CreateActivityPanel";
-import { ActiveAreasWidget, AlertsWidget, EventsWidget, MapLabels, MarkersLayer, ParkingWidget, WeatherWidget } from "../components/redesign/widgets";
+import { ActiveAreasWidget, AlertsWidget, EventsWidget, MapLabels, MarkersLayer, ParkingWidget, WeatherWidget, ServiceRequestWidget } from "../components/redesign/widgets";
 import { TrentoTweaks } from "../components/redesign/TrentoTweaks";
 import { LoginModal } from "../components/auth/LoginModal";
 import { Icon } from "../components/ui/Icon";
@@ -29,6 +29,7 @@ import { EntityPublishPage } from "../pages/EntityPublishPage";
 import { ComuneDashboardPage } from "../pages/ComuneDashboardPage";
 import { ComuneStatistichePage } from "../pages/ComuneStatistichePage";
 import { ComuneExportPage } from "../pages/ComuneExportPage";
+import { ServiceRequestModal } from "../components/ui/ServiceRequestModal";
 import { AdminPOIPage } from "../pages/AdminPOIPage";
 import { AdminUsersPage } from "../pages/AdminUsersPage";
 import { AdminEntitiesPage } from "../pages/AdminEntitiesPage";
@@ -37,7 +38,16 @@ import { AdminNotificationsPage } from "../pages/AdminNotificationsPage";
 import { PrivacyPage } from "../pages/PrivacyPage";
 import { TermsPage } from "../pages/TermsPage";
 import { getMe, getToken, setToken, UserRole, getHomeMapData, getMyActivities, getMyEvents, getParking, isActivityDeleted } from "../lib/api";
+import { getTimeFormat } from "../lib/i18n";
 import "../styles/revamp-pages.css";
+
+const fmtHHmm = (hhmm: string): string => {
+  if (!hhmm || getTimeFormat() !== "12h") return hhmm;
+  const [hStr, mStr] = hhmm.split(":");
+  const h = parseInt(hStr, 10);
+  if (isNaN(h)) return hhmm;
+  return `${h % 12 || 12}:${mStr} ${h >= 12 ? "PM" : "AM"}`;
+};
 
 function getSvgCoordinates(lat: number, lng: number, placeName?: string | null): { x: number, y: number } {
   const name = (placeName || "").toLowerCase();
@@ -187,7 +197,8 @@ function Clock() {
     return () => clearInterval(timer);
   }, []);
   const locale = dateLocale(i18n.language);
-  const time = now.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const hour12 = getTimeFormat() === "12h";
+  const time = now.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12 });
   const date = now.toLocaleDateString(locale, { weekday: "short", day: "numeric", month: "short" });
   return (
     <div className="clock-pill">
@@ -213,6 +224,8 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
   const [loading, setLoading] = useState(false);
   // POI scelto dal popup mappa per creare un'attività (id + nome)
   const [createPoi, setCreatePoi] = useState<{ id: string; title: string } | null>(null);
+  // null = modal open no pre-selection, string = open with pre-selected cat, undefined = closed
+  const [srCategory, setSrCategory] = useState<string | null | undefined>(undefined);
   const [ownedIds, setOwnedIds] = useState<Set<string>>(new Set());
   const [parkingSpots, setParkingSpots] = useState<any[]>([]);
 
@@ -322,7 +335,7 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
       let timeStr = t("home.timeTBD");
       if (m.dateTime) {
         try {
-          timeStr = new Date(m.dateTime).toLocaleTimeString(dtLocale, { hour: "2-digit", minute: "2-digit" });
+          timeStr = new Date(m.dateTime).toLocaleTimeString(dtLocale, { hour: "2-digit", minute: "2-digit", hour12: getTimeFormat() === "12h" });
         } catch (e) {}
       }
 
@@ -405,8 +418,8 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
         id: e.id,
         cat,
         date: e.dateTime ? new Date(e.dateTime).toLocaleDateString(dateLocale(i18n.language), { day: "numeric", month: "short" }) : t("home.dateTBD"),
-        start: e.startTime ? e.startTime.slice(0, 5) : "N/D",
-        end: e.endTime ? e.endTime.slice(0, 5) : "N/D",
+        start: e.startTime ? fmtHHmm(e.startTime.slice(0, 5)) : "N/D",
+        end: e.endTime ? fmtHHmm(e.endTime.slice(0, 5)) : "N/D",
         going: e.participantCount ?? 0,
         cap: e.maxPartecipanti ?? 0,
         title: e.title,
@@ -574,6 +587,9 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
         <div className="col-right">
           <ActiveAreasWidget delay={140} areas={dynamicAreas} onOpen={setDetail} />
           <EventsWidget delay={240} onFocus={openEventPopup} events={dynamicEvents} onWidgetClick={() => setPage("eventi")} />
+          {user?.role === "registered_user" && (
+            <ServiceRequestWidget delay={340} onOpen={(cat) => setSrCategory(cat ?? null)} />
+          )}
         </div>
       </div>
 
@@ -602,6 +618,14 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
           poi={createPoi}
           onClose={() => setCreatePoi(null)}
           onCreated={() => { loadMapData(); refreshOwnedIds(); }}
+        />
+      )}
+
+      {srCategory !== undefined && (
+        <ServiceRequestModal
+          theme={theme}
+          initialCategory={srCategory ?? undefined}
+          onClose={() => setSrCategory(undefined)}
         />
       )}
 

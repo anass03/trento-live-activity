@@ -177,7 +177,8 @@ export const TrentoMap = React.memo(function TrentoMap({
         const map = mapInstance.current;
         if (!map) return;
         const flyToFallback = () => map.flyTo({ center: TRENTO_CENTER, zoom: 15.5, duration: 1100 });
-        if (!navigator.geolocation) { flyToFallback(); return; }
+        const locMode = (() => { try { return localStorage.getItem("tla:locationMode") || "while_using"; } catch { return "while_using"; } })();
+        if (!navigator.geolocation || locMode === "never") { flyToFallback(); return; }
         navigator.geolocation.getCurrentPosition(
           (pos) => {
             const m = mapInstance.current;

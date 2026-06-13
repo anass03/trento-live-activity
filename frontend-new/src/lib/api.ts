@@ -617,6 +617,17 @@ export function getDashboardServiceRequests(
   return request(`/api/dashboard/service-requests${qs}`);
 }
 
+export interface ServiceRequestEntry {
+  id: string;
+  categoria: string;
+  sottocategoria: string | null;
+  createdAt: string;
+}
+
+export function getDashboardRecentServiceRequests(limit = 10): Promise<ServiceRequestEntry[]> {
+  return request(`/api/dashboard/service-requests/recent?limit=${limit}`);
+}
+
 export function submitServiceRequest(payload: {
   categoria: ServiceRequestCategory;
   sottocategoria?: ServiceRequestSubcategory | null;

@@ -4,8 +4,10 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CAT_ICON, PLACES, catColor, catLabel } from "../../data/redesignData";
+import { type ServiceRequestCategory } from "../../lib/api";
 import { Icon, WxIcon } from "../ui/Icon";
 import { getCityAlerts, getParking, getTrentoWeather } from "../../lib/api";
+import { getTimeFormat } from "../../lib/i18n";
 
 /* mouse-follow radial glow */
 export function useGlow() {
@@ -165,7 +167,7 @@ export function WeatherWidget({ delay, onOpen }: any) {
   const daily = weather?.daily?.[0];
   const hourly = weather?.hourly?.length
     ? weather.hourly.slice(0, 6).map((h: any) => ({
-      h: new Date(h.time).toLocaleTimeString(i18n.language.startsWith("en") ? "en-GB" : "it-IT", { hour: "2-digit" }),
+      h: new Date(h.time).toLocaleTimeString(i18n.language.startsWith("en") ? "en-GB" : "it-IT", { hour: "2-digit", hour12: getTimeFormat() === "12h" }),
       t: h.temperature != null ? Math.round(h.temperature) : "--",
       p: Math.max(0.12, Math.min(1, (h.precipitationProbability ?? 0) / 100)),
     }))
@@ -453,6 +455,44 @@ export function ActiveAreasWidget({ delay, areas, onOpen }: any) {
             </div>
           </div>
         ))}
+      </div>
+    </Widget>
+  );
+}
+
+/* ---------------- SERVICE REQUEST ---------------- */
+
+const SR_CAT_ICON: Record<string, string> = {
+  parcheggio_auto: "car", parcheggio_bici: "bike", sport: "activity",
+  studio: "bookmark", verde: "leaf", cultura: "ticket", ciclismo: "bike", altro: "settings",
+};
+const SR_QUICK: ServiceRequestCategory[] = ["parcheggio_auto", "sport", "verde", "studio"];
+
+export function ServiceRequestWidget({ delay, onOpen }: { delay?: number; onOpen: (cat?: ServiceRequestCategory) => void }) {
+  const { t } = useTranslation();
+  return (
+    <Widget title={t("serviceRequest.widgetTitle")} accent="var(--violet)" delay={delay}>
+      <p style={{ fontSize: 11.5, color: "var(--text-faint)", margin: "0 0 10px", lineHeight: 1.45 }}>
+        {t("serviceRequest.widgetDesc")}
+      </p>
+      <div className="sr-cat-grid">
+        {SR_QUICK.map((cat) => (
+          <button
+            key={cat}
+            className="sr-cat-pill"
+            style={{ "--accent": "var(--violet)" } as React.CSSProperties}
+            onClick={(e) => { e.stopPropagation(); onOpen(cat); }}
+          >
+            <Icon name={SR_CAT_ICON[cat]} size={13} />
+            <span>{t(`serviceRequest.categories.${cat}`)}</span>
+          </button>
+        ))}
+      </div>
+      <div className="widget-foot">
+        <button className="link-btn" onClick={(e) => { e.stopPropagation(); onOpen(); }}>
+          <span>{t("serviceRequest.widgetAll")}</span>
+          <Icon name="arrow" size={15} />
+        </button>
       </div>
     </Widget>
   );

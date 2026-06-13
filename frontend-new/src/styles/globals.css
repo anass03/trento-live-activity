@@ -1165,6 +1165,115 @@ button { font-family: inherit; cursor: pointer; }
 .marker.softdim { opacity: 0.28; filter: saturate(0.7); }
 
 /* =========================================================
+   SERVICE REQUEST WIDGET + MODAL
+   ========================================================= */
+.sr-cat-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 7px;
+  margin-bottom: 4px;
+}
+.sr-cat-pill {
+  display: flex; align-items: center; gap: 7px;
+  padding: 9px 11px;
+  background: var(--chip-fill); border: 1px solid var(--border-soft-2);
+  border-radius: 10px; cursor: pointer; pointer-events: all;
+  font-size: 11.5px; font-family: var(--font); font-weight: 500;
+  color: var(--text-secondary); text-align: left;
+  transition: background 140ms, color 140ms, border-color 140ms;
+}
+.sr-cat-pill:hover {
+  background: color-mix(in srgb, var(--accent, var(--violet)) 12%, var(--chip-fill));
+  border-color: color-mix(in srgb, var(--accent, var(--violet)) 35%, transparent);
+  color: var(--text-primary);
+}
+.sr-cat-pill svg { flex: none; opacity: 0.75; }
+
+/* Modal: narrower than the default detail-modal */
+.sr-modal { width: min(500px, 100%) !important; }
+
+/* Step progress bar */
+.sr-steps { display: flex; gap: 5px; margin-bottom: 20px; }
+.sr-step  { flex: 1; height: 3px; border-radius: 2px; background: var(--border-soft); transition: background 240ms; }
+.sr-step.done, .sr-step.active { background: var(--accent, var(--violet)); }
+
+/* Category grid inside modal */
+.sr-modal-cats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+@media (max-width: 480px) { .sr-modal-cats { grid-template-columns: repeat(2, 1fr); } }
+.sr-modal-cat {
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  padding: 14px 8px;
+  background: var(--chip-fill); border: 1px solid var(--border-soft-2);
+  border-radius: 12px; cursor: pointer; pointer-events: all;
+  font-size: 11px; font-family: var(--font); font-weight: 500; color: var(--text-secondary);
+  transition: background 140ms, color 140ms, border-color 140ms, box-shadow 140ms;
+}
+.sr-modal-cat:hover, .sr-modal-cat.selected {
+  background: color-mix(in srgb, var(--accent, var(--violet)) 14%, var(--chip-fill));
+  border-color: color-mix(in srgb, var(--accent, var(--violet)) 45%, transparent);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent, var(--violet)) 25%, transparent);
+}
+.sr-modal-cat svg { opacity: 0.8; }
+
+/* Subcategory list */
+.sr-subcat-list { display: flex; flex-direction: column; gap: 7px; }
+.sr-subcat-btn {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 11px 14px;
+  background: var(--chip-fill); border: 1px solid var(--border-soft-2);
+  border-radius: 10px; cursor: pointer; pointer-events: all;
+  font-size: 13px; font-family: var(--font); color: var(--text-secondary);
+  transition: background 140ms, color 140ms, border-color 140ms;
+  text-align: left;
+}
+.sr-subcat-btn:hover {
+  background: var(--hover-fill); color: var(--text-primary);
+  border-color: var(--border-soft);
+}
+.sr-subcat-btn.skip { color: var(--text-faint); font-style: italic; border-style: dashed; }
+.sr-subcat-btn.skip:hover { color: var(--text-secondary); }
+
+/* Location step */
+.sr-location-body {
+  display: flex; flex-direction: column; align-items: center; gap: 16px;
+  padding: 12px 0;
+}
+.sr-location-icon { font-size: 44px; line-height: 1; }
+.sr-location-desc { font-size: 13px; color: var(--text-secondary); text-align: center; line-height: 1.55; max-width: 320px; }
+.sr-location-tags { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.sr-location-tag {
+  padding: 4px 12px; border-radius: 999px; font-size: 11.5px; font-weight: 600;
+  background: color-mix(in srgb, var(--accent, var(--violet)) 22%, transparent);
+  color: color-mix(in srgb, var(--accent, var(--violet)) 90%, var(--text-primary));
+  border: 1px solid color-mix(in srgb, var(--accent, var(--violet)) 35%, transparent);
+}
+
+/* Back link */
+.sr-back {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: none; border: none; cursor: pointer; pointer-events: all;
+  color: var(--accent, var(--violet)); font-size: 12.5px; padding: 0 0 16px;
+  font-family: var(--font);
+}
+.sr-back:hover { opacity: 0.75; }
+
+/* CTA button inside modal */
+.sr-cta {
+  width: 100%; display: flex; align-items: center; justify-content: center; gap: 9px;
+  padding: 13px 20px;
+  background: color-mix(in srgb, var(--accent, var(--violet)) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent, var(--violet)) 45%, transparent);
+  border-radius: 12px; cursor: pointer; pointer-events: all;
+  font-size: 14px; font-weight: 600; font-family: var(--font);
+  color: color-mix(in srgb, var(--accent, var(--violet)) 90%, var(--text-primary));
+  transition: background 160ms, box-shadow 160ms;
+}
+.sr-cta:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent, var(--violet)) 28%, transparent);
+  box-shadow: 0 4px 20px color-mix(in srgb, var(--accent, var(--violet)) 30%, transparent);
+}
+.sr-cta:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* =========================================================
    SHARED DETAIL AND LOGIN MODALS
    ========================================================= */
 .detail-modal-scrim,

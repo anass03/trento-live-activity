@@ -12,7 +12,6 @@ import {
   updateLanguageFormat,
   updateNotifications,
   updatePrivacyLocation,
-  updatePreferences,
   updateAccessibility,
   deleteAccount,
   logout as apiLogout,
@@ -22,7 +21,13 @@ import {
   updateConsent,
 } from "../lib/api";
 import { requestFcmToken, revokeFcmToken } from "../lib/firebase";
-import { setLanguage as setUiLanguage, currentLanguage } from "../lib/i18n";
+import {
+  setLanguage as setUiLanguage,
+  currentLanguage,
+  setStoredTimeFormat,
+  setStoredDistUnit,
+  setStoredLocationMode,
+} from "../lib/i18n";
 
 const FCM_TOKEN_KEY = "tla:fcmToken";
 
@@ -186,15 +191,6 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
   const [participVis, setParticipVis] = useState("public");
   const [showProfile, setShowProfile] = useState(true);
 
-  /* preferences */
-  const [interests, setInterests] = useState<string[]>([]);
-  const [reliableOnly, setReliableOnly] = useState(false);
-  const [verifiedOnly, setVerifiedOnly] = useState(false);
-  /* parking display preference — client-side so it also applies to guests */
-  const [parkingPref, setParkingPref] = useState<string>(() => {
-    try { return localStorage.getItem("tla:parkingPref") || "both"; } catch { return "both"; }
-  });
-
   /* accessibility */
   const [reduceAnim, setReduceAnim] = useState(false);
   const [highContrast, setHighContrast] = useState(false);
@@ -219,8 +215,12 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
         setLanguage(lang);
         // Allinea la lingua reale della UI a quella salvata sul backend.
         if (lang === "it" || lang === "en") setUiLanguage(lang);
-        setTimeFormat(s.timeFormat || "24h");
-        setDistUnit(s.distanceUnit || "km");
+        const tf = s.timeFormat || "24h";
+        const du = s.distanceUnit || "km";
+        setTimeFormat(tf);
+        setDistUnit(du);
+        setStoredTimeFormat(tf);
+        setStoredDistUnit(du);
         setNotif({
           email: s.emailNotificationsEnabled,
           push: s.pushNotificationsEnabled,
@@ -228,12 +228,11 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
           activities: s.activityNotificationsEnabled,
           cityAlerts: s.cityAlertNotificationsEnabled,
         });
-        setLocationMode(s.locationMode || "while_using");
+        const locMode = s.locationMode || "while_using";
+        setLocationMode(locMode);
+        setStoredLocationMode(locMode);
         setParticipVis(s.participationVisibility || "public");
         setShowProfile(s.showProfileInParticipants);
-        setInterests(s.interestsJson || []);
-        setReliableOnly(s.showOnlyReliableActivities);
-        setVerifiedOnly(s.showVerifiedActivities);
         setReduceAnim(s.reduceAnimations);
         setHighContrast(s.increaseContrast);
         setLargerText(s.largerText);
@@ -283,11 +282,10 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
     };
     if (key === "lang") {
       setLanguage(val);
-      // US-40: cambia davvero la lingua dell'interfaccia (persistita in tla:lang).
       if (val === "it" || val === "en") setUiLanguage(val);
     }
-    if (key === "time") setTimeFormat(val);
-    if (key === "dist") setDistUnit(val);
+    if (key === "time") { setTimeFormat(val); setStoredTimeFormat(val); }
+    if (key === "dist") { setDistUnit(val); setStoredDistUnit(val); }
 
     if (user?.role !== "anonymous") {
       setSavingSection("format");
@@ -372,7 +370,7 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
     let vis = participVis;
     let show = showProfile;
 
-    if (key === "loc") { setLocationMode(val); mode = val; }
+    if (key === "loc") { setLocationMode(val); mode = val; setStoredLocationMode(val); }
     if (key === "vis") { setParticipVis(val); vis = val; }
     if (key === "show") { setShowProfile(val); show = val; }
 
@@ -390,38 +388,6 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
         setSavingSection(null);
       }
     }
-  };
-
-  const handlePreferences = async (key: string, val: any) => {
-    let list = interests;
-    let reliable = reliableOnly;
-    let verified = verifiedOnly;
-
-    if (key === "ints") { setInterests(val); list = val; }
-    if (key === "rel") { setReliableOnly(val); reliable = val; }
-    if (key === "ver") { setVerifiedOnly(val); verified = val; }
-
-    if (user?.role !== "anonymous") {
-      setSavingSection("pref");
-      try {
-        await updatePreferences({
-          interestsJson: list,
-          showOnlyReliableActivities: reliable,
-          showVerifiedActivities: verified,
-        });
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setSavingSection(null);
-      }
-    }
-  };
-
-  const handleParkingPref = (val: string) => {
-    setParkingPref(val);
-    try { localStorage.setItem("tla:parkingPref", val); } catch { /* ignore */ }
-    // Notify the parking widget (same tab) to re-read the preference instantly.
-    window.dispatchEvent(new CustomEvent("tla:parkingpref"));
   };
 
   const handleAccessibility = async (key: string, val: boolean) => {
@@ -601,34 +567,8 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
           </SetCard>
           )}
 
-          {/* 5 — Preferenze (solo cittadini). Gli interessi vivono nel
-              profilo: qui solo il rimando, niente doppioni da tenere in sync. */}
-          {user?.role === "registered_user" && (
-          <SetCard num={5} title={t("settings.pref.title")} desc={t("settings.pref.desc")} icon="sparkle" color="var(--violet)">
-            <div>
-              <div className="s-sublabel" style={{ marginBottom: 8 }}>{t("settings.pref.interests")}</div>
-              <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 8 }}>{t("settings.pref.manageInProfile")}</div>
-              <button className="s-acc-btn" style={{ alignSelf: "flex-start" }} onClick={() => setPage("profilo")}>
-                <Icon name="user" size={15} />{t("settings.pref.goToProfile")}
-              </button>
-            </div>
-            <div className="s-div"></div>
-            <SetRow label={t("settings.pref.reliableOnly")} sub={t("settings.pref.reliableOnlySub")} on={reliableOnly} onChange={(val) => handlePreferences("rel", val)} disabled={savingSection === "pref"} />
-            <SetRow label={t("settings.pref.verifiedOnly")} sub={t("settings.pref.verifiedOnlySub")} on={verifiedOnly} onChange={(val) => handlePreferences("ver", val)} disabled={savingSection === "pref"} />
-            <div className="s-div"></div>
-            <div>
-              <div className="s-sublabel" style={{ marginBottom: 8 }}>{t("settings.pref.parking")}</div>
-              <SetRadio value={parkingPref} onChange={handleParkingPref} options={[
-                { id: "both", label: t("settings.pref.parkingBoth"), icon: "grid" },
-                { id: "car",  label: t("settings.pref.parkingCar"),  icon: "car" },
-                { id: "bike", label: t("settings.pref.parkingBike"), icon: "bike" },
-              ]} />
-            </div>
-          </SetCard>
-          )}
-
-          {/* 6 — Accessibilità */}
-          <SetCard num={6} title={t("settings.a11y.title")} desc={t("settings.a11y.desc")} icon="gauge" color="var(--green)">
+          {/* 5 — Accessibilità */}
+          <SetCard num={5} title={t("settings.a11y.title")} desc={t("settings.a11y.desc")} icon="gauge" color="var(--green)">
             <SetRow label={t("settings.a11y.reduceAnim")} sub={t("settings.a11y.reduceAnimSub")} on={reduceAnim} onChange={(val) => handleAccessibility("anim", val)} disabled={savingSection === "a11y"} />
             <div className="s-div"></div>
             <SetRow label={t("settings.a11y.contrast")} sub={t("settings.a11y.contrastSub")} on={highContrast} onChange={(val) => handleAccessibility("contrast", val)} disabled={savingSection === "a11y"} />
@@ -637,47 +577,44 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
           </SetCard>
 
           {/* 7 — Account (full-width) */}
-          <div className="s-card s-full anim-in" style={{ "--sc": "var(--cyan)", animationDelay: "420ms" } as React.CSSProperties}>
-            <div className="s-card-head">
-              <span className="s-card-ic"><Icon name="users" size={19} /></span>
-              <div className="s-num-title">
-                <div className="s-num">07</div>
-                <div className="s-title">{t("settings.account.title")}</div>
-                <div className="s-desc">{t("settings.account.desc")}</div>
+          <SetCard num={6} title={t("settings.account.title")} desc={t("settings.account.desc")} icon="users" color="var(--cyan)">
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div className="s-account-av" style={{ width: 46, height: 46, fontSize: 17, flex: "none" }}>
+                {user?.role === "anonymous" ? <Icon name="user" size={17} /> : (user?.avatar || "U")}
               </div>
-            </div>
-            <div className="s-account-body">
-              <div className="s-account-user">
-                <div className="s-account-av">{user?.role === "anonymous" ? <Icon name="user" size={18} /> : (user?.avatar || "U")}</div>
-                <div className="s-account-info">
-                  <div className="s-account-name">{user?.role === "anonymous" ? t("settings.guestName") : user?.name}</div>
-                  <div className="s-account-email">{user?.role === "anonymous" ? t("settings.guestEmail") : user?.email}</div>
-                  {user?.role !== "anonymous" && (
-                    <div className="s-account-badge"><Icon name="shieldCheck" size={9} />{t("settings.account.activeBadge")}</div>
-                  )}
+              <div className="s-account-info" style={{ minWidth: 0 }}>
+                <div className="s-account-name" style={{ fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {user?.role === "anonymous" ? t("settings.guestName") : user?.name}
                 </div>
-
-              </div>
-              <div className="s-account-actions">
-                {user?.role === "anonymous" ? (
-                  <>
-                    <button className="s-acc-btn accent" onClick={() => setPage("login")}><Icon name="logIn" size={17} />{t("header.login")}</button>
-                    <button className="s-acc-btn" onClick={() => setPage("registrazione")}><Icon name="user" size={17} />{t("header.register")}</button>
-                  </>
-                ) : (
-                  <button className="s-acc-btn accent" onClick={() => setPage("profilo")}><Icon name="users" size={17} />{t("settings.account.goToProfile")}</button>
-                )}
-                <button className="s-acc-btn" onClick={() => setLegalDoc("privacy")}><Icon name="settings" size={17} />{t("settings.account.privacyPolicy")}</button>
-                <button className="s-acc-btn" onClick={() => setLegalDoc("terms")}><Icon name="ticket" size={17} />{t("settings.account.terms")}</button>
+                <div className="s-account-email" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {user?.role === "anonymous" ? t("settings.guestEmail") : user?.email}
+                </div>
                 {user?.role !== "anonymous" && (
-                  <>
-                    <button className="s-acc-btn" style={{ marginLeft: "auto" }} onClick={handleLogout}><Icon name="x" size={17} />{t("settings.account.logout")}</button>
-                    <button className="s-acc-btn danger" onClick={() => setDeleting(true)}><Icon name="warn" size={17} />{t("settings.account.delete")}</button>
-                  </>
+                  <div className="s-account-badge"><Icon name="shieldCheck" size={9} />{t("settings.account.activeBadge")}</div>
                 )}
               </div>
             </div>
-          </div>
+            <div className="s-div"></div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {user?.role === "anonymous" ? (
+                <>
+                  <button className="s-acc-btn accent" style={{ width: "100%" }} onClick={() => setPage("login")}><Icon name="logIn" size={17} />{t("header.login")}</button>
+                  <button className="s-acc-btn" style={{ width: "100%" }} onClick={() => setPage("registrazione")}><Icon name="user" size={17} />{t("header.register")}</button>
+                </>
+              ) : (
+                <button className="s-acc-btn accent" style={{ width: "100%" }} onClick={() => setPage("profilo")}><Icon name="users" size={17} />{t("settings.account.goToProfile")}</button>
+              )}
+              <button className="s-acc-btn" style={{ width: "100%" }} onClick={() => setLegalDoc("privacy")}><Icon name="settings" size={17} />{t("settings.account.privacyPolicy")}</button>
+              <button className="s-acc-btn" style={{ width: "100%" }} onClick={() => setLegalDoc("terms")}><Icon name="ticket" size={17} />{t("settings.account.terms")}</button>
+              {user?.role !== "anonymous" && (
+                <>
+                  <div className="s-div"></div>
+                  <button className="s-acc-btn" style={{ width: "100%" }} onClick={handleLogout}><Icon name="x" size={17} />{t("settings.account.logout")}</button>
+                  <button className="s-acc-btn danger" style={{ width: "100%" }} onClick={() => setDeleting(true)}><Icon name="warn" size={17} />{t("settings.account.delete")}</button>
+                </>
+              )}
+            </div>
+          </SetCard>
 
         </div>
       </div>

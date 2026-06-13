@@ -56,3 +56,22 @@ export function setLanguage(lang: "it" | "en") {
 export function currentLanguage(): "it" | "en" {
   return i18n.language?.startsWith("en") ? "en" : "it";
 }
+
+export function getTimeFormat(): "24h" | "12h" {
+  try { return (localStorage.getItem("tla:timeFormat") as "24h" | "12h") || "24h"; } catch { return "24h"; }
+}
+export function setStoredTimeFormat(fmt: string): void {
+  try { localStorage.setItem("tla:timeFormat", fmt); } catch {}
+}
+export function getDistUnit(): "km" | "mi" {
+  try { return (localStorage.getItem("tla:distUnit") as "km" | "mi") || "km"; } catch { return "km"; }
+}
+export function setStoredDistUnit(unit: string): void {
+  try { localStorage.setItem("tla:distUnit", unit); } catch {}
+}
+export function getLocationMode(): "always" | "while_using" | "never" {
+  try { return (localStorage.getItem("tla:locationMode") as any) || "while_using"; } catch { return "while_using"; }
+}
+export function setStoredLocationMode(mode: string): void {
+  try { localStorage.setItem("tla:locationMode", mode); } catch {}
+}

@@ -4,6 +4,7 @@ import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
 import { GeocodedLocation } from "../components/ui/GeocodedLocation";
 import { getEventById, joinEvent, leaveEvent, deleteEvent, ApiEvent } from "../lib/api";
+import { getTimeFormat } from "../lib/i18n";
 import { ContentActions } from "../components/ui/ContentActions";
 
 const grads: Record<string, string> = {
@@ -20,8 +21,9 @@ const formatWhen = (value: any, lang?: string) => {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return null;
   const locale = lang?.startsWith("en") ? "en-GB" : "it-IT";
+  const hour12 = getTimeFormat() === "12h";
   return d.toLocaleDateString(locale, { weekday: "short", day: "numeric", month: "short" }) +
-    ", " + d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
+    ", " + d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", hour12 });
 };
 
 export function EventDetailPage({ page, setPage, theme, setTheme, user, selectedEventId }: any) {
