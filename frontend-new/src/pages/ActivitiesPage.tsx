@@ -11,6 +11,7 @@ import { Widget, useGlow } from "../components/redesign/widgets";
 import { Icon, WxIcon } from "../components/ui/Icon";
 import { GeocodedLocation } from "../components/ui/GeocodedLocation";
 import { getActivities, addFavorite, removeFavorite, getFavorites, getMyActivities, getTrentoWeather, ApiError, isActivityDeleted } from "../lib/api";
+import { getTimeFormat, getDistUnit } from "../lib/i18n";
 
 
 const ACT_CAT = {
@@ -122,13 +123,17 @@ const activityCat = (cat: any) => ACT_CAT[normalizeActivityCat(cat)];
 const activityGrad = (cat: any) => ACT_GRAD[normalizeActivityCat(cat)];
 const distanceLabel = (distance: any) => {
   const n = numOrNull(distance);
-  return n == null ? "" : ` · ${n.toFixed(n >= 10 ? 0 : 1)} km`;
+  if (n == null) return "";
+  const unit = getDistUnit();
+  const val = unit === "mi" ? n * 0.621371 : n;
+  return ` · ${val.toFixed(val >= 10 ? 0 : 1)} ${unit}`;
 };
 const formatActivityTime = (value: any, timeTbd: string, locale = "it-IT") => {
   if (!value) return timeTbd;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return timeTbd;
-  return date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
+  const hour12 = getTimeFormat() === "12h";
+  return date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", hour12 });
 };
 const durLabel = (m: any) => {
   const n = numOrNull(m);

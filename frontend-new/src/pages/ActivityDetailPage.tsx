@@ -4,6 +4,7 @@ import { Header } from "../components/layout/Header";
 import { Icon } from "../components/ui/Icon";
 import { GeocodedLocation } from "../components/ui/GeocodedLocation";
 import { getActivityById, joinActivity, leaveActivity, cancelActivity, removeFavorite, markActivityDeleted, ApiActivity } from "../lib/api";
+import { getTimeFormat } from "../lib/i18n";
 import { ContentActions } from "../components/ui/ContentActions";
 
 const grads: Record<string, string> = {
@@ -55,8 +56,9 @@ const formatWhen = (value: any, locale = "it-IT") => {
   if (!value) return null;
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return null;
+  const hour12 = getTimeFormat() === "12h";
   return d.toLocaleDateString(locale, { weekday: "short", day: "numeric", month: "short" }) +
-    ", " + d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
+    ", " + d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", hour12 });
 };
 
 export function ActivityDetailPage({ page, setPage, theme, setTheme, user, selectedActivityId }: any) {

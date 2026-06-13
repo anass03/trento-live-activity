@@ -37,7 +37,16 @@ import { AdminNotificationsPage } from "../pages/AdminNotificationsPage";
 import { PrivacyPage } from "../pages/PrivacyPage";
 import { TermsPage } from "../pages/TermsPage";
 import { getMe, getToken, setToken, UserRole, getHomeMapData, getMyActivities, getMyEvents, getParking, isActivityDeleted } from "../lib/api";
+import { getTimeFormat } from "../lib/i18n";
 import "../styles/revamp-pages.css";
+
+const fmtHHmm = (hhmm: string): string => {
+  if (!hhmm || getTimeFormat() !== "12h") return hhmm;
+  const [hStr, mStr] = hhmm.split(":");
+  const h = parseInt(hStr, 10);
+  if (isNaN(h)) return hhmm;
+  return `${h % 12 || 12}:${mStr} ${h >= 12 ? "PM" : "AM"}`;
+};
 
 function getSvgCoordinates(lat: number, lng: number, placeName?: string | null): { x: number, y: number } {
   const name = (placeName || "").toLowerCase();
@@ -187,7 +196,8 @@ function Clock() {
     return () => clearInterval(timer);
   }, []);
   const locale = dateLocale(i18n.language);
-  const time = now.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const hour12 = getTimeFormat() === "12h";
+  const time = now.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12 });
   const date = now.toLocaleDateString(locale, { weekday: "short", day: "numeric", month: "short" });
   return (
     <div className="clock-pill">
@@ -322,7 +332,7 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
       let timeStr = t("home.timeTBD");
       if (m.dateTime) {
         try {
-          timeStr = new Date(m.dateTime).toLocaleTimeString(dtLocale, { hour: "2-digit", minute: "2-digit" });
+          timeStr = new Date(m.dateTime).toLocaleTimeString(dtLocale, { hour: "2-digit", minute: "2-digit", hour12: getTimeFormat() === "12h" });
         } catch (e) {}
       }
 
@@ -405,8 +415,8 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
         id: e.id,
         cat,
         date: e.dateTime ? new Date(e.dateTime).toLocaleDateString(dateLocale(i18n.language), { day: "numeric", month: "short" }) : t("home.dateTBD"),
-        start: e.startTime ? e.startTime.slice(0, 5) : "N/D",
-        end: e.endTime ? e.endTime.slice(0, 5) : "N/D",
+        start: e.startTime ? fmtHHmm(e.startTime.slice(0, 5)) : "N/D",
+        end: e.endTime ? fmtHHmm(e.endTime.slice(0, 5)) : "N/D",
         going: e.participantCount ?? 0,
         cap: e.maxPartecipanti ?? 0,
         title: e.title,

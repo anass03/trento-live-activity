@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { getCityAlertById } from "../../lib/api";
+import { getTimeFormat } from "../../lib/i18n";
 import { Icon, WxIcon } from "./Icon";
 import { MiniMap } from "../map/MiniMap";
 
@@ -207,7 +208,7 @@ function WeatherContent({ data }: any) {
       <div className="dm-hourly">
         {hourly.length ? hourly.slice(0, 8).map((h: any) => (
           <div key={h.time} className="dm-hour-cell">
-            <span>{new Date(h.time).toLocaleTimeString(dtLocale, { hour: "2-digit" })}</span>
+            <span>{new Date(h.time).toLocaleTimeString(dtLocale, { hour: "2-digit", hour12: getTimeFormat() === "12h" })}</span>
             <b>{h.temperature ?? "--"}&deg;</b>
             <small>{t("detail.weather.rainPct", { pct: h.precipitationProbability ?? 0 })}</small>
           </div>

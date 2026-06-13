@@ -3,7 +3,7 @@
    =========================================================== */
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import i18n from "../lib/i18n";
+import i18n, { getTimeFormat } from "../lib/i18n";
 import { Header } from "../components/layout/Header";
 import { Avatars } from "../components/redesign/Avatars";
 import { Widget, useGlow } from "../components/redesign/widgets";
@@ -54,8 +54,9 @@ function formatEventWhen(e: any, lang?: string): string | null {
   const d = parseEventDate(e);
   if (!d) return null;
   const locale = lang?.startsWith("en") ? "en-GB" : "it-IT";
+  const hour12 = getTimeFormat() === "12h";
   const date = d.toLocaleDateString(locale, { weekday: "short", day: "numeric", month: "short" });
-  const time = d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
+  const time = d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", hour12 });
   return `${date}, ${time}`;
 }
 

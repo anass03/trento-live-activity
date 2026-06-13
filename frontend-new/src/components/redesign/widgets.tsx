@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { CAT_ICON, PLACES, catColor, catLabel } from "../../data/redesignData";
 import { Icon, WxIcon } from "../ui/Icon";
 import { getCityAlerts, getParking, getTrentoWeather } from "../../lib/api";
+import { getTimeFormat } from "../../lib/i18n";
 
 /* mouse-follow radial glow */
 export function useGlow() {
@@ -165,7 +166,7 @@ export function WeatherWidget({ delay, onOpen }: any) {
   const daily = weather?.daily?.[0];
   const hourly = weather?.hourly?.length
     ? weather.hourly.slice(0, 6).map((h: any) => ({
-      h: new Date(h.time).toLocaleTimeString(i18n.language.startsWith("en") ? "en-GB" : "it-IT", { hour: "2-digit" }),
+      h: new Date(h.time).toLocaleTimeString(i18n.language.startsWith("en") ? "en-GB" : "it-IT", { hour: "2-digit", hour12: getTimeFormat() === "12h" }),
       t: h.temperature != null ? Math.round(h.temperature) : "--",
       p: Math.max(0.12, Math.min(1, (h.precipitationProbability ?? 0) / 100)),
     }))
