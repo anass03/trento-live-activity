@@ -1,6 +1,6 @@
 const { DataTypes } = require('sequelize');
 
-const EVENT_CATEGORIES = ['sport', 'cultura', 'musica', 'arte', 'gastronomia', 'altro'];
+const EVENT_CATEGORIES = ['sport', 'cultura', 'musica', 'cibo', 'outdoor', 'famiglia', 'arte', 'gastronomia', 'altro'];
 
 module.exports = (sequelize) => {
   return sequelize.define('Event', {

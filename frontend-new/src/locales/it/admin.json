@@ -260,6 +260,68 @@
       "download": "Download"
     }
   },
+  "mapPicker": {
+    "kicker": "Posizione",
+    "title": "Scegli un punto sulla mappa",
+    "noPoint": "Nessun punto selezionato — clicca sulla mappa",
+    "cancel": "Annulla",
+    "confirm": "Conferma posizione"
+  },
+  "serviceRequest": {
+    "fab": "Segnala una necessità",
+    "widgetTitle": "Segnala una necessità",
+    "widgetDesc": "Manca qualcosa nel tuo quartiere?",
+    "widgetAll": "Tutte le categorie",
+    "kicker": "Necessità civica",
+    "title": "Segnala una Necessità Civica",
+    "subtitle": "Nessun testo libero — seleziona la categoria e indica il luogo",
+    "stepCategoryTitle": "Cosa manca?",
+    "stepSubcategoryTitle": "Più nello specifico?",
+    "stepLocationTitle": "Dove?",
+    "stepCategoryLabel": "Quale tipo di servizio ti serve?",
+    "stepSubcategoryLabel": "Vuoi essere più specifico?",
+    "stepLocationLabel": "Tocca la mappa per indicare la posizione esatta",
+    "back": "Indietro",
+    "skipSubcategory": "Nessuna preferenza / generico",
+    "chooseLocation": "Scegli posizione sulla mappa",
+    "submitting": "Invio...",
+    "success": "Segnalazione inviata — grazie!",
+    "error": "Qualcosa è andato storto. Riprova.",
+    "categories": {
+      "parcheggio_auto": "Parcheggio auto",
+      "parcheggio_bici": "Parcheggio bici",
+      "sport": "Area sportiva",
+      "studio": "Spazio studio",
+      "verde": "Area verde",
+      "cultura": "Cultura",
+      "ciclismo": "Ciclismo",
+      "altro": "Altro"
+    },
+    "subcategories": {
+      "coperto": "Coperto",
+      "scoperto": "All'aperto",
+      "disabili": "Accessibile",
+      "carica_ev": "Ricarica EV",
+      "rastrelliera": "Rastrelliera",
+      "box_bici": "Box bici",
+      "ping_pong": "Ping pong",
+      "basket": "Basket",
+      "calcetto": "Calcetto",
+      "pallavolo": "Pallavolo",
+      "atletica": "Atletica",
+      "yoga": "Yoga",
+      "altro_sport": "Altro sport",
+      "biblioteca": "Biblioteca",
+      "coworking": "Coworking",
+      "sala_studio": "Sala studio",
+      "teatro": "Teatro",
+      "cinema": "Cinema",
+      "museo": "Museo",
+      "sala_prove": "Sala prove",
+      "pista_ciclabile": "Pista ciclabile",
+      "pump_track": "Pump track"
+    }
+  },
   "ente": {
     "publish": {
       "title": "Pubblica Nuovo Contenuto",

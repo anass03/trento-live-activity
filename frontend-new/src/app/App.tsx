@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { Header } from "../components/layout/Header";
 import { TrentoMap } from "../components/map/TrentoMap";
 import { CreateActivityPanel } from "../components/map/CreateActivityPanel";
-import { ActiveAreasWidget, AlertsWidget, EventsWidget, MapLabels, MarkersLayer, ParkingWidget, WeatherWidget } from "../components/redesign/widgets";
+import { ActiveAreasWidget, AlertsWidget, EventsWidget, MapLabels, MarkersLayer, ParkingWidget, WeatherWidget, ServiceRequestWidget } from "../components/redesign/widgets";
 import { TrentoTweaks } from "../components/redesign/TrentoTweaks";
 import { LoginModal } from "../components/auth/LoginModal";
 import { Icon } from "../components/ui/Icon";
@@ -29,6 +29,7 @@ import { EntityPublishPage } from "../pages/EntityPublishPage";
 import { ComuneDashboardPage } from "../pages/ComuneDashboardPage";
 import { ComuneStatistichePage } from "../pages/ComuneStatistichePage";
 import { ComuneExportPage } from "../pages/ComuneExportPage";
+import { ServiceRequestModal } from "../components/ui/ServiceRequestModal";
 import { AdminPOIPage } from "../pages/AdminPOIPage";
 import { AdminUsersPage } from "../pages/AdminUsersPage";
 import { AdminEntitiesPage } from "../pages/AdminEntitiesPage";
@@ -223,6 +224,8 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
   const [loading, setLoading] = useState(false);
   // POI scelto dal popup mappa per creare un'attività (id + nome)
   const [createPoi, setCreatePoi] = useState<{ id: string; title: string } | null>(null);
+  // null = modal open no pre-selection, string = open with pre-selected cat, undefined = closed
+  const [srCategory, setSrCategory] = useState<string | null | undefined>(undefined);
   const [ownedIds, setOwnedIds] = useState<Set<string>>(new Set());
   const [parkingSpots, setParkingSpots] = useState<any[]>([]);
 
@@ -584,6 +587,9 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
         <div className="col-right">
           <ActiveAreasWidget delay={140} areas={dynamicAreas} onOpen={setDetail} />
           <EventsWidget delay={240} onFocus={openEventPopup} events={dynamicEvents} onWidgetClick={() => setPage("eventi")} />
+          {user?.role === "registered_user" && (
+            <ServiceRequestWidget delay={340} onOpen={(cat) => setSrCategory(cat ?? null)} />
+          )}
         </div>
       </div>
 
@@ -612,6 +618,14 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
           poi={createPoi}
           onClose={() => setCreatePoi(null)}
           onCreated={() => { loadMapData(); refreshOwnedIds(); }}
+        />
+      )}
+
+      {srCategory !== undefined && (
+        <ServiceRequestModal
+          theme={theme}
+          initialCategory={srCategory ?? undefined}
+          onClose={() => setSrCategory(undefined)}
         />
       )}
 

@@ -260,6 +260,68 @@
       "download": "Download"
     }
   },
+  "mapPicker": {
+    "kicker": "Location",
+    "title": "Pick a point on the map",
+    "noPoint": "No point selected — click the map",
+    "cancel": "Cancel",
+    "confirm": "Confirm location"
+  },
+  "serviceRequest": {
+    "fab": "Report a need",
+    "widgetTitle": "Report a need",
+    "widgetDesc": "Is something missing in your neighbourhood?",
+    "widgetAll": "All categories",
+    "kicker": "Civic need",
+    "title": "Report a Civic Need",
+    "subtitle": "No free text — select a category and pin the location",
+    "stepCategoryTitle": "What's missing?",
+    "stepSubcategoryTitle": "More specific?",
+    "stepLocationTitle": "Where?",
+    "stepCategoryLabel": "What type of service do you need?",
+    "stepSubcategoryLabel": "More specific?",
+    "stepLocationLabel": "Tap the map to pin the exact location",
+    "back": "Back",
+    "skipSubcategory": "No preference / general",
+    "chooseLocation": "Pick location on map",
+    "submitting": "Sending...",
+    "success": "Request sent — thank you!",
+    "error": "Something went wrong. Please try again.",
+    "categories": {
+      "parcheggio_auto": "Car parking",
+      "parcheggio_bici": "Bike parking",
+      "sport": "Sports area",
+      "studio": "Study space",
+      "verde": "Green area",
+      "cultura": "Culture",
+      "ciclismo": "Cycling",
+      "altro": "Other"
+    },
+    "subcategories": {
+      "coperto": "Covered",
+      "scoperto": "Open-air",
+      "disabili": "Accessible",
+      "carica_ev": "EV charging",
+      "rastrelliera": "Bike rack",
+      "box_bici": "Bike locker",
+      "ping_pong": "Ping pong",
+      "basket": "Basketball",
+      "calcetto": "Five-a-side",
+      "pallavolo": "Volleyball",
+      "atletica": "Athletics",
+      "yoga": "Yoga",
+      "altro_sport": "Other sport",
+      "biblioteca": "Library",
+      "coworking": "Coworking",
+      "sala_studio": "Study room",
+      "teatro": "Theatre",
+      "cinema": "Cinema",
+      "museo": "Museum",
+      "sala_prove": "Rehearsal room",
+      "pista_ciclabile": "Cycling lane",
+      "pump_track": "Pump track"
+    }
+  },
   "ente": {
     "publish": {
       "title": "Publish New Content",

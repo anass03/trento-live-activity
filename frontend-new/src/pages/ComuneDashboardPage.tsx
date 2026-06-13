@@ -176,6 +176,36 @@ export function ComuneDashboardPage({ page, setPage, theme, setTheme, user }: an
           </div>
         </div>
 
+        {/* Citizen Needs Panel */}
+        {serviceStats && serviceStats.total > 0 && (
+          <div className="revamp-chart-card anim-in" style={{ "--accent": "var(--magenta)", animationDelay: "360ms" } as React.CSSProperties}>
+            <h3>
+              📍 {t("comune.dashboard.kpiRequests")}
+              <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: "var(--text-muted)" }}>
+                {serviceStats.total} {t("comune.dashboard.recent").toLowerCase()}
+              </span>
+            </h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
+              {serviceStats.byCategory.slice(0, 6).map((row: any) => {
+                const pct = Math.round((Number(row.count) / serviceStats.total) * 100);
+                return (
+                  <div key={row.categoria} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}>
+                        <span style={{ fontWeight: 500, textTransform: "capitalize" }}>{row.categoria.replace(/_/g, " ")}</span>
+                        <span style={{ color: "var(--text-muted)" }}>{row.count} ({pct}%)</span>
+                      </div>
+                      <div style={{ height: 5, borderRadius: 3, background: "var(--border-soft, rgba(255,255,255,0.08))" }}>
+                        <div style={{ height: "100%", borderRadius: 3, width: `${pct}%`, background: "var(--magenta)", transition: "width 0.5s" }} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
