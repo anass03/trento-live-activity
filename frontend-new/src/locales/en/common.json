@@ -108,7 +108,8 @@
       "participants": "Participants",
       "join": "Join",
       "view": "View details",
-      "close": "Close"
+      "close": "Close",
+      "centerOnMap": "Center on map"
     }
   },
   "detail": {
@@ -214,7 +215,18 @@
     "deleteActivity": "Delete activity",
     "deletingActivity": "Deleting…",
     "deleteConfirm": "Permanently delete this activity?",
-    "deleteError": "Could not delete the activity."
+    "deleteError": "Could not delete the activity.",
+    "noneSelected": "No activity selected.",
+    "detailLoading": "Loading activity details...",
+    "detailLoadError": "Failed to load activity.",
+    "notFound": "Activity not found.",
+    "backToActivities": "Back to Activities",
+    "when": "When",
+    "duration": "Duration",
+    "participation": "Participation",
+    "seatsTaken": "Seats taken",
+    "seatsOf": "<b>{{count}}</b> of <b>{{limit}}</b> seats taken",
+    "defaultTitle": "Activity in Trento"
   },
   "toast": {
     "closeAria": "Dismiss notification",
@@ -305,6 +317,9 @@
       "status": "Status",
       "createHere": "Create activity here",
       "loginToCreate": "Sign in as a citizen to create an activity here"
-    }
+    },
+    "adminHint": "Sign in as a citizen to interact",
+    "outsideTrento": "You're outside the Trento area",
+    "outsideTrentoHint": "The map only shows the Trento area and surroundings."
   }
 }

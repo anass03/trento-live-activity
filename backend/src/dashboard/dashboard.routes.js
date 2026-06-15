@@ -14,7 +14,7 @@ router.get('/service-requests/recent', authenticate, authorize('AmministratoreCo
   try {
     const limit = Math.min(Number(req.query.limit ?? 10), 50);
     const rows = await ServiceRequest.findAll({
-      attributes: ['id', 'categoria', 'sottocategoria', 'createdAt'],
+      attributes: ['id', 'categoria', 'sottocategoria', 'indirizzo', 'latitudine', 'longitudine', 'createdAt'],
       order: [['createdAt', 'DESC']],
       limit,
       raw: true,

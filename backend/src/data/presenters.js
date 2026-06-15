@@ -112,8 +112,9 @@ function serializeActivity(record) {
 
   return {
     id: activity.id,
-    title: `Attività di ${capitalize(activity.tipo)}`,
-    description: null,
+    title: activity.title || activity.titolo || null,
+    tipo: activity.tipo,
+    description: activity.description || activity.descrizione || null,
     category: activity.tipo,
     location: locationFor(activity),
     participantCount: participants.length,
@@ -174,7 +175,7 @@ function markerFromActivity(record) {
   return {
     id: `activity:${activity.id}`,
     type: 'activity',
-    title: `Attività di ${capitalize(activity.tipo)}`,
+    title: activity.title || activity.titolo || activity.tipo,
     latitude: activity.latitudine,
     longitude: activity.longitudine,
     crowdingStatus: crowdingStatus(activity.poi?.statoAffollamento),

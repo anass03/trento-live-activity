@@ -155,6 +155,12 @@
     "email": "Email:",
     "none": "Nessuna",
     "guestRole": "Ospite",
+    "roles": {
+      "Cittadino": "Cittadino",
+      "EnteCertificato": "Ente Certificato",
+      "AmministratoreComunale": "Amministratore Comunale",
+      "AmministratoreDiSistema": "Amministratore di Sistema"
+    },
     "entityName": "Nome Ente:",
     "approvalStatus": "Stato Approvazione:",
     "approved": "Approvato",

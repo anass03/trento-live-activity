@@ -20,7 +20,20 @@ function pill(type: string) {
   return "info";
 }
 
-export function ComuneDashboardPage({ page, setPage, theme, setTheme, user }: any) {
+function srCatPill(cat: string): string {
+  switch (cat) {
+    case "parcheggio_auto": return "warning";
+    case "parcheggio_bici": return "success";
+    case "sport":           return "info";
+    case "studio":          return "info";
+    case "verde":           return "success";
+    case "cultura":         return "warning";
+    case "ciclismo":        return "success";
+    default:                return "danger";
+  }
+}
+
+export function ComuneDashboardPage({ page, setPage, theme, setTheme, user, onShowOnMap }: any) {
   const { t, i18n } = useTranslation();
   const [stats, setStats] = useState<any>(null);
   const [serviceStats, setServiceStats] = useState<any>(null);
@@ -30,6 +43,7 @@ export function ComuneDashboardPage({ page, setPage, theme, setTheme, user }: an
   const [recentRequests, setRecentRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [drillDown, setDrillDown] = useState<DrillDown>(null);
+  const [selectedRequest, setSelectedRequest] = useState<any>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -260,10 +274,12 @@ export function ComuneDashboardPage({ page, setPage, theme, setTheme, user }: an
                     <tr><td colSpan={3} style={{ textAlign: "center", color: "var(--text-muted)", padding: "20px 0" }}>—</td></tr>
                   )}
                   {recentRequests.map((r: any) => (
-                    <tr key={r.id}>
-                      <td><span className="revamp-status-pill danger">{r.categoria.replace(/_/g, " ")}</span></td>
-                      <td style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                        {r.sottocategoria ? r.sottocategoria.replace(/_/g, " ") : <em style={{ color: "var(--text-faint)" }}>—</em>}
+                    <tr key={r.id} style={{ cursor: "pointer" }} onClick={() => setSelectedRequest(r)} title={t("comune.dashboard.clickToView")}>
+                      <td><span className={`revamp-status-pill ${srCatPill(r.categoria)}`}>{t(`serviceRequest.categories.${r.categoria}`, { defaultValue: r.categoria.replace(/_/g, " ") })}</span></td>
+                      <td style={{ fontSize: 12 }}>
+                        {r.sottocategoria
+                          ? <span className="revamp-status-pill info">{t(`serviceRequest.subcategories.${r.sottocategoria}`, { defaultValue: r.sottocategoria.replace(/_/g, " ") })}</span>
+                          : <em style={{ color: "var(--text-faint)" }}>—</em>}
                       </td>
                       <td style={{ fontSize: 12, color: "var(--text-muted)" }}>
                         {r.createdAt ? new Date(r.createdAt).toLocaleDateString(locale) : "—"}
@@ -294,15 +310,23 @@ export function ComuneDashboardPage({ page, setPage, theme, setTheme, user }: an
                 {recentLogs.length === 0 && (
                   <tr><td colSpan={3} style={{ textAlign: "center", color: "var(--text-muted)", padding: "20px 0" }}>—</td></tr>
                 )}
-                {recentLogs.map((log) => (
-                  <tr key={log.id}>
-                    <td>
-                      <span className={`revamp-status-pill ${pill(log.type)}`}>{log.type}</span>
-                    </td>
-                    <td>{log.desc}</td>
-                    <td style={{ whiteSpace: "nowrap" }}>{log.time}</td>
-                  </tr>
-                ))}
+                {recentLogs.map((log) => {
+                  const isReq = log.id.startsWith("sr-");
+                  const reqData = isReq ? recentRequests.find((r: any) => `sr-${r.id}` === log.id) : null;
+                  return (
+                    <tr key={log.id}
+                      style={isReq ? { cursor: "pointer" } : undefined}
+                      onClick={isReq && reqData ? () => setSelectedRequest(reqData) : undefined}
+                      title={isReq ? t("comune.dashboard.clickToView") : undefined}
+                    >
+                      <td>
+                        <span className={`revamp-status-pill ${pill(log.type)}`}>{log.type}</span>
+                      </td>
+                      <td>{log.desc}</td>
+                      <td style={{ whiteSpace: "nowrap" }}>{log.time}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -326,7 +350,7 @@ export function ComuneDashboardPage({ page, setPage, theme, setTheme, user }: an
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 5 }}>
-                          <span style={{ fontWeight: 600, textTransform: "capitalize" }}>{row.categoria.replace(/_/g, " ")}</span>
+                          <span style={{ fontWeight: 600 }}>{t(`serviceRequest.categories.${row.categoria}`, { defaultValue: row.categoria.replace(/_/g, " ") })}</span>
                           <span style={{ color: "var(--text-muted)" }}>{row.count} ({pct}%)</span>
                         </div>
                         <div style={{ height: 5, borderRadius: 3, background: "var(--border-soft)" }}>
@@ -346,7 +370,7 @@ export function ComuneDashboardPage({ page, setPage, theme, setTheme, user }: an
                             color: "color-mix(in srgb, var(--magenta) 85%, var(--text-primary))",
                             fontWeight: 500,
                           }}>
-                            {s.sottocategoria.replace(/_/g, " ")} <b>({s.count})</b>
+                            {t(`serviceRequest.subcategories.${s.sottocategoria}`, { defaultValue: s.sottocategoria.replace(/_/g, " ") })} <b>({s.count})</b>
                           </span>
                         ))}
                       </div>
@@ -359,6 +383,66 @@ export function ComuneDashboardPage({ page, setPage, theme, setTheme, user }: an
         )}
 
       </div>
+
+      {/* Request detail modal */}
+      {selectedRequest && (
+        <div className="login-modal-scrim" onMouseDown={() => setSelectedRequest(null)} style={{ zIndex: 200 }}>
+          <div className="login-modal" style={{ width: "min(500px, 96%)", padding: "28px 30px" }}
+            onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+            <button className="detail-modal-close login-modal-x" onClick={() => setSelectedRequest(null)} aria-label={t("widgets.popup.close")}>
+              <Icon name="x" size={17} />
+            </button>
+
+            {/* Header pills */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+              <span className={`revamp-status-pill ${srCatPill(selectedRequest.categoria)}`} style={{ fontSize: 12 }}>
+                {t(`serviceRequest.categories.${selectedRequest.categoria}`, { defaultValue: selectedRequest.categoria.replace(/_/g, " ") })}
+              </span>
+              {selectedRequest.sottocategoria && (
+                <span className="revamp-status-pill info" style={{ fontSize: 12 }}>
+                  {t(`serviceRequest.subcategories.${selectedRequest.sottocategoria}`, { defaultValue: selectedRequest.sottocategoria.replace(/_/g, " ") })}
+                </span>
+              )}
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {/* Date */}
+              <div style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13.5 }}>
+                <Icon name="calendar" size={15} style={{ color: "var(--text-muted)", marginTop: 2, flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 11.5, color: "var(--text-muted)", marginBottom: 2, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("comune.dashboard.colDate")}</div>
+                  <div>{selectedRequest.createdAt ? new Date(selectedRequest.createdAt).toLocaleString(locale) : "—"}</div>
+                </div>
+              </div>
+
+              {/* Location */}
+              <div style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13.5 }}>
+                <Icon name="pin" size={15} style={{ color: "var(--text-muted)", marginTop: 2, flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 11.5, color: "var(--text-muted)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("comune.dashboard.colPosition")}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ flex: 1 }}>
+                      {selectedRequest.indirizzo ?? <em style={{ color: "var(--text-faint)" }}>{t("comune.dashboard.noPosition")}</em>}
+                    </span>
+                    {selectedRequest.latitudine != null && selectedRequest.longitudine != null && onShowOnMap && (
+                      <button
+                        className="revamp-action-btn"
+                        style={{ flexShrink: 0, padding: "5px 10px", fontSize: 12, height: "auto" }}
+                        onClick={() => {
+                          setSelectedRequest(null);
+                          onShowOnMap(selectedRequest.latitudine, selectedRequest.longitudine);
+                        }}
+                      >
+                        <Icon name="map" size={13} /> {t("comune.dashboard.showOnMap")}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

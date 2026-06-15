@@ -109,7 +109,7 @@ async function listEvents({ categoria, q, page, limit }) {
     distinct: true,
     limit,
     offset: (page - 1) * limit,
-    order: [['createdAt', 'DESC']],
+    order: [['startDateTime', 'ASC'], ['createdAt', 'ASC']],
   });
   return { events: rows.map(serializeEvent), total: count, page, limit };
 }

@@ -240,7 +240,6 @@
 .act-badge.now { border-color: color-mix(in srgb, var(--teal) 55%, transparent); color: color-mix(in srgb, var(--teal) 82%, white); }
 .act-badge.rising { border-color: color-mix(in srgb, var(--amber) 55%, transparent); color: color-mix(in srgb, var(--amber) 85%, white); }
 .act-save {
-  position: absolute; top: 10px; right: 10px; z-index: 2;
   width: 32px; height: 32px; border-radius: 50%; border: none; display: grid; place-items: center;
   background: rgba(8,12,22,0.5); color: #fff; backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.18);
   transition: background 150ms ease, color 150ms ease;

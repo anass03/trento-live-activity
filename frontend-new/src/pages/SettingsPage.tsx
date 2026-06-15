@@ -24,6 +24,8 @@ import { requestFcmToken, revokeFcmToken } from "../lib/firebase";
 import {
   setLanguage as setUiLanguage,
   currentLanguage,
+  getTimeFormat,
+  getDistUnit,
   setStoredTimeFormat,
   setStoredDistUnit,
   setStoredLocationMode,
@@ -205,6 +207,21 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
   useEffect(() => {
     const fetchSettings = async () => {
       if (user?.role === "anonymous") {
+        const tf = getTimeFormat();
+        const du = getDistUnit();
+        setTimeFormat(tf);
+        setDistUnit(du);
+        setLanguage(currentLanguage());
+        try {
+          const ve = localStorage.getItem("tla:visualEffects");
+          if (ve) setVisualEffects(ve);
+          const ra = localStorage.getItem("tla:reduceAnim");
+          if (ra !== null) setReduceAnim(ra === "true");
+          const hc = localStorage.getItem("tla:highContrast");
+          if (hc !== null) setHighContrast(hc === "true");
+          const lt = localStorage.getItem("tla:largerText");
+          if (lt !== null) setLargerText(lt === "true");
+        } catch {}
         setLoading(false);
         return;
       }
@@ -262,6 +279,7 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
 
   const handleVisualEffects = async (val: string) => {
     setVisualEffects(val);
+    try { localStorage.setItem("tla:visualEffects", val); } catch {}
     if (user?.role !== "anonymous") {
       setSavingSection("aspetto");
       try {
@@ -399,19 +417,25 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
     if (key === "contrast") { setHighContrast(val); contrast = val; }
     if (key === "text") { setLargerText(val); text = val; }
 
-    if (user?.role !== "anonymous") {
-      setSavingSection("a11y");
+    if (user?.role === "anonymous") {
       try {
-        await updateAccessibility({
-          reduceAnimations: anim,
-          increaseContrast: contrast,
-          largerText: text,
-        });
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setSavingSection(null);
-      }
+        localStorage.setItem("tla:reduceAnim", String(anim));
+        localStorage.setItem("tla:highContrast", String(contrast));
+        localStorage.setItem("tla:largerText", String(text));
+      } catch {}
+      return;
+    }
+    setSavingSection("a11y");
+    try {
+      await updateAccessibility({
+        reduceAnimations: anim,
+        increaseContrast: contrast,
+        largerText: text,
+      });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSavingSection(null);
     }
   };
 

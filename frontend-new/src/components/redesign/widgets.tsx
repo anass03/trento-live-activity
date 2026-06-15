@@ -488,9 +488,13 @@ export function ServiceRequestWidget({ delay, onOpen }: { delay?: number; onOpen
           </button>
         ))}
       </div>
-      <div className="widget-foot">
-        <button className="link-btn" onClick={(e) => { e.stopPropagation(); onOpen(); }}>
-          <span>{t("serviceRequest.widgetAll")}</span>
+      <div style={{ marginTop: 8 }}>
+        <button className="sr-cat-pill" style={{ "--accent": "var(--violet)", width: "100%", justifyContent: "space-between" } as React.CSSProperties}
+          onClick={(e) => { e.stopPropagation(); onOpen(); }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
+            <Icon name="grid" size={13} />
+            {t("serviceRequest.widgetAll")}
+          </span>
           <Icon name="arrow" size={15} />
         </button>
       </div>

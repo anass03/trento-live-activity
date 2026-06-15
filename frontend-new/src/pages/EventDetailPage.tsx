@@ -5,6 +5,7 @@ import { Icon } from "../components/ui/Icon";
 import { GeocodedLocation } from "../components/ui/GeocodedLocation";
 import { getEventById, joinEvent, leaveEvent, deleteEvent, addFavorite, removeFavorite, getFavorites, ApiEvent } from "../lib/api";
 import { getTimeFormat } from "../lib/i18n";
+import { shareOrCopy } from "../lib/share";
 import { ContentActions } from "../components/ui/ContentActions";
 
 const grads: Record<string, string> = {
@@ -124,16 +125,10 @@ export function EventDetailPage({ page, setPage, theme, setTheme, user, selected
     if (!event) return;
     const text = `${event.title} — ${event.location || "Trento"}`;
     try {
-      if (navigator.share) {
-        await navigator.share({ title: event.title, text, url: window.location.href });
-      } else {
-        await navigator.clipboard.writeText(`${text}\n${window.location.href}`);
-      }
+      await shareOrCopy({ title: event.title, text, url: window.location.href });
       setShared(true);
       setTimeout(() => setShared(false), 1800);
-    } catch {
-      // dismissed or clipboard denied
-    }
+    } catch { /* share sheet dismissed */ }
   };
 
   if (loading) {
@@ -202,9 +197,9 @@ export function EventDetailPage({ page, setPage, theme, setTheme, user, selected
                 >
                   <Icon name={shared ? "check" : "share"} size={16} />
                 </button>
-                {user?.role === "registered_user" && (
+                {(user?.role === "registered_user" || user?.role === "anonymous") && (
                   <button
-                    onClick={handleSave}
+                    onClick={user?.role === "anonymous" ? () => setPage("login") : handleSave}
                     disabled={savePending}
                     title={t("events.ariaSave")}
                     style={{
@@ -275,7 +270,7 @@ export function EventDetailPage({ page, setPage, theme, setTheme, user, selected
                   <Icon name="warn" size={11} /> {joinError}
                 </div>
               )}
-              {user?.role === "registered_user" && (
+              {user?.role === "registered_user" ? (
                 <button
                   className={"revamp-form-btn" + (isJoined ? " joined" : "")}
                   style={{ "--accent": "var(--magenta)", opacity: joinPending ? 0.6 : 1 } as React.CSSProperties}
@@ -284,7 +279,15 @@ export function EventDetailPage({ page, setPage, theme, setTheme, user, selected
                 >
                   {joinPending ? t("events.joining") : isJoined ? t("events.cancelJoin") : t("events.joinCta")}
                 </button>
-              )}
+              ) : user?.role === "anonymous" ? (
+                <button
+                  className="revamp-form-btn"
+                  style={{ "--accent": "var(--magenta)" } as React.CSSProperties}
+                  onClick={() => setPage("login")}
+                >
+                  {t("events.joinCta")}
+                </button>
+              ) : null}
               <ContentActions
                 kind="event"
                 id={event.id}

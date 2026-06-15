@@ -177,6 +177,7 @@ export function LoginModal({ open, onClose, onSuccess, onRegister, onPasswordRes
   const [showOtp, setShowOtp] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPw, setShowPw] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -191,6 +192,7 @@ export function LoginModal({ open, onClose, onSuccess, onRegister, onPasswordRes
     setPassword("");
     setOtpToken("");
     setShowOtp(false);
+    setShowPw(false);
     setError("");
   }, [open]);
 
@@ -274,13 +276,16 @@ export function LoginModal({ open, onClose, onSuccess, onRegister, onPasswordRes
             <div className="revamp-form-input-wrap">
               <Icon name="key" size={16} />
               <input
-                type="password"
-                className="revamp-form-input"
+                type={showPw ? "text" : "password"}
+                className="revamp-form-input has-reveal"
                 placeholder={t("auth.passwordPlaceholder")}
                 value={password}
                 disabled={loading || showOtp}
                 onChange={(e) => setPassword(e.target.value)}
               />
+              <button type="button" className="pw-reveal-btn" onClick={() => setShowPw((v) => !v)} disabled={loading || showOtp} aria-label={showPw ? "Hide password" : "Show password"}>
+                <Icon name={showPw ? "eyeOff" : "eye"} size={16} />
+              </button>
             </div>
           </div>
 

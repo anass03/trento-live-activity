@@ -5,7 +5,7 @@
    (detail-modal*) con varianti .legal-modal definite in
    styles/settings-redesign.css.
    =========================================================== */
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "./Icon";
 import { PrivacyContent, TermsContent } from "../legal/LegalContent";
@@ -17,12 +17,19 @@ type LegalModalProps = {
 
 export function LegalModal({ doc, onClose }: LegalModalProps) {
   const { t } = useTranslation();
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    if (bodyRef.current) bodyRef.current.scrollTop = 0;
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose, doc]);
 
   const title = doc === "privacy" ? t("legal.privacy.title") : t("legal.terms.title");
 
@@ -44,7 +51,7 @@ export function LegalModal({ doc, onClose }: LegalModalProps) {
             <Icon name="x" size={17} />
           </button>
         </div>
-        <div className="detail-modal-body legal-modal-body">
+        <div ref={bodyRef} className="detail-modal-body legal-modal-body">
           {doc === "privacy" ? <PrivacyContent /> : <TermsContent />}
         </div>
       </div>

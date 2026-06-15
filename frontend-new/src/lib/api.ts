@@ -23,7 +23,8 @@ export interface ApiEvent {
 
 export interface ApiActivity {
   id: string;
-  title: string;
+  title: string | null;
+  tipo?: string | null;
   description: string | null;
   category: string;
   location: string | null;
@@ -622,6 +623,9 @@ export interface ServiceRequestEntry {
   categoria: string;
   sottocategoria: string | null;
   createdAt: string;
+  indirizzo?: string | null;
+  latitudine?: number | null;
+  longitudine?: number | null;
 }
 
 export function getDashboardRecentServiceRequests(limit = 10): Promise<ServiceRequestEntry[]> {
