@@ -89,7 +89,7 @@ export function ComuneExportPage({ page, setPage, theme, setTheme, user }: any) 
           </div>
         )}
 
-        <div className="revamp-charts-grid" style={{ gridTemplateColumns: "1fr 2fr" }}>
+        <div className="revamp-charts-grid export-grid">
           {/* Export request form */}
           <div className="revamp-chart-card anim-in" style={{ "--accent": "var(--violet)", animationDelay: "60ms" }}>
             <h3>{t("comune.export.newTitle")}</h3>

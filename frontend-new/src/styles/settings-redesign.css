@@ -177,6 +177,11 @@
   padding: 7px 10px 9px; font-size: 12.5px; font-weight: 700;
   border-top: 1px solid var(--border-soft-2); color: var(--text-secondary);
 }
+/* on narrow phones the 3 theme cards get tight — keep "Automatico" from clipping */
+@media (max-width: 480px) {
+  .tc-label { padding: 6px 4px 8px; font-size: 11px; text-align: center; }
+  .tc-preview { padding: 7px; }
+}
 
 /* =========================================================
    INTEREST CHIPS

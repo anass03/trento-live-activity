@@ -1094,17 +1094,36 @@ button { font-family: inherit; cursor: pointer; }
   /* su mobile le barre sono in basso (kindbar sopra le categorie): 12px di gap */
   .kindbar { top: auto; bottom: 152px; }
 
-  /* widget: la colonna sinistra sparisce, la destra resta come striscia
-     compatta scrollabile in alto (meteo/eventi restano raggiungibili) */
-  .col-left { display: none; }
-  .col-right {
-    left: 12px; right: 12px; top: auto; bottom: 196px;
-    width: auto; max-height: 30vh; overflow-y: auto;
+  /* widget: su mobile NON si nasconde più la colonna sinistra. Tutti i widget
+     (meteo, avvisi, parcheggi, aree, eventi, richieste) confluiscono in un
+     unico vassoio in basso, scorribile verticalmente sopra le barre filtro. */
+  .layer-widgets {
+    position: absolute; inset: auto 10px 196px 10px; top: auto;
+    z-index: 6;
+    display: flex; flex-direction: column; gap: 10px;
+    max-height: 38vh; overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     pointer-events: auto;
+    /* sfuma il bordo superiore così si capisce che si può scorrere */
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14px);
+            mask-image: linear-gradient(to bottom, transparent 0, #000 14px);
+    padding-top: 8px;
   }
+  .col-left, .col-right {
+    position: static; inset: auto; width: auto;
+    display: flex; flex-direction: column; gap: 10px;
+    align-items: stretch; pointer-events: auto;
+  }
+  .col-left { display: flex; }
+  .layer-widgets::-webkit-scrollbar { width: 0; }
 
-  .map-controls { bottom: 14px; padding: 5px; max-width: calc(100vw - 90px); }
+  .map-controls { bottom: 14px; padding: 5px; max-width: calc(100vw - 24px); }
   .mc-btn { height: 34px; min-width: 34px; padding: 0 9px; font-size: 11.5px; }
+  /* icona-soltanto su mobile: i label testuali (3D / Posizione / Reset) sparirebbero
+     fuori schermo, così la barra controlli entra per intero */
+  .mc-label { display: none; }
+  .mc-btn { gap: 0; padding: 0 8px; }
   .compass { right: 12px; bottom: 14px; transform: scale(0.8); }
 
   .revamp-admin-layout { padding: 16px 12px 40px; }

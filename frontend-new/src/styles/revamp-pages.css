@@ -258,6 +258,16 @@
 }
 .revamp-profile-tab:hover { color: var(--text-secondary); background: var(--hover-fill); }
 .revamp-profile-tab.active { color: var(--text-primary); background: var(--chip-fill); border: 1px solid var(--border-soft); }
+/* On phones the 3 long tab labels squeeze and wrap onto several lines — make the
+   nav a horizontal scroll strip with each tab on a single line instead. */
+@media (max-width: 640px) {
+  .revamp-profile-nav {
+    flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .revamp-profile-nav::-webkit-scrollbar { display: none; }
+  .revamp-profile-tab { flex: 0 0 auto; white-space: nowrap; }
+}
 
 /* ---- KPI metrics dashboard cards ---- */
 .revamp-kpi-grid {
@@ -282,6 +292,13 @@
 .revamp-comune-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; }
 .revamp-comune-head h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.03em; margin: 0; }
 .revamp-comune-head p { font-size: 14px; color: var(--text-secondary); margin: 6px 0 0; }
+/* On phones the title + action buttons don't fit one row — let the head wrap so
+   the buttons drop below the title instead of clipping off the right edge. */
+@media (max-width: 640px) {
+  .revamp-comune-head { flex-wrap: wrap; gap: 14px; }
+  .revamp-comune-head h1 { font-size: 24px; }
+  .revamp-comune-head > div:last-child { flex-wrap: wrap; }
+}
 
 .revamp-filter-card {
   padding: 16px 20px; border-radius: var(--radius-lg); background: linear-gradient(150deg, var(--glass-1), var(--glass-2));
@@ -295,6 +312,16 @@
 /* ---- Charts ---- */
 .revamp-charts-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 20px; }
 @media (max-width: 900px) { .revamp-charts-grid { grid-template-columns: 1fr; } }
+
+/* Export page: form (1fr) + recent-exports log (2fr). Was an inline style that
+   beat the media query and never collapsed; as a class it stacks on mobile and
+   min-width:0 lets the wide log table scroll inside its card (overflow-x) instead
+   of blowing the column past the viewport. */
+.revamp-charts-grid.export-grid { grid-template-columns: 1fr 2fr; }
+.revamp-charts-grid.export-grid > .revamp-chart-card { min-width: 0; }
+@media (max-width: 900px) {
+  .revamp-charts-grid.export-grid { grid-template-columns: 1fr; }
+}
 
 .revamp-chart-card {
   border-radius: var(--radius-lg); background: linear-gradient(150deg, var(--glass-1), var(--glass-2));

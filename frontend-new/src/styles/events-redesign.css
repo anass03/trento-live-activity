@@ -100,8 +100,15 @@
 }
 @media (max-width: 940px) {
   .events-scene { overflow-y: auto; }
-  .events-layout { grid-template-columns: 1fr; height: auto; }
-  .ev-col { overflow: visible; padding: 2px; margin: 0; }
+  /* Drop the height-filling grid (its equal fixed rows clip tall content and
+     make columns overlap). A plain block stack lets each section take its
+     natural height and flow top-to-bottom. */
+  .events-layout { display: block; height: auto; }
+  .ev-col { overflow: visible; min-width: 0; padding: 0; margin: 0 0 16px; }
+  .ev-col:last-child { margin-bottom: 0; }
+}
+@media (max-width: 600px) {
+  .events-layout { padding: 14px 12px 28px; }
 }
 
 /* =========================================================

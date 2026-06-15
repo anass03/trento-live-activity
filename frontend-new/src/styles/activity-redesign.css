@@ -58,8 +58,14 @@
 }
 @media (max-width: 940px) {
   .activity-scene { overflow-y: auto; }
-  .activity-layout { grid-template-columns: 1fr; height: auto; }
-  .activity-layout .ev-col { overflow: visible; }
+  /* Drop the height-filling grid (equal fixed rows clip tall content and make
+     the columns overlap). Block stack = each section at its natural height. */
+  .activity-layout { display: block; height: auto; }
+  .activity-layout .ev-col { overflow: visible; min-width: 0; padding: 0; margin: 0 0 16px; }
+  .activity-layout .ev-col:last-child { margin-bottom: 0; }
+}
+@media (max-width: 600px) {
+  .activity-layout { padding: 14px 12px 28px; gap: 14px; }
 }
 
 /* =========================================================

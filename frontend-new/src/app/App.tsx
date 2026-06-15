@@ -271,15 +271,15 @@ function MapControls({ zoom, setZoom, is3d, setIs3d, onLocate, onReset }: any) {
   const { t } = useTranslation();
   return (
     <div className="map-controls">
-      <button className={"mc-btn" + (is3d ? " on" : "")} onClick={() => setIs3d(!is3d)}><Icon name="cube" size={17} />3D</button>
-      <button className="mc-btn" onClick={onLocate}><Icon name="locate" size={17} />{t("home.locate")}</button>
+      <button className={"mc-btn" + (is3d ? " on" : "")} onClick={() => setIs3d(!is3d)}><Icon name="cube" size={17} /><span className="mc-label">3D</span></button>
+      <button className="mc-btn" onClick={onLocate}><Icon name="locate" size={17} /><span className="mc-label">{t("home.locate")}</span></button>
       <div className="mc-div"></div>
       <button className="mc-btn" onClick={() => setZoom((z: number) => Math.max(11, +(z - 0.5).toFixed(2)))}><Icon name="minus" size={17} /></button>
       {/* percentuale sul range di zoom della mappa (11–19) */}
       <div className="mc-btn" style={{ fontFamily: "var(--mono)", fontSize: 12, minWidth: 50, pointerEvents: "none" }}>{Math.round(((Math.min(19, Math.max(11, zoom)) - 11) / 8) * 100)}%</div>
       <button className="mc-btn" onClick={() => setZoom((z: number) => Math.min(19, +(z + 0.5).toFixed(2)))}><Icon name="plus" size={17} /></button>
       <div className="mc-div"></div>
-      <button className="mc-btn" onClick={onReset}><Icon name="layers" size={17} />{t("home.reset")}</button>
+      <button className="mc-btn" onClick={onReset}><Icon name="layers" size={17} /><span className="mc-label">{t("home.reset")}</span></button>
     </div>
   );
 }
