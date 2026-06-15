@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { Event, User, Report, POI, EventParticipation } = require('../data/models');
+const { Event, User, Report, POI, EventParticipation, UserSettings } = require('../data/models');
 const { sendNewEventToInterested: sendNewEventPush } = require('../notifications/push.service');
 const { sendNewEventToInterested: sendNewEventEmail } = require('../notifications/email.service');
 const { serializeEvent } = require('../data/presenters');
@@ -86,7 +86,7 @@ async function createEvent(entityId, { titolo, descrizione, categoria, latitudin
   return event;
 }
 
-async function listEvents({ categoria, q, page, limit }) {
+async function listEvents({ categoria, q, page, limit, requesterId = null }) {
   ({ page, limit } = sanitizePagination(page, limit));
   // Exclude cancelled/ended events from public listing
   const where = { status: { [Op.notIn]: ['CANCELLED', 'ENDED'] } };
@@ -104,28 +104,34 @@ async function listEvents({ categoria, q, page, limit }) {
     include: [
       { model: User, as: 'entity', attributes: ['id', 'nome', 'cognome', 'nomeEnte'] },
       { model: POI, as: 'poi', attributes: ['id', 'nome'] },
-      { model: User, as: 'eventParticipants', attributes: ['id'], through: { attributes: [] } },
+      {
+        model: User, as: 'eventParticipants', attributes: ['id'], through: { attributes: [] },
+        include: [{ model: UserSettings, as: 'settings', attributes: ['participationVisibility', 'showProfileInParticipants'] }],
+      },
     ],
     distinct: true,
     limit,
     offset: (page - 1) * limit,
     order: [['startDateTime', 'ASC'], ['createdAt', 'ASC']],
   });
-  return { events: rows.map(serializeEvent), total: count, page, limit };
+  return { events: rows.map((r) => serializeEvent(r, requesterId)), total: count, page, limit };
 }
 
-async function getEvent(id) {
+async function getEvent(id, requesterId = null) {
   const event = await Event.findByPk(id, {
     include: [
       { model: User, as: 'entity', attributes: ['id', 'nome', 'cognome', 'nomeEnte'] },
       { model: POI, as: 'poi', attributes: ['id', 'nome'] },
-      { model: User, as: 'eventParticipants', attributes: ['id'], through: { attributes: [] } },
+      {
+        model: User, as: 'eventParticipants', attributes: ['id'], through: { attributes: [] },
+        include: [{ model: UserSettings, as: 'settings', attributes: ['participationVisibility', 'showProfileInParticipants'] }],
+      },
     ],
   });
   if (!event) throw { status: 404, code: 'NOT_FOUND', error: 'Event not found' };
   // RF25: increment view counter (non-blocking)
   Event.increment('views', { by: 1, where: { id } }).catch(() => {});
-  return serializeEvent(event);
+  return serializeEvent(event, requesterId);
 }
 
 async function updateEvent(entityId, eventId, updates) {

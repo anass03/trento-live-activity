@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { Activity, Participation, User, POI } = require('../data/models');
+const { Activity, Participation, User, POI, UserSettings } = require('../data/models');
 const { serializeActivity } = require('../data/presenters');
 const { reverseGeocode } = require('../lib/geocode');
 const { ACTIVITY_TYPES } = require('../data/models/Activity');
@@ -158,7 +158,7 @@ async function createActivity(creatorId, { tipo, data, orarioInizio, orarioFine,
   return activity;
 }
 
-async function listActivities({ tipo, q, userInterests, page, limit }) {
+async function listActivities({ tipo, q, userInterests, page, limit, requesterId = null }) {
   ({ page, limit } = sanitizePagination(page, limit));
   const where = { stato: 'attiva' };
   // Un valore fuori enum manderebbe in errore Postgres (500): filtra solo se valido.
@@ -170,7 +170,10 @@ async function listActivities({ tipo, q, userInterests, page, limit }) {
   }
   const include = [
     { model: User, as: 'creator', attributes: ['id', 'nome', 'cognome'] },
-    { model: User, as: 'participants', attributes: ['id'], through: { attributes: [] } },
+    {
+      model: User, as: 'participants', attributes: ['id'], through: { attributes: [] },
+      include: [{ model: UserSettings, as: 'settings', attributes: ['participationVisibility', 'showProfileInParticipants'] }],
+    },
   ];
   // RF15: optional textual search via linked POI name
   if (q) {
@@ -192,19 +195,23 @@ async function listActivities({ tipo, q, userInterests, page, limit }) {
     offset: (page - 1) * limit,
     order: [['data', 'ASC']],
   });
-  return { activities: rows.map(serializeActivity), total: count, page, limit };
+  return { activities: rows.map((r) => serializeActivity(r, requesterId)), total: count, page, limit };
 }
 
-async function getActivity(id) {
+async function getActivity(id, requesterId = null) {
   const activity = await Activity.findByPk(id, {
     include: [
       { model: User, as: 'creator', attributes: ['id', 'nome', 'cognome', 'email'] },
-      { model: User, as: 'participants', attributes: ['id', 'nome', 'cognome'] },
+      {
+        model: User, as: 'participants', attributes: ['id', 'nome', 'cognome'],
+        through: { attributes: [] },
+        include: [{ model: UserSettings, as: 'settings', attributes: ['participationVisibility', 'showProfileInParticipants'] }],
+      },
       { model: POI, as: 'poi', attributes: ['id', 'nome'] },
     ],
   });
   if (!activity) throw { status: 404, code: 'NOT_FOUND', error: 'Activity not found' };
-  return serializeActivity(activity);
+  return serializeActivity(activity, requesterId);
 }
 
 async function updateActivity(userId, activityId, updates) {

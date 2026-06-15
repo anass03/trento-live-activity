@@ -461,6 +461,7 @@ export const TrentoMap = React.memo(function TrentoMap({
               ? `<div class="ep-flbl" style="text-align:center;padding:4px 0">${t("map.adminHint")}</div>`
               : `<button class="ep-cta">${(() => { const own = !!(ownedIds && (ownedIds.has(m.sourceId) || ownedIds.has(m.id))); const join = canJoin && !own; return `${join ? getIconSvg("ticket", 15) : getIconSvg("arrow", 15)} ${join ? t("widgets.popup.join") : t("widgets.popup.view")}`; })()}</button>`
             }
+            ${canCreateActivity && m.poiId ? `<button class="ep-cta ep-create-also" style="margin-top:6px;background:transparent;border:1.5px solid rgba(128,128,128,0.25);color:var(--text-secondary);box-shadow:none;font-weight:600">${getIconSvg("pin", 15)} ${t("map.poi.createHere")}</button>` : ""}
           </div>
         `;
 
@@ -482,6 +483,16 @@ export const TrentoMap = React.memo(function TrentoMap({
             ctaBtn.addEventListener("click", (e) => {
               e.stopPropagation();
               onOpenDetail && onOpenDetail(m);
+            });
+          }
+        }
+
+        if (canCreateActivity && m.poiId) {
+          const createAlsoBtn = popupDiv.querySelector(".ep-create-also");
+          if (createAlsoBtn) {
+            createAlsoBtn.addEventListener("click", (e) => {
+              e.stopPropagation();
+              onCreatePoi && onCreatePoi({ sourceId: m.poiId, id: m.poiId, title: m.place || m.title });
             });
           }
         }

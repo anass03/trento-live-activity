@@ -16,6 +16,7 @@ async function list(req, res, next) {
       q,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
+      requesterId: req.user?.id ?? null,
     });
     res.json(result);
   } catch (e) { next(e); }
@@ -24,7 +25,7 @@ async function list(req, res, next) {
 async function get(req, res, next) {
   try {
     assertUuid(req.params.id, 'event id');
-    const event = await service.getEvent(req.params.id);
+    const event = await service.getEvent(req.params.id, req.user?.id ?? null);
     res.json(event);
   } catch (e) { next(e); }
 }

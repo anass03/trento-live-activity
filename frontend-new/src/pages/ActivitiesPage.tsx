@@ -70,10 +70,12 @@ const creatorGradient = (name?: string | null) => {
   return CREATOR_GRADS[h % CREATOR_GRADS.length];
 };
 
-const ACT_TABS = [
-  { id: "esplora", labelKey: "activities.tabs.esplora", icon: "grid" },
-  { id: "saved",   labelKey: "activities.tabs.saved",   icon: "bookmark" },
+const ACT_TABS_BASE = [
+  { id: "esplora",       labelKey: "activities.tabs.esplora",      icon: "grid" },
+  { id: "saved",         labelKey: "activities.tabs.saved",        icon: "bookmark" },
 ];
+const ACT_TAB_MINE          = { id: "mine",          labelKey: "activities.tabs.mine",          icon: "activity" };
+const ACT_TAB_PARTICIPATING = { id: "participating", labelKey: "activities.tabs.participating", icon: "ticket" };
 const ACT_SORTS = [
   { id: "relevance",    labelKey: "activities.sorts.relevance" },
   { id: "participants", labelKey: "activities.sorts.participants" },
@@ -224,11 +226,14 @@ function ActHero() {
 }
 
 /* ===================== TABS + SORT ===================== */
-function ActTabs({ tab, setTab }: any) {
+function ActTabs({ tab, setTab, showMine, showParticipating }: any) {
   const { t } = useTranslation();
+  let tabs = [...ACT_TABS_BASE];
+  if (showMine) tabs = [tabs[0], ACT_TAB_MINE, ...tabs.slice(1)];
+  if (showParticipating) tabs = [tabs[0], ACT_TAB_PARTICIPATING, ...tabs.slice(1)];
   return (
     <div className="act-tabs">
-      {ACT_TABS.map((tabItem) => (
+      {tabs.map((tabItem) => (
         <button key={tabItem.id} className={"act-tab" + (tab === tabItem.id ? " on" : "")} onClick={() => setTab(tabItem.id)}>
           <Icon name={tabItem.icon} size={15} />{t(tabItem.labelKey)}
         </button>
@@ -462,7 +467,7 @@ export function ActivityPage({ page, setPage, theme, setTheme, user, setSelected
 
   const [s, setS] = useState({ search: "" });
   const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set());
-  const [tab, setTab] = useState("esplora");
+  const [tab, setTab] = useState<"esplora" | "mine" | "participating" | "saved">("esplora");
   const [sort, setSort] = useState("relevance");
   const [saves, setSaves] = useState<Record<string, boolean>>({});
   const set = (patch: any) => setS((prev) => ({ ...prev, ...patch }));
@@ -499,7 +504,9 @@ export function ActivityPage({ page, setPage, theme, setTheme, user, setSelected
           dist: numOrNull(a.distance),
           rating,
           reviews: numOrNull(a.reviewCount ?? a.reviewsCount) ?? 0,
+          creatorId: a.creator?.id || null,
           creatorName: a.creator?.name || null,
+          participantIds: Array.isArray(a.participantIds) ? a.participantIds : [],
           going: participants,
           cap: capacity,
           startsAt: a.startsAt || a.startAt || a.dateTime || a.scheduledAt || null,
@@ -569,6 +576,8 @@ export function ActivityPage({ page, setPage, theme, setTheme, user, setSelected
     });
     // tab
     if (tab === "saved") r = r.filter((a) => saves[a.id]);
+    if (tab === "mine") r = r.filter((a) => a.creatorId && a.creatorId === user?.id);
+    if (tab === "participating") r = r.filter((a) => a.participantIds?.includes(user?.id || ""));
     // filters
     if (activeCategories.size > 0) r = r.filter((a) => activeCategories.has(a.cat));
     if (s.search.trim()) {
@@ -613,13 +622,13 @@ export function ActivityPage({ page, setPage, theme, setTheme, user, setSelected
 
         <div className="ev-col feed" style={{ paddingRight: 8 }}>
           <ActHero />
-          <ActTabs tab={tab} setTab={setTab} />
+          <ActTabs tab={tab} setTab={setTab} showMine={user?.role === "registered_user"} showParticipating={user?.role === "registered_user"} />
           <ActSortBar count={list.length} sort={sort} setSort={setSort} />
           {list.length === 0
             ? <div className="feed-state empty">
                 <Icon name="search" size={20} />
-                <div className="feed-state-title">{tab === "saved" ? t("activities.emptyNoSavedTitle") : t("activities.emptyNoFoundTitle")}</div>
-                <div className="feed-state-msg">{tab === "saved" ? t("activities.emptyNoSavedMsg") : t("activities.emptyNoFoundMsg")}</div>
+                <div className="feed-state-title">{tab === "saved" ? t("activities.emptyNoSavedTitle") : tab === "mine" ? t("activities.emptyNoMineTitle") : tab === "participating" ? t("activities.emptyNotParticipatingTitle") : t("activities.emptyNoFoundTitle")}</div>
+                <div className="feed-state-msg">{tab === "saved" ? t("activities.emptyNoSavedMsg") : tab === "mine" ? t("activities.emptyNoMineMsg") : tab === "participating" ? t("activities.emptyNotParticipatingMsg") : t("activities.emptyNoFoundMsg")}</div>
               </div>
             : <div className="act-grid">
                 {list.map((a) => <ActCard key={a.id} a={a} saved={!!saves[a.id]} onSave={onSave} canSave={canSave} onOpen={() => handleOpenDetail(a.id)} />)}

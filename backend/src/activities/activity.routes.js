@@ -6,7 +6,7 @@ const REGISTERED = 'UtenteRegistrato';
 
 // Public — RF15 search via ?q, RF14 filter via ?tipo, RF9 personalised via ?mine=interests (auth)
 router.get('/', optionalAuth, ctrl.list);
-router.get('/:id', ctrl.get);
+router.get('/:id', optionalAuth, ctrl.get);
 
 // RF12 / RF49: calendar export (public — the link can be shared)
 router.get('/:id/calendar', ctrl.calendar);

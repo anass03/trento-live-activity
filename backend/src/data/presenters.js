@@ -78,7 +78,22 @@ function serializeUser(record) {
   };
 }
 
-function serializeEvent(record) {
+function filterParticipantIds(participants, requesterId, organizerId) {
+  return participants
+    .filter((p) => {
+      if (requesterId && p.id === requesterId) return true;
+      const s = p.settings;
+      if (!s) return true;
+      if (s.showProfileInParticipants === false || s.participationVisibility === 'private') return false;
+      if (s.participationVisibility === 'organizers_only') {
+        return requesterId != null && requesterId === organizerId;
+      }
+      return true;
+    })
+    .map((p) => p.id);
+}
+
+function serializeEvent(record, requesterId = null) {
   const event = plain(record);
   const participants = Array.isArray(event.eventParticipants) ? event.eventParticipants : [];
   return {
@@ -96,7 +111,7 @@ function serializeEvent(record) {
     endTime: event.orarioFine,
     maxPartecipanti: event.maxPartecipanti ?? null,
     participantCount: typeof event.participantCount === 'number' ? event.participantCount : participants.length,
-    participantIds: participants.map((p) => p.id),
+    participantIds: filterParticipantIds(participants, requesterId, event.entityId),
     entity: event.entity
       ? {
           id: event.entity.id,
@@ -106,7 +121,7 @@ function serializeEvent(record) {
   };
 }
 
-function serializeActivity(record) {
+function serializeActivity(record, requesterId = null) {
   const activity = plain(record);
   const participants = Array.isArray(activity.participants) ? activity.participants : [];
 
@@ -118,7 +133,7 @@ function serializeActivity(record) {
     category: activity.tipo,
     location: locationFor(activity),
     participantCount: participants.length,
-    participantIds: participants.map((p) => p.id),
+    participantIds: filterParticipantIds(participants, requesterId, activity.creatorId),
     maxParticipants: activity.maxPartecipanti,
     createdAt: timestamp(activity.createdAt),
     dateTime: dateTime(activity.data, activity.orarioInizio),
@@ -183,6 +198,7 @@ function markerFromActivity(record) {
     sourceId: activity.id,
     category: activity.tipo,
     dateTime: dateTime(activity.data, activity.orarioInizio),
+    poiId: activity.poiId || null,
   };
 }
 

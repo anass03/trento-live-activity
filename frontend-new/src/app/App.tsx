@@ -446,6 +446,7 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
         live: m.type === "event" || m.type === "activity",
         title: m.title,
         place: m.location || m.title,
+        poiId: m.poiId || null,
         time: timeStr,
         cap: m.total || m.maxPartecipanti || m.capacity || 0,
         going: m.free !== undefined && m.total !== undefined ? m.total - m.free : (m.participantCount || 0),
@@ -490,10 +491,20 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
   const dynamicEvents = React.useMemo(() => {
     if (!mapData || !mapData.events) return [];
     const now = Date.now();
+    const cutoff = now + 7 * 24 * 60 * 60 * 1000; // 7 days ahead
     return mapData.events.filter((e: any) => {
       const dt = e.dateTime || e.startTime;
-      if (dt) { try { if (new Date(dt).getTime() < now) return false; } catch (_) {} }
+      if (dt) {
+        try {
+          const t = new Date(dt).getTime();
+          if (t < now || t > cutoff) return false;
+        } catch (_) {}
+      }
       return true;
+    }).sort((a: any, b: any) => {
+      const ta = new Date(a.dateTime || a.startTime || 0).getTime();
+      const tb = new Date(b.dateTime || b.startTime || 0).getTime();
+      return ta - tb;
     }).slice(0, 7).map((e: any) => {
       let cat = e.category || "altro";
       const validCategories = ["sport", "cultura", "musica", "arte", "gastronomia", "studio", "altro"];
@@ -685,10 +696,12 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
         </div>
         <div className="col-right">
           <ActiveAreasWidget delay={140} areas={dynamicAreas} onOpen={setDetail} />
-          <EventsWidget delay={240} onFocus={(e: any) => {
-              setSelectedEventId(e.id || e.sourceId);
-              setPage("evento-dettaglio");
-            }} events={dynamicEvents} onWidgetClick={() => setPage("eventi")} />
+          {user?.role !== "system_admin" && user?.role !== "municipal_admin" && (
+            <EventsWidget delay={240} onFocus={(e: any) => {
+                setSelectedEventId(e.id || e.sourceId);
+                setPage("evento-dettaglio");
+              }} events={dynamicEvents} onWidgetClick={() => setPage("eventi")} />
+          )}
           {user?.role === "registered_user" && (
             <ServiceRequestWidget delay={340} onOpen={(cat) => setSrCategory(cat ?? null)} />
           )}

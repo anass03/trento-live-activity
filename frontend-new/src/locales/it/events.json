@@ -57,9 +57,13 @@
     "joinedCta": "Abbandona",
     "joinCta": "Partecipa all'evento",
     "tabExplore": "Esplora",
+    "tabParticipating": "A cui partecipo",
     "tabSaved": "Salvati",
     "emptyNoSavedTitle": "Nessun evento salvato",
     "emptyNoSavedMsg": "Salva un evento per ritrovarlo qui.",
+    "emptyNotParticipatingTitle": "Non partecipi a nessun evento",
+    "emptyNotParticipatingMsg": "Iscriviti a un evento per vederlo qui.",
+    "dateTbd": "Data da definire",
     "cityGrid": "Eventi in città",
     "cityGridTotal": "{{count}} totali",
     "loading": "Caricamento eventi...",
@@ -110,7 +114,9 @@
     },
     "tabs": {
       "esplora": "Esplora",
-      "saved": "Salvate"
+      "participating": "A cui partecipo",
+      "saved": "Salvate",
+      "mine": "Le mie attività"
     },
     "sorts": {
       "relevance": "Rilevanza",
@@ -160,6 +166,10 @@
     "retry": "Riprova",
     "emptyNoSavedTitle": "Nessuna attività salvata",
     "emptyNoSavedMsg": "Salva un'attività per ritrovarla qui.",
+    "emptyNoMineTitle": "Non hai ancora creato attività",
+    "emptyNoMineMsg": "Torna alla mappa e clicca su un luogo per iniziare.",
+    "emptyNotParticipatingTitle": "Non partecipi a nessuna attività",
+    "emptyNotParticipatingMsg": "Iscriviti a un'attività per vederla qui.",
     "emptyNoFoundTitle": "Nessuna attività trovata",
     "emptyNoFoundMsg": "Prova a rimuovere qualche filtro o a cambiare categoria.",
     "detailLoading": "Caricamento dettagli attività...",
