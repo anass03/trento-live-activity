@@ -223,7 +223,7 @@ function PostCard({ e, saved, shared, onSave, onShare, onOpen, flash, canSave = 
         <div className="post-desc">{e.description}</div>
         <div className="post-meta">
           <span className="pm"><Icon name="pin" size={14} /><GeocodedLocation value={e.location} fallback="Trento" /></span>
-          <span className="pm"><Icon name="clock" size={14} />{formatEventWhen(e, i18n.language) || t("events.today")}</span>
+          <span className="pm"><Icon name="clock" size={14} />{formatEventWhen(e, i18n.language) || t("events.dateTbd")}</span>
         </div>
         <div className="post-foot">
           {count > 0 && (
@@ -321,7 +321,7 @@ function NextActivity({ event, joined, saved, busy, joinError, onJoin, onSave, o
         </div>
         <div className="next-field">
           <span className="nf-ic"><Icon name="clock" size={14} /></span>
-          <div><div className="nf-lbl">{t("events.when")}</div><div className="nf-val">{formatEventWhen(event, i18n.language) || t("events.today")}</div></div>
+          <div><div className="nf-lbl">{t("events.when")}</div><div className="nf-val">{formatEventWhen(event, i18n.language) || t("events.dateTbd")}</div></div>
         </div>
       </div>
       <div className="next-part">
@@ -392,13 +392,18 @@ function CityGrid({ list, onOpen }: any) {
 }
 
 /* ===================== EVENT TABS ===================== */
-function EventTabs({ tab, setTab }: any) {
+function EventTabs({ tab, setTab, showParticipating }: any) {
   const { t } = useTranslation();
   return (
     <div className="act-tabs">
       <button className={"act-tab" + (tab === "explore" ? " on" : "")} onClick={() => setTab("explore")}>
         <Icon name="grid" size={15} />{t("events.tabExplore")}
       </button>
+      {showParticipating && (
+        <button className={"act-tab" + (tab === "participating" ? " on" : "")} onClick={() => setTab("participating")}>
+          <Icon name="ticket" size={15} />{t("events.tabParticipating")}
+        </button>
+      )}
       <button className={"act-tab" + (tab === "saved" ? " on" : "")} onClick={() => setTab("saved")}>
         <Icon name="bookmark" size={15} />{t("events.tabSaved")}
       </button>
@@ -415,7 +420,7 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
   const [events, setEvents] = useState<ApiEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<"explore" | "saved">("explore");
+  const [tab, setTab] = useState<"explore" | "participating" | "saved">("explore");
 
   const [saves, setSaves] = useState<Record<string, boolean>>({});
   const [sharedId, setSharedId] = useState<string | null>(null);
@@ -626,14 +631,18 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
 
         {/* CENTER */}
         <Feed ref={feedRef}
-          events={tab === "saved" ? filtered.filter((e) => saves[e.id]) : filtered}
+          events={
+            tab === "saved" ? filtered.filter((e) => saves[e.id])
+            : tab === "participating" ? events.filter((e) => e.participantIds?.includes(user?.id || ""))
+            : filtered
+          }
           user={user} search={search} setSearch={setSearch}
-          hasFilter={activeCategories.size > 0 || !!selDate || tab === "saved"}
+          hasFilter={activeCategories.size > 0 || !!selDate || tab === "saved" || tab === "participating"}
           saves={saves} sharedId={sharedId} onSave={handleSave} onShare={handleShare}
           onOpen={handleOpenDetail} flashId={null}
-          header={<EventTabs tab={tab} setTab={setTab} />}
-          emptyTitle={tab === "saved" ? t("events.emptyNoSavedTitle") : undefined}
-          emptyMsg={tab === "saved" ? t("events.emptyNoSavedMsg") : undefined}
+          header={<EventTabs tab={tab} setTab={setTab} showParticipating={user?.role === "registered_user"} />}
+          emptyTitle={tab === "saved" ? t("events.emptyNoSavedTitle") : tab === "participating" ? t("events.emptyNotParticipatingTitle") : undefined}
+          emptyMsg={tab === "saved" ? t("events.emptyNoSavedMsg") : tab === "participating" ? t("events.emptyNotParticipatingMsg") : undefined}
         />
 
         {/* RIGHT */}

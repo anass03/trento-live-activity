@@ -507,7 +507,7 @@ export function EventsWidget({ delay, onFocus, events, onWidgetClick }: any) {
   const { t } = useTranslation();
   const displayEvents = events || [];
   return (
-    <Widget title={t("widgets.events.title")} accent="var(--cyan)" upd={t("widgets.events.today", { count: displayEvents.length })} delay={delay} onClick={onWidgetClick}>
+    <Widget title={t("widgets.events.title")} accent="var(--cyan)" upd={t("widgets.events.upcoming", { count: displayEvents.length })} delay={delay} onClick={onWidgetClick}>
       <div className="widget-scroll" style={{ maxHeight: 300, margin: "0 -10px", padding: "0 10px" }}>
         {displayEvents.length === 0 && <div className="widget-empty big">{t("widgets.events.empty")}</div>}
         {displayEvents.map((e: any) => (

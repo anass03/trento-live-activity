@@ -57,9 +57,13 @@
     "joinedCta": "Quit",
     "joinCta": "Join event",
     "tabExplore": "Explore",
+    "tabParticipating": "Participating",
     "tabSaved": "Saved",
     "emptyNoSavedTitle": "No saved events",
     "emptyNoSavedMsg": "Save an event to find it here.",
+    "emptyNotParticipatingTitle": "You're not participating in any events",
+    "emptyNotParticipatingMsg": "Join an event to see it here.",
+    "dateTbd": "Date to be confirmed",
     "cityGrid": "Events in town",
     "cityGridTotal": "{{count}} total",
     "loading": "Loading events...",
@@ -110,7 +114,9 @@
     },
     "tabs": {
       "esplora": "Explore",
-      "saved": "Saved"
+      "participating": "Participating",
+      "saved": "Saved",
+      "mine": "My activities"
     },
     "sorts": {
       "relevance": "Relevance",
@@ -160,6 +166,10 @@
     "retry": "Retry",
     "emptyNoSavedTitle": "No saved activities",
     "emptyNoSavedMsg": "Save an activity to find it here.",
+    "emptyNoMineTitle": "You haven't created any activities yet",
+    "emptyNoMineMsg": "Go back to the map and tap a location to get started.",
+    "emptyNotParticipatingTitle": "You're not participating in any activities",
+    "emptyNotParticipatingMsg": "Join an activity to see it here.",
     "emptyNoFoundTitle": "No activities found",
     "emptyNoFoundMsg": "Try removing some filters or changing category.",
     "detailLoading": "Loading activity details...",

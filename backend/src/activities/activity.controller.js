@@ -24,6 +24,7 @@ async function list(req, res, next) {
       userInterests,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
+      requesterId: req.user?.id ?? null,
     });
     res.json(result);
   } catch (e) { next(e); }
@@ -32,7 +33,7 @@ async function list(req, res, next) {
 async function get(req, res, next) {
   try {
     assertUuid(req.params.id, 'activity id');
-    const activity = await service.getActivity(req.params.id);
+    const activity = await service.getActivity(req.params.id, req.user?.id ?? null);
     res.json(activity);
   } catch (e) { next(e); }
 }

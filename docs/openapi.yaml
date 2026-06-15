@@ -36,6 +36,18 @@ tags:
     description: Operazioni amministrative (sistema)
   - name: Notifications
   - name: AI
+  - name: Settings
+    description: Impostazioni utente (aspetto, privacy, notifiche, accessibilità)
+  - name: CityAlerts
+    description: Avvisi città in tempo reale da Open Data Trento
+  - name: Parking
+    description: Dati parcheggi in tempo reale da Open Data Trento
+  - name: Weather
+    description: Meteo in tempo reale via Open-Meteo
+  - name: ServiceRequests
+    description: Segnalazioni civiche dei cittadini al Comune
+  - name: Live
+    description: Server-Sent Events per aggiornamenti in tempo reale
 
 # ─────────────────────────────────────────────────────────────
 # REUSABLE COMPONENTS
@@ -46,6 +58,38 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+
+  responses:
+    BadRequest:
+      description: Richiesta non valida
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: Non autenticato o token non valido
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Permessi insufficienti
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Risorsa non trovata
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: Conflitto — risorsa già esistente
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    TooManyRequests:
+      description: Rate limit superato
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
 
   schemas:
 
@@ -588,65 +632,6 @@ paths:
           description: Richiesta ricevuta, in attesa di approvazione
         '400': { $ref: '#/components/responses/BadRequest' }
         '409': { $ref: '#/components/responses/Conflict' }
-
-  /auth/login:
-    post:
-      tags: [Auth]
-      summary: Login (RF6); 2FA obbligatorio per AmministratoreDiSistema (RNF15)
-      description: Rate limit dedicato 10/15min per prevenire brute-force.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [email, password]
-              properties:
-                email: { type: string, format: email }
-                password: { type: string }
-                otpToken:
-                  type: string
-                  description: |
-                    Codice TOTP a 6 cifre o codice di recupero a 10 caratteri.
-                    Obbligatorio per AmministratoreDiSistema con 2FA attivo.
-      responses:
-        '200':
-          description: Login OK
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/AuthResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403':
-          description: Email non verificata
-          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
-        '429': { $ref: '#/components/responses/TooManyRequests' }
-
-  /auth/forgot-password:
-    post:
-      tags: [Auth]
-      summary: Richiesta link reset password (RF8)
-      description: |
-        Ritorna sempre 200 per evitare user enumeration. Internamente:
-        - Account OAuth-only (passwordHash=null) → no email
-        - AmministratoreDiSistema → no email (deve usare recovery 2FA)
-        - AmministratoreComunale → no email (SPID-only)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/RegisterEntityRequest' }
-      responses:
-        '201':
-          description: Account created — pending admin approval
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/UserMinimal' }
-        '400':
-          description: Validation error
-          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
-        '409':
-          description: Email already registered
-          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
 
   /api/auth/verify-email:
     get:
@@ -1590,6 +1575,29 @@ paths:
           content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
 
   # ── Moderation ────────────────────────────────────────────
+  /api/moderation/activities/{activityId}/report:
+    post:
+      tags: [Moderation]
+      summary: Segnala un'attività spontanea (RF16, DSA). Una segnalazione per utente per attività.
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { in: path, name: activityId, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReportInput' }
+      responses:
+        '201':
+          description: Segnalazione creata
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Report' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Già segnalata (ALREADY_REPORTED)
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+
   /api/moderation/events/{eventId}/report:
     post:
       tags: [Moderation]
@@ -1998,3 +2006,691 @@ paths:
         '503':
           description: Gemini API not configured (AI_NOT_CONFIGURED)
           content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+
+  # ── Activities — social sub-resources ────────────────────
+  # NOTE (RESTful): join/leave use POST+DELETE on the same sub-resource path
+  # (/join) following the "named relationship resource" pattern. Events use the
+  # equivalent /participate path — both are consistent within their resource.
+  # A future refactor could unify to /participants for both.
+
+  /api/activities/{id}/participants:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Activities]
+      summary: List visible participants of an activity (respects participationVisibility privacy setting)
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:   { type: string, format: uuid }
+                    name: { type: string, nullable: true }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/activities/{id}/save:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Activities]
+      summary: Save activity to favourites
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Saved }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      tags: [Activities]
+      summary: Remove activity from favourites
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Unsaved }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/activities/{id}/reviews:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Activities]
+      summary: List reviews for an activity
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reviews:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:        { type: string, format: uuid }
+                        rating:    { type: integer, minimum: 1, maximum: 5 }
+                        text:      { type: string, nullable: true }
+                        createdAt: { type: string, format: date-time }
+                        user:
+                          type: object
+                          nullable: true
+                          properties:
+                            id:   { type: string, format: uuid }
+                            name: { type: string }
+    post:
+      tags: [Activities]
+      summary: Submit a review for an activity
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rating]
+              properties:
+                rating:  { type: integer, minimum: 1, maximum: 5 }
+                text:    { type: string, maxLength: 2000, nullable: true }
+                ratings: { type: object, description: "Detailed sub-ratings (optional)" }
+      responses:
+        '201':
+          description: Review created
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409':
+          description: Already reviewed (ALREADY_REVIEWED)
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+
+  # ── Events — social sub-resources ────────────────────────
+  /api/events/{id}/participants:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Events]
+      summary: List visible participants of an event (respects participationVisibility privacy setting)
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:   { type: string, format: uuid }
+                    name: { type: string, nullable: true }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/events/{id}/save:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Events]
+      summary: Save event to favourites
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Saved }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      tags: [Events]
+      summary: Remove event from favourites
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Unsaved }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/events/{id}/like:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Events]
+      summary: Like an event
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Liked }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      tags: [Events]
+      summary: Remove like from an event
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Unliked }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/events/{id}/comments:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Events]
+      summary: List comments for an event
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  comments:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:              { type: string, format: uuid }
+                        text:            { type: string }
+                        createdAt:       { type: string, format: date-time }
+                        parentCommentId: { type: string, format: uuid, nullable: true }
+                        user:
+                          type: object
+                          nullable: true
+                          properties:
+                            id:   { type: string, format: uuid }
+                            name: { type: string }
+    post:
+      tags: [Events]
+      summary: Add a comment to an event
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text:            { type: string, maxLength: 2000 }
+                parentCommentId: { type: string, format: uuid, nullable: true, description: "Reply to existing comment" }
+      responses:
+        '201':
+          description: Comment created
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ── Map — geocode-forward ─────────────────────────────────
+  /api/map/geocode-forward:
+    get:
+      tags: [Map]
+      summary: Forward geocode address to coordinates via Nominatim. Public.
+      parameters:
+        - { in: query, name: q, required: true, schema: { type: string }, description: "Address or place name" }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  lat: { type: number, nullable: true }
+                  lng: { type: number, nullable: true }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  # ── Settings ──────────────────────────────────────────────
+  # NOTE (RESTful): sub-PATCHes (e.g. /appearance, /privacy-location) are
+  # granular partial-update endpoints on the single UserSettings resource.
+  # This avoids large blind PUTs and reduces over-posting risk. Acceptable
+  # REST pattern for user-settings slices.
+  /api/me/settings:
+    get:
+      tags: [Settings]
+      summary: Get current user's settings
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                description: Full UserSettings record
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    patch:
+      tags: [Settings]
+      summary: Update all settings at once
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, description: "Partial settings object" }
+      responses:
+        '200': { description: Updated }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/me/settings/appearance:
+    patch:
+      tags: [Settings]
+      summary: Update appearance settings (theme, font size)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                theme:    { type: string, enum: [light, dark, system] }
+                fontSize: { type: string, enum: [small, medium, large] }
+      responses:
+        '200': { description: Updated }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/me/settings/language-format:
+    patch:
+      tags: [Settings]
+      summary: Update language and date/time format preferences
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                language:   { type: string, enum: [it, en] }
+                dateFormat: { type: string }
+                timeFormat: { type: string, enum: ['12h', '24h'] }
+      responses:
+        '200': { description: Updated }
+
+  /api/me/settings/notifications:
+    patch:
+      tags: [Settings]
+      summary: Update notification preferences
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                emailNotifications: { type: boolean }
+                pushNotifications:  { type: boolean }
+                activityReminders:  { type: boolean }
+                eventReminders:     { type: boolean }
+      responses:
+        '200': { description: Updated }
+
+  /api/me/settings/privacy-location:
+    patch:
+      tags: [Settings]
+      summary: Update privacy and location settings — controls participantIds visibility for other users (RF privacy)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                participationVisibility:
+                  type: string
+                  enum: [public, organizers_only, private]
+                  description: "public = visible to all; organizers_only = visible only to activity/event organizer; private = hidden from everyone"
+                showProfileInParticipants:
+                  type: boolean
+                  description: "False hides the user from participant lists regardless of participationVisibility"
+                shareLocation: { type: boolean }
+      responses:
+        '200': { description: Updated }
+
+  /api/me/settings/preferences:
+    patch:
+      tags: [Settings]
+      summary: Update general preferences (map default, categories…)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Updated }
+
+  /api/me/settings/accessibility:
+    patch:
+      tags: [Settings]
+      summary: Update accessibility settings (high contrast, reduced motion…)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Updated }
+
+  # ── City Alerts ───────────────────────────────────────────
+  /api/city-alerts/trento:
+    get:
+      tags: [CityAlerts]
+      summary: Fetch active city alerts for Trento from Open Data API (RF — real-time civic data)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:          { type: string }
+                    title:       { type: string }
+                    description: { type: string, nullable: true }
+                    severity:    { type: string, enum: [high, medium, low, info] }
+                    category:    { type: string, nullable: true }
+                    latitude:    { type: number, nullable: true }
+                    longitude:   { type: number, nullable: true }
+                    publishedAt: { type: string, format: date-time, nullable: true }
+                    updatedAt:   { type: string, format: date-time, nullable: true }
+
+  /api/city-alerts/{alertId}:
+    parameters:
+      - { in: path, name: alertId, required: true, schema: { type: string } }
+    get:
+      tags: [CityAlerts]
+      summary: Get a single city alert detail
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ── Parking ───────────────────────────────────────────────
+  /api/parking/trento:
+    get:
+      tags: [Parking]
+      summary: Fetch real-time parking occupancy for Trento from Open Data API
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  areas:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:          { type: string }
+                        name:        { type: string }
+                        type:        { type: string, enum: [car, bike] }
+                        capacity:    { type: integer }
+                        occupied:    { type: integer }
+                        latitude:    { type: number, nullable: true }
+                        longitude:   { type: number, nullable: true }
+                        updatedAt:   { type: string, format: date-time, nullable: true }
+
+  # ── Weather ───────────────────────────────────────────────
+  /api/weather/trento:
+    get:
+      tags: [Weather]
+      summary: Fetch current weather and hourly/daily forecast for Trento via Open-Meteo (no API key required)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  current:
+                    type: object
+                    properties:
+                      temperature: { type: number, description: "°C" }
+                      weatherCode: { type: integer }
+                      windSpeed:   { type: number }
+                      humidity:    { type: integer, nullable: true }
+                  hourly:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        time:        { type: string, format: date-time }
+                        temperature: { type: number }
+                        weatherCode: { type: integer }
+                        precipitation: { type: number }
+                  daily:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date:    { type: string, format: date }
+                        tempMax: { type: number }
+                        tempMin: { type: number }
+                        weatherCode: { type: integer }
+
+  # ── Service Requests ──────────────────────────────────────
+  /api/service-requests:
+    post:
+      tags: [ServiceRequests]
+      summary: Submit a civic service request (segnalazione civica) to the Municipality — UtenteRegistrato only (RF civic)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [category, description]
+              properties:
+                category:    { type: string, description: "Request category (e.g. strada, verde, rifiuti, illuminazione, altro)" }
+                subcategory: { type: string, nullable: true }
+                description: { type: string, maxLength: 2000 }
+                latitude:    { type: number, nullable: true }
+                longitude:   { type: number, nullable: true }
+                address:     { type: string, nullable: true }
+      responses:
+        '201':
+          description: Request submitted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:        { type: string, format: uuid }
+                  status:    { type: string, enum: [pending, in_progress, resolved, closed] }
+                  createdAt: { type: string, format: date-time }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ── Dashboard — service requests ──────────────────────────
+  /api/dashboard/service-requests:
+    get:
+      tags: [Dashboard]
+      summary: Aggregate service request statistics — AmministratoreComunale only
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:       { type: integer }
+                  byStatus:    { type: object }
+                  byCategory:  { type: array, items: { type: object } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/dashboard/service-requests/recent:
+    get:
+      tags: [Dashboard]
+      summary: Most recent service requests — AmministratoreComunale only
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { in: query, name: limit, schema: { type: integer, default: 20 } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ── Admin — create municipal/system accounts ───────────────
+  /api/admin/users/comunali:
+    post:
+      tags: [Admin]
+      summary: Create AmministratoreComunale account — AmministratoreDiSistema only
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, nome, cognome, ufficio]
+              properties:
+                email:    { type: string, format: email }
+                nome:     { type: string }
+                cognome:  { type: string }
+                ufficio:  { type: string }
+                password: { type: string, minLength: 8, description: "Temp password; user must change on first login" }
+      responses:
+        '201':
+          description: Account created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminUserComunale' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/admin/users/sistema:
+    post:
+      tags: [Admin]
+      summary: Create AmministratoreDiSistema account — super-admin only
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, nome, cognome]
+              properties:
+                email:    { type: string, format: email }
+                nome:     { type: string }
+                cognome:  { type: string }
+                password: { type: string, minLength: 8 }
+      responses:
+        '201':
+          description: Account created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminUserSistema' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/admin/users/sistema/{id}/super-admin:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+    patch:
+      tags: [Admin]
+      summary: Toggle superAdmin flag on an AmministratoreDiSistema — super-admin only
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [superAdmin]
+              properties:
+                superAdmin: { type: boolean }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminUserSistema' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ── Notifications — admin ─────────────────────────────────
+  /api/notifications/admin/stats:
+    get:
+      tags: [Notifications]
+      summary: Push notification delivery stats — AmministratoreDiSistema only
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalTokens:  { type: integer }
+                  totalSent:    { type: integer }
+                  totalFailed:  { type: integer }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/notifications/admin/broadcast:
+    post:
+      tags: [Notifications]
+      summary: Broadcast push notification to all registered device tokens — AmministratoreDiSistema only
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, body]
+              properties:
+                title: { type: string }
+                body:  { type: string }
+                data:  { type: object, description: "Optional extra payload for the client" }
+      responses:
+        '200':
+          description: Broadcast queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sent:   { type: integer }
+                  failed: { type: integer }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ── Live / SSE ────────────────────────────────────────────
+  /api/live/events-stream:
+    get:
+      tags: [Live]
+      summary: Server-Sent Events stream for real-time event updates (new events, participant changes)
+      description: |
+        Returns `Content-Type: text/event-stream`. Clients keep the connection open
+        and receive `data:` frames whenever an event is created, updated, or deleted.
+        No authentication required — stream only pushes aggregate/public data.
+      responses:
+        '200':
+          description: SSE stream opened
+          content:
+            text/event-stream:
+              schema: { type: string }
+
+  /api/live/activities-stream:
+    get:
+      tags: [Live]
+      summary: Server-Sent Events stream for real-time activity updates
+      responses:
+        '200':
+          description: SSE stream opened
+          content:
+            text/event-stream:
+              schema: { type: string }

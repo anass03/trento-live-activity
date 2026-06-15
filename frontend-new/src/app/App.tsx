@@ -37,7 +37,7 @@ import { AdminModerationPage } from "../pages/AdminModerationPage";
 import { AdminNotificationsPage } from "../pages/AdminNotificationsPage";
 import { PrivacyPage } from "../pages/PrivacyPage";
 import { TermsPage } from "../pages/TermsPage";
-import { getMe, getToken, setToken, UserRole, getHomeMapData, getMyActivities, getMyEvents, getParking, isActivityDeleted } from "../lib/api";
+import { getMe, getToken, setToken, UserRole, getHomeMapData, getMyActivities, getMyEvents, getParking, isActivityDeleted, type ServiceRequestCategory } from "../lib/api";
 import { getTimeFormat } from "../lib/i18n";
 import "../styles/revamp-pages.css";
 
@@ -241,7 +241,7 @@ function LiquidGlassFilter() {
 
 // Kind filter: single-select type of map content.
 // "all" | "poi" | "event" | "activity"
-function KindBar({ kind, setKind }: { kind: string; setKind: (k: string) => void }) {
+function KindBar({ kind, setKind }: { kind: string; setKind: (k: "all" | "poi" | "event" | "activity") => void }) {
   const { t } = useTranslation();
   const kinds = [
     { id: "all",      icon: "grid",     color: C.cyan    },
@@ -319,8 +319,8 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
   const [loading, setLoading] = useState(false);
   // POI scelto dal popup mappa per creare un'attività (id + nome)
   const [createPoi, setCreatePoi] = useState<{ id: string; title: string } | null>(null);
-  // null = modal open no pre-selection, string = open with pre-selected cat, undefined = closed
-  const [srCategory, setSrCategory] = useState<string | null | undefined>(undefined);
+  // null = modal open no pre-selection, category = open with pre-selected cat, undefined = closed
+  const [srCategory, setSrCategory] = useState<ServiceRequestCategory | null | undefined>(undefined);
   const [ownedIds, setOwnedIds] = useState<Set<string>>(new Set());
   const [parkingSpots, setParkingSpots] = useState<any[]>([]);
 
@@ -446,6 +446,7 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
         live: m.type === "event" || m.type === "activity",
         title: m.title,
         place: m.location || m.title,
+        poiId: m.poiId || null,
         time: timeStr,
         cap: m.total || m.maxPartecipanti || m.capacity || 0,
         going: m.free !== undefined && m.total !== undefined ? m.total - m.free : (m.participantCount || 0),
@@ -490,10 +491,20 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
   const dynamicEvents = React.useMemo(() => {
     if (!mapData || !mapData.events) return [];
     const now = Date.now();
+    const cutoff = now + 7 * 24 * 60 * 60 * 1000; // 7 days ahead
     return mapData.events.filter((e: any) => {
       const dt = e.dateTime || e.startTime;
-      if (dt) { try { if (new Date(dt).getTime() < now) return false; } catch (_) {} }
+      if (dt) {
+        try {
+          const t = new Date(dt).getTime();
+          if (t < now || t > cutoff) return false;
+        } catch (_) {}
+      }
       return true;
+    }).sort((a: any, b: any) => {
+      const ta = new Date(a.dateTime || a.startTime || 0).getTime();
+      const tb = new Date(b.dateTime || b.startTime || 0).getTime();
+      return ta - tb;
     }).slice(0, 7).map((e: any) => {
       let cat = e.category || "altro";
       const validCategories = ["sport", "cultura", "musica", "arte", "gastronomia", "studio", "altro"];
@@ -685,10 +696,12 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
         </div>
         <div className="col-right">
           <ActiveAreasWidget delay={140} areas={dynamicAreas} onOpen={setDetail} />
-          <EventsWidget delay={240} onFocus={(e: any) => {
-              setSelectedEventId(e.id || e.sourceId);
-              setPage("evento-dettaglio");
-            }} events={dynamicEvents} onWidgetClick={() => setPage("eventi")} />
+          {user?.role !== "system_admin" && user?.role !== "municipal_admin" && (
+            <EventsWidget delay={240} onFocus={(e: any) => {
+                setSelectedEventId(e.id || e.sourceId);
+                setPage("evento-dettaglio");
+              }} events={dynamicEvents} onWidgetClick={() => setPage("eventi")} />
+          )}
           {user?.role === "registered_user" && (
             <ServiceRequestWidget delay={340} onOpen={(cat) => setSrCategory(cat ?? null)} />
           )}
