@@ -472,7 +472,7 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
   if (loading) {
     return (
       <div className="settings-scene">
-        <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
+        <div className="events-header"><Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} /></div>
         <div style={{ color: "var(--text-muted)", fontSize: 15, padding: "100px 0", textAlign: "center" }}>
           {t("settings.loading")}
         </div>

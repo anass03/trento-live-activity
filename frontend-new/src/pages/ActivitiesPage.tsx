@@ -592,7 +592,7 @@ export function ActivityPage({ page, setPage, theme, setTheme, user, setSelected
   if (loading) {
     return (
       <div className="activity-scene">
-        <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
+        <div className="events-header"><Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} /></div>
         <div style={{ color: "var(--text-secondary)", fontSize: 15, padding: "100px 0", textAlign: "center" }}>
           {t("activities.loading")}
         </div>
@@ -603,7 +603,7 @@ export function ActivityPage({ page, setPage, theme, setTheme, user, setSelected
   if (error) {
     return (
       <div className="activity-scene">
-        <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
+        <div className="events-header"><Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} /></div>
         <div className="feed-state error" role="alert">
           <Icon name="warn" size={20} />
           <div className="feed-state-title">{t("activities.errorTitle")}</div>

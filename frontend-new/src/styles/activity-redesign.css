@@ -29,7 +29,9 @@
   opacity: calc(0.5 + var(--glow) * 0.5);
   transition: opacity 550ms ease;
 }
-.activity-scene > * { position: relative; z-index: 1; }
+/* Exclude the header so it keeps its sticky positioning (and z-index) — it pins
+   to the top once .activity-scene flips to overflow-y:auto at ≤940px. */
+.activity-scene > :not(.events-header) { position: relative; z-index: 1; }
 /* The rule above ties (same specificity) with `.events-header { z-index: 30 }`
    in events-redesign.css, and this stylesheet loads later — so on this page
    the header wrapper fell back to z-index 1 and the right-column widgets
@@ -37,7 +39,7 @@
    Re-lift the header here with a more specific selector. Scoped to
    .activity-scene so the home/events stacking is untouched
    (see events-redesign.css:45 for the original fix). */
-.activity-scene > .events-header { z-index: 30; }
+.activity-scene > .events-header { position: sticky; top: 0; z-index: 30; }
 /* same pending-animation guard as the events page */
 .activity-scene .anim-in { animation-fill-mode: forwards; }
 

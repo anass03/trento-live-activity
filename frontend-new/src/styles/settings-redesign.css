@@ -16,6 +16,9 @@
   transition: background 550ms ease;
   scrollbar-width: thin;
   scrollbar-color: var(--scrollthumb) transparent;
+  /* Reserve the scrollbar gutter so the pinned header's right cluster (profile,
+     theme toggle) never shifts whether or not the page is tall enough to scroll. */
+  scrollbar-gutter: stable;
 }
 .settings-scene::before {
   content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
@@ -24,10 +27,12 @@
     radial-gradient(500px 380px at 4% 96%, color-mix(in srgb, var(--cyan) 8%, transparent), transparent 60%);
   opacity: calc(0.35 + var(--glow) * 0.3);
 }
-.settings-scene > :not(.detail-modal-scrim):not(.login-modal-scrim) { position: relative; z-index: 1; }
+/* Exclude the header so it keeps its sticky positioning — .settings-scene always
+   scrolls (overflow-y:auto), so without this the bar would scroll out of view. */
+.settings-scene > :not(.detail-modal-scrim):not(.login-modal-scrim):not(.events-header) { position: relative; z-index: 1; }
 /* The header's profile dropdown must paint above the settings cards below it
    (same stacking trap as .activity-scene / .events-scene). */
-.settings-scene > .events-header { z-index: 30; }
+.settings-scene > .events-header { position: sticky; top: 0; z-index: 30; }
 
 /* entrance: forwards-fill guard */
 .settings-scene .anim-in { animation-fill-mode: forwards; }

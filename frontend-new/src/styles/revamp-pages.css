@@ -153,6 +153,31 @@
   text-align: center; margin-top: 20px; font-size: 13px; color: var(--text-muted);
 }
 
+/* ---- Standardized top bar for the document scenes ----
+   The legal/detail scenes (used by the publish, admin, comune, profile and
+   detail pages) render a bare <Header> as the first child of a scrolling
+   column. Without this it had no bar treatment, scrolled away with the page,
+   and its right cluster shifted with the scrollbar — so the top bar looked
+   different on every one of these pages. Pin it and give it the exact same
+   bar as .events-header (see events-redesign.css) so brand, nav and profile
+   sit in a fixed, identical position across the whole app.
+   `scrollbar-gutter: stable` keeps the right cluster from jumping between
+   pages that scroll and pages that don't. */
+.revamp-legal-scene,
+.revamp-detail-scene { scrollbar-gutter: stable; }
+
+.revamp-legal-scene > .header,
+.revamp-detail-scene > .header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  flex: none;
+  pointer-events: auto;
+  border-bottom: 1px solid var(--border-soft-2);
+  backdrop-filter: blur(12px) saturate(130%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-deep) 86%, transparent), color-mix(in srgb, var(--bg-deep) 58%, transparent));
+}
+
 /* ---- Legal / Text page ---- */
 .revamp-legal-scene {
   position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; overflow-y: auto; background: var(--scene-bg);

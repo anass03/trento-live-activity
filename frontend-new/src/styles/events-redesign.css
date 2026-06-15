@@ -27,7 +27,8 @@
   opacity: calc(0.55 + var(--glow) * 0.5);
   transition: opacity 550ms ease;
 }
-.events-scene > * { position: relative; z-index: 1; }
+/* Exclude the header so its sticky positioning isn't reset to `relative`. */
+.events-scene > :not(.events-header) { position: relative; z-index: 1; }
 
 /* The sidebar widgets reuse the shared `.anim-in` entrance. Because this
    page mounts on nav-click (not initial load), those keyframe animations
@@ -37,17 +38,24 @@
    style while pending, so content is never stuck invisible. */
 .events-scene .anim-in { animation-fill-mode: forwards; }
 
-/* header sits in normal flow here (sticky top) */
+/* Canonical app top bar. Shared by every full-page scene (events, activities,
+   settings, and — via revamp-pages.css — the legal/detail/admin/comune scenes)
+   so the brand, nav and profile cluster land in exactly the same place on every
+   page. `position: sticky` pins it to the top of whichever scene scrolls
+   (feed scenes flip to `overflow-y: auto` on mobile; document scenes always
+   scroll), so it never slides up and out of view. The background is opaque
+   enough to mask content scrolling underneath the pinned bar. */
 .events-header {
   flex: none;
-  /* `.events-scene > *` puts every direct child (header + layout) on z-index:1,
+  position: sticky;
+  top: 0;
+  /* `.events-scene > :not(.events-header)` puts the layout child on z-index:1,
      so the later-in-DOM widget column would otherwise paint over the header's
      profile dropdown. Lift the header above the content it overlaps. */
-  position: relative;
   z-index: 30;
   border-bottom: 1px solid var(--border-soft-2);
-  backdrop-filter: blur(10px);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-deep) 42%, transparent), transparent);
+  backdrop-filter: blur(12px) saturate(130%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-deep) 86%, transparent), color-mix(in srgb, var(--bg-deep) 58%, transparent));
 }
 .events-header .header { pointer-events: auto; }
 

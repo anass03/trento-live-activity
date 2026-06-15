@@ -239,11 +239,14 @@ function LiquidGlassFilter() {
   );
 }
 
-// Kind filter: single-select type of map content.
-// "all" | "poi" | "event" | "activity"
-function KindBar({ kind, setKind }: { kind: string; setKind: (k: "all" | "poi" | "event" | "activity") => void }) {
+// Kind filter: single-select type of map content. Keep this in sync with the
+// buttons rendered in KindBar — "parking" is a real, selectable kind (it locks
+// the category filters, see FilterBar), so it must be part of the union.
+type MapKind = "all" | "poi" | "event" | "activity" | "parking";
+
+function KindBar({ kind, setKind }: { kind: MapKind; setKind: (k: MapKind) => void }) {
   const { t } = useTranslation();
-  const kinds = [
+  const kinds: { id: MapKind; icon: string; color: string }[] = [
     { id: "all",      icon: "grid",     color: C.cyan    },
     { id: "poi",      icon: "pin",      color: "#f87171" },
     { id: "event",    icon: "calendar", color: "#a78bfa" },
@@ -307,7 +310,7 @@ function Clock() {
 function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, setSelectedActivityId, flyToRef, tempMarkerRef }: any) {
   const { t, i18n } = useTranslation();
   const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set());
-  const [kind, setKind] = useState<"all" | "poi" | "event" | "activity">("all");
+  const [kind, setKind] = useState<MapKind>("all");
   const [zoom, setZoom] = useState(14.2);
   const locateRef = React.useRef<(() => void) | null>(null);
   const resetRef = React.useRef<(() => void) | null>(null);
