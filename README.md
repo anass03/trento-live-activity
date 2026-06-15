@@ -27,7 +27,7 @@
 
 A web platform where citizens explore Trento live on an interactive map and join its social life: real-time parking and crowding, certified events, and spontaneous activities created by other people — all filtered to your interests. The Comune di Trento gets an analytics dashboard on top.
 
-> 💡 **The idea.** In 2025 NYC launched *"Summer in NYC"* (Mayor Mamdani) — a portal to find free public programs by age, area and interest. The point: *a public service nobody can find doesn't really exist.* We bring that to Trento, a student city packed with things to do that people just never hear about.
+> 💡 **The idea — and the proof.** We thought of this independently, then realized a city like New York is launching the very same thing as we speak: Mayor Mamdani's *"Summer in NYC"*, a portal to find free public programs by age, area and interest. The fact that it's happening right now, elsewhere, is the best validation we could ask for: *a public service nobody can find doesn't really exist.* We bring that idea to Trento — a student city packed with things to do that people simply never hear about.
 
 **Who uses it**
 
