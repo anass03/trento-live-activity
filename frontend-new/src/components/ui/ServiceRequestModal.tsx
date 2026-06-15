@@ -68,10 +68,10 @@ export function ServiceRequestModal({ theme, initialCategory, onClose }: Props) 
     setSubmitting(true);
     try {
       await submitServiceRequest({ categoria, sottocategoria, latitudine, longitudine });
-      showToast(t("serviceRequest.success"), "success");
+      showToast({ title: t("serviceRequest.success"), type: "success" });
       onClose();
     } catch {
-      showToast(t("serviceRequest.error"), "danger");
+      showToast({ title: t("serviceRequest.error"), type: "error" });
     } finally {
       setSubmitting(false);
     }

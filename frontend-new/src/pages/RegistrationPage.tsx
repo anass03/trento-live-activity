@@ -24,6 +24,8 @@ export function RegistrationPage({ page, setPage, isModal, onClose, onLogin }: a
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [acceptConsents, setAcceptConsents] = useState(false);
+  const [showPw, setShowPw] = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -182,7 +184,10 @@ export function RegistrationPage({ page, setPage, isModal, onClose, onLogin }: a
             <label className="revamp-form-label">{t("register.password")}</label>
             <div className="revamp-form-input-wrap">
               <Icon name="key" size={16} />
-              <input type="password" className="revamp-form-input" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
+              <input type={showPw ? "text" : "password"} className="revamp-form-input has-reveal" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
+              <button type="button" className="pw-reveal-btn" onClick={() => setShowPw((v) => !v)} aria-label={showPw ? "Nascondi password" : "Mostra password"}>
+                <Icon name={showPw ? "eyeOff" : "eye"} size={16} />
+              </button>
             </div>
             <PasswordStrengthBar password={password} />
           </div>
@@ -190,7 +195,10 @@ export function RegistrationPage({ page, setPage, isModal, onClose, onLogin }: a
           <div className="revamp-form-group">
             <label className="revamp-form-label">{t("register.confirmPassword")}</label>
             <div className="revamp-form-input-wrap">
-              <input type="password" className="revamp-form-input" placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+              <input type={showConfirmPw ? "text" : "password"} className="revamp-form-input has-reveal" placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+              <button type="button" className="pw-reveal-btn" onClick={() => setShowConfirmPw((v) => !v)} aria-label={showConfirmPw ? "Nascondi password" : "Mostra password"}>
+                <Icon name={showConfirmPw ? "eyeOff" : "eye"} size={16} />
+              </button>
             </div>
           </div>
 

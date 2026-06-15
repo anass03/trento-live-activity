@@ -253,12 +253,13 @@ function PostCard({ e, saved, shared, onSave, onShare, onOpen, flash, canSave = 
 }
 
 /* ===================== FEED ===================== */
-const Feed = React.forwardRef<any, any>(function Feed({ events, user, search, setSearch, hasFilter, saves, sharedId, onSave, onShare, onOpen, flashId }, ref) {
+const Feed = React.forwardRef<any, any>(function Feed({ events, user, search, setSearch, hasFilter, saves, sharedId, onSave, onShare, onOpen, flashId, header, emptyTitle: emptyTitleProp, emptyMsg: emptyMsgProp }, ref) {
   const { t } = useTranslation();
-  const emptyTitle = search ? t("events.emptyNoResultsTitle") : hasFilter ? t("events.emptyNoCategoryTitle") : t("events.emptyNoEventsTitle");
-  const emptyMsg = search ? t("events.emptyNoResultsMsg") : hasFilter ? t("events.emptyNoCategoryMsg") : t("events.emptyNoEventsMsg");
+  const emptyTitle = emptyTitleProp ?? (search ? t("events.emptyNoResultsTitle") : hasFilter ? t("events.emptyNoCategoryTitle") : t("events.emptyNoEventsTitle"));
+  const emptyMsg = emptyMsgProp ?? (search ? t("events.emptyNoResultsMsg") : hasFilter ? t("events.emptyNoCategoryMsg") : t("events.emptyNoEventsMsg"));
   return (
     <div className="ev-col feed" ref={ref}>
+      {header}
       <Composer user={user} search={search} setSearch={setSearch} />
       {events.length === 0 && (
         <div className="feed-state empty">
@@ -390,6 +391,21 @@ function CityGrid({ list, onOpen }: any) {
   );
 }
 
+/* ===================== EVENT TABS ===================== */
+function EventTabs({ tab, setTab }: any) {
+  const { t } = useTranslation();
+  return (
+    <div className="act-tabs">
+      <button className={"act-tab" + (tab === "explore" ? " on" : "")} onClick={() => setTab("explore")}>
+        <Icon name="grid" size={15} />{t("events.tabExplore")}
+      </button>
+      <button className={"act-tab" + (tab === "saved" ? " on" : "")} onClick={() => setTab("saved")}>
+        <Icon name="bookmark" size={15} />{t("events.tabSaved")}
+      </button>
+    </div>
+  );
+}
+
 /* ===================== PAGE ===================== */
 export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEventId }: any) {
   const { t } = useTranslation();
@@ -399,6 +415,7 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
   const [events, setEvents] = useState<ApiEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<"explore" | "saved">("explore");
 
   const [saves, setSaves] = useState<Record<string, boolean>>({});
   const [sharedId, setSharedId] = useState<string | null>(null);
@@ -608,9 +625,16 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
         </div>
 
         {/* CENTER */}
-        <Feed ref={feedRef} events={filtered} user={user} search={search} setSearch={setSearch} hasFilter={activeCategories.size > 0 || !!selDate}
+        <Feed ref={feedRef}
+          events={tab === "saved" ? filtered.filter((e) => saves[e.id]) : filtered}
+          user={user} search={search} setSearch={setSearch}
+          hasFilter={activeCategories.size > 0 || !!selDate || tab === "saved"}
           saves={saves} sharedId={sharedId} onSave={handleSave} onShare={handleShare}
-          onOpen={handleOpenDetail} flashId={null} />
+          onOpen={handleOpenDetail} flashId={null}
+          header={<EventTabs tab={tab} setTab={setTab} />}
+          emptyTitle={tab === "saved" ? t("events.emptyNoSavedTitle") : undefined}
+          emptyMsg={tab === "saved" ? t("events.emptyNoSavedMsg") : undefined}
+        />
 
         {/* RIGHT */}
         <div className="ev-col right">
