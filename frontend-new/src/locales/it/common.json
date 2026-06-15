@@ -45,6 +45,7 @@
   "home": {
     "locate": "Posizione",
     "reset": "Reset",
+    "resetNorth": "Orienta a nord",
     "timeTBD": "Orario da definire",
     "dateTBD": "Data da definire",
     "placeTBC": "Luogo da confermare",

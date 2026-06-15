@@ -1019,8 +1019,14 @@ button { font-family: inherit; cursor: pointer; }
   box-shadow: var(--controls-shadow), inset 0 1px 0 var(--inset-hi);
   display: grid; place-items: center;
   pointer-events: auto;
+  /* button resets — the compass is a real, clickable control now */
+  padding: 0; cursor: pointer; font: inherit; color: inherit; appearance: none;
+  transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
 }
-.compass .needle { color: var(--text-secondary); }
+.compass:hover { border-color: color-mix(in srgb, var(--accent) 42%, transparent); transform: translateY(-1px); }
+.compass:active { transform: translateY(0) scale(0.96); }
+.compass:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: 2px; }
+.compass .needle { color: var(--text-secondary); transition: transform 300ms cubic-bezier(.4,1.4,.5,1); }
 .compass .needle svg { width: 26px; height: 26px; display:block; }
 .compass .nlabel { position: absolute; top: 5px; font-family: var(--mono); font-size: 8px; color: var(--magenta); font-weight: 700; }
 

@@ -61,6 +61,8 @@ interface TrentoMapProps {
   is3d: boolean;
   onLocateRef?: React.MutableRefObject<(() => void) | null>;
   onResetRef?: React.MutableRefObject<(() => void) | null>;
+  onResetNorthRef?: React.MutableRefObject<(() => void) | null>;
+  onBearingChange?: (deg: number) => void;
   onFlyToRef?: React.MutableRefObject<((lng: number, lat: number, zoom?: number) => void) | null>;
   onTempMarkerRef?: React.MutableRefObject<((lng: number, lat: number) => void) | null>;
   /* true quando l'utente loggato è un cittadino: abilita la CTA
@@ -89,6 +91,8 @@ export const TrentoMap = React.memo(function TrentoMap({
   is3d,
   onLocateRef,
   onResetRef,
+  onResetNorthRef,
+  onBearingChange,
   onFlyToRef,
   onTempMarkerRef,
   canJoin = false,
@@ -137,6 +141,10 @@ export const TrentoMap = React.memo(function TrentoMap({
     map.on("zoomend", () => {
       setZoom(parseFloat(map.getZoom().toFixed(2)));
     });
+
+    // Report bearing so the compass needle can reflect the map's rotation live.
+    map.on("rotate", () => onBearingChange?.(map.getBearing()));
+    map.on("pitchend", () => onBearingChange?.(map.getBearing()));
 
     mapInstance.current = map;
 
@@ -228,6 +236,14 @@ export const TrentoMap = React.memo(function TrentoMap({
         });
       };
     }
+    if (onResetNorthRef) {
+      onResetNorthRef.current = () => {
+        const map = mapInstance.current;
+        if (!map) return;
+        // Compass: re-orient to north and flatten the tilt (leave zoom/center).
+        map.easeTo({ bearing: 0, pitch: 0, duration: 600 });
+      };
+    }
     if (onFlyToRef) {
       onFlyToRef.current = (lng: number, lat: number, zoom = 16) => {
         const map = mapInstance.current;
@@ -251,7 +267,7 @@ export const TrentoMap = React.memo(function TrentoMap({
         setTimeout(() => { el.style.opacity = "0"; setTimeout(() => marker.remove(), 500); }, 3000);
       };
     }
-  }, [onLocateRef, onResetRef, onFlyToRef, onTempMarkerRef]);
+  }, [onLocateRef, onResetRef, onResetNorthRef, onFlyToRef, onTempMarkerRef]);
 
   // Fly to selected marker coordinates dynamically
   useEffect(() => {

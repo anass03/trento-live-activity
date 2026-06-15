@@ -311,6 +311,8 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
   const [zoom, setZoom] = useState(14.2);
   const locateRef = React.useRef<(() => void) | null>(null);
   const resetRef = React.useRef<(() => void) | null>(null);
+  const resetNorthRef = React.useRef<(() => void) | null>(null);
+  const [bearing, setBearing] = useState(0);
   const [is3d, setIs3d] = useState(false);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [popup, setPopup] = useState<any>(null);
@@ -642,6 +644,8 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
                 is3d={is3d}
                 onLocateRef={locateRef}
                 onResetRef={resetRef}
+                onResetNorthRef={resetNorthRef}
+                onBearingChange={setBearing}
                 onFlyToRef={flyToRef}
                 onTempMarkerRef={tempMarkerRef}
                 canCreateActivity={user?.role === "registered_user"}
@@ -710,10 +714,22 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
 
       {/* CONTROLS */}
       <MapControls zoom={zoom} setZoom={setZoom} is3d={is3d} setIs3d={setIs3d} onLocate={locate} onReset={reset} />
-      <div className="compass">
+      <button
+        type="button"
+        className="compass"
+        aria-label={t("home.resetNorth")}
+        title={t("home.resetNorth")}
+        onClick={() => {
+          // Avoid two competing easeTo animations: if 3D is on, just exit it
+          // (its effect already flattens pitch + re-orients to north); otherwise
+          // reset the bearing from any manual drag-rotation.
+          if (is3d) setIs3d(false);
+          else resetNorthRef.current?.();
+        }}
+      >
         <span className="nlabel">N</span>
-        <span className="needle"><Icon name="compass" size={26} /></span>
-      </div>
+        <span className="needle" style={{ transform: `rotate(${-bearing}deg)` }}><Icon name="compass" size={26} /></span>
+      </button>
 
       <DetailModal
         open={!!detail}
