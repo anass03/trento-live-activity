@@ -36,6 +36,8 @@ module.exports = (sequelize) => {
     sottocategoria: { type: DataTypes.ENUM(...ALL_SUBCATEGORIES), allowNull: true },
     latitudine: { type: DataTypes.FLOAT, allowNull: false },
     longitudine: { type: DataTypes.FLOAT, allowNull: false },
+    // Reverse-geocoded street address, populated async after creation.
+    indirizzo: { type: DataTypes.STRING(300), allowNull: true },
     // userId stored only for dedup — never exposed to operators (scope ridotto #15 / GDPR)
     userId: { type: DataTypes.UUID, allowNull: true },
   }, {

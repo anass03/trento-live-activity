@@ -304,15 +304,13 @@ function Clock() {
   );
 }
 
-function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, setSelectedActivityId }: any) {
+function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, setSelectedActivityId, flyToRef, tempMarkerRef }: any) {
   const { t, i18n } = useTranslation();
   const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set());
   const [kind, setKind] = useState<"all" | "poi" | "event" | "activity">("all");
   const [zoom, setZoom] = useState(14.2);
   const locateRef = React.useRef<(() => void) | null>(null);
   const resetRef = React.useRef<(() => void) | null>(null);
-  const flyToRef = React.useRef<((lng: number, lat: number, zoom?: number) => void) | null>(null);
-  const tempMarkerRef = React.useRef<((lng: number, lat: number) => void) | null>(null);
   const [is3d, setIs3d] = useState(false);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [popup, setPopup] = useState<any>(null);
@@ -637,6 +635,7 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
                 onTempMarkerRef={tempMarkerRef}
                 canCreateActivity={user?.role === "registered_user"}
                 canJoin={user?.role === "registered_user"}
+                isAdmin={user?.role === "system_admin" || user?.role === "municipal_admin"}
                 ownedIds={ownedIds}
                 onCreatePoi={(m) => {
                   setPopup(null);
@@ -805,6 +804,8 @@ export function App() {
 
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
+  const flyToRef = React.useRef<((lng: number, lat: number, zoom?: number) => void) | null>(null);
+  const tempMarkerRef = React.useRef<((lng: number, lat: number) => void) | null>(null);
 
   const fetchUser = async () => {
     const token = getToken();
@@ -999,7 +1000,13 @@ export function App() {
         : page === "ente-pubblica"
         ? <EntityPublishPage {...shared} />
         : page === "comune-dashboard"
-        ? <ComuneDashboardPage {...shared} />
+        ? <ComuneDashboardPage {...shared} onShowOnMap={(lat: number, lng: number) => {
+            navigate("home");
+            setTimeout(() => {
+              if (flyToRef.current) flyToRef.current(lng, lat, 17);
+              if (tempMarkerRef.current) tempMarkerRef.current(lng, lat);
+            }, 120);
+          }} />
         : page === "comune-statistiche"
         ? <ComuneStatistichePage {...shared} />
         : page === "comune-export"
@@ -1018,7 +1025,7 @@ export function App() {
         ? <PrivacyPage {...shared} />
         : page === "termini"
         ? <TermsPage {...shared} />
-        : <HomeScene {...shared} />}
+        : <HomeScene {...shared} flyToRef={flyToRef} tempMarkerRef={tempMarkerRef} />}
       <Toaster />
       <TrentoTweaks theme={theme} />
       {registerOpen && (

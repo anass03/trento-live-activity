@@ -318,6 +318,7 @@
       "createHere": "Crea attività qui",
       "loginToCreate": "Accedi come cittadino per creare un'attività qui"
     },
+    "adminHint": "Accedi come cittadino per interagire",
     "outsideTrento": "Sei fuori dall'area di Trento",
     "outsideTrentoHint": "La mappa mostra solo l'area di Trento e dintorni."
   }

@@ -68,6 +68,8 @@ interface TrentoMapProps {
   canCreateActivity?: boolean;
   /* true quando l'utente può partecipare (registered_user); false = mostra "Vedi" */
   canJoin?: boolean;
+  /* true per system_admin / municipal_admin: non mostrano CTA, vedono il messaggio cittadino */
+  isAdmin?: boolean;
   /* IDs of events/activities owned by the current user — show "View" not "Join" */
   ownedIds?: Set<string>;
   onCreatePoi?: (marker: any) => void;
@@ -90,6 +92,7 @@ export const TrentoMap = React.memo(function TrentoMap({
   onFlyToRef,
   onTempMarkerRef,
   canJoin = false,
+  isAdmin = false,
   ownedIds,
   canCreateActivity,
   onCreatePoi,
@@ -454,7 +457,10 @@ export const TrentoMap = React.memo(function TrentoMap({
               </div>
               <div class="ep-part-n"><b>${going}</b> / ${cap}</div>
             </div>
-            <button class="ep-cta">${(() => { const own = !!(ownedIds && (ownedIds.has(m.sourceId) || ownedIds.has(m.id))); const join = canJoin && !own; return `${join ? getIconSvg("ticket", 15) : getIconSvg("arrow", 15)} ${join ? t("widgets.popup.join") : t("widgets.popup.view")}`; })()}</button>
+            ${isAdmin
+              ? `<div class="ep-flbl" style="text-align:center;padding:4px 0">${t("map.adminHint")}</div>`
+              : `<button class="ep-cta">${(() => { const own = !!(ownedIds && (ownedIds.has(m.sourceId) || ownedIds.has(m.id))); const join = canJoin && !own; return `${join ? getIconSvg("ticket", 15) : getIconSvg("arrow", 15)} ${join ? t("widgets.popup.join") : t("widgets.popup.view")}`; })()}</button>`
+            }
           </div>
         `;
 
@@ -470,14 +476,14 @@ export const TrentoMap = React.memo(function TrentoMap({
           });
         }
 
-        const ctaBtn = popupDiv.querySelector(".ep-cta");
-        if (ctaBtn) {
-          ctaBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            // La partecipazione vera (join, calendario, segnalazione) vive
-            // nella pagina di dettaglio: il popup è solo l'aggancio rapido.
-            onOpenDetail && onOpenDetail(m);
-          });
+        if (!isAdmin) {
+          const ctaBtn = popupDiv.querySelector(".ep-cta");
+          if (ctaBtn) {
+            ctaBtn.addEventListener("click", (e) => {
+              e.stopPropagation();
+              onOpenDetail && onOpenDetail(m);
+            });
+          }
         }
 
         el.appendChild(popupDiv);
@@ -495,7 +501,7 @@ export const TrentoMap = React.memo(function TrentoMap({
 
       mapMarkers.current.push(maplibreMarker);
     });
-  }, [markers, activeCategories, kindFilter, selectedMarkerId, styleLoaded, canCreateActivity, canJoin, ownedIds, t]);
+  }, [markers, activeCategories, kindFilter, selectedMarkerId, styleLoaded, canCreateActivity, canJoin, isAdmin, ownedIds, t]);
 
   return (
     <div 

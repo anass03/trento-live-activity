@@ -623,6 +623,9 @@ export interface ServiceRequestEntry {
   categoria: string;
   sottocategoria: string | null;
   createdAt: string;
+  indirizzo?: string | null;
+  latitudine?: number | null;
+  longitudine?: number | null;
 }
 
 export function getDashboardRecentServiceRequests(limit = 10): Promise<ServiceRequestEntry[]> {

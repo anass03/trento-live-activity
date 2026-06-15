@@ -427,7 +427,7 @@ export function ProfilePage({ page, setPage, theme, setTheme, user, initialTab, 
             {activeTab === "info" && (
               <div style={{ fontSize: 13.5, color: "var(--text-secondary)", display: "flex", flexDirection: "column", gap: 8 }}>
                 <div><b>{t("profile.memberSince")}</b> {userProfile?.createdAt ? new Date(userProfile.createdAt).toLocaleDateString(dateLocale) : "12/05/2024"}</div>
-                <div><b>{t("profile.role")}</b> {userProfile?.ruolo || t("profile.guestRole")}</div>
+                <div><b>{t("profile.role")}</b> {userProfile?.ruolo ? (t(`profile.roles.${userProfile.ruolo}`, { defaultValue: userProfile.ruolo.replace(/([A-Z])/g, " $1").trim() })) : t("profile.guestRole")}</div>
                 <div><b>{t("profile.email")}</b> {user?.email || t("profile.none")}</div>
                 {userProfile?.ruolo === "EnteCertificato" && (
                   <>

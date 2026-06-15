@@ -318,6 +318,7 @@
       "createHere": "Create activity here",
       "loginToCreate": "Sign in as a citizen to create an activity here"
     },
+    "adminHint": "Sign in as a citizen to interact",
     "outsideTrento": "You're outside the Trento area",
     "outsideTrentoHint": "The map only shows the Trento area and surroundings."
   }

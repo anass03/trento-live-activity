@@ -5,6 +5,7 @@ const {
   SERVICE_REQUEST_CATEGORIES,
   SUBCATEGORIES_BY_CATEGORY,
 } = require('../data/models/ServiceRequest');
+const { reverseGeocode } = require('../lib/geocode');
 
 // POST /api/service-requests — registered citizens flag a civic need
 // RNF22 compliant: structured categories and subcategories only, no free text
@@ -36,6 +37,11 @@ router.post('/', authenticate, authorize('UtenteRegistrato'), async (req, res, n
       longitudine,
       userId: req.user.id,
     });
+
+    // Reverse geocode in background — doesn't block the response
+    reverseGeocode(latitudine, longitudine).then((indirizzo) => {
+      if (indirizzo) record.update({ indirizzo }).catch(() => {});
+    }).catch(() => {});
 
     // Return only non-personal fields
     res.status(201).json({
