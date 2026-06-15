@@ -45,6 +45,7 @@
   "home": {
     "locate": "Locate",
     "reset": "Reset",
+    "resetNorth": "Reset to north",
     "timeTBD": "Time TBD",
     "dateTBD": "Date TBD",
     "placeTBC": "Venue to be confirmed",
