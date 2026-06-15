@@ -37,7 +37,7 @@ import { AdminModerationPage } from "../pages/AdminModerationPage";
 import { AdminNotificationsPage } from "../pages/AdminNotificationsPage";
 import { PrivacyPage } from "../pages/PrivacyPage";
 import { TermsPage } from "../pages/TermsPage";
-import { getMe, getToken, setToken, UserRole, getHomeMapData, getMyActivities, getMyEvents, getParking, isActivityDeleted } from "../lib/api";
+import { getMe, getToken, setToken, UserRole, getHomeMapData, getMyActivities, getMyEvents, getParking, isActivityDeleted, type ServiceRequestCategory } from "../lib/api";
 import { getTimeFormat } from "../lib/i18n";
 import "../styles/revamp-pages.css";
 
@@ -241,7 +241,7 @@ function LiquidGlassFilter() {
 
 // Kind filter: single-select type of map content.
 // "all" | "poi" | "event" | "activity"
-function KindBar({ kind, setKind }: { kind: string; setKind: (k: string) => void }) {
+function KindBar({ kind, setKind }: { kind: string; setKind: (k: "all" | "poi" | "event" | "activity") => void }) {
   const { t } = useTranslation();
   const kinds = [
     { id: "all",      icon: "grid",     color: C.cyan    },
@@ -319,8 +319,8 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
   const [loading, setLoading] = useState(false);
   // POI scelto dal popup mappa per creare un'attività (id + nome)
   const [createPoi, setCreatePoi] = useState<{ id: string; title: string } | null>(null);
-  // null = modal open no pre-selection, string = open with pre-selected cat, undefined = closed
-  const [srCategory, setSrCategory] = useState<string | null | undefined>(undefined);
+  // null = modal open no pre-selection, category = open with pre-selected cat, undefined = closed
+  const [srCategory, setSrCategory] = useState<ServiceRequestCategory | null | undefined>(undefined);
   const [ownedIds, setOwnedIds] = useState<Set<string>>(new Set());
   const [parkingSpots, setParkingSpots] = useState<any[]>([]);
 
