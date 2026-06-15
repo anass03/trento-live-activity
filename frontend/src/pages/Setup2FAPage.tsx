@@ -1,154 +1,207 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import QRCode from 'qrcode';
-import { setup2fa, verify2fa } from '../lib/api';
+import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import QRCode from "qrcode";
+import { Icon } from "../components/ui/Icon";
+import { Header } from "../components/layout/Header";
+import { setup2fa, verify2fa } from "../lib/api";
 
-type Phase = 'scan' | 'codes';
-
-export function Setup2FAPage() {
-  const navigate = useNavigate();
+export function Setup2FAPage({ page, setPage, theme, setTheme, user }: any) {
   const { t } = useTranslation();
-  const [phase, setPhase] = useState<Phase>('scan');
-  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
-  const [secret, setSecret] = useState<string | null>(null);
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState("");
+  const [completed, setCompleted] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [qrUrl, setQrUrl] = useState("");
+  const [secret, setSecret] = useState("");
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isVerifying, setIsVerifying] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     setup2fa()
-      .then(async ({ otpauthUrl, base32 }) => {
-        setSecret(base32);
-        const dataUrl = await QRCode.toDataURL(otpauthUrl, { width: 256, margin: 2 });
-        setQrDataUrl(dataUrl);
+      .then(async (res) => {
+        setSecret(res.base32);
+        // QR generato localmente: il secret TOTP non lascia mai il browser.
+        const dataUrl = await QRCode.toDataURL(res.otpauthUrl, { width: 256, margin: 2 });
+        setQrUrl(dataUrl);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : t('twofa.initError')))
-      .finally(() => setIsLoading(false));
-  }, [t]);
+      .catch((err: any) => {
+        setError(err.message || t("twofa.initError"));
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  async function handleVerify(event: FormEvent) {
-    event.preventDefault();
-    setError(null);
-    setIsVerifying(true);
-    try {
-      const result = await verify2fa(code);
-      setRecoveryCodes(result.recoveryCodes);
-      setPhase('codes');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('twofa.invalidCode'));
-    } finally {
-      setIsVerifying(false);
+  const handleVerify = async (e: any) => {
+    e.preventDefault();
+    if (code.length !== 6) {
+      setError(t("twofa.codeLength"));
+      return;
     }
-  }
+    setError("");
+    setLoading(true);
+    try {
+      const res = await verify2fa(code);
+      setRecoveryCodes(res.recoveryCodes || []);
+      setCompleted(true);
+    } catch (err: any) {
+      setError(err.message || t("twofa.invalidCode"));
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  function handleCopyCodes() {
-    void navigator.clipboard.writeText(recoveryCodes.join('\n'));
-  }
+  const handleCopyCodes = async () => {
+    try {
+      await navigator.clipboard.writeText(recoveryCodes.join("\n"));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard not available */
+    }
+  };
 
-  function handleDownloadCodes() {
+  const handleDownloadCodes = () => {
     const blob = new Blob([
-      `Trento Live Activity — Recovery codes 2FA\n` +
-      `Account: admin@trento-live.it\n` +
-      `Generated: ${new Date().toLocaleString()}\n\n` +
-      `Keep these in a safe place. Each code is single-use.\n\n` +
-      recoveryCodes.join('\n') + '\n',
-    ], { type: 'text/plain' });
+      `${t("twofa.downloadHeader")}\n` +
+      (user?.email ? `Account: ${user.email}\n` : "") +
+      `${t("twofa.downloadGenerated")} ${new Date().toLocaleString()}\n\n` +
+      `${t("twofa.downloadKeepSafe")}\n\n` +
+      recoveryCodes.join("\n") + "\n",
+    ], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = 'trento-live-activity-recovery-codes.txt';
+    a.download = "trento-live-activity-recovery-codes.txt";
     a.click();
     URL.revokeObjectURL(url);
-  }
+  };
 
-  function handleContinue() {
-    navigate('/');
-    window.location.reload();
-  }
+  const smallBtnStyle: React.CSSProperties = {
+    display: "inline-flex", alignItems: "center", gap: 6,
+    padding: "8px 12px", borderRadius: 8, fontSize: 12.5, fontWeight: 600,
+    background: "var(--chip-fill)", border: "1px solid var(--border-soft)",
+    color: "var(--text-primary)", cursor: "pointer",
+  };
 
   return (
-    <section className="auth-page">
-      <div className="auth-form liquid-card two-factor-card">
-        {phase === 'scan' && (
-          <>
-            <h1>{t('twofa.setupTitle')}</h1>
-            <p>{t('twofa.setupSubtitle')}</p>
+    <div className="revamp-legal-scene">
+      <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
+      <div className="revamp-legal-wrap" style={{ display: "grid", placeItems: "center", minHeight: "65vh", padding: "40px 0" }}>
+        <div className="revamp-form-card anim-in" style={{ "--accent": "var(--amber)", maxWidth: "500px" } as React.CSSProperties}>
+          <div className="revamp-form-head">
+            <div className="revamp-form-logo" style={{ "--accent": "var(--amber)" } as React.CSSProperties}>
+              <Icon name="shieldCheck" size={26} style={{ color: "var(--amber)" }} />
+            </div>
+            <h2>{t("twofa.title")}</h2>
+            <p>{t("twofa.subtitle")}</p>
+          </div>
 
-            {isLoading && <div className="state-panel liquid-panel">{t('twofa.loadingQR')}</div>}
-            {error && <div className="form-error">{error}</div>}
+          {completed ? (
+            <div style={{ textAlign: "center" }}>
+              <div className="revamp-status-pill success" style={{ marginBottom: 16, display: "inline-flex", justifyContent: "center", width: "100%" }}>
+                <Icon name="check" size={12} /> {t("twofa.activeTitle")}
+              </div>
+              <p style={{ fontSize: 13.5, color: "var(--text-secondary)", marginBottom: 16 }}>
+                {t("twofa.savedHint")}
+              </p>
 
-            {!isLoading && qrDataUrl && (
-              <>
-                <div className="qr-section">
-                  <p><strong>{t('twofa.step1')}</strong></p>
-                  <div className="qr-frame">
-                    <img src={qrDataUrl} alt="QR code 2FA" />
+              {recoveryCodes.length > 0 && (
+                <>
+                  <div style={{
+                    background: "var(--chip-fill)", padding: "12px", borderRadius: "8px", border: "1px solid var(--border-soft)",
+                    textAlign: "left", marginBottom: 14, fontFamily: "var(--mono)", fontSize: "12px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px"
+                  }}>
+                    {recoveryCodes.map((c, i) => (
+                      <div key={i} style={{ color: "var(--text-primary)" }}>● {c}</div>
+                    ))}
                   </div>
-                  {secret && (
-                    <details>
-                      <summary>{t('twofa.cannotScan')}</summary>
-                      <code className="secret-fallback">{secret}</code>
-                    </details>
+
+                  <div style={{ display: "flex", gap: 8, justifyContent: "center", marginBottom: 16 }}>
+                    <button type="button" style={smallBtnStyle} onClick={handleCopyCodes}>
+                      <Icon name="check" size={13} style={copied ? { color: "var(--green)" } : { opacity: 0.6 }} />
+                      {copied ? t("twofa.copied") : t("twofa.copyToClipboard")}
+                    </button>
+                    <button type="button" style={smallBtnStyle} onClick={handleDownloadCodes}>
+                      <Icon name="ticket" size={13} style={{ opacity: 0.6 }} />
+                      {t("twofa.downloadTxt")}
+                    </button>
+                  </div>
+
+                  <label style={{
+                    display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-start",
+                    fontSize: 13, color: "var(--text-secondary)", marginBottom: 16, cursor: "pointer", textAlign: "left"
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={acknowledged}
+                      onChange={(e) => setAcknowledged(e.target.checked)}
+                      style={{ accentColor: "var(--amber)", width: 15, height: 15 }}
+                    />
+                    {t("twofa.acknowledgeLabel")}
+                  </label>
+                </>
+              )}
+
+              <button
+                className="revamp-form-btn"
+                style={{ "--accent": "var(--amber)" } as React.CSSProperties}
+                disabled={recoveryCodes.length > 0 && !acknowledged}
+                onClick={() => setPage("home")}
+              >
+                {recoveryCodes.length > 0 ? t("twofa.savedContinue") : t("twofa.backToSettings")}
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleVerify}>
+              {error && (
+                <div className="revamp-status-pill danger" style={{ width: "100%", marginBottom: 16, justifyContent: "center" }}>
+                  <Icon name="warn" size={12} /> {error}
+                </div>
+              )}
+
+              {/* QR grande e centrato: deve essere scansionabile al volo dal telefono */}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, marginBottom: 20 }}>
+                <div style={{
+                  width: 216, height: 216, borderRadius: 14, background: "#fff",
+                  display: "grid", placeItems: "center", border: "1px solid var(--border-soft)", padding: 8
+                }}>
+                  {qrUrl ? (
+                    <img src={qrUrl} alt="QR Code 2FA" style={{ width: 200, height: 200, display: "block" }} />
+                  ) : (
+                    <Icon name="grid" size={60} style={{ color: "#000" }} />
                   )}
                 </div>
+                <div style={{ fontSize: 12.5, color: "var(--text-secondary)", textAlign: "center" }}>
+                  {t("twofa.step1")}<br />
+                  {secret && <>{t("twofa.manualCode")} <code style={{ color: "var(--amber)", fontSize: "11px", fontWeight: "bold", wordBreak: "break-all" }}>{secret}</code><br /></>}
+                  {t("twofa.step2")}
+                </div>
+              </div>
 
-                <form onSubmit={handleVerify}>
-                  <label>
-                    <span><strong>{t('twofa.step2')}</strong></span>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]{6}"
-                      maxLength={6}
-                      value={code}
-                      onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-                      placeholder="000000"
-                      required
-                      autoFocus
-                    />
-                  </label>
-                  <button className="primary-button" type="submit" disabled={isVerifying || code.length !== 6}>
-                    {isVerifying ? t('twofa.verifying') : t('twofa.confirm')}
-                  </button>
-                </form>
-              </>
-            )}
-          </>
-        )}
+              <div className="revamp-form-group">
+                <label className="revamp-form-label">{t("twofa.codeLabel")}</label>
+                <div className="revamp-form-input-wrap">
+                  <Icon name="key" size={16} />
+                  <input
+                    type="text"
+                    maxLength={6}
+                    className="revamp-form-input"
+                    placeholder="123456"
+                    value={code}
+                    disabled={loading}
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                    style={{ letterSpacing: "0.2em", textAlign: "center", fontSize: 16, fontWeight: 700 }}
+                  />
+                </div>
+              </div>
 
-        {phase === 'codes' && (
-          <>
-            <h1>{t('twofa.codesTitle')}</h1>
-            <div className="warning-box">
-              <strong>{t('twofa.codesWarning')}</strong>
-            </div>
-
-            <div className="recovery-codes-grid">
-              {recoveryCodes.map((c) => (
-                <code key={c} className="recovery-code">{c}</code>
-              ))}
-            </div>
-
-            <div className="filter-actions">
-              <button type="button" onClick={handleCopyCodes}>{t('twofa.copyToClipboard')}</button>
-              <button type="button" onClick={handleDownloadCodes}>{t('twofa.downloadTxt')}</button>
-            </div>
-
-            <label className="checkbox">
-              <input type="checkbox" checked={acknowledged} onChange={(e) => setAcknowledged(e.target.checked)} />
-              <span>{t('twofa.acknowledgeLabel')}</span>
-            </label>
-
-            <button className="primary-button" type="button" disabled={!acknowledged} onClick={handleContinue}>
-              {t('twofa.continue')}
-            </button>
-          </>
-        )}
+              <button type="submit" className="revamp-form-btn" style={{ "--accent": "var(--amber)" } as React.CSSProperties} disabled={loading}>
+                {loading ? t("twofa.activating") : t("twofa.verifyActivate")}
+              </button>
+            </form>
+          )}
+        </div>
       </div>
-    </section>
+    </div>
   );
 }

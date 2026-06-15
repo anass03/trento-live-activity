@@ -1,247 +1,329 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import { createEvent, deleteEvent, getMyEvents, getPOIs, type ApiEvent, type POI } from '../lib/api';
-import { POIMapPicker } from '../components/map/POIMapPicker';
-import { GeocodedLocation } from '../components/ui/GeocodedLocation';
-import { formatDate } from '../lib/formatters';
+import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
+import { Header } from "../components/layout/Header";
+import { Icon } from "../components/ui/Icon";
+import { createEvent, getPOIs, reverseGeocode, POI } from "../lib/api";
 
-const CATEGORIES = ['sport', 'cultura', 'musica', 'arte', 'gastronomia', 'altro'];
+const PUBLISH_CATEGORIES = [
+  { id: "cultura",  icon: "landmark", color: "var(--violet)" },
+  { id: "musica",   icon: "music",    color: "var(--magenta)" },
+  { id: "sport",    icon: "run",      color: "var(--green)" },
+  { id: "cibo",     color: "var(--amber)",   icon: "food" },
+  { id: "outdoor",  color: "var(--teal)",    icon: "bike" },
+  { id: "famiglia", color: "var(--cyan)",    icon: "family" },
+];
 
-interface FormState {
-  titolo: string; descrizione: string; categoria: string;
-  data: string; orarioInizio: string; orarioFine: string;
-  latitudine: string; longitudine: string; poiId: string; maxPartecipanti: string;
-}
+const DARK_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+const LIGHT_STYLE = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
+const TRENTO_CENTER: [number, number] = [11.1211, 46.0679];
+const isDarkTheme = (theme: string) => theme === "dark" || theme === "night";
 
-const EMPTY_FORM: FormState = {
-  titolo: '', descrizione: '', categoria: 'cultura',
-  data: '', orarioInizio: '', orarioFine: '',
-  latitudine: '', longitudine: '', poiId: '', maxPartecipanti: '',
-};
+/* Mini-mappa per piazzare il pin dell'evento: un click posiziona/sposta il marker. */
+function PinPickerMap({ theme, pin, onPin }: {
+  theme: "light" | "dark" | "auto";
+  pin: { lat: number; lng: number } | null;
+  onPin: (p: { lat: number; lng: number }) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const markerRef = useRef<maplibregl.Marker | null>(null);
+  const onPinRef = useRef(onPin);
+  onPinRef.current = onPin;
 
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const map = new maplibregl.Map({
+      container: containerRef.current,
+      style: isDarkTheme(theme) ? DARK_STYLE : LIGHT_STYLE,
+      center: TRENTO_CENTER,
+      zoom: 13,
+      attributionControl: false,
+    });
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+    map.on("click", (e) => {
+      onPinRef.current({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+    });
+    mapRef.current = map;
+    return () => { map.remove(); mapRef.current = null; markerRef.current = null; };
+  }, []);
 
-export function EntityPublishPage() {
-  const { t } = useTranslation();
-  const [myEvents, setMyEvents] = useState<ApiEvent[]>([]);
-  const [pois, setPois] = useState<POI[]>([]);
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [showPicker, setShowPicker] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
+  useEffect(() => {
+    mapRef.current?.setStyle(isDarkTheme(theme) ? DARK_STYLE : LIGHT_STYLE);
+  }, [theme]);
 
-  function load() {
-    getMyEvents().then((r) => setMyEvents(r.events || [])).catch((e) => setError(e instanceof Error ? e.message : t('common.error')));
-    getPOIs().then(setPois).catch(() => { /* ignore */ });
-  }
-  useEffect(load, []);
-
-  function selectPoi(poiId: string) {
-    if (!poiId) { setForm((f) => ({ ...f, poiId: '' })); return; }
-    const poi = pois.find((p) => p.id === poiId);
-    if (poi) setForm((f) => ({ ...f, poiId, latitudine: String(poi.latitudine), longitudine: String(poi.longitudine) }));
-  }
-
-  const validationErrors = useMemo(() => {
-    const errs: string[] = [];
-    if (form.titolo.length === 0) errs.push(t('entity.validation.titleRequired'));
-    if (form.titolo.length > 100) errs.push(t('entity.validation.titleTooLong'));
-    if (form.data && form.data < todayISO()) errs.push(t('entity.validation.datePast'));
-    if (form.orarioInizio && form.orarioFine && form.orarioInizio >= form.orarioFine) errs.push(t('entity.validation.endBeforeStart'));
-    if (!form.latitudine || !form.longitudine) errs.push(t('entity.validation.positionRequired'));
-    if (form.maxPartecipanti && Number(form.maxPartecipanti) < 1) errs.push(t('entity.validation.maxParticipants'));
-    return errs;
-  }, [form, t]);
-
-  async function handleDelete(eventId: string, titolo: string) {
-    if (!window.confirm(t('entity.deleteConfirm', { title: titolo }))) return;
-    setError(null); setMessage(null);
-    try { await deleteEvent(eventId); setMessage(t('entity.deleted')); load(); }
-    catch (e) { setError(e instanceof Error ? e.message : t('common.error')); }
-  }
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError(null); setMessage(null);
-    if (validationErrors.length > 0) { setError(validationErrors[0]); return; }
-    setIsLoading(true);
-    try {
-      await createEvent({
-        titolo: form.titolo, descrizione: form.descrizione, categoria: form.categoria,
-        data: form.data || undefined, orarioInizio: form.orarioInizio || undefined,
-        orarioFine: form.orarioFine || undefined,
-        latitudine: form.latitudine ? Number(form.latitudine) : undefined,
-        longitudine: form.longitudine ? Number(form.longitudine) : undefined,
-        poiId: form.poiId || undefined,
-        maxPartecipanti: form.maxPartecipanti ? Number(form.maxPartecipanti) : undefined,
+  useEffect(() => {
+    if (!mapRef.current) return;
+    if (!pin) { markerRef.current?.remove(); markerRef.current = null; return; }
+    if (!markerRef.current) {
+      markerRef.current = new maplibregl.Marker({ color: "#8b5cf6", draggable: true })
+        .setLngLat([pin.lng, pin.lat])
+        .addTo(mapRef.current);
+      markerRef.current.on("dragend", () => {
+        const ll = markerRef.current!.getLngLat();
+        onPinRef.current({ lat: ll.lat, lng: ll.lng });
       });
-      setMessage(t('entity.published'));
-      setForm(EMPTY_FORM); setShowPreview(false); load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('common.error'));
-    } finally { setIsLoading(false); }
-  }
-
-  const canSubmit = validationErrors.length === 0 && !isLoading;
-  const selectedPoi = pois.find((p) => p.id === form.poiId);
+    } else {
+      markerRef.current.setLngLat([pin.lng, pin.lat]);
+    }
+  }, [pin]);
 
   return (
-    <section className="data-page entity-publish-page">
-      <header className="utility-strip liquid-card">
-        <div>
-          <h1>{t('entity.publishTitle')}</h1>
-          <p>{t('entity.publishSubtitle')}</p>
-        </div>
-      </header>
+    <div
+      ref={containerRef}
+      style={{ width: "100%", height: 260, borderRadius: 14, overflow: "hidden", border: "1px solid var(--border-soft)", cursor: "crosshair" }}
+    />
+  );
+}
 
-      <div className="publish-layout">
-        <form className="auth-form liquid-card publish-form" onSubmit={handleSubmit}>
-          <h2>{t('entity.newEvent')}</h2>
+export function EntityPublishPage({ page, setPage, theme, setTheme, user }: any) {
+  const { t } = useTranslation();
+  const [cat, setCat] = useState("cultura");
+  const [title, setTitle] = useState("");
+  const [desc, setDesc] = useState("");
+  const [locationMode, setLocationMode] = useState<"poi" | "pin">("poi");
+  const [poiId, setPoiId] = useState("");
+  const [pin, setPin] = useState<{ lat: number; lng: number } | null>(null);
+  // Indirizzo leggibile del pin: l'ente ragiona per vie, non per coordinate.
+  const [pinAddress, setPinAddress] = useState<string | null>(null);
+  useEffect(() => {
+    if (!pin) { setPinAddress(null); return; }
+    let alive = true;
+    reverseGeocode(pin.lat, pin.lng)
+      .then((r) => { if (alive) setPinAddress(r.address); })
+      .catch(() => { if (alive) setPinAddress(null); });
+    return () => { alive = false; };
+  }, [pin?.lat, pin?.lng]);
+  const [pois, setPois] = useState<POI[]>([]);
+  const [when, setWhen] = useState(new Date().toISOString().substring(0, 10));
+  const [startTime, setStartTime] = useState("18:00");
+  const [endTime, setEndTime] = useState("20:00");
+  const [cap, setCap] = useState("50");
 
-          <label>
-            <span>{t('entity.titleField')} <small className="muted-copy">({form.titolo.length}/100)</small></span>
-            <input type="text" maxLength={100} value={form.titolo} onChange={(ev) => setForm({ ...form, titolo: ev.target.value })} required placeholder="Es: Mostra fotografica al Castello" />
-          </label>
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-          <label>
-            <span>{t('entity.descriptionField')}</span>
-            <textarea rows={4} value={form.descrizione} onChange={(ev) => setForm({ ...form, descrizione: ev.target.value })} placeholder={t('entity.descriptionPlaceholder')} />
-          </label>
+  useEffect(() => {
+    getPOIs()
+      .then((data) => setPois(data))
+      .catch((err) => console.error("Failed to load POIs:", err));
+  }, []);
 
-          <div className="filter-row">
-            <label>
-              <span>{t('entity.category')}</span>
-              <select value={form.categoria} onChange={(ev) => setForm({ ...form, categoria: ev.target.value })}>
-                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </label>
-            <label>
-              <span>{t('entity.maxParticipants')}</span>
-              <input type="number" min={1} value={form.maxPartecipanti} onChange={(ev) => setForm({ ...form, maxPartecipanti: ev.target.value })} placeholder={t('entity.noLimit')} />
-            </label>
-          </div>
+  const handleSubmit = async (e: any) => {
+    e.preventDefault();
+    setError("");
+    if (!title || !desc) {
+      setError(t("ente.publish.requiredFieldsError"));
+      return;
+    }
+    if (locationMode === "poi" && !poiId) {
+      setError(t("ente.publish.selectPoiError"));
+      return;
+    }
+    if (locationMode === "pin" && !pin) {
+      setError(t("ente.publish.placePinError"));
+      return;
+    }
 
-          <div className="filter-row">
-            <label><span>{t('entity.date')}</span><input type="date" min={todayISO()} value={form.data} onChange={(ev) => setForm({ ...form, data: ev.target.value })} /></label>
-            <label><span>{t('entity.startTime')}</span><input type="time" value={form.orarioInizio} onChange={(ev) => setForm({ ...form, orarioInizio: ev.target.value })} /></label>
-            <label><span>{t('entity.endTime')}</span><input type="time" value={form.orarioFine} onChange={(ev) => setForm({ ...form, orarioFine: ev.target.value })} /></label>
-          </div>
+    setLoading(true);
+    try {
+      const selectedPoi = locationMode === "poi" ? pois.find((p) => p.id === poiId) : null;
+      await createEvent({
+        titolo: title,
+        descrizione: desc,
+        categoria: cat,
+        data: when,
+        orarioInizio: startTime,
+        orarioFine: endTime,
+        poiId: locationMode === "poi" ? poiId : undefined,
+        latitudine: locationMode === "pin" ? pin!.lat : selectedPoi?.latitudine,
+        longitudine: locationMode === "pin" ? pin!.lng : selectedPoi?.longitudine,
+        maxPartecipanti: Number(cap),
+      });
 
-          <fieldset className="publish-location">
-            <legend>{t('entity.position')}</legend>
-            <label>
-              <span>{t('entity.existingPOI')}</span>
-              <select value={form.poiId} onChange={(ev) => selectPoi(ev.target.value)}>
-                <option value="">{t('entity.choosePOI')}</option>
-                {pois.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
-              </select>
-            </label>
-            <div className="poi-location-row">
-              <div className="poi-location-info">
-                <span className="poi-location-label">{t('entity.selectedPosition')}</span>
-                {form.latitudine && form.longitudine ? (
-                  <>
-                    <GeocodedLocation value={`${Number(form.latitudine).toFixed(4)}, ${Number(form.longitudine).toFixed(4)}`} />
-                    <code style={{ fontSize: 11, opacity: 0.6 }}>{Number(form.latitudine).toFixed(6)}, {Number(form.longitudine).toFixed(6)}</code>
-                  </>
-                ) : (
-                  <em>{t('entity.noPosition')}</em>
-                )}
-              </div>
-              <button type="button" className="ghost-button" onClick={() => setShowPicker(true)}>{t('entity.chooseOnMap')}</button>
+      setSuccess(true);
+      setTimeout(() => {
+        setSuccess(false);
+        setPage("eventi");
+      }, 1500);
+    } catch (err: any) {
+      setError(err.message || t("ente.publish.publishError"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="revamp-legal-scene">
+      <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
+      <div className="revamp-legal-wrap">
+        <div className="revamp-legal-card anim-in" style={{ "--accent": "var(--violet)", maxWidth: "680px" } as React.CSSProperties}>
+          <h1>{t("ente.publish.eventTitle")}</h1>
+          <p>{t("ente.publish.eventSubtitle")}</p>
+
+          {error && (
+            <div className="revamp-status-pill danger" style={{ width: "100%", padding: "10px 0", justifyContent: "center", margin: "20px 0" }}>
+              <Icon name="warn" size={12} /> {error}
             </div>
-          </fieldset>
-
-          {validationErrors.length > 0 && (
-            <ul className="form-validation-list">
-              {validationErrors.map((v) => <li key={v}>⚠ {v}</li>)}
-            </ul>
           )}
-          {error && <div className="form-error">{error}</div>}
-          {message && <div className="form-success">{message}</div>}
 
-          <div className="filter-actions">
-            <button type="button" className="ghost-button" onClick={() => setShowPreview(true)} disabled={validationErrors.length > 0}>{t('entity.preview')}</button>
-            <button type="submit" className="primary-button" disabled={!canSubmit}>{isLoading ? t('entity.publishing') : t('entity.publish')}</button>
-          </div>
-        </form>
-
-        <aside className="publish-summary liquid-card">
-          <h3>{t('entity.summary')}</h3>
-          <dl>
-            <div><dt>{t('entity.titleField')}</dt><dd>{form.titolo || <em className="muted-copy">—</em>}</dd></div>
-            <div><dt>{t('entity.category')}</dt><dd>{form.categoria}</dd></div>
-            <div><dt>{t('entity.date')}</dt><dd>{form.data || <em className="muted-copy">—</em>}</dd></div>
-            <div><dt>{t('entity.summaryTime')}</dt><dd>{form.orarioInizio || '—'} → {form.orarioFine || '—'}</dd></div>
-            <div><dt>{t('entity.summaryPlace')}</dt><dd>{selectedPoi ? selectedPoi.nome : (form.latitudine ? t('entity.pointOnMap') : <em className="muted-copy">—</em>)}</dd></div>
-            <div><dt>{t('entity.summaryCapacity')}</dt><dd>{form.maxPartecipanti || <em className="muted-copy">{t('entity.unlimited')}</em>}</dd></div>
-          </dl>
-          <small className="muted-copy">{t('entity.badgeHint')}</small>
-        </aside>
-      </div>
-
-      <div className="liquid-card">
-        <h2>{t('entity.myEvents', { count: myEvents.length })}</h2>
-        {myEvents.length === 0 ? (
-          <p>{t('entity.noEvents')}</p>
-        ) : (
-          <table className="stats-table">
-            <thead><tr><th>{t('entity.colTitle')}</th><th>{t('common.category')}</th><th>{t('entity.colDate')}</th><th>{t('entity.colParticipants')}</th><th>{t('common.actions')}</th></tr></thead>
-            <tbody>
-              {myEvents.map((e) => (
-                <tr key={e.id}>
-                  <td>{e.title}</td>
-                  <td>{e.category}</td>
-                  <td>{e.dateTime ? formatDate(e.dateTime) : '—'}</td>
-                  <td>{e.participantCount ?? 0}{e.maxPartecipanti ? ` / ${e.maxPartecipanti}` : ''}</td>
-                  <td style={{ display: 'flex', gap: 8 }}>
-                    <Link to={`/eventi/${e.id}`}>{t('common.open')}</Link>
-                    <button type="button" className="danger-button compact-button" onClick={() => handleDelete(e.id, e.title)}>{t('common.delete')}</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {showPicker && (
-        <POIMapPicker
-          initial={{ latitudine: form.latitudine ? Number(form.latitudine) : undefined, longitudine: form.longitudine ? Number(form.longitudine) : undefined }}
-          onCancel={() => setShowPicker(false)}
-          onConfirm={(coords) => {
-            setForm((f) => ({ ...f, poiId: '', latitudine: String(coords.latitudine), longitudine: String(coords.longitudine) }));
-            setShowPicker(false);
-          }}
-        />
-      )}
-
-      {showPreview && (
-        <div className="activity-popup-backdrop" role="presentation" onClick={() => setShowPreview(false)}>
-          <article className="activity-popup" role="dialog" aria-modal="true" onClick={(ev) => ev.stopPropagation()}>
-            <button className="activity-popup-close" type="button" onClick={() => setShowPreview(false)} aria-label={t('common.close')}>×</button>
-            <span className="section-eyebrow">{t('entity.previewTitle')}</span>
-            <h2>{form.titolo}</h2>
-            <p>{form.descrizione || t('events.noDescription')}</p>
-            <dl>
-              <div><dt>{t('common.category')}</dt><dd>{form.categoria}</dd></div>
-              <div><dt>{t('entity.date')}</dt><dd>{form.data ? formatDate(form.data) : '—'}</dd></div>
-              <div><dt>{t('entity.summaryTime')}</dt><dd>{form.orarioInizio || '—'} → {form.orarioFine || '—'}</dd></div>
-              <div><dt>{t('entity.summaryPlace')}</dt><dd>{selectedPoi ? selectedPoi.nome : t('entity.pointOnMap')}</dd></div>
-              {form.maxPartecipanti && <div><dt>{t('entity.summaryCapacity')}</dt><dd>{form.maxPartecipanti}</dd></div>}
-            </dl>
-            <div className="filter-actions">
-              <button type="button" className="ghost-button" onClick={() => setShowPreview(false)}>{t('entity.editAction')}</button>
-              <button type="button" className="primary-button" onClick={handleSubmit}>{t('entity.publishNow')}</button>
+          {success ? (
+            <div className="revamp-status-pill success" style={{ width: "100%", padding: "16px 0", justifyContent: "center", margin: "20px 0" }}>
+              <Icon name="check" size={14} /> {t("ente.publish.eventSuccess")}
             </div>
-          </article>
+          ) : (
+            <form onSubmit={handleSubmit} style={{ marginTop: 20 }}>
+              <h3 className="revamp-detail-section-title">{t("ente.publish.step1")}</h3>
+              <div className="s-interests" style={{ marginBottom: 24 }}>
+                {PUBLISH_CATEGORIES.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={"s-int-chip" + (cat === item.id ? " on" : "")}
+                    style={{ "--ic": item.color } as React.CSSProperties}
+                    onClick={() => setCat(item.id)}
+                  >
+                    <Icon name={item.icon} size={14} /> {t(`ente.publish.categories.${item.id}`)}
+                  </button>
+                ))}
+              </div>
+
+              <h3 className="revamp-detail-section-title">{t("ente.publish.step2")}</h3>
+              <div className="revamp-form-group">
+                <label className="revamp-form-label">{t("ente.publish.titleLabel")}</label>
+                <input
+                  type="text"
+                  className="revamp-form-input"
+                  placeholder={t("ente.publish.titlePlaceholder")}
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  style={{ paddingLeft: 14 }}
+                  required
+                />
+              </div>
+
+              <div className="revamp-form-group">
+                <label className="revamp-form-label">{t("ente.publish.descLabel")}</label>
+                <textarea
+                  className="revamp-textarea"
+                  placeholder={t("ente.publish.descPlaceholder")}
+                  value={desc}
+                  onChange={(e) => setDesc(e.target.value)}
+                  required
+                />
+              </div>
+
+              <h3 className="revamp-detail-section-title">{t("ente.publish.step3Location")}</h3>
+              <div style={{ display: "flex", gap: "10px", marginBottom: 14 }}>
+                <button
+                  type="button"
+                  className={`s-rpill ${locationMode === "poi" ? "on" : ""}`}
+                  onClick={() => setLocationMode("poi")}
+                  style={{ flex: 1, padding: "10px 0", justifyContent: "center" }}
+                >
+                  <Icon name="landmark" size={15} /> {t("ente.publish.locationModePoi")}
+                </button>
+                <button
+                  type="button"
+                  className={`s-rpill ${locationMode === "pin" ? "on" : ""}`}
+                  onClick={() => setLocationMode("pin")}
+                  style={{ flex: 1, padding: "10px 0", justifyContent: "center" }}
+                >
+                  <Icon name="pin" size={15} /> {t("ente.publish.locationModePin")}
+                </button>
+              </div>
+
+              {locationMode === "poi" ? (
+                <div className="revamp-form-group">
+                  <label className="revamp-form-label">{t("ente.publish.poiLabel")}</label>
+                  <select
+                    className="revamp-select"
+                    value={poiId}
+                    onChange={(e) => setPoiId(e.target.value)}
+                    style={{ height: "38px", width: "100%", padding: "0 10px" }}
+                  >
+                    <option value="">{t("ente.publish.poiPlaceholder")}</option>
+                    {pois.map((p) => (
+                      <option key={p.id} value={p.id}>{p.nome}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div className="revamp-form-group">
+                  <label className="revamp-form-label">
+                    {t("ente.publish.pinMapLabel")}
+                    {pin && (
+                      <span style={{ marginLeft: 8, color: "var(--text-muted)", fontWeight: 400 }}>
+                        {pinAddress || `(${pin.lat.toFixed(5)}, ${pin.lng.toFixed(5)})`}
+                      </span>
+                    )}
+                  </label>
+                  <PinPickerMap theme={theme} pin={pin} onPin={setPin} />
+                </div>
+              )}
+
+              <h3 className="revamp-detail-section-title" style={{ marginTop: 24 }}>{t("ente.publish.step4DateTime")}</h3>
+              <div className="revamp-form-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 16 }}>
+                <div className="revamp-form-group" style={{ marginBottom: 0 }}>
+                  <label className="revamp-form-label">{t("ente.publish.dateLabel")}</label>
+                  <input
+                    type="date"
+                    className="revamp-form-input"
+                    value={when}
+                    onChange={(e) => setWhen(e.target.value)}
+                    style={{ paddingLeft: 14 }}
+                    required
+                  />
+                </div>
+                <div className="revamp-form-group" style={{ marginBottom: 0 }}>
+                  <label className="revamp-form-label">{t("ente.publish.capacityLabel")}</label>
+                  <input
+                    type="number"
+                    className="revamp-form-input"
+                    placeholder="50"
+                    value={cap}
+                    onChange={(e) => setCap(e.target.value)}
+                    style={{ paddingLeft: 14 }}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="revamp-form-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 24 }}>
+                <div className="revamp-form-group" style={{ marginBottom: 0 }}>
+                  <label className="revamp-form-label">{t("ente.publish.startLabel")}</label>
+                  <input
+                    type="time"
+                    className="revamp-form-input"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    style={{ paddingLeft: 14 }}
+                    required
+                  />
+                </div>
+                <div className="revamp-form-group" style={{ marginBottom: 0 }}>
+                  <label className="revamp-form-label">{t("ente.publish.endLabel")}</label>
+                  <input
+                    type="time"
+                    className="revamp-form-input"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    style={{ paddingLeft: 14 }}
+                    required
+                  />
+                </div>
+              </div>
+
+              <button type="submit" className="revamp-form-btn" style={{ "--accent": "var(--violet)" } as React.CSSProperties} disabled={loading}>
+                {loading ? t("ente.publish.publishing") : t("ente.publish.publishEvent")}{" "}
+                {!loading && <Icon name="sparkle" size={16} />}
+              </button>
+            </form>
+          )}
         </div>
-      )}
-    </section>
+      </div>
+    </div>
   );
 }

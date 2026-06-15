@@ -1,124 +1,168 @@
-import { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { getPushStats, sendAdminBroadcast, type PushAudience, type PushStats } from '../lib/api';
-import { useAutoRefresh } from '../lib/useAutoRefresh';
+import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import { Header } from "../components/layout/Header";
+import { Icon } from "../components/ui/Icon";
+import { getPushStats, sendAdminBroadcast, PushStats, PushAudience } from "../lib/api";
 
-const MAX_TITLE = 80;
-const MAX_BODY = 240;
-
-const AUDIENCE_KEYS: PushAudience[] = ['all', 'cittadini', 'enti', 'comunali'];
-
-export function AdminNotificationsPage() {
+export function AdminNotificationsPage({ page, setPage, theme, setTheme, user }: any) {
   const { t } = useTranslation();
+  const [title, setTitle] = useState("");
+  const [desc, setDesc] = useState("");
+  const [audience, setAudience] = useState<PushAudience>("all");
   const [stats, setStats] = useState<PushStats | null>(null);
-  const [statsError, setStatsError] = useState<string | null>(null);
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
-  const [audience, setAudience] = useState<PushAudience>('all');
-  const [sending, setSending] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
-  function loadStats() {
-    return getPushStats()
-      .then((s) => { setStats(s); setStatsError(null); })
-      .catch((e) => setStatsError(e instanceof Error ? e.message : t('common.error')));
-  }
-
-  useEffect(() => { void loadStats(); }, []);
-  useAutoRefresh(loadStats, 30_000);
-
-  async function handleSend(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null); setMessage(null);
-    if (!title.trim() || !body.trim()) { setError(t('admin.notifications.emptyError')); return; }
-
-    const audLabel = t(`admin.notifications.audiences.${audience}.label`);
-    if (!window.confirm(t('admin.notifications.confirmSend', { audience: audLabel }))) return;
-
-    setSending(true);
+  const loadStats = async () => {
     try {
-      const res = await sendAdminBroadcast({ title: title.trim(), body: body.trim(), audience });
-      setMessage(
-        res.tokensTargeted > 0
-          ? t('admin.notifications.sent', { count: res.tokensTargeted, audience: audLabel })
-          : t('admin.notifications.noDevices', { audience: audLabel }),
-      );
-      setTitle(''); setBody('');
-      void loadStats();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('common.error'));
-    } finally { setSending(false); }
-  }
+      const data = await getPushStats();
+      setStats(data);
+    } catch (err) {
+      console.error("Errore nel caricamento delle statistiche notifiche:", err);
+    }
+  };
+
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  const handleSend = async (e: any) => {
+    e.preventDefault();
+    if (!title || !desc) return;
+    setLoading(true);
+    setErrorMsg("");
+    try {
+      await sendAdminBroadcast({
+        title,
+        body: desc,
+        audience,
+      });
+      setSuccess(true);
+      setTitle("");
+      setDesc("");
+      loadStats(); // reload stats
+      setTimeout(() => {
+        setSuccess(false);
+      }, 2500);
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(err.message || t("admin.notifications.sendError"));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <section className="data-page">
-      <header className="utility-strip liquid-card">
-        <div>
-          <h1>{t('admin.notifications.title')}</h1>
-          <p>{t('admin.notifications.subtitle')}</p>
-        </div>
-      </header>
+    <div className="revamp-legal-scene">
+      <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
+      <div className="revamp-admin-layout">
+        <h1>{t("admin.notifications.title")}</h1>
+        <p>{t("admin.notifications.subtitle")}</p>
 
-      <div className="moderation-stats">
-        <div className="moderation-stat">
-          <strong>{stats?.totalTokens ?? '—'}</strong>
-          <span>{t('admin.notifications.devicesRegistered')}</span>
-        </div>
-        <div className="moderation-stat">
-          <strong>{stats?.usersReachable ?? '—'}</strong>
-          <span>{t('admin.notifications.usersReachable')}</span>
-        </div>
-        <div className="moderation-stat">
-          <strong>{stats?.byPlatform?.web ?? 0}</strong>
-          <span>Web</span>
-        </div>
-        <div className="moderation-stat">
-          <strong>{(stats?.byPlatform?.android ?? 0) + (stats?.byPlatform?.ios ?? 0)}</strong>
-          <span>{t('admin.notifications.mobile')}</span>
+        {errorMsg && (
+          <div className="revamp-status-pill error" style={{ margin: "20px auto 0", maxWidth: 640, padding: "12px", width: "100%", justifyContent: "center" }}>
+            <Icon name="alert" size={14} /> {errorMsg}
+          </div>
+        )}
+
+        {stats && (
+          <div className="revamp-dashboard-grid" style={{ maxWidth: 640, margin: "20px auto 0", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 15 }}>
+            <div className="revamp-stat-card" style={{ "--accent": "var(--cyan)" } as any}>
+              <Icon name="bell" size={24} style={{ color: "var(--cyan)" }} />
+              <div>
+                <h2>{stats.totalTokens}</h2>
+                <p>{t("admin.notifications.statTokens")}</p>
+              </div>
+            </div>
+            <div className="revamp-stat-card" style={{ "--accent": "var(--emerald)" } as any}>
+              <Icon name="spid" size={24} style={{ color: "var(--emerald)" }} />
+              <div>
+                <h2>{stats.usersReachable}</h2>
+                <p>{t("admin.notifications.statReachable")}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="revamp-legal-card anim-in" style={{ "--accent": "var(--cyan)", maxWidth: 640, margin: "20px auto 0" }}>
+          <h2>{t("admin.notifications.formTitle")}</h2>
+          {success ? (
+            <div className="revamp-status-pill success" style={{ width: "100%", padding: "12px 0", justifyContent: "center", marginBottom: 14 }}>
+              <Icon name="check" size={12} /> {t("admin.notifications.success")}
+            </div>
+          ) : (
+            <form onSubmit={handleSend} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div className="revamp-form-group">
+                <label className="revamp-form-label">{t("admin.notifications.audienceLabel")}</label>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className={"s-rpill" + (audience === "all" ? " on" : "")}
+                    style={{ "--accent": "var(--cyan)" }}
+                    onClick={() => setAudience("all")}
+                  >
+                    {t("admin.notifications.audienceAll")}
+                  </button>
+                  <button
+                    type="button"
+                    className={"s-rpill" + (audience === "cittadini" ? " on" : "")}
+                    style={{ "--accent": "var(--cyan)" }}
+                    onClick={() => setAudience("cittadini")}
+                  >
+                    {t("admin.notifications.audienceCitizens")}
+                  </button>
+                  <button
+                    type="button"
+                    className={"s-rpill" + (audience === "enti" ? " on" : "")}
+                    style={{ "--accent": "var(--cyan)" }}
+                    onClick={() => setAudience("enti")}
+                  >
+                    {t("admin.notifications.audienceEntities")}
+                  </button>
+                  <button
+                    type="button"
+                    className={"s-rpill" + (audience === "comunali" ? " on" : "")}
+                    style={{ "--accent": "var(--cyan)" }}
+                    onClick={() => setAudience("comunali")}
+                  >
+                    {t("admin.notifications.audienceMunicipal")}
+                  </button>
+                </div>
+              </div>
+
+              <div className="revamp-form-group">
+                <label className="revamp-form-label">{t("admin.notifications.titleLabel")}</label>
+                <input
+                  type="text"
+                  className="revamp-form-input"
+                  placeholder={t("admin.notifications.titlePlaceholder")}
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  style={{ paddingLeft: 14 }}
+                  required
+                />
+              </div>
+
+              <div className="revamp-form-group">
+                <label className="revamp-form-label">{t("admin.notifications.bodyLabel")}</label>
+                <textarea
+                  className="revamp-textarea"
+                  placeholder={t("admin.notifications.bodyPlaceholder")}
+                  value={desc}
+                  onChange={(e) => setDesc(e.target.value)}
+                  required
+                />
+              </div>
+
+              <button type="submit" className="revamp-form-btn" style={{ "--accent": "var(--cyan)" }} disabled={loading}>
+                {loading ? t("admin.notifications.sending") : t("admin.notifications.send")}
+                <Icon name={loading ? "refresh" : "bell"} size={16} className={loading ? "spin" : ""} />
+              </button>
+            </form>
+          )}
         </div>
       </div>
-      {statsError && <div className="state-panel liquid-panel"><p>{statsError}</p></div>}
-
-      <form className="liquid-card filter-bar admin-notify-form" onSubmit={handleSend}>
-        <div className="filter-row">
-          <label>
-            <span>{t('admin.notifications.recipients')}</span>
-            <select value={audience} onChange={(e) => setAudience(e.target.value as PushAudience)}>
-              {AUDIENCE_KEYS.map((key) => (
-                <option key={key} value={key}>
-                  {t(`admin.notifications.audiences.${key}.label`)} — {t(`admin.notifications.audiences.${key}.hint`)}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <div className="filter-row">
-          <label>
-            <span>{t('admin.notifications.titleField')} <small className="muted-copy">({title.length}/{MAX_TITLE})</small></span>
-            <input type="text" value={title} maxLength={MAX_TITLE} onChange={(e) => setTitle(e.target.value)} placeholder={t('admin.notifications.titlePlaceholder')} />
-          </label>
-        </div>
-        <div className="filter-row">
-          <label>
-            <span>{t('admin.notifications.messageField')} <small className="muted-copy">({body.length}/{MAX_BODY})</small></span>
-            <textarea value={body} maxLength={MAX_BODY} rows={3} onChange={(e) => setBody(e.target.value)} placeholder={t('admin.notifications.messagePlaceholder')} />
-          </label>
-        </div>
-
-        {error && <div className="form-error">{error}</div>}
-        {message && <div className="form-success">{message}</div>}
-
-        <div className="filter-actions">
-          <button type="submit" className="primary-button" disabled={sending || !title.trim() || !body.trim()}>
-            {sending ? t('admin.notifications.sending') : t('admin.notifications.send')}
-          </button>
-        </div>
-
-        <p className="muted-copy" style={{ fontSize: 12, margin: 0 }}>
-          {t('admin.notifications.disclaimer')}
-        </p>
-      </form>
-    </section>
+    </div>
   );
 }

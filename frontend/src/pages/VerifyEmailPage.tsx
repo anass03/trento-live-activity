@@ -1,75 +1,101 @@
-import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import { getMe, verifyEmail, setToken } from '../lib/api';
+import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Icon } from "../components/ui/Icon";
+import { verifyEmail } from "../lib/api";
+import { needsOnboardingAfterOauth } from "../components/auth/LoginModal";
 
-export function VerifyEmailPage() {
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
+export function VerifyEmailPage({ page, setPage }: any) {
   const { t } = useTranslation();
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const [errorMsg, setErrorMsg] = useState('');
-  const called = useRef(false);
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    if (called.current) return;
-    called.current = true;
-
-    const token = searchParams.get('token');
-    if (!token) {
-      setStatus('error');
-      setErrorMsg(t('auth.verifyEmail.invalidToken'));
-      return;
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+    if (token) {
+      setLoading(true);
+      verifyEmail(token)
+        .then(() => {
+          setSuccess(true);
+          // Clean URL parameter
+          window.history.replaceState({}, document.title, window.location.pathname);
+        })
+        .catch((err: any) => {
+          setError(err.message || t("verifyEmail.invalidToken"));
+        })
+        .finally(() => {
+          setLoading(false);
+        });
     }
-    verifyEmail(token)
-      .then(async (result) => {
-        setToken(result.token);
-        window.dispatchEvent(new Event('tla:user-updated'));
-        setStatus('success');
-        try {
-          const me = await getMe();
-          const profile = me.profile;
-          const needsOnboarding = profile?.kind === 'cittadino' && !profile.onboardingComplete;
-          setTimeout(() => navigate(needsOnboarding ? '/onboarding/interessi' : '/'), 1400);
-        } catch {
-          setTimeout(() => navigate('/'), 1800);
-        }
-      })
-      .catch((e) => {
-        setStatus('error');
-        setErrorMsg(e instanceof Error ? e.message : t('auth.verifyEmail.error'));
-      });
-  }, [searchParams, navigate, t]);
+  }, []);
 
   return (
-    <section className="auth-page">
-      <div className="auth-form glass-card">
-        {status === 'loading' && (
-          <>
-            <h1>{t('auth.verifyEmail.loading')}</h1>
-            <p>{t('auth.verifyEmail.loadingSubtitle')}</p>
-          </>
+    <div className="revamp-auth-scene">
+      <div className="revamp-form-card anim-in" style={{ "--accent": "var(--cyan)" } as React.CSSProperties}>
+        <div className="revamp-form-head">
+          <div className="revamp-form-logo" style={{ "--accent": "var(--cyan)" } as React.CSSProperties}>
+            <Icon name="mail" size={26} style={{ color: "var(--cyan)" }} />
+          </div>
+          <h2>{t("verifyEmail.title")}</h2>
+          <p>{t("verifyEmail.subtitle")}</p>
+        </div>
+
+        {loading && (
+          <div style={{ textAlign: "center", padding: "20px 0" }}>
+            <p style={{ color: "var(--text-muted)", fontSize: 14 }}>{t("verifyEmail.verifying")}</p>
+          </div>
         )}
-        {status === 'success' && (
-          <>
-            <h1>{t('auth.verifyEmail.success')}</h1>
-            <p>{t('auth.verifyEmail.successSubtitle')}</p>
-          </>
-        )}
-        {status === 'error' && (
-          <>
-            <h1>{t('auth.verifyEmail.error')}</h1>
-            <div className="form-error">{errorMsg}</div>
-            <p style={{ marginTop: '1rem' }}>
-              {t('auth.verifyEmail.expired')}{' '}
-              <Link to="/registrazione">{t('auth.verifyEmail.registerAgain')}</Link>{' '}
-              {t('common.or')}{' '}
-              <Link to="/login">{t('auth.verifyEmail.orLogin')}</Link>{' '}
-              {t('auth.verifyEmail.ifVerified')}
+
+        {!loading && error && (
+          <div style={{ textAlign: "center" }}>
+            <div className="revamp-status-pill danger" style={{ width: "100%", marginBottom: 16, justifyContent: "center" }}>
+              <Icon name="warn" size={12} /> {error}
+            </div>
+            <p style={{ fontSize: 13.5, color: "var(--text-secondary)", marginBottom: 20 }}>
+              {t("verifyEmail.expiredHint")}
             </p>
-          </>
+            <button className="revamp-form-btn" style={{ "--accent": "var(--cyan)" } as React.CSSProperties} onClick={() => setPage("login")}>
+              {t("verifyEmail.backToLogin")}
+            </button>
+          </div>
+        )}
+
+        {!loading && !error && success && (
+          <div style={{ textAlign: "center" }}>
+            <div className="revamp-status-pill success" style={{ marginBottom: 16, display: "inline-flex", justifyContent: "center", width: "100%" }}>
+              <Icon name="check" size={12} /> {t("verifyEmail.success")}
+            </div>
+            <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 20 }}>
+              {t("verifyEmail.successBody")}
+            </p>
+            <button
+              className="revamp-form-btn"
+              style={{ "--accent": "var(--cyan)" } as React.CSSProperties}
+              onClick={async () => {
+                // La verifica fa auto-login: un cittadino nuovo passa prima
+                // dalla scelta interessi, poi dalla home.
+                window.dispatchEvent(new Event("tla:user-updated"));
+                const needsOnboarding = await needsOnboardingAfterOauth();
+                setPage(needsOnboarding ? "onboarding" : "home");
+              }}
+            >
+              {t("verifyEmail.goDashboard")}
+            </button>
+          </div>
+        )}
+
+        {!loading && !error && !success && (
+          <div style={{ textAlign: "center" }}>
+            <p style={{ fontSize: 13.5, color: "var(--text-secondary)", marginBottom: 20, lineHeight: 1.5 }}>
+              {t("verifyEmail.pendingBody")}
+            </p>
+            <button className="revamp-form-btn" style={{ "--accent": "var(--cyan)" } as React.CSSProperties} onClick={() => setPage("login")}>
+              {t("verifyEmail.backToLogin")}
+            </button>
+          </div>
         )}
       </div>
-    </section>
+    </div>
   );
 }

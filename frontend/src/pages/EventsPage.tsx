@@ -1,442 +1,666 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import { InteractiveMapCard } from '../components/ui/InteractiveMapCard';
-import {
-  getEventCalendarUrl, getEvents, getToken, googleCalendarUrl,
-  joinEvent, leaveEvent, reportEvent,
-  type ApiEvent,
-} from '../lib/api';
-import { CalendarButton } from '../components/ui/CalendarButton';
-import { GeocodedLocation } from '../components/ui/GeocodedLocation';
-import { useAutoRefresh } from '../lib/useAutoRefresh';
-import type { AppUser } from '../data/mockUser';
-import { formatDateTime, formatDay } from '../lib/formatters';
+/* ===========================================================
+   Trento Live Activity — EVENTI page
+   =========================================================== */
+import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import i18n, { getTimeFormat } from "../lib/i18n";
+import { shareOrCopy } from "../lib/share";
+import { Header } from "../components/layout/Header";
+import { Avatars } from "../components/redesign/Avatars";
+import { Widget, useGlow } from "../components/redesign/widgets";
+import { Icon } from "../components/ui/Icon";
+import { GeocodedLocation } from "../components/ui/GeocodedLocation";
+import { getEvents, joinEvent, leaveEvent, addFavorite, removeFavorite, getFavorites, ApiEvent, ApiError } from "../lib/api";
 
-const REPORT_TYPES = ['contenuto_inappropriato', 'spam', 'disinformazione', 'altro'];
+/* ---- category meta aligned with the backend enum
+   (EVENT_CATEGORIES = sport|cultura|musica|arte|gastronomia|altro) ---- */
+const EV_META: Record<string, { color: string; icon: string; grad: string }> = {
+  musica:      { color: "var(--magenta)", icon: "music",    grad: "linear-gradient(140deg,#db2777,#831843)" },
+  cultura:     { color: "var(--violet)",  icon: "landmark", grad: "linear-gradient(140deg,#7c3aed,#4c1d95)" },
+  sport:       { color: "var(--green)",   icon: "run",      grad: "linear-gradient(140deg,#059669,#064e3b)" },
+  arte:        { color: "var(--amber)",   icon: "sparkle",  grad: "linear-gradient(140deg,#d97706,#7c2d12)" },
+  gastronomia: { color: "var(--orange)",  icon: "food",     grad: "linear-gradient(140deg,#ea580c,#9a3412)" },
+  altro:       { color: "var(--cyan)",    icon: "compass",  grad: "linear-gradient(140deg,#0ea5e9,#075985)" },
+};
+const evMeta = (cat?: string) => EV_META[cat || ""] || EV_META.altro;
 
-function eventCrowdLevel(event: ApiEvent) { return event.isCertified ? 68 : 44; }
+const EV_FILTERS = [
+  { id: "all", label: "events.filters.all", color: "var(--cyan)", icon: "grid" },
+  ...Object.keys(EV_META).map((id) => ({
+    id, label: `events.filters.${id}`, color: EV_META[id].color, icon: EV_META[id].icon,
+  })),
+];
 
-function parseLocalDateTime(value: string | null | undefined): Date | null {
-  if (!value) return null;
-  const hasExplicitTimezone = /(?:z|[+-]\d{2}:?\d{2})$/i.test(value);
-  if (!hasExplicitTimezone) {
-    const localDate = value.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/);
-    if (localDate) return new Date(Number(localDate[1]), Number(localDate[2]) - 1, Number(localDate[3]), Number(localDate[4] ?? 0), Number(localDate[5] ?? 0), Number(localDate[6] ?? 0));
+const uiLocale = () => (i18n.language?.startsWith("en") ? "en-GB" : "it-IT");
+const fmt = (n?: number) => (n || 0).toLocaleString(uiLocale());
+// "16:30:00" → "16:30"
+const shortTime = (v?: string | null) => (v ? String(v).slice(0, 5) : "");
+
+/* ===================== MINI CALENDAR ===================== */
+const sameDay = (a: Date, b: Date) =>
+  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+// Best-effort parse of an event's date from whatever the API returned.
+function parseEventDate(e: any): Date | null {
+  for (const v of [e?.dateTime, e?.startTime, e?.createdAt]) {
+    if (!v) continue;
+    const d = new Date(v);
+    if (!Number.isNaN(d.getTime())) return d;
   }
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
+  return null;
 }
 
-function endDateFromStartAndTime(start: Date, endTime?: string | null): Date {
-  const end = new Date(start);
-  const time = endTime?.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
-  if (!time) return end;
-  end.setHours(Number(time[1]), Number(time[2]), Number(time[3] ?? 0), 0);
-  if (end < start) end.setDate(end.getDate() + 1);
-  return end;
+// "2026-06-17T16:30:00" → "mer 17 giu, 16:30" (segue la lingua corrente).
+function formatEventWhen(e: any, lang?: string): string | null {
+  const d = parseEventDate(e);
+  if (!d) return null;
+  const locale = lang?.startsWith("en") ? "en-GB" : "it-IT";
+  const hour12 = getTimeFormat() === "12h";
+  const date = d.toLocaleDateString(locale, { weekday: "short", day: "numeric", month: "short" });
+  const time = d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", hour12 });
+  return `${date}, ${time}`;
 }
 
-function happensToday(event: ApiEvent, ref: Date): boolean {
-  const start = parseLocalDateTime(event.dateTime);
-  if (!start) return false;
-  const end = endDateFromStartAndTime(start, event.endTime);
-  const dayStart = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
-  const dayEnd = new Date(dayStart);
-  dayEnd.setDate(dayEnd.getDate() + 1);
-  return start < dayEnd && end >= dayStart;
-}
-
-function isUpcomingWeekend(dateStr: string | null | undefined): boolean {
-  const date = parseLocalDateTime(dateStr);
-  if (!date) return false;
-  const day = date.getDay();
-  return date >= new Date() && (day === 0 || day === 6);
-}
-
-export function EventsPage({ certifiedOnly = false, user }: { certifiedOnly?: boolean; user?: AppUser }) {
+function MiniCalendar({ events = [], selected, onSelect }: any) {
   const { t } = useTranslation();
-  const [searchParams] = useSearchParams();
-  const openId = searchParams.get('open');
-  const [events, setEvents] = useState<ApiEvent[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [reportingId, setReportingId] = useState<string | null>(null);
-  const [reportTipo, setReportTipo] = useState(REPORT_TYPES[0]);
-  const [reportMsg, setReportMsg] = useState<{ id: string; ok: boolean; text: string } | null>(null);
-  const [selectedEvent, setSelectedEvent] = useState<ApiEvent | null>(null);
-  const [search, setSearch] = useState('');
-  const [timeFilter, setTimeFilter] = useState<'all' | 'today' | 'weekend'>('all');
-  const [partLoading, setPartLoading] = useState<string | null>(null);
-  const [partError, setPartError] = useState<{ id: string; text: string } | null>(null);
+  const onMove = useGlow();
+  const today = React.useMemo(() => new Date(), []);
+  const [weekOffset, setWeekOffset] = useState(0);
+  const dows = t("events.calendar.dows", { returnObjects: true }) as string[];
 
-  const isLoggedIn = !!getToken() && user?.role !== 'anonymous';
-  const userInterests = user?.interessi ?? [];
-  const userId = user?.id;
-  const isCitizen = user?.role === 'registered_user';
-  const canReport = isLoggedIn && user?.role !== 'certified_entity';
-  const hasInterests = userInterests.length > 0;
-
-  async function loadEvents(silent = false) {
-    if (!silent) { setIsLoading(true); setError(null); }
-    try { setEvents(await getEvents()); }
-    catch (e) { if (!silent) setError(e instanceof Error ? e.message : t('events.loading')); }
-    finally { if (!silent) setIsLoading(false); }
-  }
-
-  useEffect(() => { void loadEvents(); }, []);
-  useAutoRefresh(() => loadEvents(true), 30_000);
-
-  useEffect(() => {
-    if (!openId || events.length === 0) return;
-    const target = events.find((e) => String(e.id) === openId);
-    if (target) setSelectedEvent(target);
-  }, [events, openId]);
-
-  useEffect(() => {
-    if (!selectedEvent) return undefined;
-    const handleEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setSelectedEvent(null); };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [selectedEvent]);
-
-  const filteredEvents = useMemo(() => events.filter((event) => {
-    if (certifiedOnly && !event.isCertified) return false;
-    if (timeFilter === 'today' && !happensToday(event, new Date())) return false;
-    if (timeFilter === 'weekend' && !isUpcomingWeekend(event.dateTime)) return false;
-    const q = search.trim().toLowerCase();
-    if (!q) return true;
-    return `${event.title} ${event.description || ''} ${event.category} ${event.location || ''}`.toLowerCase().includes(q);
-  }), [certifiedOnly, events, search, timeFilter]);
-
-  const recommendedEvents = useMemo(
-    () => (hasInterests ? filteredEvents.filter((event) => event.category && userInterests.includes(event.category)) : filteredEvents),
-    [filteredEvents, hasInterests, userInterests],
-  );
-  const otherFilteredEvents = useMemo(
-    () => (hasInterests ? filteredEvents.filter((event) => !event.category || !userInterests.includes(event.category)) : []),
-    [filteredEvents, hasInterests, userInterests],
-  );
-
-  async function handleJoinEvent(eventId: string) {
-    setPartLoading(eventId); setPartError(null);
-    try {
-      const result = await joinEvent(eventId);
-      setEvents((prev) => prev.map((ev) => ev.id === eventId && userId ? { ...ev, participantCount: result.participantCount, participantIds: [...(ev.participantIds || []), userId] } : ev));
-    } catch (e) { setPartError({ id: eventId, text: e instanceof Error ? e.message : t('common.error') }); }
-    finally { setPartLoading(null); }
-  }
-
-  async function handleLeaveEvent(eventId: string) {
-    setPartLoading(eventId); setPartError(null);
-    try {
-      const result = await leaveEvent(eventId);
-      setEvents((prev) => prev.map((ev) => ev.id === eventId && userId ? { ...ev, participantCount: result.participantCount, participantIds: (ev.participantIds || []).filter((p) => p !== userId) } : ev));
-    } catch (e) { setPartError({ id: eventId, text: e instanceof Error ? e.message : t('common.error') }); }
-    finally { setPartLoading(null); }
-  }
-
-  function participateButton(event: ApiEvent) {
-    if (!isCitizen) return null;
-    const isJoined = !!(userId && event.participantIds?.includes(userId));
-    const isPast = event.dateTime ? new Date(event.dateTime) < new Date() : false;
-    const isFull = !!(event.maxPartecipanti && event.participantCount !== undefined && event.participantCount >= event.maxPartecipanti);
-    if (isPast) return <span className="muted-copy" style={{ fontSize: 12 }}>{t('events.ended')}</span>;
-    if (isJoined) return <button type="button" className="ghost-button compact-button" disabled={partLoading === event.id} onClick={(e) => { e.stopPropagation(); handleLeaveEvent(event.id); }}>{partLoading === event.id ? '...' : t('events.leave')}</button>;
-    if (isFull) return <span className="muted-copy" style={{ fontSize: 12 }}>{t('events.full')}</span>;
-    return <button type="button" className="primary-button compact-button" disabled={partLoading === event.id} onClick={(e) => { e.stopPropagation(); handleJoinEvent(event.id); }}>{partLoading === event.id ? '...' : t('events.join')}</button>;
-  }
-
-  async function submitReport(eventId: string) {
-    try { await reportEvent(eventId, reportTipo); setReportMsg({ id: eventId, ok: true, text: t('events.reportSent') }); }
-    catch (e) { setReportMsg({ id: eventId, ok: false, text: e instanceof Error ? e.message : t('common.error') }); }
-    finally { setReportingId(null); }
-  }
-
-  const now = new Date();
-  const upcomingVisible = recommendedEvents.filter((ev) => !ev.dateTime || new Date(ev.dateTime) >= now).slice().sort((a, b) => {
-    const ta = a.dateTime ? new Date(a.dateTime).getTime() : Number.MAX_SAFE_INTEGER;
-    const tb = b.dateTime ? new Date(b.dateTime).getTime() : Number.MAX_SAFE_INTEGER;
-    return ta - tb;
-  });
-  const pastVisible = recommendedEvents.filter((ev) => ev.dateTime && new Date(ev.dateTime) < now).slice().sort((a, b) => new Date(b.dateTime!).getTime() - new Date(a.dateTime!).getTime());
-  const myEvents = useMemo(() => events.filter((ev) => userId && ev.participantIds?.includes(userId)), [events, userId]);
-  const featuredEvent = upcomingVisible[0];
-  const timelineEvents = upcomingVisible.slice(0, 5);
-  const timelineByDay = useMemo(() => {
-    const groups = new Map<string, typeof timelineEvents>();
-    timelineEvents.forEach((ev) => {
-      const key = ev.dateTime ? new Date(ev.dateTime).toISOString().slice(0, 10) : 'unknown';
-      const arr = groups.get(key) || [];
-      arr.push(ev);
-      groups.set(key, arr);
+  // Monday-anchored week, shifted by weekOffset.
+  const weekDays = React.useMemo(() => {
+    const mondayIdx = (today.getDay() + 6) % 7;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - mondayIdx + weekOffset * 7);
+    monday.setHours(0, 0, 0, 0);
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      return d;
     });
-    return Array.from(groups.entries());
-  }, [timelineEvents]);
-  const [showPast, setShowPast] = useState(false);
+  }, [today, weekOffset]);
 
-  function renderEventCard(event: ApiEvent, className = '') {
-    return (
-      <InteractiveMapCard key={event.id} id={event.id} className={`activity-card ${className}`} onSelect={() => setSelectedEvent(event)} map={{ latitude: event.latitude, longitude: event.longitude, title: event.title, category: event.category, description: event.description || t('events.noDescription'), dateTime: event.dateTime, type: 'event', crowdLevel: eventCrowdLevel(event) }}>
-        <div className="interactive-map-card-header">
-          <span>{event.category}</span>
-          {event.isCertified && <small className="badge">{t('events.certified')}</small>}
+  // Real event dots: which days in this week actually have events.
+  const eventDays = React.useMemo(() => {
+    const days = (events || []).map(parseEventDate).filter(Boolean) as Date[];
+    return weekDays.map((wd) => days.some((d) => sameDay(d, wd)));
+  }, [events, weekDays]);
+
+  const monthLabel = weekDays[0].toLocaleDateString(uiLocale(), { month: "long", year: "numeric" });
+
+  return (
+    <div className="widget anim-in" style={{ "--accent": "var(--violet)", animationDelay: "60ms" } as React.CSSProperties} onMouseMove={onMove}>
+      <div className="widget-inner">
+        <div className="cal-head">
+          <div className="cal-month">{monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}</div>
+          <div className="cal-nav">
+            <button aria-label={t("events.calendar.prevWeek")} onClick={() => setWeekOffset((w) => w - 1)}><Icon name="chevronL" size={14} /></button>
+            <button aria-label={t("events.calendar.nextWeek")} onClick={() => setWeekOffset((w) => w + 1)}><Icon name="chevron" size={14} /></button>
+          </div>
         </div>
-        <h2>{event.title}</h2>
-        <p>{event.description || t('events.noDescription')}</p>
-        <dl>
-          <div><dt>{t('common.where')}</dt><dd><GeocodedLocation value={event.location} /></dd></div>
-          <div><dt>{t('common.when')}</dt><dd>{formatDateTime(event.dateTime)}</dd></div>
-        </dl>
-        {event.dateTime && <CalendarButton icsUrl={getEventCalendarUrl(event.id)} icsFilename={`${event.title}.ics`} googleUrl={googleCalendarUrl(event.title, event.dateTime, event.location)} />}
-        {(event.maxPartecipanti !== null && event.maxPartecipanti !== undefined) && (
-          <small className="muted-copy" style={{ display: 'block', marginTop: 4 }}>{event.participantCount ?? 0} / {event.maxPartecipanti} {t('common.participants').toLowerCase()}</small>
-        )}
-        <div className="card-actions-row">
-          {participateButton(event)}
-          {partError?.id === event.id && <small className="error-message">{partError.text}</small>}
-          {canReport && reportMsg?.id !== event.id && (
-            reportingId === event.id ? (
-              <div className="report-controls">
-                <select value={reportTipo} onChange={(e) => setReportTipo(e.target.value)}>
-                  {REPORT_TYPES.map((tipo) => <option key={tipo} value={tipo}>{tipo.replace(/_/g, ' ')}</option>)}
-                </select>
-                <button className="danger-button compact-button" onClick={() => submitReport(event.id)}>{t('common.submit')}</button>
-                <button className="ghost-button compact-button" onClick={() => setReportingId(null)}>{t('common.cancel')}</button>
-              </div>
-            ) : (
-              <button className="ghost-button compact-button" onClick={() => { setReportingId(event.id); setReportMsg(null); }}>{t('events.report')}</button>
-            )
+        <div className="cal-grid">
+          {dows.map((d, i) => <div className="cal-dow" key={"d" + i}>{d}</div>)}
+          {weekDays.map((d, i) => {
+            const isSel = selected ? sameDay(d, selected) : sameDay(d, today);
+            return (
+              <button key={d.toISOString()} type="button"
+                className={"cal-day" + (isSel ? " sel" : "")}
+                aria-current={sameDay(d, today) ? "date" : undefined}
+                aria-pressed={selected ? sameDay(d, selected) : false}
+                title={t(selected && sameDay(d, selected) ? "events.calendar.clearDay" : "events.calendar.pickDay")}
+                onClick={() => onSelect?.(selected && sameDay(d, selected) ? null : d)}>
+                {d.getDate()}
+                {eventDays[i] && <span className="dot"></span>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ===================== QUICK FILTERS ===================== */
+function QuickFilters({ activeCategories, onToggle, counts }: any) {
+  const { t } = useTranslation();
+  return (
+    <Widget title={t("events.filters.title")} accent="var(--cyan)" delay={140}>
+      <div className="qf-list">
+        {EV_FILTERS.map((f) => {
+          const isAll = f.id === "all";
+          const isActive = isAll ? activeCategories.size === 0 : activeCategories.has(f.id);
+          return (
+            <button key={f.id} className={"qf-item" + (isActive ? " active" : "")}
+              style={{ "--qc": f.color } as React.CSSProperties} onClick={() => onToggle(f.id)} aria-pressed={isActive}>
+              <span className="qf-ic"><Icon name={f.icon} size={16} /></span>
+              <span className="qf-label">{t(f.label)}</span>
+              <span className="qf-count">{counts[f.id] || 0}</span>
+            </button>
+          );
+        })}
+      </div>
+    </Widget>
+  );
+}
+
+/* ===================== MOST PARTICIPATED ===================== */
+function MostParticipated({ list, onPick }: any) {
+  const { t } = useTranslation();
+  const top = [...list]
+    .filter((e: any) => (e.participantCount || 0) > 0)
+    .sort((a: any, b: any) => (b.participantCount || 0) - (a.participantCount || 0))
+    .slice(0, 3);
+  return (
+    <Widget title={t("events.mostParticipated")} accent="var(--magenta)" delay={220}>
+      {top.map((e: any, i: number) => (
+        <button className="trend-row" key={e.id} onClick={() => onPick(e.id)}>
+          <span className="trend-rank">{i + 1}</span>
+          <span className="trend-body">
+            <span className="trend-title">{e.title}</span>
+            <span className="trend-loc"><GeocodedLocation value={e.location} fallback="Trento" /></span>
+          </span>
+          <span className="trend-count"><Icon name="users" size={13} />{fmt(e.participantCount)}</span>
+        </button>
+      ))}
+      {top.length === 0 && (
+        <div style={{ color: "var(--text-secondary)", fontSize: 12, padding: "10px 0", textAlign: "center" }}>
+          {t("events.noneWithParticipants")}
+        </div>
+      )}
+    </Widget>
+  );
+}
+
+/* ===================== SEARCH BAR ===================== */
+function Composer({ search, setSearch }: any) {
+  const { t } = useTranslation();
+  return (
+    <div className="composer">
+      <div className="composer-field" style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
+        <Icon name="search" size={17} />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={t("events.searchPlaceholder")}
+          style={{ background: "none", border: "none", color: "var(--text-primary)", outline: "none", width: "100%", fontSize: 14 }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/* ===================== EVENT POST CARD ===================== */
+const evCapColor = (r: number) => (r >= 1 ? "var(--red)" : r > 0.95 ? "var(--red)" : r > 0.7 ? "var(--amber)" : r > 0.3 ? "var(--green)" : "var(--teal)");
+
+function PostCard({ e, saved, shared, onSave, onShare, onOpen, flash, canSave = true }: any) {
+  const { t, i18n } = useTranslation();
+  const onMove = useGlow();
+  const meta = evMeta(e.category);
+  const catLabel = t(`events.filters.${e.category}`, { defaultValue: e.category });
+  const count = e.participantCount || 0;
+  const limit = e.maxPartecipanti || 0;
+  const capRatio = limit > 0 ? Math.min(1, count / limit) : 0;
+  const capPct = limit > 0 ? Math.round(capRatio * 100) : 0;
+  const stop = (fn: any) => (ev: any) => { ev.stopPropagation(); fn(); };
+  return (
+    <div className={"post" + (flash ? " flash" : "")} data-post={e.id}
+      style={{ "--pc": meta.color, "--pimg": meta.grad, "--mx": "50%", "--my": "0%" } as React.CSSProperties}
+      onMouseMove={onMove} onClick={() => onOpen(e.id)}>
+      <div className="post-media">
+        <div className="pm-badges">
+          {e.isCertified
+            ? <span className="pm-live" style={{ background: "var(--teal)" }}><Icon name="shieldCheck" size={11} />{t("events.certified")}</span>
+            : <span className="pm-tag"><Icon name={meta.icon} size={12} />{catLabel}</span>}
+          {count > 20 && <span className="pm-feat"><Icon name="flame" size={11} />{t("events.popular")}</span>}
+        </div>
+        <span className="pm-ghost"><Icon name={meta.icon} size={116} /></span>
+      </div>
+      <div className="post-content">
+        <div className="post-cat"><span className="pc-ic" style={{ color: meta.color }}><Icon name={meta.icon} size={12} /></span>{catLabel}</div>
+        <div className="post-title">{e.title}</div>
+        <div className="post-desc">{e.description}</div>
+        <div className="post-meta">
+          <span className="pm"><Icon name="pin" size={14} /><GeocodedLocation value={e.location} fallback="Trento" /></span>
+          <span className="pm"><Icon name="clock" size={14} />{formatEventWhen(e, i18n.language) || t("events.dateTbd")}</span>
+        </div>
+        <div className="post-foot">
+          {count > 0 && (
+            <Avatars ids={[0, 1, 2].slice(0, Math.min(3, count))} extra={Math.max(0, count - 3)} />
           )}
-          {reportMsg?.id === event.id && <small className={reportMsg.ok ? 'success-message' : 'error-message'}>{reportMsg.text}</small>}
+          <span className="attend-count" style={count > 0 ? undefined : { marginLeft: 0 }}>
+            <b>{fmt(count)}</b> {t("events.participantsWord", { count })}
+          </span>
+          {limit > 0 && (
+            <span className="cap-bar" style={{ "--capc": evCapColor(capRatio) } as any}>
+              <i style={{ width: Math.max(8, capPct) + "%" }}></i>
+            </span>
+          )}
+          <div className="post-actions">
+            <button className={"act-btn icon-only" + (shared ? " on-share" : "")} onClick={stop(() => onShare(e))}
+              aria-label={shared ? t("events.shareCopied") : t("events.ariaShare")} title={shared ? t("events.shareCopied") : undefined}>
+              <Icon name={shared ? "check" : "share"} size={17} />
+            </button>
+            {canSave && (
+              <button className={"act-btn save icon-only" + (saved ? " on" : "")} onClick={stop(() => onSave(e.id))} aria-label={t("events.ariaSave")}><Icon name="bookmark" size={17} /></button>
+            )}
+          </div>
         </div>
-      </InteractiveMapCard>
+      </div>
+    </div>
+  );
+}
+
+/* ===================== FEED ===================== */
+const Feed = React.forwardRef<any, any>(function Feed({ events, user, search, setSearch, hasFilter, saves, sharedId, onSave, onShare, onOpen, flashId, header, emptyTitle: emptyTitleProp, emptyMsg: emptyMsgProp }, ref) {
+  const { t } = useTranslation();
+  const emptyTitle = emptyTitleProp ?? (search ? t("events.emptyNoResultsTitle") : hasFilter ? t("events.emptyNoCategoryTitle") : t("events.emptyNoEventsTitle"));
+  const emptyMsg = emptyMsgProp ?? (search ? t("events.emptyNoResultsMsg") : hasFilter ? t("events.emptyNoCategoryMsg") : t("events.emptyNoEventsMsg"));
+  return (
+    <div className="ev-col feed" ref={ref}>
+      {header}
+      <Composer user={user} search={search} setSearch={setSearch} />
+      {events.length === 0 && (
+        <div className="feed-state empty">
+          <Icon name="calendar" size={20} />
+          <div className="feed-state-title">{emptyTitle}</div>
+          <div className="feed-state-msg">{emptyMsg}</div>
+        </div>
+      )}
+      {events.map((e: any) => (
+        <div className="feed-row" key={e.id}>
+          <div className="tl">
+            <span className={"tl-node" + (e.isCertified ? " live" : "")} style={{ "--tc": evMeta(e.category).color } as React.CSSProperties}></span>
+            <span className={"tl-label" + (e.isCertified ? " live" : "")}>{shortTime(e.startTime) || t("events.live")}</span>
+          </div>
+          <div className="feed-body">
+            <PostCard e={e} saved={!!saves[e.id]} shared={sharedId === e.id}
+              onSave={onSave} onShare={onShare} onOpen={onOpen} flash={flashId === e.id}
+              canSave={user?.role === "registered_user" || user?.role === "anonymous"} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+});
+
+/* ===================== NEXT ACTIVITY ===================== */
+function NextActivity({ event, joined, saved, busy, joinError, onJoin, onSave, onOpen, canJoin = true }: any) {
+  const { t, i18n } = useTranslation();
+  if (!event) {
+    return (
+      <Widget title={t("events.next")} accent="var(--cyan)" upd={t("events.none")} delay={120}>
+        <div style={{ color: "var(--text-muted)", fontSize: 13, padding: "20px 0", textAlign: "center" }}>
+          {t("events.noUpcoming")}
+        </div>
+      </Widget>
+    );
+  }
+  const meta = evMeta(event.category);
+  const pct = Math.round(((event.participantCount || 0) / (event.maxPartecipanti || 100)) * 100);
+  // NB: don't pass accent="var(--accent)" — the Widget sets `--accent: <value>`
+  // inline, and a self-referential var() makes the property invalid for the
+  // whole subtree (the join CTA gradient disappears). Use a concrete token.
+  return (
+    <Widget title={t("events.next")} accent="var(--cyan)" upd={t("events.upcoming")} delay={120}>
+      <div className="next-media" style={{ "--nimg": meta.grad, cursor: onOpen ? "pointer" : "default" } as React.CSSProperties}
+        onClick={onOpen ? () => onOpen(event.id) : undefined}>
+        <span className="nm-count">
+          <span className="led live green"></span>
+          <span><span className="lbl">{t("events.upcomingBadge")}</span></span>
+        </span>
+        <span className="nm-ghost"><Icon name={meta.icon} size={96} /></span>
+      </div>
+      <div className="next-title" style={{ cursor: onOpen ? "pointer" : "default" }}
+        onClick={onOpen ? () => onOpen(event.id) : undefined}>{event.title}</div>
+      <div className="next-fields">
+        <div className="next-field">
+          <span className="nf-ic"><Icon name="pin" size={14} /></span>
+          <div><div className="nf-lbl">{t("events.place")}</div><div className="nf-val"><GeocodedLocation value={event.location} fallback="Trento" /></div></div>
+        </div>
+        <div className="next-field">
+          <span className="nf-ic"><Icon name="clock" size={14} /></span>
+          <div><div className="nf-lbl">{t("events.when")}</div><div className="nf-val">{formatEventWhen(event, i18n.language) || t("events.dateTbd")}</div></div>
+        </div>
+      </div>
+      <div className="next-part">
+        <div className="np-l">
+          <div className="nf-lbl">{t("events.participantsLabel")}</div>
+          <div className="np-bar"><i style={{ width: Math.max(8, pct) + "%" }}></i></div>
+        </div>
+        <div className="np-n"><b>{event.participantCount || 0}</b> {event.maxPartecipanti ? `/ ${event.maxPartecipanti}` : ""}</div>
+      </div>
+      <div className="next-cta-row">
+        {canJoin && (
+          <button className={"next-cta" + (joined ? " joined" : "")} onClick={onJoin} aria-pressed={joined} disabled={busy} aria-busy={busy}>
+            <Icon name={joined ? "check" : "ticket"} size={17} />
+            {busy ? t("events.joining") : joined ? t("events.joinedCta") : t("events.joinCta")}
+          </button>
+        )}
+        {canJoin && (
+          <button className={"next-save" + (saved ? " on" : "")} onClick={onSave} aria-label={t("events.ariaSaveEvent")}><Icon name="bookmark" size={19} /></button>
+        )}
+      </div>
+      {joinError && <div className="next-join-error" role="alert"><Icon name="warn" size={13} />{joinError}</div>}
+    </Widget>
+  );
+}
+
+/* ===================== CITY EVENTS GRID ===================== */
+// Trento historic city centre bounding box (roughly within the old walls + immediate surroundings)
+const CITY_CENTER_BOUNDS = { minLat: 46.060, maxLat: 46.076, minLng: 11.112, maxLng: 11.135 };
+function inCityCenter(e: any): boolean {
+  const lat = e.latitude ?? e.lat;
+  const lng = e.longitude ?? e.lng;
+  if (lat == null || lng == null) return true; // no coords → don't exclude
+  return lat >= CITY_CENTER_BOUNDS.minLat && lat <= CITY_CENTER_BOUNDS.maxLat
+    && lng >= CITY_CENTER_BOUNDS.minLng && lng <= CITY_CENTER_BOUNDS.maxLng;
+}
+
+function CityGrid({ list, onOpen }: any) {
+  const { t } = useTranslation();
+  const centerList = list.filter(inCityCenter);
+  return (
+    <Widget title={t("events.cityGrid")} accent="var(--teal)" upd={t("events.cityGridTotal", { count: centerList.length })} delay={220}
+      style={{ display: "flex", flexDirection: "column", minHeight: 0, flex: "1 1 auto" }}>
+      <div className="city-grid" style={{ maxHeight: 320 }}>
+        {centerList.length === 0 && (
+          <div style={{ gridColumn: "span 3", color: "var(--text-muted)", fontSize: 13, padding: "20px 0", textAlign: "center" }}>
+            {t("events.emptyNoEventsTitle")}
+          </div>
+        )}
+        {centerList.map((e: any) => {
+          const meta = evMeta(e.category);
+          return (
+            <button className="mini" key={e.id} style={{ "--mc": meta.color, "--mimg": meta.grad } as React.CSSProperties} onClick={() => onOpen(e.id)}>
+              <div className="mini-media">
+                <span className="mled" style={{ animation: e.isCertified ? "ledPulse 2.6s ease-in-out infinite" : "none" }}></span>
+                <span className="pm-ghost" style={{ right: -8, bottom: -10 }}><Icon name={meta.icon} size={52} /></span>
+              </div>
+              <div className="mini-body">
+                <div className="mini-time">{shortTime(e.startTime) || t("events.live")}</div>
+                <div className="mini-title">{e.title}</div>
+                <div className="mini-cat"><Icon name={meta.icon} size={11} />{t(`events.filters.${e.category}`, { defaultValue: e.category })}</div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </Widget>
+  );
+}
+
+/* ===================== EVENT TABS ===================== */
+function EventTabs({ tab, setTab, showParticipating }: any) {
+  const { t } = useTranslation();
+  return (
+    <div className="act-tabs">
+      <button className={"act-tab" + (tab === "explore" ? " on" : "")} onClick={() => setTab("explore")}>
+        <Icon name="grid" size={15} />{t("events.tabExplore")}
+      </button>
+      {showParticipating && (
+        <button className={"act-tab" + (tab === "participating" ? " on" : "")} onClick={() => setTab("participating")}>
+          <Icon name="ticket" size={15} />{t("events.tabParticipating")}
+        </button>
+      )}
+      <button className={"act-tab" + (tab === "saved" ? " on" : "")} onClick={() => setTab("saved")}>
+        <Icon name="bookmark" size={15} />{t("events.tabSaved")}
+      </button>
+    </div>
+  );
+}
+
+/* ===================== PAGE ===================== */
+export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEventId }: any) {
+  const { t } = useTranslation();
+  const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState("");
+  const [selDate, setSelDate] = useState<Date | null>(null);
+  const [events, setEvents] = useState<ApiEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<"explore" | "participating" | "saved">("explore");
+
+  const [saves, setSaves] = useState<Record<string, boolean>>({});
+  const [sharedId, setSharedId] = useState<string | null>(null);
+  const [joinBusy, setJoinBusy] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
+
+  const feedRef = useRef<any>(null);
+  const shareTimer = useRef<any>(null);
+  useEffect(() => () => clearTimeout(shareTimer.current), []);
+
+  // Load all events once; category + search are applied client-side so the
+  // sidebar counters stay correct and typing doesn't refetch on every key.
+  const loadEventsData = async () => {
+    setError(null);
+    try {
+      const data = await getEvents({ limit: 100 });
+      setEvents(data);
+    } catch (err: any) {
+      setError(err instanceof ApiError ? err.message : t("events.loadError"));
+      setLoading(false);
+      return;
+    }
+
+    // Favorites are a secondary enhancement: a failure here must never blank the
+    // events feed (which already loaded successfully above).
+    if (user?.id) {
+      try {
+        const favs = await getFavorites();
+        const savesMap: Record<string, boolean> = {};
+        favs.forEach((f) => {
+          if (f.markerType === "event") savesMap[f.markerId] = true;
+        });
+        setSaves(savesMap);
+      } catch (err) {
+        console.warn("Impossibile caricare i preferiti:", err);
+      }
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadEventsData();
+  }, [user?.id]);
+
+  const toggleCategory = (id: string) => {
+    if (id === "all") { setActiveCategories(new Set()); return; }
+    setActiveCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  /* ---- client-side filtering (category + calendar day + free-text) ---- */
+  const filtered = React.useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const now = Date.now();
+    return events.filter((e) => {
+      const dt = e.dateTime || (e as any).startTime;
+      if (dt) { try { if (new Date(dt).getTime() < now) return false; } catch (_) {} }
+      if (activeCategories.size > 0 && !activeCategories.has(e.category)) return false;
+      if (selDate) {
+        const d = parseEventDate(e);
+        if (!d || !sameDay(d, selDate)) return false;
+      }
+      if (!q) return true;
+      return [e.title, e.description, e.location]
+        .some((v) => (v || "").toLowerCase().includes(q));
+    });
+  }, [events, activeCategories, selDate, search]);
+
+  const requireAuth = () => {
+    if (user?.role === "registered_user" && user?.id) return true;
+    if (!user?.id || user?.role === "anonymous") setPage("login");
+    return false;
+  };
+
+  const handleSave = async (id: string) => {
+    if (!requireAuth()) return;
+    const isSaved = !!saves[id];
+    setSaves((prev) => ({ ...prev, [id]: !isSaved }));
+    try {
+      if (isSaved) {
+        await removeFavorite("event", id);
+      } else {
+        await addFavorite("event", id);
+      }
+    } catch (err) {
+      // Roll back the optimistic toggle so the UI never claims a save that failed.
+      setSaves((prev) => ({ ...prev, [id]: isSaved }));
+      console.error(err);
+    }
+  };
+
+  const handleShare = async (e: ApiEvent) => {
+    const text = `${e.title} — ${e.location || "Trento"}`;
+    try {
+      await shareOrCopy({ title: e.title, text, url: window.location.href });
+      setSharedId(e.id);
+      clearTimeout(shareTimer.current);
+      shareTimer.current = setTimeout(() => setSharedId(null), 1800);
+    } catch { /* share sheet dismissed */ }
+  };
+
+  const handleOpenDetail = (id: string) => {
+    setSelectedEventId(id);
+    setPage("evento-dettaglio");
+  };
+
+  // Update one event in place (no full reload) after join/leave.
+  const patchEvent = (id: string, patch: Partial<ApiEvent>) =>
+    setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)));
+
+  const handleJoinToggle = async (ev: ApiEvent) => {
+    if (!requireAuth()) return;
+    if (joinBusy) return;
+    setJoinBusy(true);
+    setJoinError(null);
+    const isJoined = !!ev.participantIds?.includes(user?.id || "");
+    try {
+      if (isJoined) {
+        const res = await leaveEvent(ev.id);
+        patchEvent(ev.id, {
+          participantCount: res.participantCount,
+          participantIds: (ev.participantIds || []).filter((pid) => pid !== user?.id),
+        });
+      } else {
+        const res = await joinEvent(ev.id);
+        patchEvent(ev.id, {
+          participantCount: res.participantCount,
+          participantIds: [...(ev.participantIds || []), user?.id],
+        });
+      }
+    } catch (err: any) {
+      setJoinError(err instanceof ApiError ? err.message : t("events.joinError"));
+    } finally {
+      setJoinBusy(false);
+    }
+  };
+
+  // Sidebar filter counters: all future events per category (ignoring active search/category filter
+  // so the other category pills still show non-zero counts).
+  const futureEvents = React.useMemo(() => {
+    const now = Date.now();
+    return events.filter((e) => {
+      const dt = e.dateTime || (e as any).startTime;
+      if (dt) { try { return new Date(dt).getTime() >= now; } catch (_) {} }
+      return true;
+    });
+  }, [events]);
+
+  const categoryCounts = React.useMemo(() => {
+    const counts: Record<string, number> = { all: futureEvents.length };
+    futureEvents.forEach((e) => {
+      counts[e.category] = (counts[e.category] || 0) + 1;
+    });
+    return counts;
+  }, [futureEvents]);
+
+  // "Next event": the soonest upcoming one — no fallback to past events.
+  const nextEvent = React.useMemo(() => {
+    const now = Date.now();
+    const upcoming = events
+      .map((e) => ({ e, d: parseEventDate(e) }))
+      .filter((x) => x.d && x.d.getTime() >= now)
+      .sort((a, b) => a.d!.getTime() - b.d!.getTime());
+    return upcoming[0]?.e || null;
+  }, [events]);
+
+  if (loading) {
+    return (
+      <div className="events-scene">
+        <div className="events-header"><Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} /></div>
+        <div style={{ color: "var(--text-secondary)", fontSize: 15, padding: "100px 0", textAlign: "center" }}>
+          {t("events.loading")}
+        </div>
+      </div>
     );
   }
 
-  const stateContent = (
-    <>
-      {isLoading && <div className="state-panel liquid-panel">{t('events.loading')}</div>}
-      {error && <div className="state-panel liquid-panel"><p>{error}</p><button onClick={() => loadEvents()} type="button">{t('common.retry')}</button></div>}
-      {!isLoading && !error && recommendedEvents.length === 0 && otherFilteredEvents.length === 0 && <div className="state-panel liquid-panel">{t('events.noResults')}</div>}
-    </>
-  );
-
-  const eventPopup = selectedEvent && (
-    <div className="activity-popup-backdrop event-popup-backdrop" role="presentation" onClick={() => setSelectedEvent(null)}>
-      <article className="activity-popup event-popup" role="dialog" aria-modal="true" aria-labelledby="event-popup-title" onClick={(event) => event.stopPropagation()}>
-        <button className="activity-popup-close" type="button" onClick={() => setSelectedEvent(null)} aria-label={t('common.close')}>×</button>
-        <span className="section-eyebrow">{selectedEvent.isCertified ? t('events.certifiedEvent') : selectedEvent.category}</span>
-        <h2 id="event-popup-title">{selectedEvent.title}</h2>
-        <p>{selectedEvent.description || t('events.noDescription')}</p>
-        <dl>
-          <div><dt>{t('common.category')}</dt><dd>{selectedEvent.category}</dd></div>
-          <div><dt>{t('common.where')}</dt><dd><GeocodedLocation value={selectedEvent.location} /></dd></div>
-          <div><dt>{t('common.when')}</dt><dd>{formatDateTime(selectedEvent.dateTime)}</dd></div>
-        </dl>
-        <div className="activity-popup-actions">
-          {selectedEvent.dateTime && <CalendarButton icsUrl={getEventCalendarUrl(selectedEvent.id)} icsFilename={`${selectedEvent.title}.ics`} googleUrl={googleCalendarUrl(selectedEvent.title, selectedEvent.dateTime, selectedEvent.location)} />}
-          {participateButton(selectedEvent)}
-          {canReport && reportMsg?.id !== selectedEvent.id && (
-            reportingId === selectedEvent.id ? (
-              <div className="report-controls">
-                <select value={reportTipo} onChange={(event) => setReportTipo(event.target.value)}>
-                  {REPORT_TYPES.map((tipo) => <option key={tipo} value={tipo}>{tipo.replace(/_/g, ' ')}</option>)}
-                </select>
-                <button className="danger-button compact-button" type="button" onClick={() => submitReport(selectedEvent.id)}>{t('common.submit')}</button>
-                <button className="ghost-button compact-button" type="button" onClick={() => setReportingId(null)}>{t('common.cancel')}</button>
-              </div>
-            ) : (
-              <button className="ghost-button" type="button" onClick={() => { setReportingId(selectedEvent.id); setReportMsg(null); }}>{t('events.report')}</button>
-            )
-          )}
-          <button className="ghost-button" type="button" onClick={() => setSelectedEvent(null)}>{t('common.close')}</button>
-          {reportMsg?.id === selectedEvent.id && <small className={reportMsg.ok ? 'success-message' : 'error-message'}>{reportMsg.text}</small>}
-        </div>
-      </article>
-    </div>
-  );
-
-  if (certifiedOnly) {
+  if (error) {
     return (
-      <section className="certified-page">
-        <header className="certified-hero">
-          <label className="city-search">
-            <span>{t('common.search')}</span>
-            <input value={search} onChange={(event) => setSearch(event.target.value)} type="search" placeholder={t('events.searchCertifiedPlaceholder')} />
-          </label>
-          <div className="time-filter" aria-label={t('events.certified')}>
-            <button className={timeFilter === 'all' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('all')}>{t('filters.all')}</button>
-            <button className={timeFilter === 'today' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('today')}>{t('filters.today')}</button>
-            <button className={timeFilter === 'weekend' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('weekend')}>{t('filters.weekend')}</button>
-          </div>
-          {isLoading && <span className="muted-copy auto-refresh-hint">{t('common.updating')}</span>}
-        </header>
-        {stateContent}
-        {!isLoading && !error && filteredEvents.length > 0 && hasInterests && (
-          <div className="preference-page-stack">
-            <section className="preference-section" aria-label={t('events.recommendedTitle')}>
-              <div className="preference-section-header">
-                <div>
-                  <span className="section-eyebrow">{t('events.recommended')}</span>
-                  <h2>{t('events.recommendedTitle')} <span className="section-count">{recommendedEvents.length}</span></h2>
-                </div>
-              </div>
-              {recommendedEvents.length === 0 ? (
-                <div className="preference-empty-state">{t('events.noRecommendedCertified')}</div>
-              ) : (
-                <div className="certified-layout">
-                  <aside className="certified-trust-panel">
-                    <strong>{t('events.eventsCount', { count: recommendedEvents.length })}</strong>
-                    <ul>
-                      <li>{t('events.trustVerified')}</li>
-                      <li>{t('events.trustCalendar')}</li>
-                      <li>{t('events.trustReport')}</li>
-                    </ul>
-                  </aside>
-                  <div className="certified-registry">{recommendedEvents.map((event) => renderEventCard(event, 'certified-event-card'))}</div>
-                </div>
-              )}
-            </section>
-            {otherFilteredEvents.length > 0 && (
-              <section className="preference-section preference-section-secondary" aria-label={t('events.others')}>
-                <div className="preference-section-header"><div><span className="section-eyebrow">{t('events.discover')}</span><h2>{t('events.others')} <span className="section-count">{otherFilteredEvents.length}</span></h2></div></div>
-                <div className="certified-registry">{otherFilteredEvents.map((event) => renderEventCard(event, 'certified-event-card'))}</div>
-              </section>
-            )}
-          </div>
-        )}
-        {!isLoading && !error && filteredEvents.length > 0 && !hasInterests && (
-          <section className="preference-section" aria-label={t('events.allEvents')}>
-            <div className="preference-section-header"><div><span className="section-eyebrow">{t('events.registry')}</span><h2>{t('events.allEvents')} <span className="section-count">{recommendedEvents.length}</span></h2></div></div>
-            <div className="certified-layout">
-              <aside className="certified-trust-panel">
-                <strong>{t('events.eventsCount', { count: recommendedEvents.length })}</strong>
-                <ul>
-                  <li>{t('events.trustVerified')}</li>
-                  <li>{t('events.trustCalendar')}</li>
-                  <li>{t('events.trustReport')}</li>
-                </ul>
-              </aside>
-              <div className="certified-registry">{recommendedEvents.map((event) => renderEventCard(event, 'certified-event-card'))}</div>
-            </div>
-          </section>
-        )}
-        {eventPopup}
-      </section>
+      <div className="events-scene">
+        <div className="events-header"><Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} /></div>
+        <div className="feed-state error" role="alert">
+          <Icon name="warn" size={20} />
+          <div className="feed-state-title">{t("events.errorTitle")}</div>
+          <div className="feed-state-msg">{error}</div>
+          <button className="feed-state-retry" onClick={() => { setLoading(true); loadEventsData(); }}>{t("events.retry")}</button>
+        </div>
+      </div>
     );
   }
 
   return (
-    <section className="events-page">
-      <header className="events-hero">
-        <label className="city-search">
-          <span>{t('common.search')}</span>
-          <input value={search} onChange={(event) => setSearch(event.target.value)} type="search" placeholder={t('events.searchPlaceholder')} />
-        </label>
-        <div className="time-filter" aria-label={t('events.featured')}>
-          <button className={timeFilter === 'all' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('all')}>{t('filters.all')}</button>
-          <button className={timeFilter === 'today' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('today')}>{t('filters.today')}</button>
-          <button className={timeFilter === 'weekend' ? 'active-filter' : undefined} type="button" onClick={() => setTimeFilter('weekend')}>{t('filters.weekend')}</button>
+    <div className="events-scene">
+      <div className="events-header">
+        <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
+      </div>
+
+      <div className="events-layout">
+        {/* LEFT */}
+        <div className="ev-col left">
+          <MiniCalendar events={events} selected={selDate} onSelect={setSelDate} />
+          <QuickFilters activeCategories={activeCategories} onToggle={toggleCategory} counts={categoryCounts} />
+          <MostParticipated list={events} onPick={handleOpenDetail} />
         </div>
-        {isLoading && <span className="muted-copy auto-refresh-hint">{t('common.updating')}</span>}
-      </header>
-      {stateContent}
 
-      {isCitizen && myEvents.length > 0 && (
-        <section className="my-activities-section" aria-label={t('events.myEvents')}>
-          <h2>{t('events.myEvents')} <span className="section-count">{myEvents.length}</span></h2>
-          <div className="event-card-strip">{myEvents.map((event) => renderEventCard(event, 'event-explorer-card'))}</div>
-        </section>
-      )}
+        {/* CENTER */}
+        <Feed ref={feedRef}
+          events={
+            tab === "saved" ? filtered.filter((e) => saves[e.id])
+            : tab === "participating" ? events.filter((e) => e.participantIds?.includes(user?.id || ""))
+            : filtered
+          }
+          user={user} search={search} setSearch={setSearch}
+          hasFilter={activeCategories.size > 0 || !!selDate || tab === "saved" || tab === "participating"}
+          saves={saves} sharedId={sharedId} onSave={handleSave} onShare={handleShare}
+          onOpen={handleOpenDetail} flashId={null}
+          header={<EventTabs tab={tab} setTab={setTab} showParticipating={user?.role === "registered_user"} />}
+          emptyTitle={tab === "saved" ? t("events.emptyNoSavedTitle") : tab === "participating" ? t("events.emptyNotParticipatingTitle") : undefined}
+          emptyMsg={tab === "saved" ? t("events.emptyNoSavedMsg") : tab === "participating" ? t("events.emptyNotParticipatingMsg") : undefined}
+        />
 
-      {!isLoading && !error && hasInterests && filteredEvents.length > 0 && (
-        <section className="preference-section" aria-label={t('events.recommendedTitle')}>
-          <div className="preference-section-header"><div><span className="section-eyebrow">{t('events.recommended')}</span><h2>{t('events.recommendedTitle')} <span className="section-count">{recommendedEvents.length}</span></h2></div></div>
-          {recommendedEvents.length === 0 && <div className="preference-empty-state">{t('events.noRecommended')}</div>}
-          {recommendedEvents.length > 0 && upcomingVisible.length === 0 && <div className="preference-empty-state">{t('events.noRecommendedScheduled')}</div>}
-          {upcomingVisible.length > 0 && (
-            <div className="event-editorial-layout">
-              {featuredEvent && (
-                <>
-                  <h3 className="section-eyebrow featured-section-title">{t('events.next')}</h3>
-                  <article className="event-feature-story">
-                    <div className="event-date-tile"><strong>{formatDay(featuredEvent.dateTime)}</strong><span>{formatDateTime(featuredEvent.dateTime)}</span></div>
-                    <div>
-                      <div className="feature-badges" aria-label={t('common.category')}><span>{featuredEvent.category}</span></div>
-                      <h2>{featuredEvent.title}</h2>
-                      <p>{featuredEvent.description || t('events.noDescription')}</p>
-                    </div>
-                  </article>
-                </>
-              )}
-              <aside className="event-timeline-panel">
-                <span className="section-eyebrow">{t('activities.timeline')}</span>
-                <ol className="event-timeline-grouped">
-                  {timelineByDay.map(([day, evs]) => (
-                    <li key={day} className="event-timeline-day">
-                      <time>{day !== 'unknown' ? formatDay(day) : t('common.dateTBD')}</time>
-                      <ul>{evs.map((event) => <li key={event.id}>{event.title}</li>)}</ul>
-                    </li>
-                  ))}
-                </ol>
-              </aside>
-              <div className="event-card-strip">{upcomingVisible.map((event) => renderEventCard(event, 'event-explorer-card'))}</div>
-            </div>
-          )}
-        </section>
-      )}
-
-      {!isLoading && !error && !hasInterests && upcomingVisible.length > 0 && (
-        <section className="preference-section" aria-label={t('events.featuredTitle')}>
-          <div className="preference-section-header"><div><span className="section-eyebrow">{t('events.featured')}</span><h2>{t('events.featuredTitle')} <span className="section-count">{upcomingVisible.length}</span></h2></div></div>
-          <div className="event-editorial-layout">
-            {featuredEvent && (
-              <>
-                <h3 className="section-eyebrow featured-section-title">{t('events.next')}</h3>
-                <article className="event-feature-story">
-                  <div className="event-date-tile"><strong>{formatDay(featuredEvent.dateTime)}</strong><span>{formatDateTime(featuredEvent.dateTime)}</span></div>
-                  <div>
-                    <div className="feature-badges" aria-label={t('common.category')}><span>{featuredEvent.category}</span></div>
-                    <h2>{featuredEvent.title}</h2>
-                    <p>{featuredEvent.description || t('events.noDescription')}</p>
-                  </div>
-                </article>
-              </>
-            )}
-            <aside className="event-timeline-panel">
-              <span className="section-eyebrow">{t('activities.timeline')}</span>
-              <ol className="event-timeline-grouped">
-                {timelineByDay.map(([day, evs]) => (
-                  <li key={day} className="event-timeline-day">
-                    <time>{day !== 'unknown' ? formatDay(day) : t('common.dateTBD')}</time>
-                    <ul>{evs.map((event) => <li key={event.id}>{event.title}</li>)}</ul>
-                  </li>
-                ))}
-              </ol>
-            </aside>
-            <div className="event-card-strip">{upcomingVisible.map((event) => renderEventCard(event, 'event-explorer-card'))}</div>
-          </div>
-        </section>
-      )}
-
-      {!isLoading && pastVisible.length > 0 && (
-        <section className="my-activities-section" aria-label={t('events.past')}>
-          <button type="button" className="ghost-button compact-button" onClick={() => setShowPast((v) => !v)} aria-expanded={showPast}>
-            {showPast ? '▾' : '▸'} {t('events.past')} <span className="section-count">{pastVisible.length}</span>
-          </button>
-          {showPast && <div className="event-card-strip" style={{ marginTop: 14, opacity: 0.85 }}>{pastVisible.map((event) => renderEventCard(event, 'event-explorer-card'))}</div>}
-        </section>
-      )}
-
-      {!isLoading && !error && hasInterests && otherFilteredEvents.length > 0 && (
-        <section className="preference-section preference-section-secondary" aria-label={t('events.others')}>
-          <div className="preference-section-header"><div><span className="section-eyebrow">{t('events.discover')}</span><h2>{t('events.others')} <span className="section-count">{otherFilteredEvents.length}</span></h2></div></div>
-          <div className="event-card-strip">{otherFilteredEvents.map((event) => renderEventCard(event, 'event-explorer-card'))}</div>
-        </section>
-      )}
-
-      {eventPopup}
-    </section>
+        {/* RIGHT */}
+        <div className="ev-col right">
+          <NextActivity
+            event={nextEvent}
+            canJoin={user?.role === "registered_user"}
+            joined={nextEvent ? !!(nextEvent.participantIds?.includes(user?.id || "")) : false}
+            saved={nextEvent ? !!saves[nextEvent.id] : false}
+            busy={joinBusy}
+            joinError={joinError}
+            onJoin={() => nextEvent && handleJoinToggle(nextEvent)}
+            onSave={() => nextEvent && handleSave(nextEvent.id)}
+            onOpen={handleOpenDetail}
+          />
+          <CityGrid list={filtered.filter((e) => e.id !== nextEvent?.id)} onOpen={handleOpenDetail} />
+        </div>
+      </div>
+    </div>
   );
 }
