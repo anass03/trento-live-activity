@@ -81,7 +81,7 @@ const parkingStatusLabel = (item: any, pct: number | null | undefined, labels: {
 };
 const parkingTypeLabel = (item: any, lblBike: string, lblCar: string) => (item?.type === "bike" ? lblBike : item?.type === "car" ? lblCar : null);
 
-function ParkingContent({ data }: any) {
+function ParkingContent({ data, onAction }: any) {
   const { t, i18n } = useTranslation();
   const dtLocale = i18n.language.startsWith("en") ? "en-GB" : "it-IT";
   const items = data?.items || data?.parkings || [];
@@ -139,6 +139,11 @@ function ParkingContent({ data }: any) {
           <Field icon="clock" label={t("detail.parking.updated")} value={fmtDate(selected?.lastUpdatedAt || selected?.updatedAt || data?.fetchedAt, t("detail.parking.unavailable"), dtLocale)} />
         </div>
         <div className="dm-source">{t("common.source")}: {selected?.sourceLabel || data?.source?.name || t("detail.parking.defaultSource")}</div>
+        {(selected?.latitude != null || selected?.lat != null) && (
+          <button className="dm-primary" onClick={() => onAction?.("show-parking-on-map", selected)}>
+            <Icon name="pin" size={15} />{t("detail.alerts.showOnMap")}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -374,7 +379,7 @@ export function DetailModal({ open, type, title, accent = "var(--accent)", data,
   if (!open) return null;
 
   const content =
-    type === "parking" ? <ParkingContent data={data} /> :
+    type === "parking" ? <ParkingContent data={data} onAction={onAction} /> :
     type === "weather" ? <WeatherContent data={data} /> :
     type === "alerts" ? <AlertsContent data={data} onAction={onAction} /> :
     type === "areas" ? <AreasContent data={data} /> :

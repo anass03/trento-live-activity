@@ -24,7 +24,7 @@
     radial-gradient(500px 380px at 4% 96%, color-mix(in srgb, var(--cyan) 8%, transparent), transparent 60%);
   opacity: calc(0.35 + var(--glow) * 0.3);
 }
-.settings-scene > * { position: relative; z-index: 1; }
+.settings-scene > :not(.detail-modal-scrim):not(.login-modal-scrim) { position: relative; z-index: 1; }
 /* The header's profile dropdown must paint above the settings cards below it
    (same stacking trap as .activity-scene / .events-scene). */
 .settings-scene > .events-header { z-index: 30; }

@@ -108,7 +108,8 @@
       "participants": "Partecipanti",
       "join": "Partecipa",
       "view": "Vedi dettagli",
-      "close": "Chiudi"
+      "close": "Chiudi",
+      "centerOnMap": "Centra sulla mappa"
     }
   },
   "detail": {
@@ -214,7 +215,18 @@
     "deleteActivity": "Elimina attività",
     "deletingActivity": "Eliminazione…",
     "deleteConfirm": "Eliminare definitivamente questa attività?",
-    "deleteError": "Eliminazione non riuscita."
+    "deleteError": "Eliminazione non riuscita.",
+    "noneSelected": "Nessuna attività selezionata.",
+    "detailLoading": "Caricamento dettagli attività...",
+    "detailLoadError": "Errore durante il caricamento dell'attività.",
+    "notFound": "Attività non trovata.",
+    "backToActivities": "Torna alle Attività",
+    "when": "Quando",
+    "duration": "Durata",
+    "participation": "Partecipazione",
+    "seatsTaken": "Posti occupati",
+    "seatsOf": "<b>{{count}}</b> di <b>{{limit}}</b> posti occupati",
+    "defaultTitle": "Attività a Trento"
   },
   "toast": {
     "closeAria": "Chiudi notifica",
@@ -305,6 +317,8 @@
       "status": "Stato",
       "createHere": "Crea attività qui",
       "loginToCreate": "Accedi come cittadino per creare un'attività qui"
-    }
+    },
+    "outsideTrento": "Sei fuori dall'area di Trento",
+    "outsideTrentoHint": "La mappa mostra solo l'area di Trento e dintorni."
   }
 }

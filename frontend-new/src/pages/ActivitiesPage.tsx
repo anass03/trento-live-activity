@@ -12,6 +12,7 @@ import { Icon, WxIcon } from "../components/ui/Icon";
 import { GeocodedLocation } from "../components/ui/GeocodedLocation";
 import { getActivities, addFavorite, removeFavorite, getFavorites, getMyActivities, getTrentoWeather, ApiError, isActivityDeleted } from "../lib/api";
 import { getTimeFormat, getDistUnit } from "../lib/i18n";
+import { shareOrCopy } from "../lib/share";
 
 
 const ACT_CAT = {
@@ -270,6 +271,7 @@ function ActSortBar({ count, sort, setSort }: any) {
 function ActCard({ a, saved, onSave, onOpen, canSave = true }: any) {
   const { t } = useTranslation();
   const onMove = useGlow();
+  const [shared, setShared] = useState(false);
   const cat = activityCat(a.cat);
   const diff = a.diff ? ACT_DIFF[a.diff] : null;
   const ratio = a.cap > 0 ? a.going / a.cap : 0;
@@ -282,17 +284,26 @@ function ActCard({ a, saved, onSave, onOpen, canSave = true }: any) {
     : a.price === "paid" ? (a.priceLabel || t("activities.paid")) : null;
   const hasAttrs = !!(dur || diff || priceNode);
   const badge = a.status.rising ? { cls: "rising", icon: "trending", label: t("activities.rising") } : null;
+
+  const handleShare = async () => {
+    const text = `${a.title || catLabel} — Trento`;
+    try {
+      await shareOrCopy({ title: a.title || catLabel, text, url: window.location.href });
+      setShared(true);
+      setTimeout(() => setShared(false), 1800);
+    } catch { /* share sheet dismissed */ }
+  };
+
   return (
     <div className="act-card" style={{ "--ac": cat.color, "--aimg": activityGrad(a.cat), "--mx": "50%", "--my": "0%" } as any}
       onMouseMove={onMove} onClick={() => onOpen(a.id)}>
       <div className="act-media">
         {badge && <span className={"act-badge " + badge.cls}><Icon name={badge.icon} size={11} />{badge.label}</span>}
-        {canSave && <button className={"act-save" + (saved ? " on" : "")} onClick={stop(() => onSave(a.id))} aria-label={saved ? t("activities.removeSaved") : t("activities.save")} aria-pressed={saved}><Icon name="bookmark" size={16} /></button>}
         <span className="am-ghost"><Icon name={cat.icon} size={92} /></span>
       </div>
       <div className="act-body">
         <div className="act-cat"><Icon name={cat.icon} size={12} />{catLabel}{a.subtype && a.subtype !== catLabel ? <><span className="dotsep">·</span><span className="subtype">{a.subtype}</span></> : null}</div>
-        <div className="act-name">{a.title}</div>
+        <div className="act-name">{a.title || catLabel}</div>
         {hasAttrs && (
           <div className="act-attrs">
             {dur && <span className="act-attr"><Icon name="clock" size={13} />{dur}</span>}
@@ -310,8 +321,18 @@ function ActCard({ a, saved, onSave, onOpen, canSave = true }: any) {
             <span className="cap-bar" style={{ "--capc": capColor(ratio) } as any}><i style={{ width: Math.max(8, ratio * 100) + "%" }}></i></span>
             <span className="pnum"><b>{a.going}</b>{a.cap > 0 ? `/${a.cap}` : ""}</span>
           </span>
+          <div className="post-actions">
+            <button className={"act-btn icon-only" + (shared ? " on-share" : "")} onClick={stop(handleShare)}
+              aria-label={shared ? t("events.shareCopied") : t("events.ariaShare")} title={shared ? t("events.shareCopied") : undefined}>
+              <Icon name={shared ? "check" : "share"} size={16} />
+            </button>
+            {canSave && (
+              <button className={"act-btn save icon-only" + (saved ? " on" : "")} onClick={stop(() => onSave(a.id))} aria-label={saved ? t("activities.removeSaved") : t("activities.save")} aria-pressed={saved}>
+                <Icon name="bookmark" size={16} />
+              </button>
+            )}
+          </div>
         </div>
-        <button className="act-cta" onClick={stop(() => onOpen(a.id))}><Icon name="arrow" size={15} />{t("activities.viewDetails")}</button>
       </div>
     </div>
   );
@@ -332,11 +353,12 @@ function ActNextWidget({ activity, saved, onSave, onOpen, canSave = true }: any)
   const cat = activityCat(a.cat);
   return (
     <Widget title={t("activities.next")} accent="var(--accent)" delay={120}>
-      <div className="next-media" style={{ "--nimg": activityGrad(a.cat) } as any}>
+      <div className="next-media" style={{ "--nimg": activityGrad(a.cat), cursor: "pointer" } as any}
+        onClick={() => onOpen(a.id)}>
         <span className="nm-count"><span className="led live green"></span><span><span className="lbl">{t("activities.nextBadge")}</span><br />{formatActivityTime(a.startsAt, t("activities.timeTbd"), dtLocale)}</span></span>
         <span className="nm-ghost"><Icon name={cat.icon} size={96} /></span>
       </div>
-      <div className="next-title">{a.title}</div>
+      <div className="next-title" style={{ cursor: "pointer" }} onClick={() => onOpen(a.id)}>{a.title}</div>
       <div className="next-fields">
         <div className="next-field"><span className="nf-ic"><Icon name="pin" size={14} /></span><div><div className="nf-lbl">{t("activities.place")}</div><div className="nf-val"><GeocodedLocation value={a.loc} fallback={t("activities.locationTbd")} /></div></div></div>
         <div className="next-field"><span className="nf-ic"><Icon name="users" size={14} /></span><div><div className="nf-lbl">{t("activities.participantsLabel")}</div><div className="nf-val">{a.going}{a.cap > 0 ? ` / ${a.cap}` : ""}</div></div></div>

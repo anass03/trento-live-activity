@@ -4,6 +4,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import i18n, { getTimeFormat } from "../lib/i18n";
+import { shareOrCopy } from "../lib/share";
 import { Header } from "../components/layout/Header";
 import { Avatars } from "../components/redesign/Avatars";
 import { Widget, useGlow } from "../components/redesign/widgets";
@@ -191,12 +192,17 @@ function Composer({ search, setSearch }: any) {
 }
 
 /* ===================== EVENT POST CARD ===================== */
+const evCapColor = (r: number) => (r >= 1 ? "var(--red)" : r > 0.95 ? "var(--red)" : r > 0.7 ? "var(--amber)" : r > 0.3 ? "var(--green)" : "var(--teal)");
+
 function PostCard({ e, saved, shared, onSave, onShare, onOpen, flash, canSave = true }: any) {
   const { t, i18n } = useTranslation();
   const onMove = useGlow();
   const meta = evMeta(e.category);
   const catLabel = t(`events.filters.${e.category}`, { defaultValue: e.category });
   const count = e.participantCount || 0;
+  const limit = e.maxPartecipanti || 0;
+  const capRatio = limit > 0 ? Math.min(1, count / limit) : 0;
+  const capPct = limit > 0 ? Math.round(capRatio * 100) : 0;
   const stop = (fn: any) => (ev: any) => { ev.stopPropagation(); fn(); };
   return (
     <div className={"post" + (flash ? " flash" : "")} data-post={e.id}
@@ -226,6 +232,11 @@ function PostCard({ e, saved, shared, onSave, onShare, onOpen, flash, canSave = 
           <span className="attend-count" style={count > 0 ? undefined : { marginLeft: 0 }}>
             <b>{fmt(count)}</b> {t("events.participantsWord", { count })}
           </span>
+          {limit > 0 && (
+            <span className="cap-bar" style={{ "--capc": evCapColor(capRatio) } as any}>
+              <i style={{ width: Math.max(8, capPct) + "%" }}></i>
+            </span>
+          )}
           <div className="post-actions">
             <button className={"act-btn icon-only" + (shared ? " on-share" : "")} onClick={stop(() => onShare(e))}
               aria-label={shared ? t("events.shareCopied") : t("events.ariaShare")} title={shared ? t("events.shareCopied") : undefined}>
@@ -274,7 +285,7 @@ const Feed = React.forwardRef<any, any>(function Feed({ events, user, search, se
 });
 
 /* ===================== NEXT ACTIVITY ===================== */
-function NextActivity({ event, joined, saved, busy, joinError, onJoin, onSave, canJoin = true }: any) {
+function NextActivity({ event, joined, saved, busy, joinError, onJoin, onSave, onOpen, canJoin = true }: any) {
   const { t, i18n } = useTranslation();
   if (!event) {
     return (
@@ -292,14 +303,16 @@ function NextActivity({ event, joined, saved, busy, joinError, onJoin, onSave, c
   // whole subtree (the join CTA gradient disappears). Use a concrete token.
   return (
     <Widget title={t("events.next")} accent="var(--cyan)" upd={t("events.upcoming")} delay={120}>
-      <div className="next-media" style={{ "--nimg": meta.grad } as React.CSSProperties}>
+      <div className="next-media" style={{ "--nimg": meta.grad, cursor: onOpen ? "pointer" : "default" } as React.CSSProperties}
+        onClick={onOpen ? () => onOpen(event.id) : undefined}>
         <span className="nm-count">
           <span className="led live green"></span>
           <span><span className="lbl">{t("events.upcomingBadge")}</span></span>
         </span>
         <span className="nm-ghost"><Icon name={meta.icon} size={96} /></span>
       </div>
-      <div className="next-title">{event.title}</div>
+      <div className="next-title" style={{ cursor: onOpen ? "pointer" : "default" }}
+        onClick={onOpen ? () => onOpen(event.id) : undefined}>{event.title}</div>
       <div className="next-fields">
         <div className="next-field">
           <span className="nf-ic"><Icon name="pin" size={14} /></span>
@@ -334,13 +347,29 @@ function NextActivity({ event, joined, saved, busy, joinError, onJoin, onSave, c
 }
 
 /* ===================== CITY EVENTS GRID ===================== */
+// Trento historic city centre bounding box (roughly within the old walls + immediate surroundings)
+const CITY_CENTER_BOUNDS = { minLat: 46.060, maxLat: 46.076, minLng: 11.112, maxLng: 11.135 };
+function inCityCenter(e: any): boolean {
+  const lat = e.latitude ?? e.lat;
+  const lng = e.longitude ?? e.lng;
+  if (lat == null || lng == null) return true; // no coords → don't exclude
+  return lat >= CITY_CENTER_BOUNDS.minLat && lat <= CITY_CENTER_BOUNDS.maxLat
+    && lng >= CITY_CENTER_BOUNDS.minLng && lng <= CITY_CENTER_BOUNDS.maxLng;
+}
+
 function CityGrid({ list, onOpen }: any) {
   const { t } = useTranslation();
+  const centerList = list.filter(inCityCenter);
   return (
-    <Widget title={t("events.cityGrid")} accent="var(--teal)" upd={t("events.cityGridTotal", { count: list.length })} delay={220}
+    <Widget title={t("events.cityGrid")} accent="var(--teal)" upd={t("events.cityGridTotal", { count: centerList.length })} delay={220}
       style={{ display: "flex", flexDirection: "column", minHeight: 0, flex: "1 1 auto" }}>
-      <div className="city-grid">
-        {list.map((e: any) => {
+      <div className="city-grid" style={{ maxHeight: 320 }}>
+        {centerList.length === 0 && (
+          <div style={{ gridColumn: "span 3", color: "var(--text-muted)", fontSize: 13, padding: "20px 0", textAlign: "center" }}>
+            {t("events.emptyNoEventsTitle")}
+          </div>
+        )}
+        {centerList.map((e: any) => {
           const meta = evMeta(e.category);
           return (
             <button className="mini" key={e.id} style={{ "--mc": meta.color, "--mimg": meta.grad } as React.CSSProperties} onClick={() => onOpen(e.id)}>
@@ -467,17 +496,11 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
   const handleShare = async (e: ApiEvent) => {
     const text = `${e.title} — ${e.location || "Trento"}`;
     try {
-      if (navigator.share) {
-        await navigator.share({ title: e.title, text, url: window.location.href });
-      } else {
-        await navigator.clipboard.writeText(`${text}\n${window.location.href}`);
-      }
+      await shareOrCopy({ title: e.title, text, url: window.location.href });
       setSharedId(e.id);
       clearTimeout(shareTimer.current);
       shareTimer.current = setTimeout(() => setSharedId(null), 1800);
-    } catch (err) {
-      // User dismissed the share sheet or clipboard was denied: nothing to report.
-    }
+    } catch { /* share sheet dismissed */ }
   };
 
   const handleOpenDetail = (id: string) => {
@@ -600,6 +623,7 @@ export function EventsPage({ page, setPage, theme, setTheme, user, setSelectedEv
             joinError={joinError}
             onJoin={() => nextEvent && handleJoinToggle(nextEvent)}
             onSave={() => nextEvent && handleSave(nextEvent.id)}
+            onOpen={handleOpenDetail}
           />
           <CityGrid list={filtered.filter((e) => e.id !== nextEvent?.id)} onOpen={handleOpenDetail} />
         </div>

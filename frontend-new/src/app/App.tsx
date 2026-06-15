@@ -311,6 +311,8 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
   const [zoom, setZoom] = useState(14.2);
   const locateRef = React.useRef<(() => void) | null>(null);
   const resetRef = React.useRef<(() => void) | null>(null);
+  const flyToRef = React.useRef<((lng: number, lat: number, zoom?: number) => void) | null>(null);
+  const tempMarkerRef = React.useRef<((lng: number, lat: number) => void) | null>(null);
   const [is3d, setIs3d] = useState(false);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [popup, setPopup] = useState<any>(null);
@@ -631,6 +633,8 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
                 is3d={is3d}
                 onLocateRef={locateRef}
                 onResetRef={resetRef}
+                onFlyToRef={flyToRef}
+                onTempMarkerRef={tempMarkerRef}
                 canCreateActivity={user?.role === "registered_user"}
                 canJoin={user?.role === "registered_user"}
                 ownedIds={ownedIds}
@@ -682,7 +686,10 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
         </div>
         <div className="col-right">
           <ActiveAreasWidget delay={140} areas={dynamicAreas} onOpen={setDetail} />
-          <EventsWidget delay={240} onFocus={openEventPopup} events={dynamicEvents} onWidgetClick={() => setPage("eventi")} />
+          <EventsWidget delay={240} onFocus={(e: any) => {
+              setSelectedEventId(e.id || e.sourceId);
+              setPage("evento-dettaglio");
+            }} events={dynamicEvents} onWidgetClick={() => setPage("eventi")} />
           {user?.role === "registered_user" && (
             <ServiceRequestWidget delay={340} onOpen={(cat) => setSrCategory(cat ?? null)} />
           )}
@@ -703,9 +710,28 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
         accent={detail?.accent}
         data={detail?.data}
         onClose={() => setDetail(null)}
-        onAction={(action) => {
+        onAction={(action, payload) => {
           if (action === "open-events-page") setPage("eventi");
           if (action === "open-activity-page") setPage("attivita");
+          if (action === "show-alert-on-map") {
+            setDetail(null);
+            const loc = payload?.location;
+            if (loc?.longitude != null && loc?.latitude != null) {
+              if (flyToRef.current) flyToRef.current(loc.longitude, loc.latitude, 16);
+              if (tempMarkerRef.current) tempMarkerRef.current(loc.longitude, loc.latitude);
+            }
+          }
+          if (action === "show-parking-on-map") {
+            setDetail(null);
+            const lng = payload?.longitude ?? payload?.lng;
+            const lat = payload?.latitude ?? payload?.lat;
+            if (lng != null && lat != null && flyToRef.current) {
+              flyToRef.current(lng, lat, 18);
+            }
+            if (payload?.id) {
+              setPopup({ markerId: `parking:${payload.id}` });
+            }
+          }
         }}
       />
 
@@ -756,6 +782,7 @@ function mapBackendRole(ruolo?: string): UserRole {
 export function App() {
   const [page, setPage] = useState("home");
   const [loginOpen, setLoginOpen] = useState(false);
+  const [registerOpen, setRegisterOpen] = useState(false);
   const [themeMode, setThemeModeState] = useState(() => {
     const stored = localStorage.getItem("tla:themeMode") || "light";
     return stored === "auto" ? "system" : stored;
@@ -895,6 +922,10 @@ export function App() {
       setLoginOpen(true);
       return;
     }
+    if (nextPage === "registrazione") {
+      setRegisterOpen(true);
+      return;
+    }
     setLoginOpen(false);
     setPage(nextPage);
   };
@@ -988,7 +1019,16 @@ export function App() {
         : page === "termini"
         ? <TermsPage {...shared} />
         : <HomeScene {...shared} />}
+      <Toaster />
       <TrentoTweaks theme={theme} />
+      {registerOpen && (
+        <RegistrationPage
+          {...shared}
+          isModal
+          onClose={() => setRegisterOpen(false)}
+          onLogin={() => { setRegisterOpen(false); setLoginOpen(true); }}
+        />
+      )}
       <LoginModal
         open={loginOpen}
         onClose={() => setLoginOpen(false)}
@@ -999,7 +1039,7 @@ export function App() {
         }}
         onRegister={() => {
           setLoginOpen(false);
-          setPage("registrazione");
+          navigate("registrazione");
         }}
         onPasswordReset={() => {
           setLoginOpen(false);

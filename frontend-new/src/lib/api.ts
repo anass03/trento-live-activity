@@ -23,7 +23,8 @@ export interface ApiEvent {
 
 export interface ApiActivity {
   id: string;
-  title: string;
+  title: string | null;
+  tipo?: string | null;
   description: string | null;
   category: string;
   location: string | null;

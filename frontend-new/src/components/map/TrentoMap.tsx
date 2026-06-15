@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { CAT_ICON, catColor, catLabel } from "../../data/redesignData";
+import { showToast } from "../ui/Toaster";
 
 // CartoDB vector tile style urls (completely free, no API key required)
 const DARK_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
@@ -60,6 +61,8 @@ interface TrentoMapProps {
   is3d: boolean;
   onLocateRef?: React.MutableRefObject<(() => void) | null>;
   onResetRef?: React.MutableRefObject<(() => void) | null>;
+  onFlyToRef?: React.MutableRefObject<((lng: number, lat: number, zoom?: number) => void) | null>;
+  onTempMarkerRef?: React.MutableRefObject<((lng: number, lat: number) => void) | null>;
   /* true quando l'utente loggato è un cittadino: abilita la CTA
      "Crea attività qui" nel popup dei POI */
   canCreateActivity?: boolean;
@@ -84,6 +87,8 @@ export const TrentoMap = React.memo(function TrentoMap({
   is3d,
   onLocateRef,
   onResetRef,
+  onFlyToRef,
+  onTempMarkerRef,
   canJoin = false,
   ownedIds,
   canCreateActivity,
@@ -179,11 +184,20 @@ export const TrentoMap = React.memo(function TrentoMap({
         const flyToFallback = () => map.flyTo({ center: TRENTO_CENTER, zoom: 15.5, duration: 1100 });
         const locMode = (() => { try { return localStorage.getItem("tla:locationMode") || "while_using"; } catch { return "while_using"; } })();
         if (!navigator.geolocation || locMode === "never") { flyToFallback(); return; }
+        // Trento area bounding box — roughly 20 km radius around city center
+        const TRENTO_BOUNDS = { minLat: 45.96, maxLat: 46.18, minLng: 11.00, maxLng: 11.24 };
         navigator.geolocation.getCurrentPosition(
           (pos) => {
             const m = mapInstance.current;
             if (!m) return;
-            const coords: [number, number] = [pos.coords.longitude, pos.coords.latitude];
+            const { latitude, longitude } = pos.coords;
+            const insideTrento = latitude >= TRENTO_BOUNDS.minLat && latitude <= TRENTO_BOUNDS.maxLat
+              && longitude >= TRENTO_BOUNDS.minLng && longitude <= TRENTO_BOUNDS.maxLng;
+            if (!insideTrento) {
+              showToast({ title: t("map.outsideTrento"), body: t("map.outsideTrentoHint"), type: "info" });
+              return;
+            }
+            const coords: [number, number] = [longitude, latitude];
             if (!userDotMarker.current) {
               const dot = document.createElement("div");
               dot.className = "tla-user-dot";
@@ -211,7 +225,30 @@ export const TrentoMap = React.memo(function TrentoMap({
         });
       };
     }
-  }, [onLocateRef, onResetRef]);
+    if (onFlyToRef) {
+      onFlyToRef.current = (lng: number, lat: number, zoom = 16) => {
+        const map = mapInstance.current;
+        if (!map) return;
+        map.flyTo({ center: [lng, lat], zoom, duration: 1200 });
+      };
+    }
+    if (onTempMarkerRef) {
+      onTempMarkerRef.current = (lng: number, lat: number) => {
+        const map = mapInstance.current;
+        if (!map) return;
+        if (!document.getElementById("tla-pulse-kf")) {
+          const s = document.createElement("style");
+          s.id = "tla-pulse-kf";
+          s.textContent = `@keyframes tla-pm{0%{box-shadow:0 0 0 0 rgba(13,148,136,.6)}70%{box-shadow:0 0 0 16px rgba(13,148,136,0)}100%{box-shadow:0 0 0 0 rgba(13,148,136,0)}}`;
+          document.head.appendChild(s);
+        }
+        const el = document.createElement("div");
+        el.style.cssText = "width:20px;height:20px;border-radius:50%;background:rgba(13,148,136,.75);border:2px solid #0d9488;animation:tla-pm 1s ease infinite;transition:opacity .5s";
+        const marker = new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
+        setTimeout(() => { el.style.opacity = "0"; setTimeout(() => marker.remove(), 500); }, 3000);
+      };
+    }
+  }, [onLocateRef, onResetRef, onFlyToRef, onTempMarkerRef]);
 
   // Fly to selected marker coordinates dynamically
   useEffect(() => {
