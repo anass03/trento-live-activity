@@ -1,0 +1,50 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"/F/UNI/UNITN/SOFTWARE ENGINEERING/repo/trento-live-activity\" && grep -r \"click.*map\\\\|onMapClick\\\\|handleMapClick\\\\|map.on.*click\" . --include=\"*.ts\" --include=\"*.tsx\" --include=\"*.js\" --include=\"*.jsx\" -l 2>/dev/null | head -20)",
+      "Bash(xargs grep -l \"latitude\\\\|longitude\\\\|coords\\\\|coordinates\")",
+      "Bash(xargs grep -l \"onMapClick\\\\|map.on.*click\")",
+      "Bash(npx tsc *)",
+      "PowerShell(Get-Command node, npm 2>&1)",
+      "Bash(Get-ChildItem -Path \"F:\\\\UNI\\\\UNITN\\\\SOFTWARE ENGINEERING\\\\repo\\\\trento-live-activity\\\\frontend-new\\\\src\" -Recurse -Depth 3)",
+      "Bash(Select-Object FullName)",
+      "Bash(Get-ChildItem \"F:\\\\UNI\\\\UNITN\\\\SOFTWARE ENGINEERING\\\\repo\\\\trento-live-activity\\\\frontend-new\\\\src\\\\locales\" -Recurse -Name)",
+      "Bash(grep -n \"\\\\/activities\\\\|\\\\/events\\\\|join\\\\|leave\\\\|participate\\\\|/save\\\\|/like\" \"F:\\\\UNI\\\\UNITN\\\\SOFTWARE ENGINEERING\\\\repo\\\\trento-live-activity\\\\frontend-new\\\\src\\\\lib\\\\api.ts\")",
+      "Bash(grep '$ref')",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "PowerShell(Get-Command node, npm, npx -ErrorAction SilentlyContinue | Select-Object Name, Source; $env:Path -split ';' | Where-Object { $_ -match 'node' })",
+      "PowerShell($paths = @\\(\"$env:ProgramFiles\\\\nodejs\\\\node.exe\", \"${env:ProgramFiles\\(x86\\)}\\\\nodejs\\\\node.exe\", \"$env:LOCALAPPDATA\\\\nodejs\\\\node.exe\", \"$env:APPDATA\\\\npm\\\\node.exe\", \"$env:LOCALAPPDATA\\\\Programs\\\\nodejs\\\\node.exe\"\\); foreach \\($p in $paths\\) { if \\(Test-Path $p\\) { Write-Output \"FOUND: $p\" } }; Get-ChildItem -Path \"$env:LOCALAPPDATA\\\\nvm\",\"$env:ProgramFiles\\\\nodejs\" -Filter node.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -First 5 FullName)",
+      "PowerShell(wsl -- bash -lc \"which node nvm 2>/dev/null; ls -d \\\\$HOME/.nvm 2>/dev/null; command -v node; echo '---'; ls \\\\$HOME/.nvm/versions/node 2>/dev/null\")",
+      "WebFetch(domain:www.cbsnews.com)",
+      "Bash(awk -F/ '{print $1\"/\"$2}')",
+      "Bash(grep -i \"\\\\.tex$\")",
+      "Bash(git rm *)",
+      "Bash(rm -rf frontend frontend-old)",
+      "Bash(grep -vE \"^\\(node_modules\\)$\")",
+      "Bash(mv frontend-new *)",
+      "Bash(git add *)",
+      "Bash(echo \"rc=$?\")",
+      "Bash(grep -iE \"\\\\.tex$|PRODUCT\\\\.md|DESIGN\\\\.md\")",
+      "Bash(git config *)",
+      "Read(//c/Users/filip/**)",
+      "Bash(echo \"set to: $\\(git config --global core.excludesFile\\)\")",
+      "Bash(git check-ignore *)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/skills/impeccable/scripts/hook.mjs\"",
+            "timeout": 5,
+            "statusMessage": "Checking UI changes"
+          }
+        ]
+      }
+    ]
+  },
+  "description": "Impeccable design detector: runs after Edit/Write/MultiEdit on UI files and surfaces findings as system reminders."
+}

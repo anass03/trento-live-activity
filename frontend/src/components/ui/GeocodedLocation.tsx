@@ -1,19 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
+import { reverseGeocode } from "../../lib/api";
 
-// Matches "46.0664, 11.1216" style strings produced by locationFor() on the backend
+// Matches "46.0664, 11.1216" strings produced by the backend's locationFor()
 const COORD_RE = /^-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$/;
 
 const geocodeCache = new Map<string, string>();
 
-// Client-side geocoding proxied through our backend (proper User-Agent, shared cache).
-// Only used for the live map picker — all stored data is pre-geocoded server-side.
-export async function reverseGeocode(coordStr: string): Promise<string> {
+async function geocodeCoordString(coordStr: string): Promise<string> {
   if (geocodeCache.has(coordStr)) return geocodeCache.get(coordStr)!;
-  const [lat, lon] = coordStr.split(',').map((s) => s.trim());
-  const res = await fetch(`/api/map/geocode?lat=${lat}&lon=${lon}`);
-  if (!res.ok) throw new Error(`geocode HTTP ${res.status}`);
-  const data = await res.json();
-  const result: string = data.address || coordStr;
+  const [latStr, lonStr] = coordStr.split(",").map((s) => s.trim());
+  const { address } = await reverseGeocode(parseFloat(latStr), parseFloat(lonStr));
+  const result = address || coordStr;
   geocodeCache.set(coordStr, result);
   return result;
 }
@@ -23,11 +20,11 @@ interface Props {
   fallback?: string;
 }
 
-export function GeocodedLocation({ value, fallback = 'Non specificato' }: Props) {
+export function GeocodedLocation({ value, fallback = "Non specificato" }: Props) {
   const [display, setDisplay] = useState<string>(() => {
     if (!value) return fallback;
     if (geocodeCache.has(value)) return geocodeCache.get(value)!;
-    return COORD_RE.test(value) ? '…' : value;
+    return COORD_RE.test(value) ? "…" : value;
   });
 
   useEffect(() => {
@@ -40,7 +37,7 @@ export function GeocodedLocation({ value, fallback = 'Non specificato' }: Props)
       return;
     }
     let cancelled = false;
-    reverseGeocode(value)
+    geocodeCoordString(value)
       .then((name) => { if (!cancelled) setDisplay(name); })
       .catch(() => { if (!cancelled) setDisplay(value); });
     return () => { cancelled = true; };

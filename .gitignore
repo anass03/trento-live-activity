@@ -3,8 +3,6 @@ node_modules/
 __pycache__/
 *.pyc
 .venv/
-frontend-new/node_modules/
-frontend-new/dist/
 
 #Environment
 .env
@@ -14,7 +12,9 @@ frontend-new/dist/
 #Build
 dist/
 build/
+.vite/
 *.egg-info/
+*.tsbuildinfo
 
 #OS
 .DS_Store
@@ -23,13 +23,3 @@ Thumbs.db
 #IDE
 .vscode/
 .idea/
-
-#Claude Code
-.claude/
-skills-lock.json
-.agents
-
-#Skill mirrors / local tooling state (not source)
-.cursor/skills/impeccable/
-.gemini/skills/impeccable/
-.impeccable/

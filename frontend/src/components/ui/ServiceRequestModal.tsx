@@ -1,177 +1,190 @@
-import { useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { POIMapPicker } from '../map/POIMapPicker';
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Icon } from "./Icon";
+import { POIMapPicker } from "../map/POIMapPicker";
 import {
   submitServiceRequest,
-  SUBCATEGORIES_BY_CATEGORY,
   type ServiceRequestCategory,
   type ServiceRequestSubcategory,
-} from '../../lib/api';
-import { GeocodedLocation } from './GeocodedLocation';
+  SUBCATEGORIES_BY_CATEGORY,
+} from "../../lib/api";
+import { showToast } from "./Toaster";
 
-const CATEGORIES: ServiceRequestCategory[] = [
-  'parcheggio_auto', 'parcheggio_bici', 'sport', 'studio',
-  'verde', 'cultura', 'ciclismo', 'altro',
+interface Props {
+  theme?: string;
+  initialCategory?: ServiceRequestCategory;
+  onClose: () => void;
+}
+
+const ALL_CATS: ServiceRequestCategory[] = [
+  "parcheggio_auto", "parcheggio_bici", "sport", "studio",
+  "verde", "cultura", "ciclismo", "altro",
 ];
 
-interface Props { onClose: () => void }
+const CAT_ICON: Record<ServiceRequestCategory, string> = {
+  parcheggio_auto: "car",
+  parcheggio_bici: "bike",
+  sport:           "activity",
+  studio:          "bookmark",
+  verde:           "leaf",
+  cultura:         "ticket",
+  ciclismo:        "bike",
+  altro:           "settings",
+};
 
-export function ServiceRequestModal({ onClose }: Props) {
+type Step = "category" | "subcategory" | "location";
+
+export function ServiceRequestModal({ theme, initialCategory, onClose }: Props) {
   const { t } = useTranslation();
-  const [categoria, setCategoria] = useState<ServiceRequestCategory | null>(null);
+  const [step, setStep] = useState<Step>(initialCategory ? (SUBCATEGORIES_BY_CATEGORY[initialCategory]?.length ? "subcategory" : "location") : "category");
+  const [categoria, setCategoria] = useState<ServiceRequestCategory | null>(initialCategory ?? null);
   const [sottocategoria, setSottocategoria] = useState<ServiceRequestSubcategory | null>(null);
-  const [coords, setCoords] = useState<{ latitudine: number; longitudine: number } | null>(null);
-  const [showMap, setShowMap] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [showPicker, setShowPicker] = useState(false);
 
-  // When macro category changes, reset subcategory
-  function handleCategorySelect(cat: ServiceRequestCategory) {
+  const subcats: ServiceRequestSubcategory[] = categoria ? (SUBCATEGORIES_BY_CATEGORY[categoria] ?? []) : [];
+  const steps: Step[] = subcats.length > 0 ? ["category", "subcategory", "location"] : ["category", "location"];
+  const stepIdx = steps.indexOf(step);
+
+  function selectCategory(cat: ServiceRequestCategory) {
     setCategoria(cat);
     setSottocategoria(null);
+    const subs = SUBCATEGORIES_BY_CATEGORY[cat] ?? [];
+    setStep(subs.length > 0 ? "subcategory" : "location");
   }
 
-  const availableSubcats = categoria ? SUBCATEGORIES_BY_CATEGORY[categoria] : [];
-  const hasSubcats = availableSubcats.length > 0;
+  function selectSubcat(sub: ServiceRequestSubcategory | null) {
+    setSottocategoria(sub);
+    setStep("location");
+  }
 
-  async function handleSubmit() {
-    if (!categoria || !coords) return;
+  function goBack() {
+    if (step === "location") setStep(subcats.length > 0 ? "subcategory" : "category");
+    else if (step === "subcategory") setStep("category");
+  }
+
+  async function handleLocationConfirm({ latitudine, longitudine }: { latitudine: number; longitudine: number }) {
+    if (!categoria) return;
     setSubmitting(true);
-    setError(null);
     try {
-      await submitServiceRequest({
-        categoria,
-        sottocategoria: sottocategoria ?? null,
-        latitudine: coords.latitudine,
-        longitudine: coords.longitudine,
-      });
-      setSuccess(true);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('serviceRequest.error'));
+      await submitServiceRequest({ categoria, sottocategoria, latitudine, longitudine });
+      showToast({ title: t("serviceRequest.success"), type: "success" });
+      onClose();
+    } catch {
+      showToast({ title: t("serviceRequest.error"), type: "error" });
     } finally {
       setSubmitting(false);
     }
   }
 
-  // Delegate to the existing POIMapPicker modal already used in the whole app
-  if (showMap) {
+  if (showPicker) {
     return (
       <POIMapPicker
-        initial={coords ?? undefined}
-        onConfirm={(c) => { setCoords(c); setShowMap(false); }}
-        onCancel={() => setShowMap(false)}
+        theme={theme}
+        onConfirm={(coords) => { setShowPicker(false); handleLocationConfirm(coords); }}
+        onCancel={() => setShowPicker(false)}
       />
     );
   }
 
   return (
-    <div className="poi-map-picker-backdrop" role="presentation" onClick={onClose}>
+    <div
+      className="detail-modal-scrim"
+      style={{ zIndex: 90 }}
+      onClick={onClose}
+    >
       <div
-        className="poi-map-picker liquid-card"
-        style={{ maxWidth: 480 }}
-        role="dialog"
-        aria-modal="true"
+        className="detail-modal sr-modal"
+        style={{ "--dm-accent": "var(--violet)" } as React.CSSProperties}
         onClick={(e) => e.stopPropagation()}
       >
-        <header>
-          <h2>{t('serviceRequest.title')}</h2>
-          <p>{t('serviceRequest.hint')}</p>
-        </header>
-
-        {success ? (
-          <div style={{ display: 'grid', gap: 16, padding: '8px 0' }}>
-            <p style={{ color: 'var(--color-success)', fontWeight: 720 }}>
-              {t('serviceRequest.success')}
-            </p>
-            <div className="filter-actions">
-              <button type="button" className="primary-button" onClick={onClose}>{t('common.close')}</button>
-            </div>
+        {/* Header */}
+        <div className="detail-modal-head">
+          <div>
+            <div className="detail-modal-kicker">📍 {t("serviceRequest.kicker")}</div>
+            <h2>{step === "category" ? t("serviceRequest.stepCategoryTitle") : step === "subcategory" ? t("serviceRequest.stepSubcategoryTitle") : t("serviceRequest.stepLocationTitle")}</h2>
           </div>
-        ) : (
-          <div style={{ display: 'grid', gap: 20 }}>
+          <button className="detail-modal-close bare-btn" onClick={onClose} aria-label="Chiudi">
+            <Icon name="x" size={16} />
+          </button>
+        </div>
 
-            {/* Step 1: Macro category */}
-            <div style={{ display: 'grid', gap: 10 }}>
-              <span style={{ fontSize: 13, fontWeight: 780, color: 'var(--color-text-secondary)' }}>
-                {t('serviceRequest.categoryLabel')}
-              </span>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {CATEGORIES.map((cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    className={categoria === cat ? 'primary-button' : 'ghost-button'}
-                    style={{ minHeight: 34, padding: '0 12px', fontSize: 13 }}
-                    onClick={() => handleCategorySelect(cat)}
-                  >
-                    {t(`serviceRequest.categories.${cat}`)}
+        {/* Body */}
+        <div className="detail-modal-body">
+          {/* Progress bar */}
+          <div className="sr-steps">
+            {steps.map((s, i) => (
+              <div key={s} className={"sr-step" + (i < stepIdx ? " done" : i === stepIdx ? " active" : "")} />
+            ))}
+          </div>
+
+          {/* STEP 1: category */}
+          {step === "category" && (
+            <div className="sr-modal-cats">
+              {ALL_CATS.map((cat) => (
+                <button
+                  key={cat}
+                  className={"sr-modal-cat" + (categoria === cat ? " selected" : "")}
+                  onClick={() => selectCategory(cat)}
+                >
+                  <Icon name={CAT_ICON[cat]} size={22} />
+                  <span>{t(`serviceRequest.categories.${cat}`)}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* STEP 2: subcategory */}
+          {step === "subcategory" && categoria && (
+            <>
+              <button className="sr-back" onClick={goBack}>
+                <Icon name="chevronL" size={14} /> {t("serviceRequest.back")}
+              </button>
+              <div className="sr-subcat-list">
+                {subcats.map((sub) => (
+                  <button key={sub} className="sr-subcat-btn" onClick={() => selectSubcat(sub)}>
+                    {t(`serviceRequest.subcategories.${sub}`)}
+                    <Icon name="chevron" size={15} />
                   </button>
                 ))}
+                <button className="sr-subcat-btn skip" onClick={() => selectSubcat(null)}>
+                  {t("serviceRequest.skipSubcategory")}
+                </button>
               </div>
-            </div>
+            </>
+          )}
 
-            {/* Step 2: Subcategory — progressive reveal, only when category has options */}
-            {categoria && hasSubcats && (
-              <div style={{ display: 'grid', gap: 10 }}>
-                <span style={{ fontSize: 13, fontWeight: 780, color: 'var(--color-text-secondary)' }}>
-                  {t('serviceRequest.subcategoryLabel')}
-                  <span className="muted-copy" style={{ fontWeight: 400, marginLeft: 6 }}>
-                    {t('serviceRequest.subcategoryOptional')}
-                  </span>
-                </span>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {availableSubcats.map((sub) => (
-                    <button
-                      key={sub}
-                      type="button"
-                      className={sottocategoria === sub ? 'primary-button' : 'ghost-button'}
-                      style={{ minHeight: 32, padding: '0 10px', fontSize: 12 }}
-                      onClick={() => setSottocategoria(sottocategoria === sub ? null : sub)}
-                    >
-                      {t(`serviceRequest.subcategories.${sub}`)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Step 3: Location — shown after category is chosen */}
-            {categoria && (
-              <div style={{ display: 'grid', gap: 8 }}>
-                <span style={{ fontSize: 13, fontWeight: 780, color: 'var(--color-text-secondary)' }}>
-                  {t('serviceRequest.locationLabel')}
-                </span>
-                {coords ? (
-                  <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
-                    <GeocodedLocation value={`${coords.latitudine.toFixed(4)}, ${coords.longitudine.toFixed(4)}`} />
-                  </span>
-                ) : (
-                  <em className="muted-copy" style={{ fontSize: 13 }}>{t('serviceRequest.noLocation')}</em>
-                )}
-                <div>
-                  <button type="button" className="ghost-button" onClick={() => setShowMap(true)}>
-                    {coords ? t('serviceRequest.changeLocation') : t('serviceRequest.chooseLocation')}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {error && <div className="form-error">{error}</div>}
-
-            <div className="filter-actions">
-              <button type="button" onClick={onClose}>{t('common.cancel')}</button>
-              <button
-                type="button"
-                className="primary-button"
-                disabled={!categoria || !coords || submitting}
-                onClick={() => { void handleSubmit(); }}
-              >
-                {submitting ? t('serviceRequest.submitting') : t('serviceRequest.submit')}
+          {/* STEP 3: location */}
+          {step === "location" && (
+            <>
+              <button className="sr-back" onClick={goBack}>
+                <Icon name="chevronL" size={14} /> {t("serviceRequest.back")}
               </button>
-            </div>
-          </div>
-        )}
+              <div className="sr-location-body">
+                <div className="sr-location-icon">📍</div>
+                <p className="sr-location-desc">{t("serviceRequest.stepLocationLabel")}</p>
+                {categoria && (
+                  <div className="sr-location-tags">
+                    <span className="sr-location-tag">{t(`serviceRequest.categories.${categoria}`)}</span>
+                    {sottocategoria && (
+                      <span className="sr-location-tag" style={{ "--accent": "var(--cyan)" } as React.CSSProperties}>
+                        {t(`serviceRequest.subcategories.${sottocategoria}`)}
+                      </span>
+                    )}
+                  </div>
+                )}
+                <button
+                  className="sr-cta"
+                  disabled={submitting}
+                  onClick={() => setShowPicker(true)}
+                >
+                  <Icon name="pin" size={17} />
+                  {submitting ? t("serviceRequest.submitting") : t("serviceRequest.chooseLocation")}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

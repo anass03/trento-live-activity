@@ -21,10 +21,10 @@ export interface ApiEvent {
   entity?: { id: string; name: string } | null;
 }
 
-
 export interface ApiActivity {
   id: string;
-  title: string;
+  title: string | null;
+  tipo?: string | null;
   description: string | null;
   category: string;
   location: string | null;
@@ -54,7 +54,6 @@ export interface MapMarker {
   category?: string | null;
   description?: string | null;
   dateTime?: string | null;
-  // Solo per i marker di tipo 'parking': posti liberi / totali.
   free?: number | null;
   total?: number | null;
 }
@@ -70,6 +69,7 @@ export interface CurrentUser {
   interessi?: string[];
   nomeEnte?: string | null;
   approvato?: boolean;
+  superAdmin?: boolean;
 }
 
 export interface AuthResponse {
@@ -104,7 +104,6 @@ export interface RecoveryCodesResponse {
 }
 
 export interface DashboardStats {
-  // RIMOSSO totalUsers per scope ridotto (#15) — il Comune vede solo aggregati.
   totalUsers?: never;
   totalActivities: number;
   totalEvents: number;
@@ -114,7 +113,6 @@ export interface DashboardStats {
   eventsByCategory?: Array<{ categoria: string; count: number }>;
   poiCrowding: Array<{ statoAffollamento: string; count: number }>;
   topCrowdedPOIs?: Array<{ id: string; nome: string; tipo: string | null; statoAffollamento: string; capacitaMax: number }>;
-  // New: demand/supply, time-series
   poiByType?: Array<{ tipo: string | null; count: number }>;
   activitiesByDay?: Array<{ date: string; count: number }>;
   activitiesByHour?: Array<{ hour: string; count: number }>;
@@ -125,14 +123,13 @@ export type ServiceRequestCategory =
   | 'verde' | 'cultura' | 'ciclismo' | 'altro';
 
 export type ServiceRequestSubcategory =
-  | 'coperto' | 'scoperto' | 'disabili' | 'carica_ev'       // parcheggio_auto
-  | 'rastrelliera' | 'box_bici'                              // parcheggio_bici
-  | 'ping_pong' | 'basket' | 'calcetto' | 'pallavolo' | 'atletica' | 'yoga' | 'altro_sport'  // sport
-  | 'biblioteca' | 'coworking' | 'sala_studio'               // studio
-  | 'teatro' | 'cinema' | 'museo' | 'sala_prove'             // cultura
-  | 'pista_ciclabile' | 'pump_track';                        // ciclismo
+  | 'coperto' | 'scoperto' | 'disabili' | 'carica_ev'
+  | 'rastrelliera' | 'box_bici'
+  | 'ping_pong' | 'basket' | 'calcetto' | 'pallavolo' | 'atletica' | 'yoga' | 'altro_sport'
+  | 'biblioteca' | 'coworking' | 'sala_studio'
+  | 'teatro' | 'cinema' | 'museo' | 'sala_prove'
+  | 'pista_ciclabile' | 'pump_track';
 
-/** Predefined subcategory map — mirrors backend SUBCATEGORIES_BY_CATEGORY (RNF22) */
 export const SUBCATEGORIES_BY_CATEGORY: Record<ServiceRequestCategory, ServiceRequestSubcategory[]> = {
   parcheggio_auto: ['coperto', 'scoperto', 'disabili', 'carica_ev'],
   parcheggio_bici: ['rastrelliera', 'box_bici'],
@@ -165,7 +162,7 @@ export class ApiError extends Error {
   }
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
+const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL ?? '';
 const TOKEN_KEY = 'tla_token';
 
 export function getToken(): string | null {
@@ -175,9 +172,7 @@ export function setToken(token: string | null): void {
   try {
     if (token) localStorage.setItem(TOKEN_KEY, token);
     else localStorage.removeItem(TOKEN_KEY);
-  } catch { /* localStorage may be unavailable */ }
-  // Notifica i listener che l'identità è cambiata (login o logout).
-  // App.tsx::fetchUser ricarica lo stato utente in risposta.
+  } catch { /* ignore */ }
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('tla:user-updated'));
   }
@@ -227,6 +222,18 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   return (opts.raw ? response : payload) as T;
 }
 
+// Serializza solo i parametri valorizzati: URLSearchParams trasformerebbe
+// undefined/null nelle stringhe letterali "undefined"/"null".
+function toQuery(params?: object): string {
+  if (!params) return '';
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') search.set(key, String(value));
+  }
+  const qs = search.toString();
+  return qs ? `?${qs}` : '';
+}
+
 function arrayFromPayload<T>(payload: unknown, key: string): T[] {
   if (Array.isArray(payload)) return payload as T[];
   if (payload && typeof payload === 'object') {
@@ -239,8 +246,7 @@ function arrayFromPayload<T>(payload: unknown, key: string): T[] {
 // ============================== Public data ==============================
 
 export async function getEvents(params?: { q?: string; categoria?: string; page?: number; limit?: number }): Promise<ApiEvent[]> {
-  const qs = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : '';
-  const payload = await request<EventsResponse | ApiEvent[]>(`/api/events${qs}`);
+  const payload = await request<EventsResponse | ApiEvent[]>(`/api/events${toQuery(params)}`);
   return arrayFromPayload<ApiEvent>(payload, 'events');
 }
 export function getEventById(id: string): Promise<ApiEvent> {
@@ -253,8 +259,7 @@ export function leaveEvent(id: string): Promise<{ eventId: string; joined: false
   return request(`/api/events/${encodeURIComponent(id)}/participate`, { method: 'DELETE' });
 }
 export async function getActivities(params?: { q?: string; tipo?: string; page?: number; limit?: number; mine?: 'interests' }): Promise<ApiActivity[]> {
-  const qs = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : '';
-  const payload = await request<ActivitiesResponse | ApiActivity[]>(`/api/activities${qs}`);
+  const payload = await request<ActivitiesResponse | ApiActivity[]>(`/api/activities${toQuery(params)}`);
   return arrayFromPayload<ApiActivity>(payload, 'activities');
 }
 export function getActivityById(id: string): Promise<ApiActivity> {
@@ -264,6 +269,81 @@ export async function getMapMarkers(): Promise<MapMarker[]> {
   const payload = await request<MapResponse | MapMarker[]>('/api/map');
   return arrayFromPayload<MapMarker>(payload, 'markers');
 }
+export function getHomeMapData(): Promise<{
+  markers: MapMarker[];
+  pois: any[];
+  activities: ApiActivity[];
+  events: ApiEvent[];
+}> {
+  return request('/api/map');
+}
+
+// ============================== Comments ==============================
+
+export interface ApiComment {
+  id: string;
+  eventId: string;
+  userId: string;
+  parentCommentId: string | null;
+  text: string;
+  createdAt: string;
+  user?: { nome: string; cognome: string } | null;
+  replies?: ApiComment[];
+}
+
+export async function getComments(eventId: string): Promise<ApiComment[]> {
+  const payload = await request<{ comments: ApiComment[] } | ApiComment[]>(`/api/events/${encodeURIComponent(eventId)}/comments`);
+  if (Array.isArray(payload)) return payload;
+  if (payload && typeof payload === 'object' && Array.isArray(payload.comments)) return payload.comments;
+  return [];
+}
+
+export function postComment(eventId: string, text: string, parentCommentId?: string | null): Promise<ApiComment> {
+  return request(`/api/events/${encodeURIComponent(eventId)}/comments`, { method: 'POST', body: { text, parentCommentId } });
+}
+
+export function patchComment(commentId: string, text: string): Promise<{ message: string }> {
+  return request(`/api/comments/${encodeURIComponent(commentId)}`, { method: 'PATCH', body: { text } });
+}
+
+export function deleteComment(commentId: string): Promise<void> {
+  return request(`/api/comments/${encodeURIComponent(commentId)}`, { method: 'DELETE' });
+}
+
+// ============================== Reviews ==============================
+
+export interface ApiReview {
+  id: string;
+  activityId: string;
+  userId: string;
+  ratingOverall: number;
+  ratingAccuracy: number;
+  ratingOrganization: number;
+  ratingSafety: number;
+  ratingAtmosphere: number;
+  comment: string;
+  createdAt: string;
+  user?: { nome: string; cognome: string } | null;
+}
+
+export async function getActivityReviews(activityId: string): Promise<ApiReview[]> {
+  const payload = await request<{ reviews: ApiReview[] } | ApiReview[]>(`/api/activities/${encodeURIComponent(activityId)}/reviews`);
+  if (Array.isArray(payload)) return payload;
+  if (payload && typeof payload === 'object' && Array.isArray(payload.reviews)) return payload.reviews;
+  return [];
+}
+
+export function postActivityReview(activityId: string, payload: {
+  ratingOverall: number;
+  ratingAccuracy: number;
+  ratingOrganization: number;
+  ratingSafety: number;
+  ratingAtmosphere: number;
+  comment: string;
+}): Promise<ApiReview> {
+  return request(`/api/activities/${encodeURIComponent(activityId)}/reviews`, { method: 'POST', body: payload });
+}
+
 // ============================== Auth ==============================
 
 export async function login(email: string, password: string, otpToken?: string): Promise<AuthResponse> {
@@ -289,7 +369,6 @@ export async function register(payload: RegisterPayload): Promise<RegisterRespon
 export interface RegisterEntityPayload {
   email: string; password: string; nomeEnte: string; pec: string;
   nome?: string; cognome?: string;
-  // #M6: il backend ora richiede consenso esplicito privacy + ToS anche per gli enti.
   consents: { privacy_policy: boolean; terms_of_service: boolean; marketing?: boolean; analytics?: boolean; };
 }
 export function registerEntity(payload: RegisterEntityPayload): Promise<{ message: string; userId: string }> {
@@ -302,12 +381,10 @@ export function resetPassword(token: string, password: string): Promise<{ messag
   return request(`/api/auth/reset-password/${encodeURIComponent(token)}`, { method: 'POST', body: { password }, auth: false });
 }
 export async function logout(): Promise<void> {
-  // setToken(null) viene chiamato comunque nel finally, anche se la richiesta
-  // al backend fallisce (rete offline, token già revocato, ecc.).
   try {
     await request('/api/auth/logout', { method: 'POST' });
   } catch {
-    /* ignore: il logout deve riuscire lato client comunque */
+    /* ignore */
   } finally {
     setToken(null);
   }
@@ -335,7 +412,7 @@ export type MeProfile = MeProfileCittadino | MeProfileEnte | MeProfileComunale |
 export function updateEnteProfile(payload: { noteAdmin?: string }): Promise<{ noteAdmin: string | null }> {
   return request('/api/auth/me/ente', { method: 'PATCH', body: payload });
 }
-export function completeOnboarding(payload: { interessi: string[] }): Promise<{ interessi: string[]; onboardingComplete: true }> {
+export function completeOnboarding(payload: { interessi: string[]; dataNascita?: string }): Promise<{ interessi: string[]; onboardingComplete: true }> {
   return request('/api/auth/me/onboarding', { method: 'POST', body: payload });
 }
 
@@ -393,7 +470,6 @@ export function updateConsent(type: ConsentType, granted: boolean): Promise<Cons
   return request('/api/auth/consents', { method: 'POST', body: { type, granted } });
 }
 
-// Riassume lo stato corrente di ciascun consenso dato il log (l'ultimo record vince)
 export function summarizeConsents(records: ConsentRecord[]): Partial<Record<ConsentType, boolean>> {
   const out: Partial<Record<ConsentType, boolean>> = {};
   for (const r of records) {
@@ -431,15 +507,10 @@ export function getMe(): Promise<CurrentUser & { id: string; profile: MeProfile 
 export function updateProfile(data: { nome?: string; cognome?: string; interessi?: string[] }): Promise<CurrentUser> {
   return request('/api/auth/me', { method: 'PUT', body: data });
 }
-// #M7: il backend ora richiede currentPassword (account con password) o
-// confirmEmail="DELETE <email>" (account OAuth-only) per impedire che un JWT
-// rubato basti a cancellare l'account.
 export function deleteAccount(payload: { currentPassword?: string; confirmEmail?: string } = {}): Promise<void> {
   return request('/api/auth/me', { method: 'DELETE', body: payload });
 }
 
-// #M5: cambio password per utente loggato. Richiede password attuale; il backend
-// revoca il JWT corrente al successo, l'utente deve fare login di nuovo.
 export function changePassword(payload: { currentPassword: string; newPassword: string }): Promise<void> {
   return request('/api/auth/me/password', { method: 'POST', body: payload });
 }
@@ -447,8 +518,7 @@ export function updateLocation(lat: number, lng: number): Promise<{ lat: number;
   return request('/api/auth/me/location', { method: 'PUT', body: { lat, lng } });
 }
 
-// Push notifications — RF40. The frontend gets an FCM token from Firebase
-// and registers it here so the backend can target this device.
+// Push notifications
 export function registerDeviceToken(token: string, platform: 'web' | 'ios' | 'android' = 'web'): Promise<{ id: string }> {
   return request('/api/notifications/device-token', { method: 'POST', body: { token, platform } });
 }
@@ -459,8 +529,7 @@ export function sendTestPush(): Promise<{ tokensTargeted: number }> {
   return request('/api/notifications/test', { method: 'POST' });
 }
 
-// 2FA — RNF15. Two-step setup: client calls setup2fa() to get the otpauth URL +
-// secret, displays a QR code, then calls verify2fa() with the 6-digit code.
+// 2FA
 export function setup2fa(): Promise<Setup2FAResponse> {
   return request('/api/auth/2fa/setup', { method: 'POST' });
 }
@@ -495,6 +564,12 @@ export function cancelActivity(activityId: string): Promise<void> {
   return request(`/api/activities/${encodeURIComponent(activityId)}`, { method: 'DELETE' });
 }
 
+// Module-level set of activity IDs that have been deleted in this session.
+// Avoids stale-data issues when the backend soft-deletes (status !== 404).
+const _locallyDeletedActivityIds = new Set<string>();
+export function markActivityDeleted(id: string): void { _locallyDeletedActivityIds.add(id); }
+export function isActivityDeleted(id: string): boolean { return _locallyDeletedActivityIds.has(id); }
+
 // ============================== Events (write) ==============================
 
 export interface CreateEventPayload {
@@ -519,13 +594,11 @@ export function deleteEvent(eventId: string): Promise<void> {
 // ============================== Dashboard (municipal admin) ==============================
 
 export function getDashboardStats(params?: DashboardFilters | Record<string, string | number>): Promise<DashboardStats & { filters?: unknown }> {
-  const qs = params ? `?${new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])).toString()}` : '';
-  return request(`/api/dashboard/stats${qs}`);
+  return request(`/api/dashboard/stats${toQuery(params)}`);
 }
 export function getDashboardExportUrl(format: 'csv' | 'pdf', params?: Record<string, string | number>): string {
-  const allParams = { ...(params || {}), format };
-  const qs = new URLSearchParams(Object.entries(allParams).map(([k, v]) => [k, String(v)])).toString();
-  return `${API_BASE_URL}/api/dashboard/stats/export?${qs}`;
+  const qs = toQuery({ ...(params || {}), format });
+  return `${API_BASE_URL}/api/dashboard/stats/export${qs}`;
 }
 export interface DashboardFilters {
   tipo?: string;
@@ -543,6 +616,20 @@ export function getDashboardServiceRequests(
     ? `?${new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])).toString()}`
     : '';
   return request(`/api/dashboard/service-requests${qs}`);
+}
+
+export interface ServiceRequestEntry {
+  id: string;
+  categoria: string;
+  sottocategoria: string | null;
+  createdAt: string;
+  indirizzo?: string | null;
+  latitudine?: number | null;
+  longitudine?: number | null;
+}
+
+export function getDashboardRecentServiceRequests(limit = 10): Promise<ServiceRequestEntry[]> {
+  return request(`/api/dashboard/service-requests/recent?limit=${limit}`);
 }
 
 export function submitServiceRequest(payload: {
@@ -566,7 +653,15 @@ export async function downloadDashboardExport(format: 'csv' | 'pdf', params?: Da
   const headers: Record<string, string> = {};
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`${API_BASE_URL}/api/dashboard/stats/export?${qs}`, { headers });
-  if (!res.ok) throw new Error(`Export fallito (${res.status})`);
+  if (!res.ok) {
+    // Backend errors are JSON ({ error, code }) — surface the real message.
+    let message = `Export fallito (${res.status})`;
+    try {
+      const body = await res.json();
+      if (body?.error) message = body.error;
+    } catch { /* non-JSON error body — keep generic message */ }
+    throw new Error(message);
+  }
   return res.blob();
 }
 
@@ -587,7 +682,7 @@ export function rejectEntity(id: string): Promise<{ message: string }> {
 
 export interface AdminUser {
   id: string; email: string; nome: string; cognome: string;
-  ruolo: string; approvato?: boolean; nomeEnte?: string | null; createdAt: string;
+  ruolo: string; ruoloLabel?: string; approvato?: boolean; nomeEnte?: string | null; createdAt: string;
 }
 export function getAdminUsers(): Promise<AdminUser[]> {
   return request('/api/admin/users');
@@ -596,7 +691,6 @@ export function deleteAdminUser(id: string): Promise<void> {
   return request(`/api/admin/users/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
 
-// === Admin users — split per ruolo (tabelle profilo separate) ===
 export interface AdminCittadino {
   id: string; email: string; createdAt: string; emailVerified: boolean;
   nome?: string; cognome?: string; dataNascita?: string;
@@ -626,6 +720,15 @@ export function getAdminComunali(): Promise<AdminComunale[]> {
 export function getAdminSistema(): Promise<AdminSistema[]> {
   return request('/api/admin/users/sistema');
 }
+export function createAdminComunale(payload: { nome: string; cognome: string; email: string; password: string; ufficio?: string }): Promise<AdminComunale> {
+  return request('/api/admin/users/comunali', { method: 'POST', body: payload });
+}
+export function createAdminSistema(payload: { nome: string; cognome: string; email: string; password: string }): Promise<AdminSistema> {
+  return request('/api/admin/users/sistema', { method: 'POST', body: payload });
+}
+export function toggleSuperAdmin(id: string, superAdmin: boolean): Promise<{ id: string; superAdmin: boolean }> {
+  return request(`/api/admin/users/sistema/${encodeURIComponent(id)}/super-admin`, { method: 'PATCH', body: { superAdmin } });
+}
 
 export interface POI {
   id: string; nome: string; latitudine: number; longitudine: number;
@@ -641,6 +744,12 @@ export function createPOI(payload: Partial<POI>): Promise<POI> {
 export function updatePOI(id: string, payload: Partial<POI>): Promise<POI> {
   return request(`/api/map/poi/${encodeURIComponent(id)}`, { method: 'PUT', body: payload });
 }
+export function geocodeForward(q: string): Promise<{ result: { lat: number; lng: number; formatted: string } | null }> {
+  return request(`/api/map/geocode-forward?q=${encodeURIComponent(q)}`, { auth: false });
+}
+export function reverseGeocode(lat: number, lon: number): Promise<{ address: string | null }> {
+  return request(`/api/map/geocode?lat=${lat}&lon=${lon}`, { auth: false });
+}
 export function deletePOI(id: string): Promise<void> {
   return request(`/api/map/poi/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
@@ -648,12 +757,16 @@ export function deletePOI(id: string): Promise<void> {
 // ============================== Moderation ==============================
 
 export interface Report {
-  id: string; userId: string; eventId: string;
+  id: string; userId: string; eventId: string | null; activityId: string | null;
   tipo: string; stato: string; descrizione?: string; createdAt: string;
-  event?: { id: string; titolo: string };
+  event?: { id: string; titolo: string } | null;
+  activity?: { id: string; title?: string | null; tipo?: string | null } | null;
 }
 export function reportEvent(eventId: string, tipo: string, descrizione?: string): Promise<Report> {
   return request(`/api/moderation/events/${encodeURIComponent(eventId)}/report`, { method: 'POST', body: { tipo, descrizione } });
+}
+export function reportActivity(activityId: string, tipo: string, descrizione?: string): Promise<Report> {
+  return request(`/api/moderation/activities/${encodeURIComponent(activityId)}/report`, { method: 'POST', body: { tipo, descrizione } });
 }
 export function getReports(stato?: string): Promise<{ reports: Report[] }> {
   const qs = stato ? `?stato=${encodeURIComponent(stato)}` : '';
@@ -681,7 +794,7 @@ export function googleCalendarUrl(title: string, startIso: string, location?: st
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
-// ============================== Parking (proxy Comune di Trento) ==============================
+// ============================== Parking ==============================
 
 export type CrowdingLevel = 'verde' | 'giallo' | 'rosso';
 export interface ParkingSpot {
@@ -700,13 +813,114 @@ export interface ParkingSpot {
   link: string | null;
   updatedAt: string | null;
 }
-export interface ParkingResponse { parkings: ParkingSpot[]; fetchedAt: string; }
-// Public — the backend proxies the Comune di Trento registry (avoids CORS).
+export interface ParkingDetailItem {
+  id: string;
+  name: string;
+  address: string | null;
+  area?: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  availableSpaces: number | null;
+  totalSpaces: number;
+  occupancyPercentage: number | null;
+  status: 'available' | 'almost_full' | 'full' | 'unknown';
+  lastUpdatedAt: string | null;
+  sourceLabel: string;
+  type?: 'car' | 'bike';
+  link?: string | null;
+}
+export interface ParkingResponse {
+  city?: string;
+  source?: { name: string; url: string; scrapedAt: string };
+  items?: ParkingDetailItem[];
+  parkings: ParkingSpot[];
+  fetchedAt: string;
+}
 export function getParking(): Promise<ParkingResponse> {
-  return request('/api/parking', { auth: false });
+  return request('/api/parking/trento', { auth: false });
 }
 
-// ============================== Admin: push notifications ==============================
+// ============================== Weather and city alerts ==============================
+
+export interface WeatherHour {
+  time: string;
+  temperature: number | null;
+  precipitationProbability: number | null;
+  weatherCode: number | null;
+  condition: string;
+  windSpeed: number | null;
+}
+export interface WeatherDay {
+  date: string;
+  weatherCode: number | null;
+  condition: string;
+  temperatureMax: number | null;
+  temperatureMin: number | null;
+  precipitationProbabilityMax: number | null;
+  sunrise: string | null;
+  sunset: string | null;
+}
+export interface WeatherResponse {
+  city: string;
+  latitude: number;
+  longitude: number;
+  timezone?: string;
+  source: { name: string; url: string; fetchedAt: string };
+  current: {
+    temperature: number | null;
+    apparentTemperature: number | null;
+    humidity: number | null;
+    condition: string;
+    weatherCode: number | null;
+    cloudCover: number | null;
+    precipitation: number | null;
+    rain: number | null;
+    showers: number | null;
+    windSpeed: number | null;
+    windDirection: number | null;
+    windGusts: number | null;
+    isDay: boolean;
+    time: string;
+  };
+  daily: WeatherDay[];
+  hourly: WeatherHour[];
+  unavailable?: boolean;
+  stale?: boolean;
+}
+export function getTrentoWeather(): Promise<WeatherResponse> {
+  return request('/api/weather/trento', { auth: false });
+}
+
+export type AlertSeverity = 'high' | 'medium' | 'low' | 'info';
+export interface CityAlertSummary {
+  id: string;
+  title: string;
+  summary: string;
+  severity: AlertSeverity;
+  category: string;
+  sourceName: string;
+  publishedAt: string;
+  updatedAt: string;
+  hasLocation: boolean;
+}
+export interface CityAlertDetail extends CityAlertSummary {
+  description: string;
+  source: { name: string; url: string };
+  location: { label: string; latitude: number; longitude: number } | null;
+}
+export interface CityAlertsResponse {
+  city: string;
+  source: { name: string; url: string; scrapedAt: string };
+  items: CityAlertSummary[];
+}
+export function getCityAlerts(): Promise<CityAlertsResponse> {
+  return request('/api/city-alerts/trento', { auth: false });
+}
+export function getCityAlertById(id: string): Promise<CityAlertDetail> {
+  return request(`/api/city-alerts/${encodeURIComponent(id)}`, { auth: false });
+}
+
+// ============================== Admin notifications ==============================
 
 export type PushAudience = 'all' | 'cittadini' | 'enti' | 'comunali';
 export interface PushStats {
@@ -719,4 +933,153 @@ export function getPushStats(): Promise<PushStats> {
 }
 export function sendAdminBroadcast(payload: { title: string; body: string; audience: PushAudience }): Promise<{ tokensTargeted: number; audience: PushAudience }> {
   return request('/api/notifications/admin/broadcast', { method: 'POST', body: payload });
+}
+
+// ============================== Settings ==============================
+export interface UserSettings {
+  themeMode: string;
+  visualEffects: string;
+  language: string;
+  timeFormat: string;
+  distanceUnit: string;
+  emailNotificationsEnabled: boolean;
+  pushNotificationsEnabled: boolean;
+  eventNotificationsEnabled: boolean;
+  activityNotificationsEnabled: boolean;
+  cityAlertNotificationsEnabled: boolean;
+  locationMode: string;
+  participationVisibility: string;
+  showProfileInParticipants: boolean;
+  interestsJson: string[];
+  showOnlyReliableActivities: boolean;
+  showVerifiedActivities: boolean;
+  reduceAnimations: boolean;
+  increaseContrast: boolean;
+  largerText: boolean;
+}
+
+function normalizeSettings(payload: any): UserSettings {
+  if (payload?.appearance || payload?.languageFormat || payload?.notifications) {
+    return {
+      themeMode: payload.appearance?.themeMode ?? 'light',
+      visualEffects: payload.appearance?.visualEffects ?? 'full',
+      language: payload.languageFormat?.language ?? 'it',
+      timeFormat: payload.languageFormat?.timeFormat ?? '24h',
+      distanceUnit: payload.languageFormat?.distanceUnit ?? 'km',
+      emailNotificationsEnabled: !!payload.notifications?.emailEnabled,
+      pushNotificationsEnabled: !!payload.notifications?.pushEnabled,
+      eventNotificationsEnabled: !!payload.notifications?.eventNotifications,
+      activityNotificationsEnabled: !!payload.notifications?.activityNotifications,
+      cityAlertNotificationsEnabled: !!payload.notifications?.cityAlertNotifications,
+      locationMode: payload.privacyLocation?.locationMode ?? 'while_using',
+      participationVisibility: payload.privacyLocation?.participationVisibility ?? 'public',
+      showProfileInParticipants: payload.privacyLocation?.showProfileInParticipants ?? true,
+      interestsJson: payload.preferences?.interests ?? [],
+      showOnlyReliableActivities: !!payload.preferences?.showOnlyReliableActivities,
+      showVerifiedActivities: !!payload.preferences?.showVerifiedActivities,
+      reduceAnimations: !!payload.accessibility?.reduceAnimations,
+      increaseContrast: !!payload.accessibility?.increaseContrast,
+      largerText: !!payload.accessibility?.largerText,
+    };
+  }
+  return payload as UserSettings;
+}
+
+export async function getSettings(): Promise<UserSettings> {
+  return normalizeSettings(await request('/api/me/settings'));
+}
+
+export function updateAppearance(data: { themeMode?: string; visualEffects?: string }) {
+  return request<UserSettings>('/api/me/settings/appearance', { method: 'PATCH', body: data });
+}
+
+export function updateLanguageFormat(data: { language?: string; timeFormat?: string; distanceUnit?: string }) {
+  return request<UserSettings>('/api/me/settings/language-format', { method: 'PATCH', body: data });
+}
+
+export function updateNotifications(data: Partial<Pick<UserSettings, 'emailNotificationsEnabled' | 'pushNotificationsEnabled' | 'eventNotificationsEnabled' | 'activityNotificationsEnabled' | 'cityAlertNotificationsEnabled'>>) {
+  return request('/api/me/settings/notifications', {
+    method: 'PATCH',
+    body: {
+      emailEnabled: data.emailNotificationsEnabled,
+      pushEnabled: data.pushNotificationsEnabled,
+      eventNotifications: data.eventNotificationsEnabled,
+      activityNotifications: data.activityNotificationsEnabled,
+      cityAlertNotifications: data.cityAlertNotificationsEnabled,
+    },
+  });
+}
+
+export function updatePrivacyLocation(data: { locationMode?: string; participationVisibility?: string; showProfileInParticipants?: boolean }) {
+  return request<UserSettings>('/api/me/settings/privacy-location', { method: 'PATCH', body: data });
+}
+
+export function updatePreferences(data: { interestsJson?: string[]; showOnlyReliableActivities?: boolean; showVerifiedActivities?: boolean }) {
+  return request('/api/me/settings/preferences', {
+    method: 'PATCH',
+    body: {
+      interests: data.interestsJson,
+      showOnlyReliableActivities: data.showOnlyReliableActivities,
+      showVerifiedActivities: data.showVerifiedActivities,
+    },
+  });
+}
+
+export function updateAccessibility(data: { reduceAnimations?: boolean; increaseContrast?: boolean; largerText?: boolean }) {
+  return request<UserSettings>('/api/me/settings/accessibility', { method: 'PATCH', body: data });
+}
+
+export interface UserParticipation {
+  id: string;
+  userId: string;
+  targetType: 'EVENT' | 'ACTIVITY';
+  targetId: string;
+  createdAt: string;
+  target?: {
+    id: string;
+    title?: string;
+    titolo?: string;
+    category?: string;
+    categoria?: string;
+    location?: string;
+    dateTime?: string;
+    data?: string;
+    orarioInizio?: string;
+  } | null;
+}
+
+export function getMyParticipations(): Promise<UserParticipation[]> {
+  return request<UserParticipation[]>('/api/users/me/participations');
+}
+
+export interface MeProfileSummary {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  initials: string;
+  email: string;
+  role: string;
+}
+export function getMeProfile(): Promise<MeProfileSummary> {
+  return request('/api/me/profile');
+}
+
+export interface MyActivitySummary {
+  id: string;
+  title: string;
+  status: 'draft' | 'published' | 'active' | 'completed' | 'cancelled' | 'under_review';
+  participantsCount: number;
+  capacity: number | null;
+  averageRating: number;
+  reviewCount: number;
+  verifiedActivity: boolean;
+  lastUpdatedAt: string;
+}
+export interface MyActivitiesResponse {
+  items: MyActivitySummary[];
+  pagination: { page: number; limit: number; total: number };
+}
+export function getMyActivities(params?: { status?: string; page?: number; limit?: number }): Promise<MyActivitiesResponse> {
+  const qs = params ? `?${new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString()}` : '';
+  return request(`/api/me/activities${qs}`);
 }

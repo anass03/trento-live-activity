@@ -1,475 +1,539 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import {
-  changePassword, deleteAccount, getMe, listConsents, logout, regenerateRecoveryCodes,
-  registerDeviceToken, sendTestPush, setToken, summarizeConsents, unregisterDeviceToken,
-  updateConsent, updateEnteProfile, updateLocation, updateProfile,
-  type ConsentType, type MeProfile,
-} from '../lib/api';
-import { requestFcmToken, revokeFcmToken } from '../lib/firebase';
+import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Header } from "../components/layout/Header";
+import { Icon } from "../components/ui/Icon";
+import { PasswordStrengthBar } from "../components/ui/PasswordStrengthBar";
+import { getMyParticipations, leaveEvent, leaveActivity, getMe, regenerateRecoveryCodes, getFavorites, getEventById, getActivityById, getMyActivities, isActivityDeleted, changePassword } from "../lib/api";
 
-const AVAILABLE_INTERESTS = ['sport', 'cultura', 'musica', 'arte', 'gastronomia', 'studio', 'natura', 'tecnologia', 'volontariato'];
-const FCM_TOKEN_KEY = 'tla_fcm_token';
+const PROFILE_INTERESTS = [
+  { id: "outdoor",  icon: "bike",     color: "var(--teal)" },
+  { id: "cultura",  icon: "landmark", color: "var(--violet)" },
+  { id: "musica",   icon: "music",    color: "var(--magenta)" },
+  { id: "food",     icon: "food",     color: "var(--amber)" },
+  { id: "sport",    icon: "run",      color: "var(--green)" },
+];
 
-interface MeUser {
-  id?: string;
-  email?: string;
-  ruolo?: string;
-  twoFactorEnabled?: boolean;
-  twoFactorRecoveryCodesRemaining?: number;
-  hasPassword?: boolean;
-  profile: MeProfile | null;
-  nome?: string;
-  cognome?: string;
-  interessi?: string[];
-  nomeEnte?: string;
-}
+const getCatColor = (cat?: string) => {
+  switch (cat?.toLowerCase()) {
+    case "musica": return "var(--magenta)";
+    case "cultura": return "var(--violet)";
+    case "food":
+    case "cibo": return "var(--amber)";
+    case "outdoor": return "var(--teal)";
+    case "sport": return "var(--green)";
+    default: return "var(--cyan)";
+  }
+};
 
-function initials(profile: MeProfile | null | undefined, user: MeUser): string {
-  if (profile?.kind === 'cittadino') return [(profile.nome || '')[0], (profile.cognome || '')[0]].filter(Boolean).join('').toUpperCase() || '◯';
-  if (profile?.kind === 'ente') return (profile.nomeEnte || '◯')[0].toUpperCase();
-  if (profile?.kind === 'comunale' || profile?.kind === 'sistema') return [(profile.nome || '')[0], (profile.cognome || '')[0]].filter(Boolean).join('').toUpperCase() || '◯';
-  return (user.email || '◯')[0].toUpperCase();
-}
+const getCatIcon = (cat?: string) => {
+  switch (cat?.toLowerCase()) {
+    case "musica": return "music";
+    case "cultura": return "landmark";
+    case "food":
+    case "cibo": return "food";
+    case "outdoor": return "bike";
+    case "sport": return "run";
+    default: return "activity";
+  }
+};
 
-export function ProfilePage() {
-  const navigate = useNavigate();
-  const { t } = useTranslation();
-  const [user, setUser] = useState<MeUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [nome, setNome] = useState('');
-  const [cognome, setCognome] = useState('');
-  const [interessi, setInteressi] = useState<string[]>([]);
-  const [noteAdmin, setNoteAdmin] = useState('');
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [locationMessage, setLocationMessage] = useState<string | null>(null);
-  const [locationError, setLocationError] = useState<string | null>(null);
-  const locationInFlight = useRef(false);
-  const [newRecoveryCodes, setNewRecoveryCodes] = useState<string[] | null>(null);
-  const [isRegenerating, setIsRegenerating] = useState(false);
-  const [pushEnabled, setPushEnabled] = useState<boolean>(() => Boolean(localStorage.getItem(FCM_TOKEN_KEY)));
-  const [isTogglingPush, setIsTogglingPush] = useState(false);
-  const [pushMessage, setPushMessage] = useState<string | null>(null);
-  const [pushError, setPushError] = useState<string | null>(null);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [deleteEmailConfirm, setDeleteEmailConfirm] = useState('');
-  const [deletePassword, setDeletePassword] = useState('');
-  const [pwdCurrent, setPwdCurrent] = useState('');
-  const [pwdNew, setPwdNew] = useState('');
-  const [pwdConfirm, setPwdConfirm] = useState('');
-  const [pwdSaving, setPwdSaving] = useState(false);
-  const [pwdMessage, setPwdMessage] = useState<string | null>(null);
-  const [pwdError, setPwdError] = useState<string | null>(null);
-  const [notifSummary, setNotifSummary] = useState<Partial<Record<ConsentType, boolean>>>({});
+export function ProfilePage({ page, setPage, theme, setTheme, user, initialTab, setSelectedEventId, setSelectedActivityId }: any) {
+  const { t, i18n } = useTranslation();
+  const isCitizen = user?.role === "registered_user";
+  const defaultTab = initialTab || (isCitizen ? "attivita" : "info");
+  const [activeTab, setActiveTab] = useState(defaultTab);
+  const [participations, setParticipations] = useState<any[]>([]);
+  const [savedItems, setSavedItems] = useState<any[]>([]);
+  const [loadingSaved, setLoadingSaved] = useState(false);
+  const [createdActivities, setCreatedActivities] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [userProfile, setUserProfile] = useState<any>(null);
 
-  useEffect(() => {
-    getMe()
-      .then((u) => {
-        const me = u as unknown as MeUser;
-        setUser(me);
-        if (me.profile?.kind === 'cittadino') { setNome(me.profile.nome || ''); setCognome(me.profile.cognome || ''); setInteressi(me.profile.interessi || []); }
-        else if (me.profile?.kind === 'ente') { setNoteAdmin(me.profile.noteAdmin || ''); }
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : t('common.error')))
-      .finally(() => setIsLoading(false));
-  }, [t]);
+  const dateLocale = i18n.language?.startsWith("en") ? "en-GB" : "it-IT";
 
-  useEffect(() => {
-    function refreshSummary() {
-      listConsents().then((records) => setNotifSummary(summarizeConsents(records))).catch(() => { /* ignore */ });
-    }
-    refreshSummary();
-    window.addEventListener('tla:consents-changed', refreshSummary);
-    window.addEventListener('focus', refreshSummary);
-    return () => { window.removeEventListener('tla:consents-changed', refreshSummary); window.removeEventListener('focus', refreshSummary); };
-  }, []);
+  const isFuture = (item: any) => {
+    const dt = item?.target?.dateTime || item?.target?.data || item?.dateTime || item?.data || item?.startsAt || item?.startAt || item?.scheduledAt;
+    if (!dt) return true;
+    try { return new Date(dt).getTime() >= Date.now(); } catch (_) { return true; }
+  };
 
-  async function handleEnablePush() {
-    setPushError(null); setPushMessage(null); setIsTogglingPush(true);
+  const fetchParticipations = async () => {
+    setLoading(true);
     try {
-      const token = await requestFcmToken();
-      await registerDeviceToken(token, 'web');
-      localStorage.setItem(FCM_TOKEN_KEY, token);
-      try { await updateConsent('notif_push', true); } catch { /* best-effort */ }
-      window.dispatchEvent(new CustomEvent('tla:consents-changed'));
-      setPushEnabled(true); setPushMessage(t('profile.pushEnabled'));
-    } catch (e) { setPushError(e instanceof Error ? e.message : t('common.error')); }
-    finally { setIsTogglingPush(false); }
-  }
-
-  async function handleDisablePush() {
-    setPushError(null); setPushMessage(null); setIsTogglingPush(true);
-    try {
-      const token = localStorage.getItem(FCM_TOKEN_KEY);
-      if (token) { await unregisterDeviceToken(token); localStorage.removeItem(FCM_TOKEN_KEY); }
-      await revokeFcmToken();
-      try { await updateConsent('notif_push', false); } catch { /* best-effort */ }
-      window.dispatchEvent(new CustomEvent('tla:consents-changed'));
-      setPushEnabled(false); setPushMessage(t('profile.pushDisabled'));
-    } catch (e) { setPushError(e instanceof Error ? e.message : t('common.error')); }
-    finally { setIsTogglingPush(false); }
-  }
-
-  async function handleTestPush() {
-    setPushError(null); setPushMessage(null);
-    try { const result = await sendTestPush(); setPushMessage(t('profile.testSent', { count: result.tokensTargeted })); }
-    catch (e) { setPushError(e instanceof Error ? e.message : t('common.error')); }
-  }
-
-  async function handleRegenerate() {
-    if (!window.confirm(t('profile.regenerateConfirm'))) return;
-    setIsRegenerating(true); setError(null);
-    try {
-      const result = await regenerateRecoveryCodes();
-      setNewRecoveryCodes(result.recoveryCodes);
-      setUser((prev) => prev && { ...prev, twoFactorRecoveryCodesRemaining: result.recoveryCodes.length });
-    } catch (e) { setError(e instanceof Error ? e.message : t('common.error')); }
-    finally { setIsRegenerating(false); }
-  }
-
-  function toggleInteresse(name: string) {
-    setInteressi((prev) => (prev.includes(name) ? prev.filter((i) => i !== name) : [...prev, name]));
-  }
-
-  async function handleSaveCittadino(event: FormEvent) {
-    event.preventDefault(); setMessage(null); setError(null);
-    try { await updateProfile({ nome, cognome, interessi }); setMessage(t('profile.profileSaved')); window.dispatchEvent(new CustomEvent('tla:user-updated')); }
-    catch (e) { setError(e instanceof Error ? e.message : t('common.error')); }
-  }
-
-  async function handleSaveEnte(event: FormEvent) {
-    event.preventDefault(); setMessage(null); setError(null);
-    try { await updateEnteProfile({ noteAdmin }); setMessage(t('profile.notesSaved')); }
-    catch (e) { setError(e instanceof Error ? e.message : t('common.error')); }
-  }
-
-  async function handleShareLocation() {
-    if (locationInFlight.current) return;
-    if (!navigator.geolocation) { setLocationError(t('profile.locationUnsupported')); return; }
-    locationInFlight.current = true;
-    setLocationError(null);
-    setLocationMessage(t('profile.locationDetecting'));
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const result = await updateLocation(pos.coords.latitude, pos.coords.longitude);
-          const placeName = result.address || `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
-          setLocationMessage(t('profile.locationUpdated', { place: placeName }));
-          setLocationError(null);
-        } catch (e) { setLocationError(e instanceof Error ? e.message : t('common.error')); setLocationMessage(null); }
-        finally { locationInFlight.current = false; }
-      },
-      (err) => {
-        const reasons: Record<number, string> = {
-          1: t('profile.locationDenied'),
-          2: t('profile.locationUnavailable'),
-          3: t('profile.locationTimeout'),
-        };
-        setLocationError(reasons[err.code] ?? `Error (code ${err.code})`);
-        setLocationMessage(null);
-        locationInFlight.current = false;
-      },
-      { timeout: 10000, enableHighAccuracy: false },
-    );
-  }
-
-  async function handleLogout() {
-    const fcmToken = localStorage.getItem(FCM_TOKEN_KEY);
-    if (fcmToken) { try { await unregisterDeviceToken(fcmToken); } catch { /* ignore */ } localStorage.removeItem(FCM_TOKEN_KEY); }
-    await logout();
-    navigate('/');
-  }
-
-  async function handleDelete() {
-    setError(null);
-    const payload: { currentPassword?: string; confirmEmail?: string } = {};
-    if (user?.hasPassword) {
-      if (!deletePassword) { setError(t('profile.deletePasswordRequired')); return; }
-      payload.currentPassword = deletePassword;
-    } else {
-      const expected = `DELETE ${user?.email || ''}`.toLowerCase().trim();
-      if (deleteEmailConfirm.trim().toLowerCase() !== expected) {
-        setError(`${t('profile.deleteConfirmType')} DELETE ${user?.email}`);
-        return;
+      if (isCitizen) {
+        const [parts, myActs] = await Promise.allSettled([
+          getMyParticipations(),
+          getMyActivities(),
+        ]);
+        if (parts.status === "fulfilled") {
+          setParticipations(parts.value.filter((p) => p.target != null && isFuture(p) && (p.target as any)?.status !== "cancelled" && (p.target as any)?.status !== "deleted" && !isActivityDeleted(p.target?.id)));
+        }
+        if (myActs.status === "fulfilled") {
+          setCreatedActivities(
+            (myActs.value.items || []).filter((a: any) => {
+              if (isActivityDeleted(a.id)) return false;
+              if (a.status === "completed" || a.status === "cancelled" || a.stato === "cancellata" || a.stato === "conclusa") return false;
+              return isFuture(a);
+            })
+          );
+        }
       }
-      payload.confirmEmail = deleteEmailConfirm;
+      const profile = await getMe();
+      setUserProfile(profile);
+    } catch (err) {
+      console.error("Failed to load participations/profile:", err);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const fetchSaved = async () => {
+    setLoadingSaved(true);
     try {
-      localStorage.removeItem(FCM_TOKEN_KEY);
-      await deleteAccount(payload);
-      setToken(null);
-      navigate('/');
-      window.location.reload();
-    } catch (e) { setError(e instanceof Error ? e.message : t('common.error')); }
-  }
+      const favs = await getFavorites();
+      const results = await Promise.allSettled(
+        favs.map((f) =>
+          f.markerType === "event"
+            ? getEventById(f.markerId).then((e) => ({ ...e, _favType: "event" }))
+            : f.markerType === "activity"
+            ? getActivityById(f.markerId).then((a) => ({ ...a, _favType: "activity" }))
+            : Promise.reject("unsupported")
+        )
+      );
+      setSavedItems(
+        results
+          .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
+          .map((r) => r.value)
+          .filter(isFuture)
+          .filter((item) => item.status !== "cancelled" && item.status !== "deleted" && !isActivityDeleted(item.id))
+      );
+    } catch (err) {
+      console.error("Failed to load saved items:", err);
+    } finally {
+      setLoadingSaved(false);
+    }
+  };
 
-  async function handleChangePassword(event: FormEvent) {
-    event.preventDefault(); setPwdError(null); setPwdMessage(null);
-    if (pwdNew !== pwdConfirm) { setPwdError(t('profile.passwordMismatch')); return; }
-    if (pwdNew === pwdCurrent) { setPwdError(t('profile.passwordSameAsCurrent')); return; }
-    setPwdSaving(true);
+  useEffect(() => {
+    if (user?.id) {
+      fetchParticipations();
+      fetchSaved();
+    }
+  }, [user?.id]);
+
+  // Se il ruolo cambia (es. re-login con un account diverso) il tab attivo
+  // non deve restare su una vista da cittadino.
+  useEffect(() => {
+    if (!isCitizen && activeTab !== "info") setActiveTab("info");
+  }, [isCitizen]);
+
+  const [newCodes, setNewCodes] = useState<string[]>([]);
+  const [regenPending, setRegenPending] = useState(false);
+  const [regenError, setRegenError] = useState("");
+
+  // Change password form
+  const [pwCurrent, setPwCurrent] = useState("");
+  const [pwNew, setPwNew] = useState("");
+  const [pwConfirm, setPwConfirm] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwMsg, setPwMsg] = useState<{ kind: "success" | "danger"; text: string } | null>(null);
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwMsg(null);
+    if (pwNew !== pwConfirm) { setPwMsg({ kind: "danger", text: t("profile.changePasswordMismatch") }); return; }
+    if (pwNew.length < 8) { setPwMsg({ kind: "danger", text: t("profile.changePasswordShort") }); return; }
+    setPwSaving(true);
     try {
-      await changePassword({ currentPassword: pwdCurrent, newPassword: pwdNew });
-      setPwdMessage(t('profile.passwordUpdated'));
-      setPwdCurrent(''); setPwdNew(''); setPwdConfirm('');
-      setToken(null);
-      setTimeout(() => { navigate('/login'); window.location.reload(); }, 1500);
-    } catch (e) { setPwdError(e instanceof Error ? e.message : t('common.error')); }
-    finally { setPwdSaving(false); }
-  }
+      await changePassword({ currentPassword: pwCurrent, newPassword: pwNew });
+      setPwMsg({ kind: "success", text: t("profile.changePasswordSuccess") });
+      setPwCurrent(""); setPwNew(""); setPwConfirm("");
+    } catch (err: any) {
+      setPwMsg({ kind: "danger", text: err?.message || t("profile.changePasswordError") });
+    } finally {
+      setPwSaving(false);
+    }
+  };
 
-  if (isLoading) return <section className="data-page"><div className="state-panel liquid-panel">{t('profile.loading')}</div></section>;
-  if (!user) return <Navigate to="/login" replace />;
+  const handleRegenCodes = async () => {
+    setRegenPending(true);
+    setRegenError("");
+    try {
+      const res = await regenerateRecoveryCodes();
+      setNewCodes(res.recoveryCodes || []);
+    } catch (err: any) {
+      setRegenError(err?.message || "Errore");
+    } finally {
+      setRegenPending(false);
+    }
+  };
 
-  const profile = user.profile;
-  const role = user.ruolo;
-  const isCittadino = profile?.kind === 'cittadino';
-  const isEnte = profile?.kind === 'ente';
-  const isComunale = profile?.kind === 'comunale';
-  const isSistema = profile?.kind === 'sistema';
+  const handleCancel = async (item: any) => {
+    try {
+      if (item.targetType === "EVENT") {
+        await leaveEvent(item.targetId);
+      } else {
+        await leaveActivity(item.targetId);
+      }
+      fetchParticipations();
+    } catch (err) {
+      console.error("Failed to cancel participation:", err);
+    }
+  };
 
-  const roleLabel = role ? (t(`profile.roles.${role}`, { defaultValue: role }) as string) : '—';
-  const displayName = isCittadino
-    ? `${profile.nome || ''} ${profile.cognome || ''}`.trim() || (user.email || t('common.name'))
-    : isEnte ? (profile.nomeEnte || user.email || t('common.name'))
-    : (isComunale || isSistema) ? `${profile.nome || ''} ${profile.cognome || ''}`.trim() || (user.email || t('common.name'))
-    : user.email || t('common.name');
+  const interestsList = userProfile?.profile?.interessi || [];
 
   return (
-    <section className="data-page profile-page">
-      <header className="profile-hero liquid-card">
-        <div className="profile-avatar-big" aria-hidden="true">{initials(profile, user)}</div>
-        <div className="profile-hero-info">
-          <h1>{displayName}</h1>
-          <p>
-            <span className="role-badge">{roleLabel}</span>
-            <span className="muted-copy"> · {user.email}</span>
-          </p>
-          {isEnte && (
-            <p>
-              {profile.approvato
-                ? <span className="report-stato report-stato-done">{t('profile.entityApproved')}</span>
-                : <span className="report-stato report-stato-open">{t('profile.entityPending')}</span>}
-            </p>
-          )}
-        </div>
-        <button type="button" className="ghost-button" onClick={handleLogout}>{t('nav.logout')}</button>
-      </header>
-
-      <div className="profile-main-grid">
-        <div className="profile-col">
-          {isCittadino && (
-            <form className="auth-form liquid-card" onSubmit={handleSaveCittadino}>
-              <h2>{t('profile.citizenData')}</h2>
-              <div className="filter-row">
-                <label><span>{t('common.name')}</span><input type="text" value={nome} onChange={(e) => setNome(e.target.value)} /></label>
-                <label><span>{t('common.lastName')}</span><input type="text" value={cognome} onChange={(e) => setCognome(e.target.value)} /></label>
+    <div className="revamp-legal-scene">
+      <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
+      <div className="revamp-profile-wrap">
+        <div className="revamp-profile-card anim-in" style={{ "--accent": "var(--cyan)", animationDelay: "60ms" } as React.CSSProperties}>
+          <div className="revamp-profile-flex">
+            <div className="revamp-profile-av">
+              {user.avatar || "MR"}
+            </div>
+            <div className="revamp-profile-info">
+              <div className="revamp-profile-name">{user.name || t("settings.guestName")}</div>
+              <div className="revamp-profile-email">{user.email || t("settings.guestEmail")}</div>
+              <div className="revamp-profile-badge">
+                <Icon name="shieldCheck" size={10} style={{ color: "var(--cyan)" }} /> {t("profile.verifiedAuthor")}
               </div>
-              <label>
-                <span>{t('profile.fiscalCode')}</span>
-                <input type="text" value={profile.codiceFiscale || ''} disabled readOnly />
-                <small>{t('profile.fiscalCodeReadOnly')}</small>
-              </label>
-              <label>
-                <span>{t('profile.birthDate')}</span>
-                <input type="text" value={profile.dataNascita ? new Date(profile.dataNascita + 'T00:00:00').toLocaleDateString() : '—'} disabled readOnly />
-              </label>
-              <fieldset>
-                <legend>{t('profile.interests')}</legend>
-                <div className="chips">
-                  {AVAILABLE_INTERESTS.map((i) => (
-                    <label key={i} className={`chip ${interessi.includes(i) ? 'active' : ''}`}>
-                      <input type="checkbox" checked={interessi.includes(i)} onChange={() => toggleInteresse(i)} />
-                      {t(`categories.${i}`, { defaultValue: i })}
-                    </label>
-                  ))}
+            </div>
+            {isCitizen && (
+              <div className="revamp-profile-stats">
+                <div className="revamp-profile-stat">
+                  <b>{participations.length}</b>
+                  <span>{t("profile.participations")}</span>
                 </div>
-              </fieldset>
-              {message && <div className="form-success">{message}</div>}
-              {error && <div className="form-error">{error}</div>}
-              <button className="primary-button" type="submit">{t('profile.saveChanges')}</button>
-            </form>
-          )}
-
-          {isEnte && (
-            <form className="auth-form liquid-card" onSubmit={handleSaveEnte}>
-              <h2>{t('profile.entityData')}</h2>
-              <label><span>{t('profile.entityName')}</span><input type="text" value={profile.nomeEnte || ''} disabled readOnly /></label>
-              <label>
-                <span>{t('profile.pec')}</span>
-                <input type="text" value={profile.pec || ''} disabled readOnly />
-                <small>{t('profile.pecReadOnly')}</small>
-              </label>
-              <label>
-                <span>{t('profile.entityNotes')}</span>
-                <textarea rows={4} value={noteAdmin} onChange={(e) => setNoteAdmin(e.target.value)} placeholder={t('profile.entityNotesPlaceholder')} />
-              </label>
-              {message && <div className="form-success">{message}</div>}
-              {error && <div className="form-error">{error}</div>}
-              <button className="primary-button" type="submit">{t('profile.saveNotes')}</button>
-            </form>
-          )}
-
-          {isComunale && (
-            <div className="auth-form liquid-card">
-              <h2>{t('profile.comunalData')}</h2>
-              <div className="filter-row">
-                <label><span>{t('common.name')}</span><input type="text" value={profile.nome || ''} disabled readOnly /></label>
-                <label><span>{t('common.lastName')}</span><input type="text" value={profile.cognome || ''} disabled readOnly /></label>
+                <div style={{ width: 1, background: "var(--border-soft-2)" }}></div>
+                <div className="revamp-profile-stat">
+                  <b>{createdActivities.length}</b>
+                  <span>{t("profile.createdActivitiesSection")}</span>
+                </div>
               </div>
-              <label><span>{t('profile.office')}</span><input type="text" value={profile.ufficio || '—'} disabled readOnly /></label>
-              <label>
-                <span>{t('profile.spidId')}</span>
-                <input type="text" value={profile.spidId || '—'} disabled readOnly />
-                <small>{t('profile.spidReadOnly')}</small>
-              </label>
-            </div>
-          )}
-
-          {isSistema && (
-            <div className="auth-form liquid-card">
-              <h2>{t('profile.sistemaData')}</h2>
-              <div className="filter-row">
-                <label><span>{t('common.name')}</span><input type="text" value={profile.nome || ''} disabled readOnly /></label>
-                <label><span>{t('common.lastName')}</span><input type="text" value={profile.cognome || ''} disabled readOnly /></label>
-              </div>
-              {profile.superAdmin && <p><span className="report-stato report-stato-done">{t('profile.superAdmin')}</span></p>}
-            </div>
-          )}
-
-          {isCittadino && (
-            <div className="auth-form liquid-card">
-              <h2>{t('profile.location')}</h2>
-              <p>{t('profile.locationHint')}</p>
-              {locationMessage && <div className="form-success">{locationMessage}</div>}
-              {locationError && <div className="form-error">{locationError}</div>}
-              <button type="button" className="primary-button" onClick={handleShareLocation}>{t('profile.shareLocation')}</button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
-        <div className="profile-col">
-          {(isCittadino || isEnte || isComunale || isSistema) && (() => {
-            const browserBlocked = 'Notification' in window && Notification.permission === 'denied';
-            const consentDenied = notifSummary.notif_push === false;
-            const pushActive = pushEnabled && !consentDenied && !browserBlocked;
-            return (
-              <div className="auth-form liquid-card">
-                <h2>{t('profile.pushNotifications')}</h2>
-                {browserBlocked ? (
-                  <p className="form-error" style={{ margin: 0 }}>{t('profile.pushBlocked')}</p>
-                ) : pushActive ? (
-                  <p className="muted-copy" style={{ marginTop: 0 }}>{t('profile.pushActive')}</p>
-                ) : (
-                  <p className="muted-copy" style={{ marginTop: 0 }}>{t('profile.pushInactive')}</p>
-                )}
-                {pushMessage && <div className="form-success">{pushMessage}</div>}
-                {pushError && <div className="form-error">{pushError}</div>}
-                {!browserBlocked && (
-                  <div className="filter-actions">
-                    {pushActive ? (
-                      <>
-                        <button type="button" className="primary-button" onClick={handleTestPush}>{t('profile.sendTest')}</button>
-                        <button type="button" onClick={handleDisablePush} disabled={isTogglingPush}>{isTogglingPush ? '...' : t('profile.disable')}</button>
-                      </>
-                    ) : (
-                      <button type="button" className="primary-button" onClick={handleEnablePush} disabled={isTogglingPush}>{isTogglingPush ? '...' : t('profile.enablePush')}</button>
-                    )}
-                  </div>
-                )}
-                <p className="muted-copy" style={{ fontSize: 12, margin: '6px 0 0' }}>
-                  Email: <strong>{notifSummary.notif_email === false ? 'OFF' : 'ON'}</strong>
-                  {' · '}
-                  {t('profile.managePrefsPrefix')}{' '}<a href="/impostazioni">{t('settings.title')}</a>.
-                </p>
-                {isSistema && (
-                  <p className="muted-copy" style={{ fontSize: 12, margin: '8px 0 0' }}>
-                    📣 {t('profile.broadcastLinkText')}: <a href="/admin/notifiche">{t('admin.notifications.title')}</a>.
-                  </p>
-                )}
-              </div>
-            );
-          })()}
+        <div className="revamp-profile-card anim-in" style={{ "--accent": "var(--violet)", animationDelay: "120ms" } as React.CSSProperties}>
+          <div className="revamp-profile-nav">
+            {isCitizen && (
+              <>
+                <button
+                  className={"revamp-profile-tab" + (activeTab === "attivita" ? " active" : "")}
+                  onClick={() => setActiveTab("attivita")}
+                >
+                  {t("profile.tabBookings")}
+                </button>
+                <button
+                  className={"revamp-profile-tab" + (activeTab === "saved" ? " active" : "")}
+                  onClick={() => setActiveTab("saved")}
+                >
+                  {t("profile.tabSaved")}
+                </button>
+                <button
+                  className={"revamp-profile-tab" + (activeTab === "interessi" ? " active" : "")}
+                  onClick={() => setActiveTab("interessi")}
+                >
+                  {t("profile.tabInterests")}
+                </button>
+              </>
+            )}
+            <button
+              className={"revamp-profile-tab" + (activeTab === "info" ? " active" : "")}
+              onClick={() => setActiveTab("info")}
+            >
+              {t("profile.tabInfo")}
+            </button>
+          </div>
 
-          {(isSistema || user.twoFactorEnabled) && (
-            <div className="auth-form liquid-card">
-              <h2>{t('profile.twoFactor')}</h2>
-              {user.twoFactorEnabled ? (
-                <p>{t('profile.twoFactorActive', { remaining: user.twoFactorRecoveryCodesRemaining ?? 0 })}</p>
-              ) : (
-                <p>{t('profile.twoFactorInactive')}</p>
-              )}
-              {newRecoveryCodes && (
-                <>
-                  <div className="warning-box"><strong>{t('profile.recoverySaveWarning')}</strong></div>
-                  <div className="recovery-codes-grid">{newRecoveryCodes.map((c) => <code key={c} className="recovery-code">{c}</code>)}</div>
-                  <div className="filter-actions">
-                    <button type="button" onClick={() => navigator.clipboard.writeText(newRecoveryCodes.join('\n'))}>{t('profile.copyCode')}</button>
-                    <button type="button" onClick={() => setNewRecoveryCodes(null)}>{t('profile.savedCodes')}</button>
+          <div className="revamp-profile-tab-body">
+            {activeTab === "attivita" && (() => {
+              const eventParts = participations.filter((p) => p.targetType === "EVENT");
+              const actParts = participations.filter((p) => p.targetType !== "EVENT");
+
+              const renderRow = (item: any) => {
+                if (!item.target) return null;
+                const title = item.target?.title || item.target?.titolo || t("profile.fallbackTitle");
+                const cat = item.target?.category || item.target?.categoria || "altro";
+                const color = getCatColor(cat);
+                const iconName = getCatIcon(cat);
+                const when = item.target?.dateTime || item.target?.data || t("profile.toBeDefined");
+                return (
+                  <div key={item.id} className="area-row" style={{ padding: "12px 14px", border: "1px solid var(--border-soft-2)", borderRadius: 12, background: "var(--chip-fill)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, width: "100%" }}>
+                      <div style={{
+                        width: 38, height: 38, borderRadius: 8, background: `color-mix(in srgb, ${color} 16%, transparent)`,
+                        border: `1px solid color-mix(in srgb, ${color} 30%, transparent)`, color,
+                        display: "grid", placeItems: "center"
+                      }}>
+                        <Icon name={iconName} size={16} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700 }}>{title}</div>
+                        <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 3 }}>
+                          <Icon name="clock" size={11} /> {when} | <Icon name="pin" size={11} /> {item.target?.location || "Trento"}
+                        </div>
+                      </div>
+                      <button className="revamp-action-btn danger" style={{ height: 34 }} onClick={() => handleCancel(item)}>
+                        <Icon name="x" size={12} /> {t("profile.cancelBooking")}
+                      </button>
+                    </div>
                   </div>
-                </>
-              )}
-              {!newRecoveryCodes && (
-                <div className="filter-actions">
-                  {user.twoFactorEnabled && (
-                    <button type="button" className="primary-button" onClick={handleRegenerate} disabled={isRegenerating}>
-                      {isRegenerating ? t('profile.regenerating') : t('profile.regenerate')}
-                    </button>
+                );
+              };
+
+              const sectionLabel = (color: string, icon: string, label: string, mt = 4) => (
+                <div style={{ fontSize: 12, fontWeight: 700, color, letterSpacing: "0.06em", textTransform: "uppercase", marginTop: mt }}>
+                  <Icon name={icon} size={11} /> {label}
+                </div>
+              );
+              const emptyNote = (msg: string) => (
+                <div style={{ color: "var(--text-muted)", fontSize: 13, padding: "6px 2px" }}>{msg}</div>
+              );
+
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {loading && (
+                    <div style={{ color: "var(--text-muted)", fontSize: 13.5, padding: "20px 0", textAlign: "center" }}>
+                      {t("profile.loadingBookings")}
+                    </div>
                   )}
-                  <button type="button" onClick={() => navigate('/setup-2fa')}>
-                    {user.twoFactorEnabled ? t('profile.changeAuthenticator') : t('profile.configure2FA')}
+                  {!loading && (
+                    <>
+                      {sectionLabel("var(--magenta)", "calendar", t("profile.joinedEvents"))}
+                      {eventParts.length === 0
+                        ? emptyNote(t("profile.noJoinedEvents"))
+                        : eventParts.map(renderRow)}
+
+                      {sectionLabel("var(--teal)", "activity", t("profile.joinedActivities"), 8)}
+                      {actParts.length === 0
+                        ? emptyNote(t("profile.noJoinedActivities"))
+                        : actParts.map(renderRow)}
+
+                      {sectionLabel("var(--violet)", "sparkle", t("profile.createdActivitiesSection"), 8)}
+                      {createdActivities.length === 0 ? (
+                        emptyNote(t("profile.noCreatedActivities"))
+                      ) : createdActivities.map((act) => {
+                        const statusSlug: Record<string, string> = { draft: "Draft", published: "Published", active: "Active", completed: "Completed", cancelled: "Cancelled", under_review: "Review" };
+                        const statusKey = `profile.activityStatus${statusSlug[act.status] || "Draft"}`;
+                        const statusLabel = t(statusKey, { defaultValue: act.status || "" });
+                        return (
+                          <div key={act.id} className="area-row" style={{ padding: "12px 14px", border: "1px solid var(--border-soft-2)", borderRadius: 12, background: "var(--chip-fill)" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 12, width: "100%" }}>
+                              <div style={{
+                                width: 38, height: 38, borderRadius: 8,
+                                background: "color-mix(in srgb, var(--violet) 16%, transparent)",
+                                border: "1px solid color-mix(in srgb, var(--violet) 30%, transparent)",
+                                color: "var(--violet)", display: "grid", placeItems: "center"
+                              }}>
+                                <Icon name="activity" size={16} />
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 14, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{act.title}</div>
+                                <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 3 }}>
+                                  <Icon name="users" size={11} /> {act.participantsCount ?? 0}{act.capacity ? ` / ${act.capacity}` : ""} · {statusLabel}
+                                </div>
+                              </div>
+                              <button className="revamp-action-btn" style={{ height: 34 }} onClick={() => { setSelectedActivityId?.(act.id); setPage("attivita-dettaglio"); }}>
+                                <Icon name="arrow" size={12} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </>
+                  )}
+                </div>
+              );
+            })()}
+
+            {activeTab === "saved" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {loadingSaved && (
+                  <div style={{ color: "var(--text-muted)", fontSize: 13.5, padding: "20px 0", textAlign: "center" }}>
+                    {t("profile.loadingSaved")}
+                  </div>
+                )}
+                {!loadingSaved && savedItems.length === 0 && (
+                  <div style={{ color: "var(--text-muted)", fontSize: 13.5, padding: "20px 0", textAlign: "center" }}>
+                    {t("profile.noSaved")}
+                  </div>
+                )}
+                {!loadingSaved && savedItems.map((item) => {
+                  const isEvent = item._favType === "event";
+                  const title = item.title || t("profile.fallbackTitle");
+                  const color = isEvent ? "var(--magenta)" : "var(--teal)";
+                  const iconName = isEvent ? "calendar" : "activity";
+                  const when = item.dateTime || item.startsAt || null;
+                  const loc = item.location || item.address || null;
+                  return (
+                    <button
+                      key={item.id}
+                      className="area-row"
+                      style={{ padding: "12px 14px", border: "1px solid var(--border-soft-2)", borderRadius: 12, background: "var(--chip-fill)", textAlign: "left", width: "100%", cursor: "pointer" }}
+                      onClick={() => {
+                        if (isEvent) {
+                          setSelectedEventId?.(item.id);
+                          setPage("evento-dettaglio");
+                        } else {
+                          setSelectedActivityId?.(item.id);
+                          setPage("attivita-dettaglio");
+                        }
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <div style={{
+                          width: 38, height: 38, borderRadius: 8,
+                          background: `color-mix(in srgb, ${color} 16%, transparent)`,
+                          border: `1px solid color-mix(in srgb, ${color} 30%, transparent)`, color,
+                          display: "grid", placeItems: "center", flexShrink: 0,
+                        }}>
+                          <Icon name={iconName} size={16} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>
+                          <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 3 }}>
+                            {when && <><Icon name="clock" size={11} /> {new Date(when).toLocaleDateString(dateLocale)}{loc ? " · " : ""}</>}
+                            {loc && <><Icon name="pin" size={11} /> {loc}</>}
+                          </div>
+                        </div>
+                        <Icon name="arrow" size={14} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {activeTab === "interessi" && (
+              <div>
+                <p style={{ fontSize: 13.5, color: "var(--text-secondary)", marginBottom: 12 }}>
+                  {t("profile.interestsIntro")}
+                </p>
+                <div className="s-interests">
+                  {PROFILE_INTERESTS.filter(item => interestsList.includes(item.id) || interestsList.length === 0).map((item) => (
+                    <div key={item.id} className="s-int-chip on" style={{ "--ic": item.color } as React.CSSProperties}>
+                      <Icon name={item.icon} size={14} /> {t(`settings.interests.${item.id}`)}
+                    </div>
+                  ))}
+                  <button className="s-int-chip" style={{ "--ic": "var(--cyan)" } as React.CSSProperties} onClick={() => setPage("onboarding")}>
+                    <Icon name="settings" size={14} /> {t("profile.manageInterests")}
                   </button>
                 </div>
-              )}
-            </div>
-          )}
+              </div>
+            )}
 
-          {user.hasPassword && (
-            <form className="auth-form liquid-card" onSubmit={handleChangePassword}>
-              <h2>{t('profile.changePassword')}</h2>
-              <p className="muted-copy" style={{ marginTop: 0 }}>{t('profile.changePasswordHint')}</p>
-              <label><span>{t('profile.currentPassword')}</span><input type="password" value={pwdCurrent} onChange={(e) => setPwdCurrent(e.target.value)} autoComplete="current-password" required /></label>
-              <label><span>{t('profile.newPassword')}</span><input type="password" value={pwdNew} onChange={(e) => setPwdNew(e.target.value)} autoComplete="new-password" minLength={8} required /></label>
-              <label><span>{t('profile.confirmNewPassword')}</span><input type="password" value={pwdConfirm} onChange={(e) => setPwdConfirm(e.target.value)} autoComplete="new-password" minLength={8} required /></label>
-              <p className="muted-copy" style={{ fontSize: 12, margin: '4px 0 0' }}>{t('profile.passwordHint')}</p>
-              {pwdError && <div className="form-error">{pwdError}</div>}
-              {pwdMessage && <div className="form-success">{pwdMessage}</div>}
-              <button className="primary-button" type="submit" disabled={pwdSaving || !pwdCurrent || !pwdNew}>
-                {pwdSaving ? t('profile.saving') : t('profile.updatePassword')}
+            {activeTab === "info" && (
+              <div style={{ fontSize: 13.5, color: "var(--text-secondary)", display: "flex", flexDirection: "column", gap: 8 }}>
+                <div><b>{t("profile.memberSince")}</b> {userProfile?.createdAt ? new Date(userProfile.createdAt).toLocaleDateString(dateLocale) : "12/05/2024"}</div>
+                <div><b>{t("profile.role")}</b> {userProfile?.ruolo ? (t(`profile.roles.${userProfile.ruolo}`, { defaultValue: userProfile.ruolo.replace(/([A-Z])/g, " $1").trim() })) : t("profile.guestRole")}</div>
+                <div><b>{t("profile.email")}</b> {user?.email || t("profile.none")}</div>
+                {userProfile?.ruolo === "EnteCertificato" && (
+                  <>
+                    <div><b>{t("profile.entityName")}</b> {userProfile.nomeEnte}</div>
+                    <div><b>{t("profile.approvalStatus")}</b> {userProfile.approvato ? t("profile.approved") : t("profile.pending")}</div>
+                  </>
+                )}
+                <div style={{ marginTop: 8 }}>
+                  <button className="revamp-action-btn" onClick={() => setPage("impostazioni")}>
+                    <Icon name="settings" size={14} /> {t("profile.editSettings")}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Cambio password: visibile a tutti gli utenti non-anonimi */}
+        {user?.role !== "anonymous" && (
+          <div className="revamp-profile-card anim-in" style={{ "--accent": "var(--teal)", animationDelay: "160ms" } as React.CSSProperties}>
+            <h3 style={{ margin: "0 0 12px", fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
+              <Icon name="key" size={16} style={{ color: "var(--teal)" }} /> {t("profile.changePasswordTitle")}
+            </h3>
+            <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 14 }}>{t("profile.changePasswordDesc")}</p>
+            <form onSubmit={handleChangePassword} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div className="revamp-form-group" style={{ margin: 0 }}>
+                <label className="revamp-form-label">{t("profile.currentPassword")}</label>
+                <div className="revamp-form-input-wrap">
+                  <Icon name="key" size={15} />
+                  <input type="password" className="revamp-form-input" placeholder="••••••••" value={pwCurrent} disabled={pwSaving} onChange={(e) => setPwCurrent(e.target.value)} />
+                </div>
+              </div>
+              <div className="revamp-form-group" style={{ margin: 0 }}>
+                <label className="revamp-form-label">{t("profile.newPassword")}</label>
+                <div className="revamp-form-input-wrap">
+                  <Icon name="shieldCheck" size={15} />
+                  <input type="password" className="revamp-form-input" placeholder="••••••••" value={pwNew} disabled={pwSaving} onChange={(e) => setPwNew(e.target.value)} />
+                </div>
+                <PasswordStrengthBar password={pwNew} />
+              </div>
+              <div className="revamp-form-group" style={{ margin: 0 }}>
+                <label className="revamp-form-label">{t("profile.confirmPassword")}</label>
+                <div className="revamp-form-input-wrap">
+                  <input type="password" className="revamp-form-input" placeholder="••••••••" value={pwConfirm} disabled={pwSaving} onChange={(e) => setPwConfirm(e.target.value)} />
+                </div>
+              </div>
+              {pwMsg && (
+                <div className={`revamp-status-pill ${pwMsg.kind}`} style={{ justifyContent: "center" }}>
+                  <Icon name={pwMsg.kind === "success" ? "check" : "warn"} size={12} /> {pwMsg.text}
+                </div>
+              )}
+              <button type="submit" className="revamp-action-btn" style={{ alignSelf: "flex-start" }} disabled={pwSaving || !pwCurrent || !pwNew || !pwConfirm}>
+                <Icon name="key" size={13} /> {pwSaving ? t("profile.changePasswordSaving") : t("profile.changePasswordBtn")}
               </button>
             </form>
-          )}
-        </div>
-      </div>
+          </div>
+        )}
 
-      <div className="profile-delete-footer">
-        {!confirmingDelete ? (
-          <button type="button" className="ghost-button danger-text" onClick={() => setConfirmingDelete(true)}>{t('profile.deleteAccount')}</button>
-        ) : (
-          <div className="profile-delete-confirm liquid-card">
-            <strong>{t('profile.confirmDeleteTitle')}</strong>
-            <p>{t('profile.deleteIrreversible')}</p>
-            {user.hasPassword ? (
-              <label>
-                <span>{t('profile.currentPassword')}</span>
-                <input type="password" value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} autoComplete="current-password" required />
-              </label>
-            ) : (
-              <label>
-                <span>{t('profile.deleteConfirmType')} <code>DELETE {user.email}</code></span>
-                <input type="text" value={deleteEmailConfirm} onChange={(e) => setDeleteEmailConfirm(e.target.value)} placeholder={`DELETE ${user.email}`} autoComplete="off" />
-              </label>
-            )}
-            <div className="filter-actions">
-              <button type="button" onClick={() => { setConfirmingDelete(false); setDeleteEmailConfirm(''); setDeletePassword(''); setError(null); }}>{t('common.cancel')}</button>
-              <button type="button" className="danger-button compact-button" onClick={handleDelete}>{t('profile.deleteFinal')}</button>
+        {/* Sicurezza account: solo admin di sistema (2FA obbligatorio per loro).
+            Cambio authenticator = nuovo setup QR; i codici rigenerati invalidano i vecchi. */}
+        {user?.role === "system_admin" && (
+          <div className="revamp-profile-card anim-in" style={{ "--accent": "var(--amber)", animationDelay: "180ms" } as React.CSSProperties}>
+            <h3 style={{ margin: "0 0 6px", fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
+              <Icon name="shieldCheck" size={16} style={{ color: "var(--amber)" }} /> {t("twofa.securityTitle")}
+            </h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ flex: 1, minWidth: 220 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 650 }}>{t("twofa.changeAuthenticator")}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{t("twofa.changeAuthenticatorSub")}</div>
+                </div>
+                <button className="revamp-action-btn" onClick={() => setPage("setup-2fa")}>
+                  <Icon name="refresh" size={13} /> {t("twofa.changeAuthenticator")}
+                </button>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ flex: 1, minWidth: 220 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 650 }}>{t("twofa.regenCodes")}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{t("twofa.regenCodesSub")}</div>
+                </div>
+                <button className="revamp-action-btn" disabled={regenPending} onClick={handleRegenCodes}>
+                  <Icon name="key" size={13} /> {regenPending ? "…" : t("twofa.regenCodes")}
+                </button>
+              </div>
+              {regenError && (
+                <div className="revamp-status-pill danger" style={{ justifyContent: "center" }}>
+                  <Icon name="warn" size={12} /> {regenError}
+                </div>
+              )}
+              {newCodes.length > 0 && (
+                <div>
+                  <div className="revamp-status-pill warning" style={{ width: "100%", justifyContent: "center", marginBottom: 10 }}>
+                    <Icon name="warn" size={12} /> {t("twofa.regenDone")}
+                  </div>
+                  <div style={{
+                    background: "var(--chip-fill)", padding: 12, borderRadius: 8, border: "1px solid var(--border-soft)",
+                    fontFamily: "var(--mono)", fontSize: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8
+                  }}>
+                    {newCodes.map((c, i) => <div key={i}>● {c}</div>)}
+                  </div>
+                </div>
+              )}
             </div>
-            {error && <div className="form-error">{error}</div>}
           </div>
         )}
       </div>
-    </section>
+    </div>
   );
 }
