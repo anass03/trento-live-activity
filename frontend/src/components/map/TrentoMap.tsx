@@ -14,6 +14,17 @@ const TRENTO_CENTER: [number, number] = [11.1211, 46.0679];
 // arrivava anche "dark": accetta entrambi per scegliere le tile scure.
 const isDarkTheme = (theme: string) => theme === "dark" || theme === "night";
 
+// I popup/tooltip sono costruiti via innerHTML: la descrizione è testo libero
+// dell'utente, quindi va sempre escapata prima di interpolarla (anti-XSS).
+function escapeHtml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function getIconSvg(name: string, size = 15): string {
   const paths: Record<string, string> = {
     grid: `<rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" />`,
@@ -337,6 +348,11 @@ export const TrentoMap = React.memo(function TrentoMap({
       const color = isParking ? "var(--teal)" : isPoi ? CROWD_COLOR[crowd] : catColor(m.cat);
       const crowdLabel = t(CROWD_KEY[crowd] || CROWD_KEY.green);
 
+      // Per le attività mostriamo la descrizione come testo grande (il tipo
+      // sport/cultura resta la piccola etichetta sopra); gli eventi tengono il
+      // proprio titolo. Senza descrizione si ricade sul titolo dell'attività.
+      const bigTitle = escapeHtml(m.type === "activity" && m.description ? m.description : (m.title || ""));
+
       // L'elemento esterno è posizionato da maplibre via transform inline:
       // niente transform in CSS qui, le animazioni vivono sul .tla-pin interno.
       const el = document.createElement("div");
@@ -371,7 +387,7 @@ export const TrentoMap = React.memo(function TrentoMap({
         } else {
           tip.innerHTML = `
           <div class="tip-cat">${catLabel(m.cat)}</div>
-          <div class="tip-title">${m.title}</div>
+          <div class="tip-title">${bigTitle}</div>
           <div class="tip-meta">
             <span>${m.time}</span> · <span>${m.place}</span>
           </div>
@@ -469,7 +485,7 @@ export const TrentoMap = React.memo(function TrentoMap({
               <span class="ep-cat-ic">${getIconSvg(CAT_ICON[m.cat] || "grid", 12)}</span>
               ${catLabel(m.cat)}
             </div>
-            <div class="ep-title">${m.title}</div>
+            <div class="ep-title">${bigTitle}</div>
             <button class="ep-close" aria-label="${t("widgets.popup.close")}">${getIconSvg("x", 13)}</button>
           </div>
           <div class="ep-body">

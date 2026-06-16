@@ -308,7 +308,7 @@ function ActCard({ a, saved, onSave, onOpen, canSave = true }: any) {
       </div>
       <div className="act-body">
         <div className="act-cat"><Icon name={cat.icon} size={12} />{catLabel}{a.subtype && a.subtype !== catLabel ? <><span className="dotsep">·</span><span className="subtype">{a.subtype}</span></> : null}</div>
-        <div className="act-name">{a.title || catLabel}</div>
+        <div className="act-name">{a.desc || a.title || catLabel}</div>
         {hasAttrs && (
           <div className="act-attrs">
             {dur && <span className="act-attr"><Icon name="clock" size={13} />{dur}</span>}
@@ -363,7 +363,7 @@ function ActNextWidget({ activity, saved, onSave, onOpen, canSave = true }: any)
         <span className="nm-count"><span className="led live green"></span><span><span className="lbl">{t("activities.nextBadge")}</span><br />{formatActivityTime(a.startsAt, t("activities.timeTbd"), dtLocale)}</span></span>
         <span className="nm-ghost"><Icon name={cat.icon} size={96} /></span>
       </div>
-      <div className="next-title" style={{ cursor: "pointer" }} onClick={() => onOpen(a.id)}>{a.title}</div>
+      <div className="next-title" style={{ cursor: "pointer" }} onClick={() => onOpen(a.id)}>{a.desc || a.title}</div>
       <div className="next-fields">
         <div className="next-field"><span className="nf-ic"><Icon name="pin" size={14} /></span><div><div className="nf-lbl">{t("activities.place")}</div><div className="nf-val"><GeocodedLocation value={a.loc} fallback={t("activities.locationTbd")} /></div></div></div>
         <div className="next-field"><span className="nf-ic"><Icon name="users" size={14} /></span><div><div className="nf-lbl">{t("activities.participantsLabel")}</div><div className="nf-val">{a.going}{a.cap > 0 ? ` / ${a.cap}` : ""}</div></div></div>
@@ -512,7 +512,7 @@ export function ActivityPage({ page, setPage, theme, setTheme, user, setSelected
           startsAt: a.startsAt || a.startAt || a.dateTime || a.scheduledAt || null,
           rawStatus: a.status || null,
           status: { rising: participants >= 5 },
-          desc: a.description || t("activities.noDescription"),
+          desc: a.description || null,
         };
       });
       setBackendActivities(mapped);
@@ -582,7 +582,7 @@ export function ActivityPage({ page, setPage, theme, setTheme, user, setSelected
     if (activeCategories.size > 0) r = r.filter((a) => activeCategories.has(a.cat));
     if (s.search.trim()) {
       const q = s.search.toLowerCase();
-      r = r.filter((a) => (a.title + " " + t(activityCat(a.cat).labelKey) + " " + (a.loc || "") + " " + (a.creatorName || "")).toLowerCase().includes(q));
+      r = r.filter((a) => (a.title + " " + (a.desc || "") + " " + t(activityCat(a.cat).labelKey) + " " + (a.loc || "") + " " + (a.creatorName || "")).toLowerCase().includes(q));
     }
     // sort
     if (sort === "participants") r.sort((a, b) => b.going - a.going);

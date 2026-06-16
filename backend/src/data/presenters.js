@@ -191,6 +191,7 @@ function markerFromActivity(record) {
     id: `activity:${activity.id}`,
     type: 'activity',
     title: activity.title || activity.titolo || activity.tipo,
+    description: activity.description || null,
     latitude: activity.latitudine,
     longitude: activity.longitudine,
     crowdingStatus: crowdingStatus(activity.poi?.statoAffollamento),

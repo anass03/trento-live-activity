@@ -338,7 +338,7 @@ button { font-family: inherit; cursor: pointer; }
   font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.14em;
   text-transform: uppercase; color: var(--mc); margin-bottom: 3px;
 }
-.marker-tip .tip-title { font-size: 13.5px; font-weight: 700; line-height: 1.25; color: var(--text-primary); }
+.marker-tip .tip-title { font-size: 13.5px; font-weight: 700; line-height: 1.25; color: var(--text-primary); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .marker-tip .tip-meta { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; display: flex; gap: 6px; align-items: center; }
 
 /* =========================================================
@@ -1233,7 +1233,7 @@ button { font-family: inherit; cursor: pointer; }
 .ep-cat .ep-cat-ic { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 6px;
   background: color-mix(in srgb, var(--ec) 18%, transparent); }
 .ep-cat .ep-cat-ic svg { width: 12px; height: 12px; }
-.ep-title { font-size: 15.5px; font-weight: 700; line-height: 1.2; letter-spacing: -0.01em; padding-right: 24px; }
+.ep-title { font-size: 15.5px; font-weight: 700; line-height: 1.2; letter-spacing: -0.01em; padding-right: 24px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .ep-close {
   position: absolute; top: 12px; right: 12px;
   width: 24px; height: 24px; border-radius: 50%;

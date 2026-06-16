@@ -62,7 +62,7 @@ async function getMapData() {
     POI.findAll({ order: [['nome', 'ASC']] }),
     Activity.findAll({
       where: { stato: 'attiva' },
-      attributes: ['id', 'tipo', 'data', 'orarioInizio', 'maxPartecipanti', 'stato', 'latitudine', 'longitudine', 'poiId', 'createdAt'],
+      attributes: ['id', 'tipo', 'data', 'orarioInizio', 'maxPartecipanti', 'stato', 'latitudine', 'longitudine', 'poiId', 'createdAt', 'description', 'title'],
       // Senza i partecipanti, serializeActivity riporta participantCount: 0 per
       // tutte le attività della mappa (il frontend lo usa per i conteggi).
       include: [
