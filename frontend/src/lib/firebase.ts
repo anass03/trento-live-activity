@@ -1,4 +1,4 @@
-import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
+import { initializeApp, getApps, deleteApp, type FirebaseApp } from 'firebase/app';
 import { getMessaging, getToken, deleteToken, onMessage, isSupported, type Messaging } from 'firebase/messaging';
 
 // These values are intentionally public — they identify the web client to
@@ -88,6 +88,18 @@ function isIdbVersionError(err: unknown): boolean {
     || /lower version than the existing version|version/i.test(e.message || '');
 }
 
+// Closes the Firebase client so it releases its IndexedDB connections. Without
+// this, deleteDatabase() below stays "blocked" (the messaging/installations
+// instances keep the dbs open), the stale db is never actually dropped, and the
+// retry re-opens it at the old version — throwing the same VersionError again.
+async function resetFirebaseClient(): Promise<void> {
+  messaging = null;
+  if (app) {
+    try { await deleteApp(app); } catch { /* ignore */ }
+    app = null;
+  }
+}
+
 async function clearFcmIndexedDb(): Promise<void> {
   if (typeof indexedDB === 'undefined') return;
   await Promise.all(
@@ -124,9 +136,6 @@ export async function requestFcmToken(): Promise<string> {
   if (!(await isSupported())) {
     throw new Error('Notifiche push non supportate da questo browser. Su iPhone/iPad aggiungi prima l\'app alla schermata Home (richiede iOS/Safari 16.4 o superiore).');
   }
-  const m = getFirebaseMessaging();
-  if (!m) throw new Error('Notifiche push non supportate da questo browser');
-
   if (Notification.permission === 'denied') {
     throw new Error('Permesso notifiche bloccato. Vai nelle impostazioni del browser e riabilita le notifiche per questo sito.');
   }
@@ -154,29 +163,31 @@ export async function requestFcmToken(): Promise<string> {
     });
   }
 
-  // Delete the existing token first so Firebase issues a fresh one.
-  // Con timeout: se hanga (bug Firefox post-revoca), procediamo comunque.
-  try { await withTimeout(deleteToken(m), 3000, 'deleteToken'); } catch { /* ignore */ }
-
-  const fetchToken = (msg: Messaging) =>
-    withTimeout(
-      getToken(msg, { vapidKey: VAPID_KEY, serviceWorkerRegistration: swRegistration }),
+  // One full token acquisition against a fresh messaging instance. We delete the
+  // existing token first so Firebase always issues a fresh one (with timeout, in
+  // case deleteToken hangs — a known Firefox bug post-revoca).
+  const acquire = async (): Promise<string | null> => {
+    const m = getFirebaseMessaging();
+    if (!m) throw new Error('Notifiche push non supportate da questo browser');
+    try { await withTimeout(deleteToken(m), 3000, 'deleteToken'); } catch { /* ignore */ }
+    return withTimeout(
+      getToken(m, { vapidKey: VAPID_KEY, serviceWorkerRegistration: swRegistration }),
       15000,
       'getToken',
     );
+  };
 
   let token: string | null = null;
   try {
-    token = await fetchToken(m);
+    token = await acquire();
   } catch (err) {
-    // Stale IndexedDB from an older SDK → clear it and retry once with a fresh
-    // messaging instance. This is the "lower version than existing" error.
+    // "Lower version than the existing version" → a previous deploy left the FCM
+    // IndexedDB stores at a higher schema version. Close the client first so the
+    // dbs are released, drop them, then retry once with a clean client.
     if (!isIdbVersionError(err)) throw err;
+    await resetFirebaseClient();
     await clearFcmIndexedDb();
-    messaging = null;
-    const m2 = getFirebaseMessaging();
-    if (!m2) throw err;
-    token = await fetchToken(m2);
+    token = await acquire();
   }
   if (!token) throw new Error('Impossibile ottenere il token FCM. Assicurati di non avere estensioni che bloccano le notifiche.');
   return token;
