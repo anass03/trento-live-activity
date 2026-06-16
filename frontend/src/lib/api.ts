@@ -1,3 +1,5 @@
+import { revokeFcmToken } from './firebase';
+
 export type CrowdingStatus = 'green' | 'yellow' | 'orange' | 'red';
 export type MarkerType = 'poi' | 'activity' | 'event' | 'parking';
 export type UserRole = 'anonymous' | 'registered_user' | 'certified_entity' | 'municipal_admin' | 'system_admin';
@@ -164,6 +166,10 @@ export class ApiError extends Error {
 
 const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL ?? '';
 const TOKEN_KEY = 'tla_token';
+// Chiave del token FCM di QUESTO browser (push per-dispositivo). Single source
+// of truth: la legge anche SettingsPage. Se le due divergessero, il logout non
+// troverebbe il token da deregistrare.
+export const FCM_TOKEN_KEY = 'tla:fcmToken';
 
 export function getToken(): string | null {
   try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
@@ -381,6 +387,21 @@ export function resetPassword(token: string, password: string): Promise<{ messag
   return request(`/api/auth/reset-password/${encodeURIComponent(token)}`, { method: 'POST', body: { password }, auth: false });
 }
 export async function logout(): Promise<void> {
+  // Rilascia il token push di QUESTO browser PRIMA di chiudere la sessione (il
+  // bearer deve essere ancora valido per deregistrarlo lato server). I token FCM
+  // sono per-dispositivo, non per-account: se non lo deregistriamo al logout
+  // resta associato all'utente uscente e — su un browser condiviso — l'utente
+  // successivo ne eredita la subscription, con notifiche (es. "invia prova")
+  // che finiscono all'account sbagliato. Revochiamo anche la subscription FCM
+  // così il prossimo utente parte con un token nuovo e pulito.
+  let fcmToken: string | null = null;
+  try { fcmToken = localStorage.getItem(FCM_TOKEN_KEY); } catch { /* ignore */ }
+  if (fcmToken) {
+    try { await unregisterDeviceToken(fcmToken); } catch { /* best-effort */ }
+  }
+  try { localStorage.removeItem(FCM_TOKEN_KEY); } catch { /* ignore */ }
+  try { await revokeFcmToken(); } catch { /* best-effort */ }
+
   try {
     await request('/api/auth/logout', { method: 'POST' });
   } catch {

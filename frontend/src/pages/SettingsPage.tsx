@@ -19,6 +19,7 @@ import {
   unregisterDeviceToken,
   sendTestPush,
   updateConsent,
+  FCM_TOKEN_KEY,
 } from "../lib/api";
 import { requestFcmToken, revokeFcmToken } from "../lib/firebase";
 import {
@@ -31,8 +32,6 @@ import {
   setStoredDistUnit,
   setStoredLocationMode,
 } from "../lib/i18n";
-
-const FCM_TOKEN_KEY = "tla:fcmToken";
 
 /* ===================== CARD SHELL ===================== */
 function SetCard({ num, title, desc, icon, color, children, full }: any) {
