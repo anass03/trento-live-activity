@@ -44,15 +44,19 @@ function init() {
 }
 
 async function sendToTokens(tokens, { title, body, data }) {
-  if (!tokens || tokens.length === 0) return;
+  // Dedup difensivo: anche se la stessa notifica raggiunge più device legittimi
+  // dello stesso utente (uno a testa), un token NON deve mai comparire due volte
+  // nello stesso invio, altrimenti quel device riceverebbe la notifica doppia.
+  const unique = tokens ? [...new Set(tokens)] : [];
+  if (unique.length === 0) return;
   const m = init();
   if (!m) {
-    console.log(`[push:stub] tokens=${tokens.length} title="${title}" body="${body}"`);
+    console.log(`[push:stub] tokens=${unique.length} title="${title}" body="${body}"`);
     return;
   }
   try {
     const response = await m.sendEachForMulticast({
-      tokens,
+      tokens: unique,
       notification: { title, body },
       data: data || {},
     });
@@ -64,7 +68,7 @@ async function sendToTokens(tokens, { title, body, data }) {
           const code = r.error?.code;
           if (code === 'messaging/invalid-registration-token' ||
               code === 'messaging/registration-token-not-registered') {
-            stale.push(tokens[idx]);
+            stale.push(unique[idx]);
           }
         }
       });

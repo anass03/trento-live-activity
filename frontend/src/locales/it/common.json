@@ -322,6 +322,11 @@
     },
     "adminHint": "Accedi come cittadino per interagire",
     "outsideTrento": "Sei fuori dall'area di Trento",
-    "outsideTrentoHint": "La mappa mostra solo l'area di Trento e dintorni."
+    "outsideTrentoHint": "La mappa mostra solo l'area di Trento e dintorni.",
+    "locationOff": "Posizione non consentita",
+    "locationOffHint": "Hai impostato la posizione su \"Mai\". Attivala per individuarti sulla mappa.",
+    "locationOffAction": "Cambia nelle impostazioni",
+    "locationDenied": "Permesso posizione bloccato",
+    "locationDeniedHint": "Il browser ha bloccato la posizione. Riabilitala per individuarti sulla mappa."
   }
 }

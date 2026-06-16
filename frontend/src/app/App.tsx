@@ -646,6 +646,7 @@ function HomeScene({ page, setPage, theme, setTheme, user, setSelectedEventId, s
                 setZoom={setZoom}
                 is3d={is3d}
                 onLocateRef={locateRef}
+                onNavigate={(p) => setPage(p)}
                 onResetRef={resetRef}
                 onResetNorthRef={resetNorthRef}
                 onBearingChange={setBearing}

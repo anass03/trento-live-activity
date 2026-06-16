@@ -58,7 +58,7 @@ module.exports = (sequelize) => {
     // Privacy & Location
     locationMode: {
       type: DataTypes.ENUM('always', 'while_using', 'never'),
-      defaultValue: 'while_using',
+      defaultValue: 'never',
     },
     participationVisibility: {
       type: DataTypes.ENUM('public', 'organizers_only', 'private'),

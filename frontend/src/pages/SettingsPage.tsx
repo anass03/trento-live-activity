@@ -26,6 +26,7 @@ import {
   currentLanguage,
   getTimeFormat,
   getDistUnit,
+  getLocationMode,
   setStoredTimeFormat,
   setStoredDistUnit,
   setStoredLocationMode,
@@ -188,8 +189,8 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
   const [pushBusy, setPushBusy] = useState(false);
   const [pushMsg, setPushMsg] = useState<{ kind: "success" | "danger"; text: string } | null>(null);
 
-  /* privacy */
-  const [locationMode, setLocationMode] = useState("while_using");
+  /* privacy — default "never": la posizione parte disattivata per i nuovi utenti */
+  const [locationMode, setLocationMode] = useState("never");
   const [participVis, setParticipVis] = useState("public");
   const [showProfile, setShowProfile] = useState(true);
   /* Stato REALE del permesso di geolocalizzazione del browser (non la sola
@@ -215,6 +216,7 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
         setTimeFormat(tf);
         setDistUnit(du);
         setLanguage(currentLanguage());
+        setLocationMode(getLocationMode());
         try {
           const ve = localStorage.getItem("tla:visualEffects");
           if (ve) setVisualEffects(ve);
@@ -248,7 +250,7 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
           activities: s.activityNotificationsEnabled,
           cityAlerts: s.cityAlertNotificationsEnabled,
         });
-        const locMode = s.locationMode || "while_using";
+        const locMode = s.locationMode || "never";
         setLocationMode(locMode);
         setStoredLocationMode(locMode);
         setParticipVis(s.participationVisibility || "public");
@@ -353,7 +355,16 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
     setNotif((n) => ({ ...n, push: val }));
     try {
       if (val) {
+        let prev: string | null = null;
+        try { prev = localStorage.getItem(FCM_TOKEN_KEY); } catch { /* ignore */ }
         const token = await requestFcmToken();
+        // requestFcmToken() forza un token FCM nuovo ad ogni attivazione: se non
+        // rimuoviamo dal server quello precedente di questo browser, lo stesso
+        // utente accumula token "stale" e riceve la notifica più volte. Lo
+        // deregistriamo prima di salvare il nuovo.
+        if (prev && prev !== token) {
+          try { await unregisterDeviceToken(prev); } catch { /* best-effort */ }
+        }
         await registerDeviceToken(token);
         try { localStorage.setItem(FCM_TOKEN_KEY, token); } catch { /* ignore */ }
         try { await updateConsent("notif_push", true); } catch { /* best-effort */ }
@@ -385,8 +396,10 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
   const handleTestPush = async () => {
     setPushMsg(null);
     try {
-      const result = await sendTestPush();
-      setPushMsg({ kind: "success", text: t("settings.notif.testSent", { count: result.tokensTargeted }) });
+      // La notifica di test arriva solo ai device dell'utente corrente. Il
+      // numero di destinatari è un'informazione da pannello admin, non da qui.
+      await sendTestPush();
+      setPushMsg({ kind: "success", text: t("settings.notif.testSent") });
     } catch (err: any) {
       setPushMsg({ kind: "danger", text: err?.message || t("settings.notif.pushError") });
     }
@@ -617,9 +630,10 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
           </SetCard>
           )}
 
-          {/* 4 — Privacy e posizione: visibilità partecipazioni e posizione
-              sono concetti da cittadino, non da admin/ente */}
-          {user?.role === "registered_user" && (
+          {/* 4 — Privacy e posizione. La posizione è universale: anche ospiti,
+              enti e admin usano "individuami" sulla mappa (e il toast li manda
+              qui), quindi mostriamo il controllo a tutti. Visibilità
+              partecipazioni e profilo restano concetti da cittadino. */}
           <SetCard num={4} title={t("settings.privacy.title")} desc={t("settings.privacy.desc")} icon="pin" color="var(--teal)">
             <div>
               <div className="s-sublabel" style={{ marginBottom: 8 }}>{t("settings.privacy.useLocation")}</div>
@@ -643,19 +657,22 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
                 );
               })()}
             </div>
-            <div className="s-div"></div>
-            <div>
-              <div className="s-sublabel" style={{ marginBottom: 8 }}>{t("settings.privacy.participVis")}</div>
-              <SetRadio value={participVis} onChange={(val) => handlePrivacyLocation("vis", val)} disabled={savingSection === "privacy"} options={[
-                { id: "public",            label: t("settings.privacy.public") },
-                { id: "organizers_only",   label: t("settings.privacy.organizersOnly") },
-                { id: "private",           label: t("settings.privacy.private") },
-              ]} />
-            </div>
-            <div className="s-div"></div>
-            <SetRow label={t("settings.privacy.showProfile")} sub={t("settings.privacy.showProfileSub")} on={showProfile} onChange={(val) => handlePrivacyLocation("show", val)} disabled={savingSection === "privacy"} />
+            {user?.role === "registered_user" && (
+              <>
+                <div className="s-div"></div>
+                <div>
+                  <div className="s-sublabel" style={{ marginBottom: 8 }}>{t("settings.privacy.participVis")}</div>
+                  <SetRadio value={participVis} onChange={(val) => handlePrivacyLocation("vis", val)} disabled={savingSection === "privacy"} options={[
+                    { id: "public",            label: t("settings.privacy.public") },
+                    { id: "organizers_only",   label: t("settings.privacy.organizersOnly") },
+                    { id: "private",           label: t("settings.privacy.private") },
+                  ]} />
+                </div>
+                <div className="s-div"></div>
+                <SetRow label={t("settings.privacy.showProfile")} sub={t("settings.privacy.showProfileSub")} on={showProfile} onChange={(val) => handlePrivacyLocation("show", val)} disabled={savingSection === "privacy"} />
+              </>
+            )}
           </SetCard>
-          )}
 
           {/* 5 — Accessibilità */}
           <SetCard num={5} title={t("settings.a11y.title")} desc={t("settings.a11y.desc")} icon="gauge" color="var(--green)">

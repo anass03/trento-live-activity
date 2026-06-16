@@ -46,7 +46,7 @@
       "pushDisabled": "Push notifications disabled.",
       "pushError": "Could not enable push notifications on this browser.",
       "sendTest": "Send test notification",
-      "testSent": "Test notification sent to {{count}} device(s)."
+      "testSent": "Test notification sent."
     },
     "privacy": {
       "title": "Privacy and location",

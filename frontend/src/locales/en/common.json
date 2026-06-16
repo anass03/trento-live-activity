@@ -322,6 +322,11 @@
     },
     "adminHint": "Sign in as a citizen to interact",
     "outsideTrento": "You're outside the Trento area",
-    "outsideTrentoHint": "The map only shows the Trento area and surroundings."
+    "outsideTrentoHint": "The map only shows the Trento area and surroundings.",
+    "locationOff": "Location not allowed",
+    "locationOffHint": "Your location is set to \"Never\". Enable it to locate yourself on the map.",
+    "locationOffAction": "Change in settings",
+    "locationDenied": "Location permission blocked",
+    "locationDeniedHint": "The browser blocked location access. Re-enable it to locate yourself on the map."
   }
 }

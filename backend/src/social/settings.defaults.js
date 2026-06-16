@@ -16,7 +16,9 @@ const DEFAULT_SETTINGS = {
     cityAlertNotifications: true,
   },
   privacyLocation: {
-    locationMode: 'while_using',
+    // Default "never": un account nuovo parte senza posizione attiva; l'utente
+    // sceglie "in uso"/"sempre" e solo allora il browser chiede il permesso.
+    locationMode: 'never',
     participationVisibility: 'public',
     showProfileInParticipants: true,
   },

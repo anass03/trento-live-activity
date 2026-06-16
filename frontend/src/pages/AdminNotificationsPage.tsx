@@ -56,7 +56,7 @@ export function AdminNotificationsPage({ page, setPage, theme, setTheme, user }:
   return (
     <div className="revamp-legal-scene">
       <Header page={page} setPage={setPage} theme={theme} setTheme={setTheme} user={user} />
-      <div className="revamp-admin-layout">
+      <div className="revamp-admin-layout admin-notif">
         <h1>{t("admin.notifications.title")}</h1>
         <p>{t("admin.notifications.subtitle")}</p>
 
@@ -95,7 +95,7 @@ export function AdminNotificationsPage({ page, setPage, theme, setTheme, user }:
             <form onSubmit={handleSend} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div className="revamp-form-group">
                 <label className="revamp-form-label">{t("admin.notifications.audienceLabel")}</label>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <div className="admin-notif-audience">
                   <button
                     type="button"
                     className={"s-rpill" + (audience === "all" ? " on" : "")}

@@ -77,6 +77,8 @@ interface TrentoMapProps {
   onCreatePoi?: (marker: any) => void;
   /* apre la pagina di dettaglio di un evento/attività dal popup */
   onOpenDetail?: (marker: any) => void;
+  /* naviga a una pagina (es. impostazioni dal toast "posizione non consentita") */
+  onNavigate?: (page: string) => void;
 }
 
 export const TrentoMap = React.memo(function TrentoMap({
@@ -100,7 +102,8 @@ export const TrentoMap = React.memo(function TrentoMap({
   ownedIds,
   canCreateActivity,
   onCreatePoi,
-  onOpenDetail
+  onOpenDetail,
+  onNavigate
 }: TrentoMapProps) {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -193,8 +196,21 @@ export const TrentoMap = React.memo(function TrentoMap({
         const map = mapInstance.current;
         if (!map) return;
         const flyToFallback = () => map.flyTo({ center: TRENTO_CENTER, zoom: 15.5, duration: 1100 });
-        const locMode = (() => { try { return localStorage.getItem("tla:locationMode") || "while_using"; } catch { return "while_using"; } })();
-        if (!navigator.geolocation || locMode === "never") { flyToFallback(); return; }
+        // Toast "posizione non consentita" con scorciatoia alle impostazioni.
+        const notifyBlocked = (denied: boolean) => {
+          showToast({
+            title: denied ? t("map.locationDenied") : t("map.locationOff"),
+            body: denied ? t("map.locationDeniedHint") : t("map.locationOffHint"),
+            type: "error",
+            action: onNavigate ? { label: t("map.locationOffAction"), onClick: () => onNavigate("impostazioni") } : undefined,
+          });
+        };
+        const locMode = (() => { try { return localStorage.getItem("tla:locationMode") || "never"; } catch { return "never"; } })();
+        // "Mai": NON spostiamo la mappa, segnaliamo solo che la posizione è
+        // disattivata e offriamo il link alle impostazioni.
+        if (locMode === "never") { notifyBlocked(false); return; }
+        // Browser senza geolocalizzazione: avvisa, non centrare in silenzio.
+        if (!navigator.geolocation) { notifyBlocked(false); return; }
         // Trento area bounding box — roughly 20 km radius around city center
         const TRENTO_BOUNDS = { minLat: 45.96, maxLat: 46.18, minLng: 11.00, maxLng: 11.24 };
         navigator.geolocation.getCurrentPosition(
@@ -218,7 +234,12 @@ export const TrentoMap = React.memo(function TrentoMap({
             }
             m.flyTo({ center: coords, zoom: Math.max(m.getZoom(), 16), duration: 1100 });
           },
-          flyToFallback,
+          (err) => {
+            // Permesso negato a livello browser → stesso avviso del "Mai".
+            // Altri errori (timeout/posizione non disponibile) → fallback al centro.
+            if (err && err.code === err.PERMISSION_DENIED) { notifyBlocked(true); return; }
+            flyToFallback();
+          },
           { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
         );
       };
@@ -267,7 +288,7 @@ export const TrentoMap = React.memo(function TrentoMap({
         setTimeout(() => { el.style.opacity = "0"; setTimeout(() => marker.remove(), 500); }, 3000);
       };
     }
-  }, [onLocateRef, onResetRef, onResetNorthRef, onFlyToRef, onTempMarkerRef]);
+  }, [onLocateRef, onResetRef, onResetNorthRef, onFlyToRef, onTempMarkerRef, onNavigate, t]);
 
   // Fly to selected marker coordinates dynamically
   useEffect(() => {
