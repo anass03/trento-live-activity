@@ -1111,10 +1111,11 @@ button { font-family: inherit; cursor: pointer; }
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
     pointer-events: auto;
-    /* sfuma il bordo superiore così si capisce che si può scorrere */
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14px);
-            mask-image: linear-gradient(to bottom, transparent 0, #000 14px);
-    padding-top: 8px;
+    /* sfuma entrambi i bordi: in alto "c'è altro sopra", in basso "scorri per
+       vedere gli altri widget" — affordance di scroll del vassoio */
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 18px), transparent 100%);
+            mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 18px), transparent 100%);
+    padding-top: 8px; padding-bottom: 6px;
   }
   .col-left, .col-right {
     position: static; inset: auto; width: auto;
@@ -1124,8 +1125,17 @@ button { font-family: inherit; cursor: pointer; }
   .col-left { display: flex; }
   .layer-widgets::-webkit-scrollbar { width: 0; }
 
-  .map-controls { bottom: 14px; padding: 5px; max-width: calc(100vw - 24px); }
-  .mc-btn { height: 34px; min-width: 34px; padding: 0 9px; font-size: 11.5px; }
+  /* left-align the controls on mobile (override the desktop centering) so the
+     bottom row reads as controls-left / compass-right with a clear gap, instead
+     of a centered bar colliding with the pinned compass. */
+  .map-controls { bottom: 14px; left: 12px; right: auto; transform: none; padding: 5px; max-width: calc(100vw - 80px); }
+  /* icon-only controls on mobile: 40px tap targets (closer to the 44px touch
+     guideline, and visually consistent with the 54px compass) */
+  .mc-btn { height: 40px; min-width: 40px; padding: 0 10px; font-size: 11.5px; }
+  /* drop the zoom-% readout on mobile: it's a non-interactive <div>, the +/-
+     buttons are self-explanatory, and removing it keeps the larger controls
+     from colliding with the compass on a 375px row. */
+  .map-controls > div.mc-btn { display: none; }
   /* icona-soltanto su mobile: i label testuali (3D / Posizione / Reset) sparirebbero
      fuori schermo, così la barra controlli entra per intero */
   .mc-label { display: none; }
