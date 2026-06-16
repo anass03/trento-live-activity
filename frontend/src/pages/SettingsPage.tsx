@@ -192,6 +192,9 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
   const [locationMode, setLocationMode] = useState("while_using");
   const [participVis, setParticipVis] = useState("public");
   const [showProfile, setShowProfile] = useState(true);
+  /* Stato REALE del permesso di geolocalizzazione del browser (non la sola
+     preferenza salvata): "granted" | "prompt" | "denied" | "unsupported". */
+  const [geoPerm, setGeoPerm] = useState<"granted" | "prompt" | "denied" | "unsupported">("prompt");
 
   /* accessibility */
   const [reduceAnim, setReduceAnim] = useState(false);
@@ -344,6 +347,10 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
   const handlePushToggle = async (val: boolean) => {
     setPushMsg(null);
     setPushBusy(true);
+    // Stato ottimistico: l'interruttore scatta subito, così l'UI risponde senza
+    // attendere il round-trip FCM (token + registrazione device). In caso di
+    // errore lo riportiamo allo stato precedente più sotto.
+    setNotif((n) => ({ ...n, push: val }));
     try {
       if (val) {
         const token = await requestFcmToken();
@@ -364,12 +371,14 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
       }
       window.dispatchEvent(new CustomEvent("tla:consents-changed"));
     } catch (err: any) {
+      setNotif((n) => ({ ...n, push: !val })); // rollback ottimistico
       setPushMsg({ kind: "danger", text: err?.message || t("settings.notif.pushError") });
       setPushBusy(false);
-      return; // il toggle resta com'era
+      return;
     }
     setPushBusy(false);
-    // Mantieni anche il flag sul backend (comportamento preesistente).
+    // Persisti la preferenza sul backend (comportamento preesistente). Lo stato
+    // UI è già aggiornato in modo ottimistico, qui confermiamo solo il salvataggio.
     await handleNotifications("push", val);
   };
 
@@ -388,7 +397,20 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
     let vis = participVis;
     let show = showProfile;
 
-    if (key === "loc") { setLocationMode(val); mode = val; setStoredLocationMode(val); }
+    if (key === "loc") {
+      setLocationMode(val); mode = val; setStoredLocationMode(val);
+      // Richiediamo il permesso reale SOLO quando l'utente attiva la posizione
+      // ("sempre"/"in uso") e il browser non l'ha ancora concesso. Così il
+      // prompt nativo compare su azione esplicita, non all'avvio.
+      if ((val === "always" || val === "while_using") && geoPerm === "prompt"
+          && typeof navigator !== "undefined" && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          () => setGeoPerm("granted"),
+          (err) => { if (err && err.code === err.PERMISSION_DENIED) setGeoPerm("denied"); },
+          { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 },
+        );
+      }
+    }
     if (key === "vis") { setParticipVis(val); vis = val; }
     if (key === "show") { setShowProfile(val); show = val; }
 
@@ -458,6 +480,36 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
   };
 
 
+
+  /* Riflette il permesso REALE del browser per la posizione. All'avvio la card
+     mostrava sempre la preferenza salvata (es. "In uso") anche se l'utente non
+     aveva mai concesso il permesso: qui interroghiamo l'API Permissions e ci
+     teniamo aggiornati sui cambi. iOS/Safari spesso non espone la query per la
+     geolocalizzazione → fallback a "prompt" (permesso da concedere). */
+  useEffect(() => {
+    let cancelled = false;
+    let status: any = null;
+    const onChange = () => { if (status && !cancelled) setGeoPerm(status.state); };
+    (async () => {
+      if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+        if (!cancelled) setGeoPerm("unsupported");
+        return;
+      }
+      const perms: any = (navigator as any).permissions;
+      if (!perms || typeof perms.query !== "function") {
+        if (!cancelled) setGeoPerm("prompt");
+        return;
+      }
+      try {
+        status = await perms.query({ name: "geolocation" as PermissionName });
+        if (!cancelled) setGeoPerm(status.state);
+        status.onchange = onChange;
+      } catch {
+        if (!cancelled) setGeoPerm("prompt");
+      }
+    })();
+    return () => { cancelled = true; if (status) status.onchange = null; };
+  }, []);
 
   /* sync visual effects → glow */
   useEffect(() => {
@@ -576,6 +628,20 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
                 { id: "while_using", label: t("settings.privacy.whileUsing") },
                 { id: "never",       label: t("settings.privacy.never") },
               ]} />
+              {/* Stato reale del permesso del browser, indipendente dalla preferenza scelta. */}
+              {(() => {
+                const map = {
+                  granted:     { kind: "success", icon: "check", key: "permGranted" },
+                  prompt:      { kind: "warning", icon: "pin",   key: "permPrompt" },
+                  denied:      { kind: "danger",  icon: "warn",  key: "permDenied" },
+                  unsupported: { kind: "info",    icon: "pin",   key: "permUnsupported" },
+                }[geoPerm];
+                return (
+                  <div className={"revamp-status-pill " + map.kind} style={{ width: "100%", justifyContent: "center", marginTop: 8 }}>
+                    <Icon name={map.icon} size={12} /> {t("settings.privacy." + map.key)}
+                  </div>
+                );
+              })()}
             </div>
             <div className="s-div"></div>
             <div>

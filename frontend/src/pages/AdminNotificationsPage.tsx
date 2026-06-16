@@ -61,13 +61,13 @@ export function AdminNotificationsPage({ page, setPage, theme, setTheme, user }:
         <p>{t("admin.notifications.subtitle")}</p>
 
         {errorMsg && (
-          <div className="revamp-status-pill error" style={{ margin: "20px auto 0", maxWidth: 640, padding: "12px", width: "100%", justifyContent: "center" }}>
+          <div className="revamp-status-pill danger" style={{ margin: "20px auto 0", maxWidth: 640, padding: "12px", width: "100%", justifyContent: "center" }}>
             <Icon name="alert" size={14} /> {errorMsg}
           </div>
         )}
 
         {stats && (
-          <div className="revamp-dashboard-grid" style={{ maxWidth: 640, margin: "20px auto 0", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 15 }}>
+          <div className="revamp-dashboard-grid" style={{ maxWidth: 640, margin: "20px auto 0" }}>
             <div className="revamp-stat-card" style={{ "--accent": "var(--cyan)" } as any}>
               <Icon name="bell" size={24} style={{ color: "var(--cyan)" }} />
               <div>
