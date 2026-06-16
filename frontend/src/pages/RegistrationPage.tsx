@@ -4,6 +4,7 @@ import { Icon } from "../components/ui/Icon";
 import { PasswordStrengthBar } from "../components/ui/PasswordStrengthBar";
 import { LegalModal } from "../components/ui/LegalModal";
 import { register, registerEntity } from "../lib/api";
+import { SocialLoginButtons, needsOnboardingAfterOauth } from "../components/auth/LoginModal";
 
 export function RegistrationPage({ page, setPage, isModal, onClose, onLogin }: any) {
   const { t } = useTranslation();
@@ -77,6 +78,16 @@ export function RegistrationPage({ page, setPage, isModal, onClose, onLogin }: a
     }
   };
 
+  // Registrazione/accesso con Google: oauthGoogleLogin ha già salvato il token
+  // (crea l'account se non esiste). Notifichiamo l'app, chiudiamo l'eventuale
+  // modale e mandiamo i nuovi cittadini all'onboarding, gli altri alla home.
+  const handleSocialLoggedIn = async () => {
+    window.dispatchEvent(new CustomEvent("tla:user-updated"));
+    const needsOnboarding = await needsOnboardingAfterOauth();
+    if (isModal && onClose) onClose();
+    setPage(needsOnboarding ? "onboarding" : "home");
+  };
+
   const formContent = (
     <>
       <style>{`
@@ -113,6 +124,7 @@ export function RegistrationPage({ page, setPage, isModal, onClose, onLogin }: a
       )}
 
       {!successMsg && (
+        <>
         <form onSubmit={handleRegister}>
           <div className="reg-type-toggle">
             <button type="button" className={"reg-type-opt" + (!isEntity ? " on" : "")} onClick={() => { setIsEntity(false); setError(""); }}>
@@ -214,6 +226,13 @@ export function RegistrationPage({ page, setPage, isModal, onClose, onLogin }: a
             {!loading && <Icon name="arrow" size={16} style={{ transform: "rotate(-45deg)" }} />}
           </button>
         </form>
+
+        {/* Registrazione con Google: solo per il percorso "utente" (gli enti
+            usano il flusso certificato via PEC). Stesso componente del login. */}
+        {!isEntity && (
+          <SocialLoginButtons onError={setError} onLoggedIn={handleSocialLoggedIn} busy={loading} />
+        )}
+        </>
       )}
 
       <div className="revamp-form-foot">
