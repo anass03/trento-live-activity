@@ -184,8 +184,10 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
   const [timeFormat, setTimeFormat] = useState("24h");
   const [distUnit, setDistUnit] = useState("km");
 
-  /* notifications */
-  const [notif, setNotif] = useState({ email: true, push: true, events: true, activities: true, cityAlerts: true });
+  /* notifications — push parte da OFF: è uno stato per-dispositivo (token FCM +
+     permesso del browser), non una pura preferenza server, quindi non lo diamo
+     per attivo finché non lo verifichiamo su QUESTO browser (vedi load sotto). */
+  const [notif, setNotif] = useState({ email: true, push: false, events: true, activities: true, cityAlerts: true });
   const [pushBusy, setPushBusy] = useState(false);
   const [pushMsg, setPushMsg] = useState<{ kind: "success" | "danger"; text: string } | null>(null);
 
@@ -243,9 +245,18 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
         setDistUnit(du);
         setStoredTimeFormat(tf);
         setStoredDistUnit(du);
+        // Le push sono per-dispositivo: la preferenza server (pushNotificationsEnabled)
+        // è globale per l'utente, ma su QUESTO browser le notifiche funzionano solo
+        // se il permesso è "granted" e c'è un token FCM registrato (tracciato in
+        // localStorage). Così un browser nuovo mostra lo switch OFF anche se l'utente
+        // le aveva attivate su un altro device, evitando un toggle "attivo" ma inerte.
+        let hasLocalToken = false;
+        try { hasLocalToken = !!localStorage.getItem(FCM_TOKEN_KEY); } catch { /* ignore */ }
+        const browserGranted = typeof Notification !== "undefined" && Notification.permission === "granted";
+        const pushOnThisDevice = !!s.pushNotificationsEnabled && browserGranted && hasLocalToken;
         setNotif({
           email: s.emailNotificationsEnabled,
-          push: s.pushNotificationsEnabled,
+          push: pushOnThisDevice,
           events: s.eventNotificationsEnabled,
           activities: s.activityNotificationsEnabled,
           cityAlerts: s.cityAlertNotificationsEnabled,
@@ -642,14 +653,19 @@ export function SettingsPage({ page, setPage, theme, setTheme, user, setUser, th
                 { id: "while_using", label: t("settings.privacy.whileUsing") },
                 { id: "never",       label: t("settings.privacy.never") },
               ]} />
-              {/* Stato reale del permesso del browser, indipendente dalla preferenza scelta. */}
+              {/* Quando l'utente sceglie "Mai" la posizione è disattivata per scelta:
+                  mostriamo uno stato "off" invece del permesso del browser, che può
+                  restare "granted" (il browser non revoca da solo cambiando la
+                  preferenza dell'app). Negli altri casi riflettiamo il permesso reale. */}
               {(() => {
-                const map = {
-                  granted:     { kind: "success", icon: "check", key: "permGranted" },
-                  prompt:      { kind: "warning", icon: "pin",   key: "permPrompt" },
-                  denied:      { kind: "danger",  icon: "warn",  key: "permDenied" },
-                  unsupported: { kind: "info",    icon: "pin",   key: "permUnsupported" },
-                }[geoPerm];
+                const map = locationMode === "never"
+                  ? { kind: "info", icon: "pin", key: "permOff" }
+                  : {
+                      granted:     { kind: "success", icon: "check", key: "permGranted" },
+                      prompt:      { kind: "warning", icon: "pin",   key: "permPrompt" },
+                      denied:      { kind: "danger",  icon: "warn",  key: "permDenied" },
+                      unsupported: { kind: "info",    icon: "pin",   key: "permUnsupported" },
+                    }[geoPerm];
                 return (
                   <div className={"revamp-status-pill " + map.kind} style={{ width: "100%", justifyContent: "center", marginTop: 8 }}>
                     <Icon name={map.icon} size={12} /> {t("settings.privacy." + map.key)}

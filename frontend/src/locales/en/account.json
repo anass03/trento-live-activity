@@ -59,6 +59,7 @@
       "permPrompt": "Permission not granted yet — it will be requested when you enable location.",
       "permDenied": "Permission blocked by the browser — re-enable it in the site settings.",
       "permUnsupported": "Location is not supported on this device.",
+      "permOff": "Location turned off in your preferences.",
       "participVis": "Participation visibility",
       "public": "Public",
       "organizersOnly": "Organizers only",

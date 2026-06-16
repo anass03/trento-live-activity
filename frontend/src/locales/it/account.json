@@ -59,6 +59,7 @@
       "permPrompt": "Permesso non ancora concesso — verrà richiesto quando attivi la posizione.",
       "permDenied": "Permesso bloccato dal browser — riabilitalo nelle impostazioni del sito.",
       "permUnsupported": "Posizione non supportata su questo dispositivo.",
+      "permOff": "Posizione disattivata nelle preferenze.",
       "participVis": "Visibilità partecipazioni",
       "public": "Pubblica",
       "organizersOnly": "Solo organizzatori",
