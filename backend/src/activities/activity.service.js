@@ -79,8 +79,16 @@ async function getParticipantIds(activityId, excludeUserId = null) {
     .filter((id) => id && id !== excludeUserId);
 }
 
-async function createActivity(creatorId, { tipo, data, orarioInizio, orarioFine, maxPartecipanti, latitudine, longitudine, poiId }) {
+async function createActivity(creatorId, { tipo, data, orarioInizio, orarioFine, maxPartecipanti, latitudine, longitudine, poiId, description, descrizione }) {
   validateActivityInput({ tipo, data, orarioInizio, orarioFine });
+
+  // Descrizione opzionale del creatore: testo libero, ripulito e limitato in
+  // lunghezza per non gonfiare payload/notifiche. Accettiamo sia "description"
+  // (campo nuovo) sia "descrizione" per tolleranza lato client.
+  const rawDescription = description ?? descrizione;
+  const cleanDescription = typeof rawDescription === 'string' && rawDescription.trim()
+    ? rawDescription.trim().slice(0, 2000)
+    : null;
 
   // OCL C9: start date must not be in the past
   if (isDatePast(data)) {
@@ -114,6 +122,7 @@ async function createActivity(creatorId, { tipo, data, orarioInizio, orarioFine,
   const activity = await Activity.create({
     tipo, data, orarioInizio, orarioFine, maxPartecipanti,
     stato: 'attiva', creatorId, latitudine, longitudine, poiId,
+    description: cleanDescription,
   });
   await Participation.create({ userId: creatorId, activityId: activity.id });
   if (latitudine && longitudine) {
@@ -261,7 +270,7 @@ async function updateActivity(userId, activityId, updates) {
   // Mass-assignment guard: solo i campi qui sotto sono modificabili.
   // Senza whitelist, un attaccante autenticato potrebbe passare creatorId,
   // stato, id e impossessarsi/manipolare l'attività.
-  const ALLOWED_UPDATE_FIELDS = ['tipo', 'data', 'orarioInizio', 'orarioFine', 'maxPartecipanti', 'latitudine', 'longitudine', 'poiId'];
+  const ALLOWED_UPDATE_FIELDS = ['tipo', 'data', 'orarioInizio', 'orarioFine', 'maxPartecipanti', 'latitudine', 'longitudine', 'poiId', 'description'];
   const safeUpdates = Object.fromEntries(
     Object.entries(updates).filter(([k]) => ALLOWED_UPDATE_FIELDS.includes(k))
   );

@@ -571,6 +571,7 @@ export function verifyEmail(token: string): Promise<AuthResponse> {
 export interface CreateActivityPayload {
   tipo: string; data: string; orarioInizio: string; orarioFine: string;
   maxPartecipanti: number; latitudine?: number; longitudine?: number; poiId?: string;
+  description?: string;
 }
 export function createActivity(payload: CreateActivityPayload): Promise<ApiActivity> {
   return request('/api/activities', { method: 'POST', body: payload });

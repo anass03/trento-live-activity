@@ -34,7 +34,9 @@ export function CreateActivityPanel({ poi, onClose, onCreated }: {
   const [endTime, setEndTime] = useState("20:00");
   const [cap, setCap] = useState("10");
 
-  const [aiDescription, setAiDescription] = useState("");
+  // Descrizione dell'attività (salvata sull'attività). È anche il testo che
+  // alimenta il suggeritore AI: un solo campo, niente doppia digitazione.
+  const [description, setDescription] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiHint, setAiHint] = useState("");
   const [aiError, setAiError] = useState("");
@@ -44,12 +46,12 @@ export function CreateActivityPanel({ poi, onClose, onCreated }: {
   const [loading, setLoading] = useState(false);
 
   const handleAiSuggest = async () => {
-    if (!aiDescription.trim()) return;
+    if (!description.trim()) return;
     setAiError("");
     setAiHint("");
     setAiLoading(true);
     try {
-      const result = await suggestActivityAi({ description: aiDescription, location: poi.title });
+      const result = await suggestActivityAi({ description, location: poi.title });
       setTipo(result.tipo);
       setData(result.data);
       setStartTime(result.orarioInizio);
@@ -79,6 +81,7 @@ export function CreateActivityPanel({ poi, onClose, onCreated }: {
         orarioFine: endTime,
         maxPartecipanti: Number(cap),
         poiId: poi.id,
+        description: description.trim() || undefined,
       });
       setSuccess(true);
       setTimeout(() => { onCreated && onCreated(); onClose(); }, 1500);
@@ -115,28 +118,30 @@ export function CreateActivityPanel({ poi, onClose, onCreated }: {
             </div>
           ) : (
             <>
-              {/* AI suggester: descrizione libera → categoria/orari proposti */}
+              {/* Descrizione dell'attività (salvata). Lo stesso testo può
+                  alimentare il suggeritore AI per categoria e orari. */}
               <div className="cap-ai-box">
                 <label className="revamp-form-label" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <Icon name="sparkle" size={13} /> {t("createActivity.aiLabel")}
+                  <Icon name="edit" size={13} /> {t("createActivity.descriptionLabel")}
                 </label>
                 <textarea
                   className="revamp-textarea"
-                  style={{ minHeight: 56 }}
-                  rows={2}
-                  value={aiDescription}
-                  onChange={(e) => setAiDescription(e.target.value)}
-                  placeholder={t("createActivity.aiPlaceholder")}
+                  style={{ minHeight: 72 }}
+                  rows={3}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder={t("createActivity.descriptionPlaceholder")}
                 />
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
                   <button
                     type="button"
                     className="revamp-action-btn"
-                    disabled={aiLoading || !aiDescription.trim()}
+                    disabled={aiLoading || !description.trim()}
                     onClick={handleAiSuggest}
                   >
                     <Icon name="sparkle" size={12} /> {aiLoading ? t("createActivity.aiLoading") : t("createActivity.aiSuggest")}
                   </button>
+                  <small style={{ color: "var(--text-muted)", fontSize: 12 }}>{t("createActivity.descriptionAiHint")}</small>
                   {aiHint && <small style={{ color: "var(--green)", fontSize: 12 }}>{aiHint}</small>}
                   {aiError && <small style={{ color: "var(--red)", fontSize: 12 }}>{aiError}</small>}
                 </div>
