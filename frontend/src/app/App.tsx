@@ -810,8 +810,28 @@ function mapBackendRole(ruolo?: string): UserRole {
   }
 }
 
+// Deep-link entry for email links and shared URLs. Cloudflare serves index.html
+// for every path (not_found_handling=single-page-application), so we read the
+// path once at load and open the right page. Without this the SPA always started
+// on "home", so the email verification and password-reset links did nothing.
+function computeInitialPage(): string {
+  if (typeof window === "undefined") return "home";
+  const path = window.location.pathname;
+  if (path.startsWith("/verifica-email")) return "verifica-email";
+  // The backend builds /password-reset/:token (token in the path), but
+  // PasswordResetPage reads it from ?token= — normalise it into the query.
+  const reset = path.match(/^\/password-reset\/([^/?#]+)/);
+  if (reset) {
+    window.history.replaceState({}, document.title, `/password-reset?token=${reset[1]}`);
+    return "password-reset";
+  }
+  if (path.startsWith("/password-reset")) return "password-reset";
+  return "home";
+}
+const INITIAL_PAGE = computeInitialPage();
+
 export function App() {
-  const [page, setPage] = useState("home");
+  const [page, setPage] = useState(INITIAL_PAGE);
   const [loginOpen, setLoginOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [themeMode, setThemeModeState] = useState(() => {

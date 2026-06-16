@@ -75,7 +75,10 @@ async function calendar(req, res, next) {
     assertUuid(req.params.id, 'activity id');
     const ics = await service.getActivityIcs(req.params.id);
     res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="activity-${req.params.id}.ics"`);
+    // inline (default) so iOS/macOS hand the .ics straight to the Calendar app;
+    // ?download=1 forces a file download (the "Scarica .ics" button).
+    const disposition = req.query.download ? 'attachment' : 'inline';
+    res.setHeader('Content-Disposition', `${disposition}; filename="activity-${req.params.id}.ics"`);
     res.send(ics);
   } catch (e) { next(e); }
 }

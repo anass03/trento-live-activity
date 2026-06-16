@@ -67,6 +67,53 @@ export async function revokeFcmToken(): Promise<void> {
   }
 }
 
+// Firebase/FCM IndexedDB databases. A previous deploy on a different Firebase
+// SDK can leave these at another schema version; when the current SDK opens
+// them it throws "an attempt was made to open a database using a lower version
+// than the existing version" (IndexedDB VersionError). That makes getToken
+// fail — so no push token arrives, and the settings toggle hangs on its
+// timeout ("slow"). Deleting the stale databases lets the SDK recreate them.
+const FCM_IDB_NAMES = [
+  'firebase-messaging-database',
+  'firebase-installations-database',
+  'firebase-installations-store',
+  'firebase-messaging-store',
+  'fcm_token_details_db',
+];
+
+function isIdbVersionError(err: unknown): boolean {
+  const e = err as { name?: string; message?: string } | null;
+  if (!e) return false;
+  return e.name === 'VersionError'
+    || /lower version than the existing version|version/i.test(e.message || '');
+}
+
+async function clearFcmIndexedDb(): Promise<void> {
+  if (typeof indexedDB === 'undefined') return;
+  await Promise.all(
+    FCM_IDB_NAMES.map(
+      (name) =>
+        new Promise<void>((resolve) => {
+          let done = false;
+          const finish = () => {
+            if (!done) { done = true; resolve(); }
+          };
+          try {
+            const req = indexedDB.deleteDatabase(name);
+            req.onsuccess = finish;
+            req.onerror = finish;
+            // 'blocked' = an open connection elsewhere; the delete still
+            // completes later, so don't hold up the flow.
+            req.onblocked = finish;
+            setTimeout(finish, 1500);
+          } catch {
+            finish();
+          }
+        }),
+    ),
+  );
+}
+
 // Returns a fresh FCM device token. Always forces a new token (deletes the old
 // one first) so stale tokens are replaced on every "enable" click.
 // Throws if the user denies notification permission or the browser isn't supported.
@@ -111,14 +158,26 @@ export async function requestFcmToken(): Promise<string> {
   // Con timeout: se hanga (bug Firefox post-revoca), procediamo comunque.
   try { await withTimeout(deleteToken(m), 3000, 'deleteToken'); } catch { /* ignore */ }
 
-  const token = await withTimeout(
-    getToken(m, {
-      vapidKey: VAPID_KEY,
-      serviceWorkerRegistration: swRegistration,
-    }),
-    15000,
-    'getToken',
-  );
+  const fetchToken = (msg: Messaging) =>
+    withTimeout(
+      getToken(msg, { vapidKey: VAPID_KEY, serviceWorkerRegistration: swRegistration }),
+      15000,
+      'getToken',
+    );
+
+  let token: string | null = null;
+  try {
+    token = await fetchToken(m);
+  } catch (err) {
+    // Stale IndexedDB from an older SDK → clear it and retry once with a fresh
+    // messaging instance. This is the "lower version than existing" error.
+    if (!isIdbVersionError(err)) throw err;
+    await clearFcmIndexedDb();
+    messaging = null;
+    const m2 = getFirebaseMessaging();
+    if (!m2) throw err;
+    token = await fetchToken(m2);
+  }
   if (!token) throw new Error('Impossibile ottenere il token FCM. Assicurati di non avere estensioni che bloccano le notifiche.');
   return token;
 }

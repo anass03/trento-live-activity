@@ -40,20 +40,53 @@ export function ContentActions({ kind, id, title, startIso, location, accent = "
   const [reportError, setReportError] = useState("");
 
   const icsUrl = kind === "event" ? getEventCalendarUrl(id) : getActivityCalendarUrl(id);
+  const withParam = (url: string, p: string) => url + (url.includes("?") ? "&" : "?") + p;
+
+  // A user-gesture anchor click opens reliably on mobile, where window.open is
+  // often popup-blocked.
+  const openUrl = (url: string) => {
+    const a = document.createElement("a");
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
 
   const openGoogle = () => {
     if (!startIso) return;
-    window.open(googleCalendarUrl(title, startIso, location), "_blank", "noopener");
+    // calendar.google.com TEMPLATE: on mobile the OS hands this to the Google
+    // Calendar app if installed, otherwise it opens in the browser.
+    openUrl(googleCalendarUrl(title, startIso, location));
   };
   const openApple = () => {
-    // On macOS/iOS the browser hands the .ics to Calendar automatically.
-    window.open(icsUrl, "_blank", "noopener");
+    // The .ics is now served inline (text/calendar), so iOS/macOS open it in the
+    // Calendar app directly. Navigating in place is the most reliable trigger on
+    // iOS Safari (a new tab is often blocked / shows a blank page).
+    window.location.href = icsUrl;
   };
-  const downloadIcs = () => {
-    const a = document.createElement("a");
-    a.href = icsUrl;
-    a.download = `${title.replace(/[^a-z0-9]/gi, "_") || "evento"}.ics`;
-    a.click();
+  const downloadIcs = async () => {
+    const filename = `${title.replace(/[^a-z0-9]/gi, "_") || (kind === "event" ? "evento" : "attivita")}.ics`;
+    try {
+      // Fetch the file and download via a same-origin blob URL — the `download`
+      // attribute is ignored for cross-origin hrefs, which is why the old direct
+      // link never downloaded on mobile.
+      const res = await fetch(withParam(icsUrl, "download=1"));
+      if (!res.ok) throw new Error(String(res.status));
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    } catch {
+      // Fallback: the server's attachment header forces the download anyway.
+      window.location.href = withParam(icsUrl, "download=1");
+    }
   };
 
   const toggleReport = () => {
