@@ -15,6 +15,9 @@ export interface Toast {
   title: string;
   body?: string;
   type?: ToastType;
+  /* Azione opzionale: mostra un bottone nel toast (es. "Cambia nelle
+     impostazioni"). onClick può navigare o eseguire qualunque callback. */
+  action?: { label: string; onClick: () => void };
 }
 
 const MAX_VISIBLE = 3;
@@ -156,6 +159,24 @@ export function Toaster() {
           background: var(--hover-fill, rgba(255,255,255,0.08));
           color: var(--text-primary);
         }
+        .tla-toast-action {
+          align-self: flex-start;
+          margin-top: 7px;
+          padding: 5px 10px;
+          border-radius: 8px;
+          border: 1px solid color-mix(in srgb, var(--tc, var(--cyan)) 40%, transparent);
+          background: color-mix(in srgb, var(--tc, var(--cyan)) 14%, transparent);
+          color: var(--tc, var(--cyan));
+          font-family: var(--font);
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 160ms ease, border-color 160ms ease;
+        }
+        .tla-toast-action:hover {
+          background: color-mix(in srgb, var(--tc, var(--cyan)) 24%, transparent);
+          border-color: color-mix(in srgb, var(--tc, var(--cyan)) 60%, transparent);
+        }
       `}</style>
       {toasts.map((toast) => {
         const type: ToastType = toast.type || "info";
@@ -165,6 +186,18 @@ export function Toaster() {
             <div className="tla-toast-content">
               {toast.title && <div className="tla-toast-title">{toast.title}</div>}
               {toast.body && <div className="tla-toast-body">{toast.body}</div>}
+              {toast.action && (
+                <button
+                  type="button"
+                  className="tla-toast-action"
+                  onClick={() => {
+                    toast.action!.onClick();
+                    window.dispatchEvent(new CustomEvent(EVENT_DISMISS, { detail: toast.id }));
+                  }}
+                >
+                  {toast.action.label}
+                </button>
+              )}
             </div>
             <button
               type="button"

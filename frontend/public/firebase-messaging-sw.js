@@ -45,7 +45,7 @@ try {
         const title = (payload.notification && payload.notification.title) || 'Trento Live Activity';
         const options = {
           body: (payload.notification && payload.notification.body) || '',
-          icon: '/favicon.ico',
+          icon: '/logo.png',
           data: payload.data || {},
         };
         self.registration.showNotification(title, options);

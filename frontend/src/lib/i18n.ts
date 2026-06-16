@@ -70,7 +70,9 @@ export function setStoredDistUnit(unit: string): void {
   try { localStorage.setItem("tla:distUnit", unit); } catch {}
 }
 export function getLocationMode(): "always" | "while_using" | "never" {
-  try { return (localStorage.getItem("tla:locationMode") as any) || "while_using"; } catch { return "while_using"; }
+  // Default "never": un nuovo utente parte senza posizione attiva; il permesso
+  // del browser viene chiesto solo quando sceglie "in uso"/"sempre".
+  try { return (localStorage.getItem("tla:locationMode") as any) || "never"; } catch { return "never"; }
 }
 export function setStoredLocationMode(mode: string): void {
   try { localStorage.setItem("tla:locationMode", mode); } catch {}

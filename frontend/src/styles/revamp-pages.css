@@ -390,7 +390,7 @@
 .revamp-admin-layout {
   flex: 1; max-width: 1440px; width: 100%; margin: 0 auto; padding: 24px 30px 48px;
 }
-.revamp-admin-layout h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.03em; margin: 0 0 4px; }
+.revamp-admin-layout h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.03em; margin: 0 0 4px; text-wrap: balance; }
 .revamp-admin-layout p { font-size: 14px; color: var(--text-secondary); margin: 0 0 24px; }
 
 /* Admin "Gestione Notifiche": stat cards + grid. Erano prive di stile (solo
@@ -410,9 +410,26 @@
 .revamp-stat-card h2 { font-size: 24px; font-weight: 800; margin: 0; line-height: 1.05; letter-spacing: -0.02em; }
 .revamp-stat-card p { font-size: 12.5px; color: var(--text-secondary); margin: 4px 0 0; line-height: 1.3; }
 
+/* Send-notification (broadcast) page — audience selector. Desktop: pills share
+   one row. Mobile: a clean 2×2 grid (flex-wrap would leave the 3rd/4th pill
+   unevenly stretched). */
+.admin-notif-audience { display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-notif-audience .s-rpill { flex: 1 1 auto; }
+/* Touch: lift the 36px pills to a 44px minimum tap target on coarse pointers. */
+@media (pointer: coarse) {
+  .admin-notif-audience .s-rpill { height: 44px; }
+}
+
 @media (max-width: 560px) {
   .revamp-admin-layout { padding: 20px 16px 40px; }
   .revamp-dashboard-grid { grid-template-columns: 1fr; }
+  /* The 32px/40px legal-card padding swallows a phone screen — tighten it.
+     Shared with the legal/text pages, which gain the same breathing room. */
+  .revamp-legal-card { padding: 22px 18px; }
+  .admin-notif-audience { display: grid; grid-template-columns: 1fr 1fr; }
+  /* Guarantee the longest labels ("Tutti gli Utenti", "Enti Certificati")
+     fit a 2-up cell even at the 320px floor, since pills are nowrap. */
+  .admin-notif-audience .s-rpill { padding: 0 8px; font-size: 12.5px; }
 }
 
 .revamp-admin-row-actions { display: flex; gap: 6px; }

@@ -46,7 +46,7 @@
       "pushDisabled": "Notifiche push disattivate.",
       "pushError": "Impossibile attivare le notifiche push su questo browser.",
       "sendTest": "Invia notifica di prova",
-      "testSent": "Notifica di prova inviata a {{count}} dispositivo/i."
+      "testSent": "Notifica di prova inviata."
     },
     "privacy": {
       "title": "Privacy e posizione",
