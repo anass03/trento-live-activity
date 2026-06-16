@@ -11,7 +11,7 @@ import { TrentoTweaks } from "../components/redesign/TrentoTweaks";
 import { LoginModal } from "../components/auth/LoginModal";
 import { Icon } from "../components/ui/Icon";
 import { DetailModal } from "../components/ui/DetailModal";
-import { Toaster, showToast } from "../components/ui/Toaster";
+import { Toaster, showToast, type ToastType } from "../components/ui/Toaster";
 import { onForegroundMessage } from "../lib/firebase";
 import { C, CATEGORIES, catColor } from "../data/redesignData";
 import { ActivityPage } from "../pages/ActivitiesPage";
@@ -937,6 +937,25 @@ export function App() {
     return () => {
       window.removeEventListener("tla:user-updated", fetchUser);
     };
+  }, []);
+
+  // Push in foreground: con la scheda aperta e a fuoco, FCM NON mostra da solo
+  // la notifica di sistema (quello lo fa il service worker solo quando la pagina
+  // è in background/chiusa). Senza questo handler il messaggio arriva ma resta
+  // invisibile — è il motivo per cui "invia notifica di prova" non mostrava
+  // nulla. Qui agganciamo onMessage e lo presentiamo come toast in-app.
+  useEffect(() => {
+    return onForegroundMessage((payload) => {
+      const title = payload?.notification?.title || "Trento Live Activity";
+      const body = payload?.notification?.body;
+      const kind = payload?.data?.type || "";
+      const type: ToastType =
+        kind === "new_event" ? "event"
+          : kind.startsWith("activity") ? "activity"
+          : kind === "test" ? "success"
+          : "info";
+      showToast({ title, body, type });
+    });
   }, []);
 
   const setTheme = (newTheme: string) => {
