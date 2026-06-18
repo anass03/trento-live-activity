@@ -13,6 +13,7 @@
     "seed:university-pois": "node scripts/seed-university-pois.js",
     "migrate:consents": "node scripts/migrate-consent-types.js",
     "migrate:activity-types": "node scripts/migrate-activity-types.js",
+    "backfill:dual-schema": "node scripts/backfill-dual-schema.js",
     "db:sync": "node -e \"require('./src/data/db').sync({ force: true }).then(() => { console.log('DB synced'); process.exit(0); })\""
   },
   "dependencies": {
