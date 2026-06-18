@@ -37,7 +37,10 @@ const PASSWORD = 'password123';
 async function seed() {
   await sequelize.authenticate();
   console.log('PostgreSQL connesso');
-  await sequelize.sync({ alter: true });
+  // { drop: false }: aggiunge le colonne mancanti senza MAI droppare. Il seed
+  // può girare su un DB condiviso; con { alter: true } cancellerebbe le colonne
+  // assenti in questi modelli. Vedi il commento in server.js.
+  await sequelize.sync({ alter: { drop: false } });
 
   console.log('Wiping existing data...');
   await Participation.destroy({ where: {}, truncate: true, cascade: true });
