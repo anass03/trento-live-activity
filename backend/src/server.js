@@ -24,14 +24,25 @@ if (process.env.NODE_ENV === 'production' && process.env.MOCK_CURRENT_USER_EMAIL
 
 const app = require('./app');
 const { sequelize } = require('./data/db');
+const { ensureSchema } = require('./data/ensureSchema');
 
 const PORT = process.env.PORT || 3000;
 
 async function start() {
   await sequelize.authenticate();
   console.log('PostgreSQL connected');
-  await sequelize.sync({ alter: true });
-  // sync({alter}) non rimuove il NOT NULL da colonne FK preesistenti:
+  // NB: NON usiamo più { alter: true }. Dietro il pooler di Supabase (pgBouncer
+  // in transaction mode) l'ALTER multi-statement generato da Sequelize non
+  // veniva applicato in modo affidabile: ritornava senza errore (il server
+  // partiva regolarmente) ma lasciava il DB privo delle colonne del "social
+  // layer" su events/activities (title, status, startDateTime, description...).
+  // Risultato: ogni SELECT le referenziava → `column ... does not exist` → 500.
+  // sync() crea solo le tabelle mancanti (CREATE TABLE IF NOT EXISTS); le
+  // colonne mancanti sulle tabelle già esistenti le riconcilia ensureSchema()
+  // con DDL idempotenti e pooler-safe.
+  await sequelize.sync();
+  await ensureSchema();
+  // sync() non rimuove il NOT NULL da colonne FK preesistenti:
   // reports.eventId deve essere nullable da quando le segnalazioni
   // coprono anche le attività (eventId XOR activityId). Idempotente.
   await sequelize.query('ALTER TABLE "reports" ALTER COLUMN "eventId" DROP NOT NULL').catch(() => {});
