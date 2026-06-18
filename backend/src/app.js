@@ -64,18 +64,37 @@ app.use(express.json());
 // Structured access log (one JSON line per request, with latency + user id).
 app.use(requestLogger);
 
-// Rate limit globale (RNF / API Gateway): protegge da brute force, DoS, scraping
-// e abuso di endpoint costosi (es. AI suggester che consuma quota Gemini).
-// In dev il limite è più alto perché React StrictMode + Vite HMR + DevTools
-// generano molte più richieste rispetto a un utente reale.
+// Rate limit globale (RNF / API Gateway): rete anti brute-force/DoS/scraping con
+// ampio margine per una SPA che fa polling. Su rete condivisa (es. Wi-Fi UniTN)
+// molti utenti escono dallo STESSO IP pubblico: con un tetto basso saturavano
+// insieme il budget e ricevevano tutti 429 (che il frontend mostra come "Internal
+// Server Error"). Gli endpoint costosi hanno limiti propri più stretti
+// (auth: brute-force in auth.routes; AI: quota Gemini, qui sotto).
+// In dev il limite è ancora più alto (StrictMode + HMR + DevTools).
 const isProd = process.env.NODE_ENV === 'production';
+
+// Endpoint pubblici ad alta frequenza, già cache-ati lato server (parking è
+// rinfrescato su timer, meteo e allerte idem): il client li interroga ogni pochi
+// secondi. Esentarli dal contatore globale evita che da soli saturino il limite
+// e facciano 429 sugli endpoint veri (eventi, attività, dashboard).
+const CACHED_POLLING_PREFIXES = ['/api/parking', '/api/weather', '/api/city-alerts'];
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: isProd ? 200 : 2000,
-  skip: (req) => req.path === '/health' || req.path === '/api/health',
+  max: isProd ? 1000 : 5000,
+  skip: (req) => req.path === '/health' || req.path === '/api/health'
+    || CACHED_POLLING_PREFIXES.some((prefix) => req.path.startsWith(prefix)),
   standardHeaders: true,
   legacyHeaders: false,
 }));
+
+// Limite dedicato e stretto per l'AI: Gemini ha quota a pagamento, quindi qui un
+// abuso costa davvero. Resta basso anche con il globale permissivo.
+const aiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isProd ? 30 : 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
@@ -96,7 +115,7 @@ app.use('/api/moderation', moderationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationsRoutes);
-app.use('/api/ai', aiRoutes);
+app.use('/api/ai', aiLimiter, aiRoutes);
 app.use('/api/parking', parkingRoutes);
 app.use('/api/weather', weatherRoutes);
 app.use('/api/city-alerts', cityAlertsRoutes);

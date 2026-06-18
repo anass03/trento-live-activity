@@ -23,3 +23,7 @@ Thumbs.db
 #IDE
 .vscode/
 .idea/
+
+#Logs (export da Railway/Supabase: contengono IP e dati di richiesta)
+logs.*.json
+*.log
